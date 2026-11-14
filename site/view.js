@@ -211,7 +211,8 @@ function renderLights(report) {
     ["Contraband", contraband.length ? `${contraband.length} finding(s)` : "None found", worstTone(contraband)],
     ["Identity", identityValue, identityTone],
     ["Itinerary", external.length ? `${external.length} other site(s)` : "Stays home", worstTone(by("itinerary"))],
-    ["Privacy", report.privacy.length ? `${report.privacy.length} sharing rule(s)` : "Shares nothing", worstTone(by("privacy"))],
+    ["Privacy", by("privacy").some((f) => f.rule === "S-SECRET") ? "Publishes a key"
+      : report.privacy.length ? `${report.privacy.length} sharing rule(s)` : "Shares nothing", worstTone(by("privacy"))],
     ["Budget", report.budget.maxSteps ? `Up to ${report.budget.maxSteps} steps` : "Runtime default", worstTone(by("budget"))],
   ];
   return h("div", { class: "lights" }, lights.map(([name, value, t]) =>

@@ -8,7 +8,7 @@ Agent Customs adds the missing checkpoint. It runs five groups of checks:
 
 | Check | What it looks at |
 | --- | --- |
-| Papers | Conformance with the MVP spec (profile 0.2), one check at a time, each citing its section and giving the publisher a fix. It uses the runtime's own parser and validator. |
+| Papers | Conformance with the MVP spec (profile 0.2), one check at a time, each citing its section and giving the publisher a fix. It uses the runtime's own parser and validator, and flags keys or passwords left in the public files (shown shortened). |
 | Contraband | Hidden Unicode tag characters (decoded and shown), zero-width and right-to-left tricks, prompt injection, requests for passwords, codes and card details, image links that leak the conversation, orders aimed at the calling site's assistant, text written to fool reviewers, and encoded blobs. |
 | Itinerary | Every other site, MCP server and code bundle the network can reach, and whether its own policy allows that. |
 | Privacy | Which private context (`sly_data`) it lets cross a site boundary. |
@@ -60,7 +60,7 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 57 tests: engine, guard inside the real runtime, website tools, local server
+npm test                 # 59 tests: engine, guard inside the real runtime, website tools, local server
 npm run serve            # the site at http://127.0.0.1:8080/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log
 npm run smoke            # optional: drives headless Edge or Chrome and saves screenshots

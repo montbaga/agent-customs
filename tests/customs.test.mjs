@@ -384,6 +384,25 @@ test("a report can be redone against a new approval without fetching anything", 
   assert.ok(!("inputs" in JSON.parse(JSON.stringify(redone))));
 });
 
+test("keys and passwords in the public files are found, and never shown in full", async () => {
+  const key = "sk-proj-4f9Kd2Lx8Qw1Zr7Tn3Vb6Hy0";
+  const leaked = await analyzeNetwork(minimalNetwork({ config: { llm_config: { model_name: "m", api_key: key } } }));
+  assert.equal(leaked.conformance.checks.find((c) => c.id === "P-SECRETS").status, "fail");
+  assert.equal(leaked.findings.find((f) => f.rule === "S-SECRET").severity, "medium");
+  assert.notEqual(leaked.verdict.code, "CLEARED");
+  assert.ok(!JSON.stringify([leaked.findings, leaked.conformance]).includes(key), "the key is shortened");
+
+  // A field named like a secret counts only with a real-looking value.
+  const named = (value) => analyzeNetwork(minimalNetwork({ manifest: { llm_router: { base_url: "https://r.example", api_key: value } } }));
+  assert.ok((await named("q8Zr2Lm4Pw9Xt")).findings.some((f) => f.rule === "S-SECRET"));
+  for (const value of ["YOUR_API_KEY", "<key>", "demo-token", ""]) {
+    assert.ok(!(await named(value)).findings.some((f) => f.rule === "S-SECRET"), value);
+  }
+  // Talking about keys is fine.
+  const talk = await analyzeNetwork(minimalNetwork({ agent: { instructions: "Never share your API key or password." } }));
+  assert.equal(talk.conformance.checks.find((c) => c.id === "P-SECRETS").status, "pass");
+});
+
 test("the flags of England, Scotland and Wales are emoji, not hidden text", () => {
   const wales = "Welsh cakes \u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F} daily";
   assert.equal(scanHidden(wales).total, 0);
