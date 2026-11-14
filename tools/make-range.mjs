@@ -4,7 +4,7 @@
 // .invalid domain (RFC 2606), which never resolves, so nothing here can reach a real
 // server. Nothing in the range is a real business.
 //
-//   node tools/make-range.mjs [--origin https://range.example]   (default http://localhost:8081)
+//   node tools/make-range.mjs [--origin https://range.example]   (default: RANGE_ORIGIN in site/desk.js)
 //
 // The hidden payloads are written here in plain text and converted to invisible
 // Unicode tag characters when the files are written, so this source stays readable.
@@ -12,11 +12,13 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { RANGE_ORIGIN } from "../site/desk.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(here, "..", "range");
 const argOrigin = process.argv.indexOf("--origin");
-const RANGE = (argOrigin > 0 ? process.argv[argOrigin + 1] : "http://localhost:8081").replace(/\/$/, "");
+// Without --origin, write the range for the address the site uses (set by set-origins.mjs).
+const RANGE = (argOrigin > 0 ? process.argv[argOrigin + 1] : RANGE_ORIGIN).replace(/\/$/, "");
 
 const ROUTER = { base_url: "https://api.otari.ai/api/v1", mock: false, byok_router: "https://api.otari.ai/api/v1" };
 const MODEL = { model_name: "alibaba/qwen-3.5-35b-a3b" };

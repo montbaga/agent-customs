@@ -5,6 +5,34 @@
 // not carry over silently. A snapshot keeps what matters for that decision; diff()
 // lists the changes in plain terms and line by line.
 
+import { canonicalJson } from "./canonical.js";
+
+/**
+ * The text the runtime sends as an agent's system prompt: its instructions, then its
+ * "command" (runner.js and langchain-runner.mjs). Every check that reads an agent's words
+ * reads both, so nothing the model reads goes unchecked.
+ *
+ * :param agent: An agent from the network file, or one from a snapshot.
+ * :return: The two texts, trimmed and joined the way the runtime joins them.
+ */
+export function promptOf(agent) {
+  return [agent?.instructions, agent?.command]
+    .filter((text) => typeof text === "string" && text.trim())
+    .map((text) => text.trim())
+    .join("\n\n");
+}
+
+/**
+ * The peer policy mode the runtime applies: peer_policy, or web_policy when there is no
+ * peer_policy (engine.js manifestAllowsPeer).
+ *
+ * :param manifest: A site's agent-manifest.json.
+ * :return: "open", "closed", "allowlist" or "".
+ */
+export function peerPolicyOf(manifest) {
+  return (manifest?.peer_policy || manifest?.web_policy)?.mode || "";
+}
+
 /**
  * Take a snapshot of a compiled network and its manifest.
  *
@@ -20,6 +48,8 @@ export function snapshotOf(config, manifest, fingerprint) {
     agents[agent.name] = {
       description: String(agent.function?.description || ""),
       instructions: String(agent.instructions || ""),
+      // The runtime adds "command" to the system prompt after the instructions.
+      command: String(agent.command || ""),
       tools: (agent.tools || []).map((t) => (typeof t === "string" ? t : JSON.stringify(t))).sort(),
       parameters: JSON.stringify(agent.function?.parameters || null),
       allow: JSON.stringify(agent.allow || null),
@@ -35,11 +65,41 @@ export function snapshotOf(config, manifest, fingerprint) {
     manifest: {
       brand: manifest?.brand || "",
       allowedPeers: [...(manifest?.allowed_peers || [])].sort(),
-      peerPolicy: manifest?.peer_policy?.mode || "",
+      peerPolicy: peerPolicyOf(manifest),
       codedTools: manifest?.coded_tools ? JSON.stringify(manifest.coded_tools) : "",
     },
     agents,
   };
+}
+
+/**
+ * Whether two snapshots describe the same version: the same network fingerprint, the
+ * same partner links, and the same manifest fields that matter for trust (brand,
+ * allowed peers, peer policy and code bundle). The fingerprint covers only the network
+ * file, so a publisher could otherwise change its manifest without anyone noticing.
+ *
+ * :param before: A snapshot, such as the one stored with an approval.
+ * :param after: A snapshot of what is published now.
+ * :return: True when nothing the snapshots cover has changed.
+ */
+export function sameSnapshot(before, after) {
+  if (!before || !after) return false;
+  // The whole recorded manifest block, so a field added to snapshotOf counts here too.
+  return before.hash === after.hash && before.linksHash === after.linksHash
+    && canonicalJson(before.manifest || {}) === canonicalJson(after.manifest || {});
+}
+
+/**
+ * Whether an approval covers exactly the version in a snapshot.
+ *
+ * :param pin: A stored approval (pins.js).
+ * :param snapshot: The snapshot of what is published now.
+ * :return: True when the approval still applies.
+ */
+export function matchesPin(pin, snapshot) {
+  if (!pin?.hash || !snapshot) return false;
+  // An approval without a snapshot holds only the fingerprint.
+  return pin.hash === snapshot.hash && (!pin.snapshot || sameSnapshot(pin.snapshot, snapshot));
 }
 
 /**
@@ -52,15 +112,22 @@ export function snapshotOf(config, manifest, fingerprint) {
 export function diffSnapshots(before, after) {
   const changes = [];
   if (!before || !after) return changes;
-  if (before.hash === after.hash && before.linksHash === after.linksHash) return changes;
+  if (sameSnapshot(before, after)) return changes;
   const add = (change) => changes.push(change);
+  // Text the model reads, compared line by line.
+  const textChanged = (kind, name, label, old, now) => {
+    if ((old || "") === (now || "")) return;
+    const d = lineDiff(lines(old), lines(now));
+    add({ kind, severity: "high", agent: name, title: `${label} changed (${d.added.length} line(s) added, ${d.removed.length} removed)`,
+      added: d.added, removed: d.removed });
+  };
 
   const beforeAgents = before.agents || {};
   const afterAgents = after.agents || {};
   for (const name of Object.keys(afterAgents)) {
     if (!(name in beforeAgents)) {
       add({ kind: "agent_added", severity: "high", agent: name, title: `New agent "${name}"`,
-        added: lines(afterAgents[name].instructions) });
+        added: lines(promptOf(afterAgents[name])) });
     }
   }
   for (const name of Object.keys(beforeAgents)) {
@@ -70,12 +137,9 @@ export function diffSnapshots(before, after) {
     const a = beforeAgents[name];
     const b = afterAgents[name];
     if (!a) continue;
-    if (a.instructions !== b.instructions) {
-      const d = lineDiff(lines(a.instructions), lines(b.instructions));
-      add({ kind: "instructions_changed", severity: "high", agent: name,
-        title: `Instructions of "${name}" changed (${d.added.length} line(s) added, ${d.removed.length} removed)`,
-        added: d.added, removed: d.removed });
-    }
+    textChanged("instructions_changed", name, `Instructions of "${name}"`, a.instructions, b.instructions);
+    // Approvals saved before "command" was recorded have none; they match an agent without one.
+    textChanged("command_changed", name, `The "command" text of "${name}", which the model reads after its instructions,`, a.command, b.command);
     if (a.description !== b.description) {
       add({ kind: "description_changed", severity: "medium", agent: name, title: `Description of "${name}" changed`,
         added: [b.description], removed: [a.description] });
@@ -93,7 +157,11 @@ export function diffSnapshots(before, after) {
       add({ kind: "privacy_changed", severity: "high", agent: name, title: `Private-context rules of "${name}" changed`,
         added: [b.allow], removed: [a.allow] });
     }
-    if (a.parameters !== b.parameters) add({ kind: "schema_changed", severity: "low", agent: name, title: `Input schema of "${name}" changed` });
+    // A calling model reads the whole input schema, so its text is shown like the rest.
+    if (a.parameters !== b.parameters) {
+      add({ kind: "schema_changed", severity: "medium", agent: name, title: `Input schema of "${name}" changed`,
+        added: [b.parameters], removed: [a.parameters] });
+    }
     if (a.limits !== b.limits) {
       add({ kind: "limits_changed", severity: "medium", agent: name, title: `Execution limits of "${name}" changed`,
         added: [b.limits], removed: [a.limits] });
@@ -115,7 +183,9 @@ export function diffSnapshots(before, after) {
   if (JSON.stringify(before.links) !== JSON.stringify(after.links) || JSON.stringify(before.linkLabels) !== JSON.stringify(after.linkLabels)) {
     add({ kind: "links_changed", severity: "medium", title: "Its partner links or their labels changed" });
   }
-  if (!changes.length) add({ kind: "other", severity: "low", title: "Formatting or settings changed (no agent behavior changes found)" });
+  // The fingerprint ignores formatting, so a change here is real content this list does
+  // not cover. Say so, rather than suggest that nothing important changed.
+  if (!changes.length) add({ kind: "other", severity: "medium", title: "Other parts of the network file changed. This list does not show them, so read the file before approving." });
   return changes;
 }
 

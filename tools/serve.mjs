@@ -55,9 +55,16 @@ function matches(pattern, urlPath) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const urlPath = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  } catch {
+    res.writeHead(400).end("Bad request"); // a malformed escape such as "/%E0%A4%A"
+    return;
+  }
   let file = path.join(root, urlPath);
-  if (!file.startsWith(root)) { res.writeHead(403).end("Forbidden"); return; }
+  // The separator matters: ".../range-requests.jsonl" starts with ".../range" too.
+  if (file !== root && !file.startsWith(root + path.sep)) { res.writeHead(403).end("Forbidden"); return; }
   let status = 200;
   let body;
   const headers = { "Cache-Control": "no-store" };
@@ -82,5 +89,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Serving ${root} at http://${host === "127.0.0.1" ? "localhost" : host}:${port}/ (headers from _headers)`);
+  // With --port 0 the system picks a free port; print the one it picked.
+  console.log(`Serving ${root} at http://${host === "127.0.0.1" ? "localhost" : host}:${server.address().port}/ (headers from _headers)`);
 });

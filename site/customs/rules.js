@@ -250,31 +250,93 @@ export function scanText(text) {
   return hits;
 }
 
-/**
- * Words in a brand or label that claim an authority the host may not have.
- */
-export const AUTHORITY_TERMS = [
-  "bank", "banking", "security team", "fraud", "official", "government", "gov", "tax", "irs", "hmrc", "police",
-  "support team", "helpdesk", "help desk", "it department", "administrator", "paypal", "apple", "google",
-  "microsoft", "amazon", "meta", "facebook", "visa", "mastercard", "amex", "american express", "netflix",
-  "whatsapp", "openai", "anthropic", "cognizant", "mozilla", "nanda", "mit",
-];
+// Words for a role or an institution. A host backs one when its name contains it, as
+// citybank.example backs "bank". Checked in names (brands and link labels) only:
+// descriptions use them honestly all the time ("prices include tax").
+const ROLE_TERMS = ["bank", "banking", "security team", "fraud", "official", "government", "gov", "tax", "police",
+  "support team", "helpdesk", "help desk", "IT department", "administrator"];
+
+// Names of organisations. Only the organisation's own domain backs one: paypal.com and
+// www.paypal.co.uk back "PayPal"; paypal-help.evil.example and secure-paypal-login.example
+// do not.
+const ORGANISATIONS = ["PayPal", "Google", "Microsoft", "Facebook", "Mastercard", "Amex", "American Express",
+  "Netflix", "WhatsApp", "OpenAI", "Anthropic", "Cognizant", "Mozilla", "NANDA", "MIT", "IRS", "HMRC"];
+
+// Organisation names that are also ordinary words ("apple pie", "a travel visa"). They
+// count only in a claim to speak for the organisation, such as "Apple Support".
+const WORD_ORGANISATIONS = ["Apple", "Amazon", "Meta", "Visa"];
+
+// Abbreviations count only in capitals: in lower case some are ordinary words, such as
+// German "mit" ("with") and English "it".
+const CAPITALS_ONLY = new Map([
+  ["IT department", /\bIT\s+[Dd]epartment\b/],
+  ["NANDA", /\bNANDA\b/],
+  ["MIT", /\bMIT\b/],
+  ["IRS", /\bIRS\b/],
+  ["HMRC", /\bHMRC\b/],
+]);
+
+// "Official PayPal ..." or "PayPal Security": a claim to speak for an organisation. A
+// description may name one ("we accept Visa"); claiming to be its staff is the impersonation.
+const CLAIM_BEFORE = "(?:official|verified|authori[sz]ed)\\s+";
+const CLAIM_AFTER = "\\s+(?:support|security|help\\s*desk|customer\\s+(?:service|care|support)|fraud|team|staff)\\b";
+
+const AUTHORITY = [
+  ...ROLE_TERMS.map((t) => ({ term: t, kind: "role" })),
+  ...ORGANISATIONS.map((t) => ({ term: t, kind: "organisation" })),
+  ...WORD_ORGANISATIONS.map((t) => ({ term: t, kind: "word" })),
+].map(({ term, kind }) => {
+  const body = term.replace(/ /g, "\\s+");
+  return {
+    key: term.toLowerCase(), kind, flat: flatName(term),
+    name: CAPITALS_ONLY.get(term) || new RegExp(`\\b${body}\\b`, "i"),
+    claim: new RegExp(`\\b${CLAIM_BEFORE}${body}\\b|\\b${body}${CLAIM_AFTER}`, "i"),
+  };
+});
+
+function flatName(text) {
+  return String(text || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// The part of a host name its owner registered: "paypal" in www.paypal.com and in
+// www.paypal.co.uk. Without the public-suffix list, this knows the common two-part
+// country endings such as co.uk and com.au.
+const SECOND_LEVEL = new Set(["co", "com", "net", "org", "gov", "edu", "ac", "mil", "gob", "gouv", "go", "ne", "or", "nic", "ltd", "plc", "sch"]);
 
 /**
- * Find authority words in a label that do not appear in the host name.
+ * The registered name of a host, such as "paypal" for www.paypal.co.uk.
  *
- * :param label: A brand, label or description.
- * :param host: The publishing host, such as "evil.example".
- * :return: The authority words the host does not back up.
+ * :param host: A host, with or without a port.
+ * :return: The label before the public ending, in lower case.
  */
-export function unbackedAuthority(label, host) {
+export function registeredName(host) {
+  const labels = String(host || "").toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "").split(".").filter(Boolean);
+  if (labels.length >= 3 && labels.at(-1).length === 2 && SECOND_LEVEL.has(labels.at(-2))) return labels.at(-3);
+  return labels.length >= 2 ? labels.at(-2) : labels[0] || "";
+}
+
+/**
+ * Find authority claims in a label that the publishing host does not back up.
+ *
+ * :param label: A brand, a link label or a description.
+ * :param host: The publishing host, such as "evil.example".
+ * :param options.description: True for a description, where only claims to speak for an
+ *   organisation count, not every mention of one.
+ * :return: The authority words the host does not back up, in lower case.
+ */
+export function unbackedAuthority(label, host, { description = false } = {}) {
   if (typeof label !== "string") return [];
-  const text = normalizeForRules(label).toLowerCase();
-  const hostFlat = String(host || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const text = normalizeForRules(label);
+  const hostFlat = flatName(host);
+  const registered = flatName(registeredName(host));
   const found = [];
-  for (const term of AUTHORITY_TERMS) {
-    const re = new RegExp(`\\b${term.replace(/ /g, "\\s+")}\\b`, "i");
-    if (re.test(text) && !hostFlat.includes(term.replace(/[^a-z0-9]/g, ""))) found.push(term);
+  for (const t of AUTHORITY) {
+    if (description && t.kind === "role") continue;
+    if (!t.name.test(text)) continue;
+    // In descriptions, and for names that are also ordinary words, only a claim counts.
+    if ((description || t.kind === "word") && !t.claim.test(text)) continue;
+    const backed = t.kind === "role" ? hostFlat.includes(t.flat) : registered === t.flat;
+    if (!backed) found.push(t.key);
   }
   return found;
 }
@@ -286,8 +348,17 @@ export function unbackedAuthority(label, host) {
  * :return: The URLs found, without trailing punctuation.
  */
 export function urlsIn(text) {
-  if (typeof text !== "string") return [];
-  return (normalizeForRules(text).match(/https?:\/\/[^\s)"'<>\]]+/gi) || []).map((u) => u.replace(/[.,;:!?]+$/, ""));
+  return typeof text === "string" ? findUrls(normalizeForRules(text)) : [];
+}
+
+/**
+ * The same, for text that normalizeForRules has already cleaned.
+ *
+ * :param normalized: Text from normalizeForRules.
+ * :return: The URLs found, without trailing punctuation.
+ */
+export function findUrls(normalized) {
+  return (normalized.match(/https?:\/\/[^\s)"'<>\]]+/gi) || []).map((u) => u.replace(/[.,;:!?]+$/, ""));
 }
 
 function clip(text, max) {

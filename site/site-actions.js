@@ -95,10 +95,12 @@ class SiteActions {
     };
   }
 
+  // Text from inspected networks reaches the officer, and approvals belong to the visitor,
+  // so these two ask the visitor first (askFirst) and change nothing without a yes.
   static pinAction() {
     return {
       name: "pin_network",
-      description: "Approve the version of a network inspected in this visit, by storing its fingerprint in this browser. The guard then lets that exact version run and holds any changed version for review. Refuses networks that were denied entry. Undo with unpin_network.",
+      description: "Approve the version of a network inspected in this visit, by storing its fingerprint in this browser. The visitor confirms first. The guard then lets that exact version run and holds any changed version for review. Refuses networks that were denied entry. Undo with unpin_network.",
       effect: "write",
       inputSchema: {
         type: "object",
@@ -106,14 +108,14 @@ class SiteActions {
         required: ["url"],
         properties: { url: { ...URL_FIELD, description: "The inspected network URL to approve." } },
       },
-      execute: (args) => desk.pin(args.url),
+      execute: (args) => desk.pin(args.url, { askFirst: true }),
     };
   }
 
   static unpinAction() {
     return {
       name: "unpin_network",
-      description: "Forget the approval stored in this browser for a network URL. Its next use is inspected as new.",
+      description: "Forget the approval stored in this browser for a network URL. The visitor confirms first. Its next use is inspected as new.",
       effect: "write",
       inputSchema: {
         type: "object",
@@ -121,7 +123,7 @@ class SiteActions {
         required: ["url"],
         properties: { url: { ...URL_FIELD, description: "The approved network URL to forget." } },
       },
-      execute: (args) => desk.unpin(args.url),
+      execute: (args) => desk.unpin(args.url, { askFirst: true }),
     };
   }
 }

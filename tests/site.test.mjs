@@ -102,6 +102,7 @@ test("an allowed inspection returns the verdict, and details quote the hidden te
 
 test("denied networks cannot be approved; cleared ones can, and approval can be undone", async () => {
   desk.askContact = async () => true;
+  desk.confirmApproval = async () => true;
   const denied = await callTool("pin_network", { url: `${RANGE}/shady_pizza/shady_pizza` });
   assert.equal(denied.ok, false);
   assert.match(denied.reason, /does not approve/);
@@ -118,6 +119,53 @@ test("denied networks cannot be approved; cleared ones can, and approval can be 
   assert.equal(unpinned.ok, true);
   const again = await callTool("unpin_network", { url: `${RANGE}/sunny_bakery/sunny_bakery` });
   assert.equal(again.ok, false);
+});
+
+test("the officer cannot approve or forget a version unless the visitor confirms", async () => {
+  desk.askContact = async () => true;
+  const url = `${RANGE}/sunny_bakery/sunny_bakery`;
+  await callTool("inspect_agent_network", { url });
+  const asked = [];
+  const answer = (yes) => async ({ action }) => { asked.push(action); return yes; };
+
+  desk.confirmApproval = answer(false);
+  assert.equal((await callTool("pin_network", { url })).ok, false);
+  assert.equal(desk.pins.get(url), null);
+  // With no dialog wired up, the answer is no.
+  desk.confirmApproval = null;
+  assert.equal((await callTool("pin_network", { url })).ok, false);
+  assert.equal(desk.pins.get(url), null);
+
+  desk.confirmApproval = answer(true);
+  assert.equal((await callTool("pin_network", { url })).ok, true);
+  desk.confirmApproval = answer(false);
+  assert.equal((await callTool("unpin_network", { url })).ok, false);
+  assert.ok(desk.pins.get(url), "the approval is kept");
+  assert.deepEqual(asked, ["approve", "approve", "forget"]);
+
+  // The page's own buttons follow the visitor's click and ask nothing more.
+  desk.confirmApproval = async () => { throw new Error("the page's button must not ask again"); };
+  assert.equal((await desk.unpin(url)).ok, true);
+});
+
+test("approving a changed version redoes its report, so no change is left to review", async () => {
+  desk.askContact = async () => true;
+  const bakery = `${RANGE}/sunny_bakery/sunny_bakery`;
+  const rug = `${RANGE}/rugpull/sunny_bakery`;
+  await desk.inspect(bakery);
+  assert.equal((await desk.pin(bakery)).ok, true);
+  // As if the bakery had changed at its own address: the rug-pulled copy with the bakery's approval.
+  desk.pins.set(rug, desk.pins.get(bakery));
+  const held = await desk.inspect(rug);
+  assert.equal(held.drift.changed, true);
+
+  assert.equal((await desk.pin(rug)).ok, true);
+  const redone = desk.reportFor(rug);
+  assert.equal(redone.drift.changed, false);
+  assert.ok(!redone.findings.some((f) => f.rule === "D-DRIFT"));
+  assert.equal(desk.latest, redone);
+  await desk.unpin(rug);
+  await desk.unpin(bakery);
 });
 
 test("comparing the bakery with its rug-pulled version lists the new lines", async () => {
@@ -256,6 +304,11 @@ test("a model outside a free-tier key is explained as a billing matter", async (
   const info = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-4-argon","status":"RESOURCE_EXHAUSTED"}}', "Google AI Studio", "Gemini 4 Argon");
   assert.match(info.advice, /not part of this key's free tier/);
   assert.match(info.advice, /billing/);
+  // Google sometimes says only "limit: 0".
+  const bare = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded, limit: 0, model: gemini-4-argon"}}', "Google AI Studio", "Gemini 4 Argon");
+  assert.match(bare.advice, /not part of this key's free tier/);
+  const ordinary = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded, limit: 10, model: x"}}');
+  assert.match(ordinary.advice, /reached its limit/);
 });
 
 test("each provider's newest saved key is found, by address or by the key itself", async () => {

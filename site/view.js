@@ -2,7 +2,8 @@
 //
 // Everything that comes from an inspected network is inserted with text nodes, never
 // as HTML, so a hostile network cannot put markup into this page.
-import { EXAMPLES, desk } from "./desk.js";
+import { EXAMPLES, NOT_APPROVABLE, desk } from "./desk.js";
+import { matchesPin } from "./customs/diff.js";
 
 const SEVERITY_TONE = { critical: "bad", high: "warn", medium: "caution", low: "info", info: "info" };
 const SEVERITY_RANK = ["critical", "high", "medium", "low", "info"];
@@ -192,15 +193,18 @@ function renderReport({ animate = false } = {}) {
 function renderLights(report) {
   const by = (cat) => report.findings.filter((f) => f.category === cat);
   const external = report.itinerary.filter((s) => !s.sameSite);
+  // Compare with the approval stored now, not the one at inspection time: the visitor
+  // may have approved this version since.
   const pin = desk.pins.get(report.target.url);
-  const pinnedNow = pin && pin.hash === report.identity.hash;
+  const pinnedNow = matchesPin(pin, report.snapshot);
+  const changed = !!pin && !!report.snapshot && !pinnedNow;
   const c = report.conformance;
-  const identityFindings = by("identity");
+  const identityFindings = by("identity").filter((f) => f.rule !== "D-DRIFT");
   let identityValue = "Not approved yet";
   let identityTone = identityFindings.length ? worstTone(identityFindings) : "info";
-  if (report.drift?.changed) { identityValue = "Changed since approved"; identityTone = "warn"; }
+  if (changed) { identityValue = "Changed since approved"; identityTone = "warn"; }
   else if (pinnedNow) { identityValue = "Matches your approval"; identityTone = identityFindings.length ? worstTone(identityFindings) : "ok"; }
-  if (identityFindings.some((f) => f.rule !== "D-DRIFT") && !report.drift?.changed) identityValue = `${identityFindings.length} finding(s)`;
+  if (identityFindings.length && !changed) identityValue = `${identityFindings.length} finding(s)`;
   const contraband = by("contraband").filter((f) => f.severity !== "info");
   const lights = [
     ["Papers", `${c.passed}/${c.total} pass`, c.failed ? "bad" : c.warned ? "caution" : "ok"],
@@ -283,7 +287,7 @@ function renderItinerary(report) {
   block.append(h("ul", { class: "stops" }, stops.map((s) => h("li", null,
     h("span", { class: "host" }, s.host),
     h("div", { class: "tags" }, s.kinds.map((k) => h("span", { class: "tag" }, k)),
-      s.kinds.some((k) => k !== "mentioned in instructions") && !s.allowed ? h("span", { class: "tag no" }, "refused by its own policy") : null)))));
+      s.refused ? h("span", { class: "tag no" }, "refused by its own policy") : null)))));
   return block;
 }
 
@@ -294,19 +298,32 @@ function renderPrivacy(report) {
         p.fields.map((f) => h("span", { class: "tag" }, f)))))));
 }
 
+// A message for the next report drawing. Approving redraws the report, so a message put
+// in the old drawing would never be seen.
+let reportNotice = "";
+
+async function changeApproval(change, done) {
+  const result = await change();
+  reportNotice = result.ok ? done : result.reason;
+  renderReport();
+}
+
 function renderReportActions(report) {
   const bar = h("div", { class: "report-actions" });
-  const toast = h("span", { class: "toast", role: "status" });
+  const toast = h("span", { class: "toast", role: "status" }, reportNotice);
+  reportNotice = "";
   const pin = desk.pins.get(report.target.url);
-  const pinnedNow = pin && pin.hash === report.identity.hash;
+  const pinnedNow = matchesPin(pin, report.snapshot);
   if (report.snapshot) {
     if (pinnedNow) {
-      bar.append(h("button", { type: "button", class: "ghost", onclick: () => { desk.unpin(report.target.url); } }, "Forget approval"));
+      bar.append(h("button", { type: "button", class: "ghost",
+        onclick: () => changeApproval(() => desk.unpin(report.target.url), "Approval forgotten. Its next use is inspected as new."),
+      }, "Forget approval"));
     } else {
-      const blocked = ["DENIED", "INVALID", "UNREADABLE"].includes(report.verdict.code);
+      const blocked = NOT_APPROVABLE.has(report.verdict.code);
       bar.append(h("button", {
         type: "button", class: "primary", disabled: blocked, title: blocked ? "Denied networks cannot be approved." : null,
-        onclick: () => { const r = desk.pin(report.target.url); toast.textContent = r.ok ? "Approved. If this network changes, it will be held for your review." : r.reason; },
+        onclick: () => changeApproval(() => desk.pin(report.target.url), "Approved. If this network changes, it will be held for your review."),
       }, pin ? "Approve this new version" : report.verdict.code === "HOLD" ? "Approve after review" : "Approve this version"));
     }
   }
