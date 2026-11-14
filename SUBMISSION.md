@@ -99,9 +99,9 @@ Speak it yourself, with the site running in a browser. Use no music, and keep ot
 
 ## Before you submit
 
-- [ ] Host the test range and the site on two different origins (README, "Host it").
+- [x] Host the test range and the site on two different origins: https://montbaga.github.io/agent-customs/ and https://agent-customs-range.github.io/.
 - [ ] Run `npm test`, and run `npm run smoke` against the hosted site to make the screenshots.
 - [ ] Try the officer live with your own key: the Sunny Bakery question, the Shady Pizza question, and one inspection by chat.
 - [ ] Record the video, keep it under 2 minutes, and upload it to YouTube as public.
-- [ ] Push the code to a public GitHub repository and fill in the links above.
+- [x] Push the code to a public GitHub repository and fill in the links above.
 - [ ] Submit before Monday, January 11, 2027, 8:00 am Pacific Time.
