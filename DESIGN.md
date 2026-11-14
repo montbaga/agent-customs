@@ -51,3 +51,7 @@ Each section fills one screen, on a 12-column grid with equal edges.
 | Hover and press | Feedback on every control | Buttons rise 1 px and press down to scale 0.98; arrows move 3 px; underlines draw in; fine pointers only |
 
 Nothing else moves on scroll. The curves are `cubic-bezier(0.23, 1, 0.32, 1)` for interface motion and `cubic-bezier(0.77, 0, 0.175, 1)` for movement across the screen.
+
+## The practice site
+
+Main Street Guide (`practice/`) uses the same system with the navy palette (`#0a1430`, `#eef0f2` and coral `#ff6f59`), so it reads as a different site by the same hand. It has three screens: the street, with each shop's stamp; what the site added, as a folder tree and a two-line diff; and the assistant. It keeps the hero entrance, the glass bar and the stamps, and drops the shader, the scroll moment and the diagram, which belong to Agent Customs.

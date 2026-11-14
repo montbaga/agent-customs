@@ -4,8 +4,9 @@
 //
 // The range is a second website (a second origin), so partner calls show real consent
 // cards. This rewrites the range address in the network source, the manifest, the page
-// and the desk; regenerates the range for that address; and rebuilds the network with
-// the official build script. Run it again with --range http://localhost:8081 to go back.
+// and the desk, and in the practice site; regenerates the range for that address; and
+// rebuilds both networks with the official build script. Run it again with
+// --range http://localhost:8081 to go back.
 
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
@@ -24,7 +25,8 @@ const current = (await readFile(deskFile, "utf8")).match(/export const RANGE_ORI
 if (!current) throw new Error("RANGE_ORIGIN not found in site/desk.js");
 if (current === next) console.log(`Range is already ${next}; rebuilding.`);
 
-for (const rel of ["site/agent_customs.hocon", "site/agent-manifest.json", "site/desk.js", "site/index.html"]) {
+for (const rel of ["site/agent_customs.hocon", "site/agent-manifest.json", "site/desk.js", "site/index.html",
+  "practice/main_street_guide.hocon", "practice/agent-manifest.json", "practice/index.html"]) {
   const file = path.join(ROOT, rel);
   const text = await readFile(file, "utf8");
   const updated = text.split(current).join(next);
@@ -36,4 +38,5 @@ for (const rel of ["site/agent_customs.hocon", "site/agent-manifest.json", "site
 const run = (args) => execFileSync(process.execPath, args, { cwd: ROOT, stdio: "inherit" });
 run(["tools/make-range.mjs", "--origin", next]);
 run(["vendor/agentify-website/scripts/build_network.mjs", "site/agent_customs.hocon", "--manifest", "site/agent-manifest.json"]);
-console.log(`\nDone. The range is ${next}. Deploy range/ there and site/ to its own host.`);
+run(["vendor/agentify-website/scripts/build_network.mjs", "practice/main_street_guide.hocon", "--manifest", "practice/agent-manifest.json"]);
+console.log(`\nDone. The range is ${next}. Deploy range/ there, and site/ (with practice/) to its own host.`);

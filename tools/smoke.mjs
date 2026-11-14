@@ -1,73 +1,24 @@
 // smoke.mjs: open the running site in headless Edge or Chrome, click through the main
 // flows, record JavaScript errors and take screenshots. Uses the browser's DevTools
-// protocol over Node's built-in WebSocket (Node 22+). No dependencies.
+// protocol (tools/cdp.mjs). No dependencies.
 //
 //   node tools/smoke.mjs [--url http://127.0.0.1:8080/] [--out ./screenshots] [--browser <path>]
 //
 // Serve the site and the range first (see README). Exits 1 on any page error.
 
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { findBrowser, openBrowser, sleep } from "./cdp.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
 const URL_ = opt("--url", "http://127.0.0.1:8080/");
 const OUT = path.resolve(opt("--out", "screenshots"));
-const PORT = 9333;
-const candidates = [
-  opt("--browser", ""),
-  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  "C:/Program Files/Google/Chrome/Application/chrome.exe",
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser",
-].filter(Boolean);
-const browserPath = candidates.find((p) => existsSync(p));
+const browserPath = findBrowser(opt("--browser", ""));
 if (!browserPath) { console.error("No Edge or Chrome found. Pass --browser <path>."); process.exit(2); }
 
 await mkdir(OUT, { recursive: true });
-const profile = await mkdtemp(path.join(os.tmpdir(), "agent-customs-smoke-"));
-const browser = spawn(browserPath, [`--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, "--headless=new",
-  "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--window-size=1366,900", "about:blank"], { stdio: "ignore" });
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let targets;
-for (let i = 0; i < 50; i += 1) {
-  try { targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json(); if (targets.some((t) => t.type === "page")) break; } catch { /* starting */ }
-  await sleep(200);
-}
-const page = targets.find((t) => t.type === "page");
-const ws = new WebSocket(page.webSocketDebuggerUrl);
-await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-let seq = 0;
-const pending = new Map();
-const events = [];
-const problems = [];
-ws.addEventListener("message", (msg) => {
-  const data = JSON.parse(msg.data);
-  if (data.id && pending.has(data.id)) { pending.get(data.id)(data); pending.delete(data.id); return; }
-  events.push(data);
-  if (data.method === "Runtime.exceptionThrown") problems.push(`exception: ${data.params.exceptionDetails.exception?.description || data.params.exceptionDetails.text}`);
-  if (data.method === "Runtime.consoleAPICalled" && data.params.type === "error") problems.push(`console.error: ${data.params.args.map((a) => a.value ?? a.description).join(" ")}`);
-  if (data.method === "Log.entryAdded" && data.params.entry.level === "error") problems.push(`log: ${data.params.entry.text} ${data.params.entry.url || ""}`);
-});
-const send = (method, params = {}) => new Promise((resolve, reject) => {
-  const id = ++seq;
-  pending.set(id, (d) => (d.error ? reject(new Error(`${method}: ${d.error.message}`)) : resolve(d.result)));
-  ws.send(JSON.stringify({ id, method, params }));
-});
-const evaluate = async (expression) => {
-  const r = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
-  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
-  return r.result.value;
-};
-const waitFor = async (expression, ms = 15000) => {
-  const end = Date.now() + ms;
-  while (Date.now() < end) { if (await evaluate(expression)) return true; await sleep(150); }
-  throw new Error(`Timed out waiting for: ${expression}`);
-};
+const { send, evaluate, waitFor, close, problems } = await openBrowser({ browserPath, port: 9333 });
 const shot = async (name, { full = true } = {}) => {
   let params = { format: "png" };
   if (full) {
@@ -91,9 +42,6 @@ const noSideScroll = async (label) => {
 };
 
 try {
-  await send("Page.enable");
-  await send("Runtime.enable");
-  await send("Log.enable");
   await viewport(1366, 900);
   console.log(`Opening ${URL_} in ${path.basename(browserPath)}`);
   await send("Page.navigate", { url: URL_ });
@@ -235,8 +183,7 @@ try {
 } catch (error) {
   problems.push(`smoke step failed: ${error.message}`);
 } finally {
-  ws.close();
-  browser.kill();
+  close();
 }
 
 if (problems.length) {

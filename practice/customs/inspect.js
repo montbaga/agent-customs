@@ -1,0 +1,260 @@
+// inspect.js: fetch an agent site's public files and inspect them.
+//
+// It reads exactly what a caller's runtime reads (spec section 3.2): the site's
+// agent-manifest.json, the network definition it names, and links.json. Requests
+// carry no cookies, no key and no referrer. It parses and validates with the
+// runtime's own HOCON parser and validator, so "valid here" means "valid there".
+
+import { parseHocon } from "../runtime/hocon.js";
+import { AgentNetwork, validateNetwork } from "../runtime/kernel.js";
+import { VERDICTS, analyzeNetwork } from "./analyze.js";
+
+const DEFAULT_TIMEOUT_MS = 15000;
+const MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Work out the site base and network name from what a person pasted: a network URL,
+ * a site page, a folder, or the manifest's own URL.
+ *
+ * :param input: A URL string.
+ * :return: {candidates: [{base, name}]}, tried in order; name null means "ask the manifest".
+ */
+export function targetsFor(input) {
+  const raw = String(input || "").trim();
+  let u;
+  try { u = new URL(raw); } catch { throw new Error(`"${raw.slice(0, 80)}" is not a full web address. Start with https://`); }
+  if (!/^https?:$/.test(u.protocol)) throw new Error("Only http and https addresses can be inspected.");
+  u.hash = "";
+  u.search = "";
+  const segs = u.pathname.split("/").filter(Boolean);
+  const folder = (parts) => `${u.origin}${parts.length ? "/" + parts.join("/") : ""}`;
+  if (/agent-manifest\.json$/i.test(u.pathname)) return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }] };
+  if (!segs.length || u.pathname.endsWith("/")) return { candidates: [{ base: folder(segs), name: null }] };
+  const last = segs[segs.length - 1];
+  if (/\.(html?|php|aspx?)$/i.test(last)) return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }] };
+  if (/\.network\.json$/i.test(last)) {
+    return { candidates: [{ base: folder(segs.slice(0, -1)), name: last.replace(/\.network\.json$/i, "") }] };
+  }
+  // Usually ".../<network>"; it may also be a site folder without its trailing slash.
+  return { candidates: [{ base: folder(segs.slice(0, -1)), name: last }, { base: folder(segs), name: null }] };
+}
+
+// A file the server did send, but too big to be an agent file. It is not a reading
+// failure, so it must not be reported as one (such as a missing CORS header).
+class FileTooLarge extends Error {}
+
+/**
+ * Read a response body as text, stopping as soon as it passes MAX_BYTES, so a hostile
+ * server cannot fill the visitor's memory.
+ */
+async function readCapped(resp, url) {
+  const tooLarge = () => new FileTooLarge(`${url} is larger than 2 MB, the most Agent Customs reads. Agent files are usually a few kilobytes.`);
+  if (Number(resp.headers?.get?.("content-length")) > MAX_BYTES) throw tooLarge();
+  const reader = resp.body?.getReader?.();
+  if (!reader) {
+    const text = await resp.text();
+    if (text.length > MAX_BYTES) throw tooLarge();
+    return text;
+  }
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BYTES) {
+      reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  return new Blob(chunks).text();
+}
+
+async function fetchPublic(url, fetchImpl, timeoutMs) {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const resp = await fetchImpl(url, {
+      credentials: "omit", cache: "no-store", redirect: "follow", referrerPolicy: "no-referrer",
+      signal: controller?.signal,
+    });
+    const text = resp.ok ? await readCapped(resp, url) : "";
+    return { ok: resp.ok, status: resp.status, text, finalUrl: resp.url || url, redirected: !!resp.redirected };
+  } catch (error) {
+    if (error instanceof FileTooLarge) throw error;
+    if (error?.name === "AbortError") throw new Error(`No answer from ${hostOf(url)} within ${Math.round(timeoutMs / 1000)} s`);
+    throw new Error(`Could not read ${url}: the server is down or unreachable, or it does not allow other sites to read it (no CORS header).`);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Inspect a network by URL.
+ *
+ * :param input: A network URL, or a site/manifest URL with exactly one network.
+ * :param options.fetchImpl: fetch, or a stand-in for tests.
+ * :param options.pins: A PinStore, to compare with the approved version.
+ * :param options.pageOrigin: The inspecting page's origin, to tell whether CORS was exercised.
+ * :param options.timeoutMs: Per-file timeout.
+ * :return: The report. Failures that stop the inspection give an INVALID report.
+ */
+export async function inspectNetworkUrl(input, options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch.bind(globalThis);
+  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const pageOrigin = options.pageOrigin || (typeof location !== "undefined" ? location.origin : null);
+  let candidates;
+  try {
+    ({ candidates } = targetsFor(input));
+  } catch (error) {
+    return failureReport(String(input), "P-URL", "3.2", "Network URL is usable", error.message);
+  }
+
+  const redirects = [];
+  let manifestInfo = null;
+  let lastError = null;
+  let unreachable = false;
+  let chosen = null;
+  for (const candidate of candidates) {
+    const manifestUrl = `${candidate.base}/agent-manifest.json`;
+    try {
+      const got = await fetchPublic(manifestUrl, fetchImpl, timeoutMs);
+      if (!got.ok) {
+        lastError = got.status === 404
+          ? `No AI agents are published here: ${manifestUrl} does not exist (HTTP 404). Agentic websites publish this file; most websites do not have one yet.`
+          : `${manifestUrl} answered HTTP ${got.status}.`;
+        unreachable = false;
+        continue;
+      }
+      let manifest;
+      try { manifest = JSON.parse(got.text); } catch { lastError = `${manifestUrl} is not valid JSON.`; unreachable = false; continue; }
+      if (got.redirected) redirects.push({ from: manifestUrl, to: got.finalUrl, crossOrigin: originOf(got.finalUrl) !== originOf(manifestUrl) });
+      manifestInfo = { manifest, url: manifestUrl };
+      chosen = candidate;
+      break;
+    } catch (error) {
+      if (error instanceof FileTooLarge) { lastError = error.message; unreachable = false; continue; }
+      // The browser could not read it at all: down, unreachable, or no CORS header.
+      // That says nothing about the network itself, so it gets its own verdict.
+      if (!lastError || unreachable) { lastError = error.message; unreachable = true; }
+    }
+  }
+  if (!manifestInfo) {
+    const report = failureReport(String(input), "P-MANIFEST-FOUND", "3.2, 3.3", "agent-manifest.json is published", lastError || "No manifest found.",
+      "Publish agent-manifest.json in the folder of the network URL, with Access-Control-Allow-Origin: *.");
+    if (unreachable) {
+      report.verdict = { ...VERDICTS.UNREADABLE, summary: "Your browser could not read any agent files at this address. There may be none here (most websites have none yet), the site may be down, or it may not let other websites read its files (no CORS header). In that last case no caller can run it either (spec sections 3.3 and 3.4)." };
+      report.conformance.checks[0] = { id: "P-CORS", section: "3.3, 3.4", title: "Public files readable by other sites (CORS)", status: "fail",
+        detail: lastError, fix: "If this is your site: serve agent-manifest.json, the network file and links.json with Access-Control-Allow-Origin: *." };
+    }
+    return report;
+  }
+  const { manifest } = manifestInfo;
+  const networks = Array.isArray(manifest.networks) ? manifest.networks : [];
+  let name = chosen.name;
+  if (!name) {
+    if (networks.length === 1 && networks[0]?.name) name = networks[0].name;
+    else {
+      const names = networks.map((n) => n?.name).filter(Boolean);
+      return failureReport(`${chosen.base}/`, "P-PICK", "3.2", "One network chosen",
+        names.length ? `This site publishes ${names.length} networks. Inspect one of: ${names.map((n) => `${chosen.base}/${n}`).join(", ")}` : "The manifest lists no networks.",
+        "Use a network URL: the folder that holds agent-manifest.json, then the network name.", { choices: names.map((n) => `${chosen.base}/${n}`) });
+    }
+  }
+  const networkUrl = `${chosen.base}/${name}`;
+  const entry = networks.find((n) => n && n.name === name);
+  if (!entry) {
+    return failureReport(networkUrl, "P-EXACT", "3.2", "The manifest publishes this exact network",
+      `No network named "${name}" at ${hostOf(networkUrl)}. A runtime must fail rather than run another one. Published: ${networks.map((n) => n?.name).filter(Boolean).join(", ") || "none"}.`,
+      "Check the network name: it is the last part of the URL and must match networks[].name exactly.");
+  }
+  if (typeof entry.hocon !== "string" || !entry.hocon) {
+    return failureReport(networkUrl, "P-HOCON", "3.3", "The manifest says where the network file is", "The entry has no hocon path.", "Add \"hocon\": \"./<network>.network.json\".");
+  }
+  const hoconUrl = resolveUrl(chosen.base, entry.hocon);
+  let file;
+  try {
+    file = await fetchPublic(hoconUrl, fetchImpl, timeoutMs);
+  } catch (error) {
+    return failureReport(networkUrl, "P-NETWORK-FOUND", "3.3", "The network file is published", error.message, "Publish the file the manifest names, with CORS.");
+  }
+  if (!file.ok) {
+    return failureReport(networkUrl, "P-NETWORK-FOUND", "3.3", "The network file is published", `${hoconUrl} answered HTTP ${file.status}.`, "Publish the file the manifest names.");
+  }
+  if (file.redirected) redirects.push({ from: hoconUrl, to: file.finalUrl, crossOrigin: originOf(file.finalUrl) !== originOf(hoconUrl) });
+
+  let config;
+  try {
+    config = parseHocon(file.text);
+  } catch (error) {
+    return failureReport(networkUrl, "P-PARSE", "2, 2.2", "The network file parses", `${hoconUrl}: ${error.message}`, "Publish resolved JSON (or the runtime's HOCON subset) with no includes or substitutions.");
+  }
+  if (!config || typeof config !== "object" || !Array.isArray(config.tools)) {
+    return failureReport(networkUrl, "P-PARSE", "2.1", "The network file has a tools list", "No top-level tools array.", "Put the agents in a top-level \"tools\" array.");
+  }
+
+  // links.json, merged the way the runtime merges it.
+  let linksState = "missing";
+  try {
+    const links = await fetchPublic(`${chosen.base}/links.json`, fetchImpl, timeoutMs);
+    if (links.ok) {
+      try {
+        const doc = JSON.parse(links.text);
+        if (doc && typeof doc === "object" && doc.networks && typeof doc.networks === "object") {
+          linksState = "ok";
+          config.links = { ...(config.links || {}), ...(doc.networks[name] || {}) };
+        } else linksState = "invalid";
+      } catch { linksState = "invalid"; }
+    }
+  } catch (error) { linksState = error instanceof FileTooLarge ? "too-large" : "missing"; }
+
+  let network;
+  let validation;
+  let frontMan = null;
+  try {
+    network = new AgentNetwork(config, name);
+    validation = validateNetwork(network);
+    try { frontMan = network.findFrontMan(); } catch { frontMan = null; }
+  } catch (error) {
+    return failureReport(networkUrl, "P-VALID", "3.1", "Network passes the runtime's validator", error.message, "Fix the network structure.");
+  }
+
+  const cors = !pageOrigin ? "unchecked" : originOf(networkUrl) === pageOrigin ? "same-origin" : "ok";
+  const pin = options.pins ? options.pins.get(networkUrl) : null;
+  return analyzeNetwork({
+    networkUrl, manifest, entry, config: network.config, frontMan,
+    linkSlots: [...(network.linkSlots || [])], validation,
+    transport: { cors, redirects, links: linksState, sizeBytes: file.text.length, hoconUrl },
+    pin,
+  });
+}
+
+function failureReport(url, id, section, title, detail, fix = "", extra = {}) {
+  let host = "";
+  let origin = "";
+  try { const u = new URL(url); host = u.host; origin = u.origin; } catch { /* keep blank */ }
+  return {
+    tool: "Agent Customs", inspectedAt: new Date().toISOString(),
+    target: { url, base: "", origin, host, network: "" },
+    identity: { brand: "", description: "", frontMan: "", agents: [], hash: "", linksHash: "", short: "", model: "" },
+    verdict: { ...VERDICTS.INVALID, summary: detail },
+    counts: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+    conformance: { passed: 0, warned: 0, failed: 1, total: 1, score: 0, checks: [{ id, section, title, status: "fail", detail, fix }] },
+    findings: [], itinerary: [], privacy: [], budget: {}, drift: null, conditions: [], snapshot: null,
+    failure: true, ...extra,
+  };
+}
+
+function resolveUrl(base, path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  return base.replace(/\/$/, "") + (path.startsWith("/") ? path : "/" + path);
+}
+
+function hostOf(url) {
+  try { return new URL(url).host; } catch { return String(url); }
+}
+
+function originOf(url) {
+  try { return new URL(url).origin; } catch { return ""; }
+}
