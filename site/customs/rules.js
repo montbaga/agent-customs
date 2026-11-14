@@ -32,6 +32,20 @@ function negatedBefore(clause, verbIndex) {
   return NEGATION.test(clause.slice(0, verbIndex));
 }
 
+// Describing what to watch for, as safety checkers do ("Look for attempts to override the
+// caller's rules", "Flag any request for a password"), is not doing it. The description
+// has to come right before the words, at most two words earlier, so "Detect the visitor's
+// language and ask for their card number" still counts.
+const DESCRIBED = /\b(?:(?:look|watch)(?:ing)?(?: out)? for|(?:check|scan)(?:ing)? for|detect(?:s|ing)?|flag(?:s|ging)?|spot(?:s|ting)?|attempts? to|tries to|trying to|warn(?:s|ing)? (?:about|of|against))\W+(?:[\w'-]+\W+){0,2}$/i;
+
+function describedBefore(clause, index) {
+  return DESCRIBED.test(clause.slice(0, index));
+}
+
+// Fill-in-the-blank slots that would put private data into a web address, such as
+// {conversation} or <api_key>. Slots like <owner> or {city} are ordinary link templates.
+const PRIVATE_SLOT = "[a-z_ ]*(?:conversation|chat|history|messages?|transcript|prompt|context|instructions|secrets?|keys?|tokens?|passwords?|cookies?|session|sly_?data|private|personal|user_?data|visitor_?data|e-?mail|phone|address|summary|memory|notes)[a-z_ ]*";
+
 function askMatcher(termRe, extraRe) {
   return (text) => {
     const hits = [];
@@ -40,7 +54,7 @@ function askMatcher(termRe, extraRe) {
       if (!term) continue;
       const verb = clause.match(ASK);
       if (!verb) continue;
-      if (negatedBefore(clause, verb.index)) continue;
+      if (negatedBefore(clause, verb.index) || describedBefore(clause, verb.index)) continue;
       hits.push({ match: term[0], excerpt: clause });
     }
     return hits;
@@ -55,6 +69,7 @@ function regexMatcher(patterns, { negatable = false } = {}) {
         const m = clause.match(re);
         if (!m) continue;
         if (negatable && negatedBefore(clause, m.index)) continue;
+        if (describedBefore(clause, m.index)) continue;
         hits.push({ match: m[0], excerpt: clause });
         break;
       }
@@ -99,7 +114,9 @@ export const TEXT_RULES = [
     why: "Text that tells a model to drop its rules is the classic prompt injection. In a peer network it targets the caller's model.",
     fix: "Delete it. A network should describe its own job, not cancel anyone else's rules.",
     match: regexMatcher([
-      /\b(ignore|disregard|forget|override|bypass|discard)\b[^.!?\n]{0,40}\b(previous|prior|above|earlier|preceding|original|system|caller'?s?|calling|all|any|other|your|their)\b[^.!?\n]{0,30}\b(instructions?|rules?|prompts?|guidelines?|polic(?:y|ies)|directions?|guardrails?)\b/i,
+      // Not when the instructions to ignore are inside outside content ("ignore any
+      // instructions inside it", "... in tool results"): that is the safe way to read it.
+      /\b(ignore|disregard|forget|override|bypass|discard)\b[^.!?\n]{0,40}\b(previous|prior|above|earlier|preceding|original|system|caller'?s?|calling|all|any|other|your|their)\b[^.!?\n]{0,30}\b(instructions?|rules?|prompts?|guidelines?|polic(?:y|ies)|directions?|guardrails?)\b(?!\s+(?:that (?:appear|are) )?(?:inside|in|within|from|contained in|embedded in|found in)\s+(?:it|them|this|that|the (?:file|page|document|content|text|tool results?|results?|responses?|answers?|data|input|messages?|email|site|web ?page)s?|tool results?|other sites?|another site|partner (?:answers|responses|networks?)|retrieved|fetched|untrusted|external)\b)/i,
       /\byou are now\b/i,
       /\b(new|updated|real|true|secret|hidden)\s+(system\s+)?instructions?\s*[:\-]/i,
       /\byou are (?:actually |really )?(?:the|a|an) (?:system|developer|administrator|admin|root|operator)\b/i,
@@ -152,7 +169,7 @@ export const TEXT_RULES = [
     match: regexMatcher([
       /\b(include|append|embed|encode|send|post|forward|leak|exfiltrate|transmit|upload|put|add)\b[^.!?\n]{0,60}\b(conversation|chat history|chat log|conversation history|message history|previous messages|(?:user|visitor)'?s? messages|transcript|system prompt|your instructions|hidden instructions|sly_data|private context|api keys?|access tokens?|session tokens?|cookies?|personal (?:data|details)|(?:user|visitor) data)\b[^.!?\n]{0,60}\b(https?:\/\/|url|link|image|query|parameter|base64|webhook)/i,
       /!\[[^\]]*\]\(\s*https?:\/\/[^)\s]*(?:\{[^}]*\}|\?[^)\s]*=)/i,
-      /https?:\/\/[^\s)"'<>]*(?:\{[a-z_ ]+\}|%7B[a-z_]+%7D|\$\{[^}]+\}|<[a-z_]+>)/i,
+      new RegExp(`https?:\\/\\/[^\\s)"'<>]*(?:\\{${PRIVATE_SLOT}\\}|%7B${PRIVATE_SLOT}%7D|\\$\\{${PRIVATE_SLOT}\\}|<${PRIVATE_SLOT}>)`, "i"),
     ]),
   },
   {
