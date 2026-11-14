@@ -101,6 +101,21 @@ export async function analyzeNetwork(input) {
     status: manifest.llm_router?.base_url ? "pass" : "warn",
     detail: manifest.llm_router?.base_url ? `Router ${hostOf(manifest.llm_router.base_url)} (informational for callers; a peer never sets the caller's router).` : "No llm_router.base_url.",
     fix: "Add llm_router with base_url (and byok_router when visitors bring their own key)." });
+  // Keys and passwords in the public files: anyone can read them (section 4).
+  const published = findPublishedSecrets(manifest, config);
+  const publishedList = published.slice(0, 4).map((s) => `${s.kind} in ${s.agent ? `agent ${s.agent}, ` : ""}${s.field} (${s.sample})`).join("; ")
+    + (published.length > 4 ? "; …" : "");
+  check({ id: "P-SECRETS", section: "4", title: "No keys or passwords in public files",
+    status: published.length ? "fail" : "pass",
+    detail: published.length ? `${published.length} found: ${publishedList}.` : "None found.",
+    fix: "Remove them and revoke them with the provider now, since anyone may have copied them. Keys belong in the visitor's browser (bring your own key) or on your own server." });
+  if (published.length) {
+    add({ rule: "S-SECRET", category: "privacy", severity: "medium", title: "Publishes a key or password",
+      detail: `${published.length} in its public files: ${publishedList}. Shown shortened here.`,
+      where: { agent: published[0].agent, field: published[0].field },
+      why: "Anyone can read these files, so anyone can copy the key and use it, on the owner's account and bill.",
+      fix: "Remove the key, revoke it with the provider, and keep keys out of published files." });
+  }
   const policyMode = peerPolicyOf(manifest);
   check({ id: "P-POLICY", section: "1, 3.3", title: "Manifest declares a peer policy",
     status: policyMode ? "pass" : "warn",
@@ -627,6 +642,56 @@ function isMcpRef(ref) {
 
 function sameNetwork(a, b) {
   try { return new URL(a).href.replace(/\/$/, "") === new URL(b).href.replace(/\/$/, ""); } catch { return false; }
+}
+
+// Key formats that are secret by themselves, wherever they appear. Each needs a digit, so
+// ordinary hyphenated words do not match.
+const SECRET_FORMATS = [
+  ["an OpenAI, Anthropic or OpenRouter key", /\bsk-(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{20,}/],
+  ["a Google API key", /\bAIza(?=[0-9A-Za-z_-]*\d)[0-9A-Za-z_-]{35}/],
+  ["a Groq key", /\bgsk_(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{20,}/],
+  ["a GitHub token", /\b(?:gh[pousr]_(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,})/],
+  ["an AWS access key", /\bAKIA[0-9A-Z]{16}\b/],
+  ["a Slack token", /\bxox[abprs]-(?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{10,}/],
+  ["a Stripe secret key", /\b(?:sk|rk)_live_[0-9A-Za-z]{20,}/],
+  ["a private key", /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/],
+  ["a signed token (JWT)", /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/],
+];
+// Field names that hold a secret, and values that only stand in for one.
+const SECRET_FIELD = /^(?:api[_-]?key|apikey|secret|client[_-]?secret|(?:access|auth|bearer|backend|refresh|id)[_-]?token|token|bearer|password|passwd|pwd|private[_-]?key|authorization)$/i;
+const STAND_IN = /demo|test|example|sample|fake|dummy|placeholder|redacted|changeme|your[_ -]|^my[_ -]|^<.*>$|^\{\{.*\}\}$|^\$\{.*\}$|^x{3,}$|^\*{3,}$/i;
+
+function looksSecret(value) {
+  if (/^Bearer\s+\S{16,}$/i.test(value)) return true;
+  return value.length >= 8 && !/\s/.test(value) && !STAND_IN.test(value);
+}
+
+// Enough of a secret to recognise it, never enough to use it.
+function maskSecret(value) {
+  return value.length <= 10 ? "•••" : `${value.slice(0, 4)}…${value.slice(-2)}`;
+}
+
+/**
+ * Keys, tokens and passwords in the manifest or the network file: values in a known key
+ * format anywhere, and real-looking values of fields named like secrets.
+ *
+ * :return: [{kind, agent, field, sample}], with each secret shortened in sample.
+ */
+function findPublishedSecrets(manifest, config) {
+  const found = [];
+  walkStrings({ manifest, network: config }, (text, path) => {
+    const last = path[path.length - 1];
+    if (typeof last === "string" && last.startsWith("key:")) return;
+    const place = placeOf(path, config);
+    const format = SECRET_FORMATS.find(([, re]) => re.test(text));
+    if (format) {
+      const value = text.match(format[1])[0];
+      found.push({ kind: format[0], agent: place.agent, field: place.field, sample: format[0] === "a private key" ? "BEGIN PRIVATE KEY" : maskSecret(value) });
+    } else if (typeof last === "string" && SECRET_FIELD.test(last) && looksSecret(text)) {
+      found.push({ kind: `a value for "${last}"`, agent: place.agent, field: place.field, sample: maskSecret(text) });
+    }
+  });
+  return found;
 }
 
 function walkStrings(value, fn, path = []) {

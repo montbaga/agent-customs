@@ -22,7 +22,7 @@ The spec lists the missing pieces as future work: conformance tests, integrity p
 
 Agent Customs loads a published agent network the same way a caller's runtime does and gives it one verdict: Cleared, Cleared with conditions, Held for review or Entry denied. It runs five groups of checks:
 
-- Papers: conformance with MVP profile 0.2, one check at a time, each with its spec section and a fix for the publisher. It uses the runtime's own parser and validator.
+- Papers: conformance with MVP profile 0.2, one check at a time, each with its spec section and a fix for the publisher. It uses the runtime's own parser and validator, and flags keys or passwords left in the public files (shown shortened).
 - Contraband: instructions hidden in invisible Unicode tag characters (decoded and shown in red), zero-width and right-to-left tricks, prompt injection, requests for passwords, one-time codes and card details, image links that leak the conversation, orders aimed at the calling site's assistant, and notes written to fool a reviewer.
 - Itinerary: every other site, MCP server and code bundle the network can reach.
 - Privacy: any private context (`sly_data`) the network lets cross a site boundary.
@@ -47,14 +47,14 @@ You can use it in three ways. On the website, paste a network URL to get a repor
 - The guard wraps `engine._compile` on one engine instance. Every partner network passes through that step after it is fetched and validated and before it runs, which is why the guard needs no runtime changes.
 - Fingerprints are SHA-256 over canonical JSON, with a pure JavaScript fallback for browsers without Web Crypto.
 - `DESIGN.md` describes the page: three colors, one live effect in the hero (a WebGL ink shader that stops off screen and holds still under reduced motion), and a replay of a real inspection that a test checks against the engine. The page loads no third-party scripts, because any script on it could read the visitor's AI key.
-- 57 Node tests, including end-to-end runs of the guard inside the real runtime engine with scripted models, plus a headless-browser check that clicks through the page on desktop and phone and checks each verdict, the approval dialogs and the model picker.
+- 59 Node tests, including end-to-end runs of the guard inside the real runtime engine with scripted models, plus a headless-browser check that clicks through the page on desktop and phone and checks each verdict, the approval dialogs and the model picker.
 - Started and built during the submission period (November 2026).
 
 ### Tools shared with the community
 
 All are Apache 2.0, in the public repository, and each one works on its own:
 
-- The inspection engine (`site/customs/`) checks any agent network for conformance and safety, in a browser or in Node. It could serve as the validation script the agentic-web README asks for.
+- The inspection engine (`site/customs/`) checks any agent network for conformance and safety, in a browser or in Node, and gives the same verdict in both.
 - The guard (`site/customs/guard.js`) drops into any agentic site with one line.
 - The test range (`tools/make-range.mjs`) has deliberately unsafe sample networks (a smuggler, an impersonator, a budget burner and a rug pull) next to an honest one, for testing any runtime or checker. Every attacker address uses the reserved `.invalid` domain.
 - Smaller tools: a command-line inspector (`tools/inspect-local.mjs`), a local server that applies Netlify-style `_headers` (`tools/serve.mjs`), and a headless-browser smoke test with no dependencies (`tools/smoke.mjs`).
@@ -62,6 +62,10 @@ All are Apache 2.0, in the public repository, and each one works on its own:
 ### Why it's different
 
 Most agentic websites put an assistant in front of a business. This one is about the agentic web itself: it is the checkpoint that makes it reasonable to link your agent to someone else's.
+
+A conformance checker tells a publisher, before launch, whether a site follows the spec. Agent Customs keeps protecting visitors while partners actually run. The guard inspects each partner inside the runtime, at the moment it loads and before any of its agents run. It remembers the exact version the visitor approved, and when the partner changes later it shows what changed and waits for the visitor.
+
+Before submitting, I ran it against every agent network other entrants had published by mid-November 2026, 21 in all. That run exposed three false alarms (a checker's own description of attacks, a safe "ignore instructions inside the file" rule, and a link template), and I fixed them. Now the honest networks come out Cleared, and the rest are flagged for specific, listed reasons, such as an open peer policy.
 
 A few choices came straight from the spec's threat model. No verdict comes from a model, because the officer reads text written by attackers, and refusals sent to a calling agent contain only Agent Customs' own rule titles, never the attacker's words. Consent comes first: inspections the officer starts use the runtime's own consent card, and the guard runs after the partner's card, never before. The officer cannot approve a network on its own either; approvals wait for the visitor's click. The checks read everything the model reads, including an agent's `command` text and the input schema a calling model sees, not just its instructions. Honest sites are not flagged: the rules understand negation, so "Never ask for passwords" passes and "Never forget to ask for the CVV" does not, and the challenge's own examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared.
 
