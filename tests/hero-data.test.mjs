@@ -6,14 +6,14 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { EXAMPLES } from "../site/desk.js";
+import { EXAMPLES, RANGE_ORIGIN } from "../site/desk.js";
 import { CHECK_NAMES, HERO_DEMO } from "../site/hero-data.js";
 import { inspectNetworkUrl } from "../site/customs/inspect.js";
 import { normalizeForRules } from "../site/customs/unicode.js";
 import { fsFetch } from "../tools/fs-fetch.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const RANGE = "http://localhost:8081";
+const RANGE = RANGE_ORIGIN;
 const fetchImpl = fsFetch({ [RANGE]: path.join(ROOT, "range") });
 const RANK = ["critical", "high", "medium", "low", "info"];
 const CATEGORY = { contraband: "contraband", itinerary: "itinerary", privacy: "privacy", identity: "identity" };

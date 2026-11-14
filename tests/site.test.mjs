@@ -10,12 +10,15 @@ import { ActionRegistry } from "../site/runtime/actions.js";
 import { AgentNetwork, validateNetwork } from "../site/runtime/kernel.js";
 import { buildToolTable, runAgent } from "../site/runtime/runner.js";
 import { TraceBus } from "../site/runtime/trace.js";
+import { RANGE_ORIGIN } from "../site/desk.js";
 import { fsFetch } from "../tools/fs-fetch.mjs";
 import { ScriptedModel } from "./scripted_model.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = "http://127.0.0.1:8080";
-const RANGE = "http://localhost:8081";
+const RANGE = RANGE_ORIGIN;
+const RANGE_HOST = new URL(RANGE).host;
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const NETWORK = "agent_customs";
 const requests = [];
 const serve = fsFetch({ [BASE]: path.join(ROOT, "site"), [RANGE]: path.join(ROOT, "range") });
@@ -63,7 +66,7 @@ test("the officer is offered the website tools, its analyst and both test-range 
     "sunny_bakery_sunny_bakery", "shady_pizza_shady_pizza", "render_cruse"]) {
     assert.ok(tools.includes(name), `missing ${name}`);
   }
-  for (const partner of ["http://localhost:8081/sunny_bakery/sunny_bakery", "http://localhost:8081/shady_pizza/shady_pizza"]) {
+  for (const partner of [`${RANGE}/sunny_bakery/sunny_bakery`, `${RANGE}/shady_pizza/shady_pizza`]) {
     assert.ok(manifest.allowed_peers.includes(new URL(partner).origin));
     assert.ok(config.link_labels[partner]);
   }
@@ -74,7 +77,7 @@ test("an inspection the assistant starts asks the visitor first; declining fetch
   const before = requests.length;
   const result = await callTool("inspect_agent_network", { url: `${RANGE}/shady_pizza/shady_pizza` });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /did not allow contacting localhost:8081/);
+  assert.match(result.reason, new RegExp(`did not allow contacting ${escapeRe(RANGE_HOST)}`));
   assert.equal(requests.length, before);
 });
 
@@ -82,7 +85,7 @@ test("an allowed inspection returns the verdict, and details quote the hidden te
   let asked = null;
   desk.askContact = async (info) => { asked = info; return true; };
   const result = await callTool("inspect_agent_network", { url: `${RANGE}/shady_pizza/shady_pizza` });
-  assert.equal(asked.host, "localhost:8081");
+  assert.equal(asked.host, RANGE_HOST);
   assert.ok(asked.purpose.length <= 140, "the consent card shows the whole purpose");
   assert.equal(result.ok, true);
   assert.equal(result.report.verdict, "DENIED");
