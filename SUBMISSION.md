@@ -26,7 +26,7 @@ Agent Customs loads a published agent network the same way a caller's runtime do
 - Contraband: instructions hidden in invisible Unicode tag characters (decoded and shown in red), zero-width and right-to-left tricks, prompt injection, requests for passwords, one-time codes and card details, image links that leak the conversation, orders aimed at the calling site's assistant, and notes written to fool a reviewer.
 - Itinerary: every other site, MCP server and code bundle the network can reach.
 - Privacy: any private context (`sly_data`) the network lets cross a site boundary.
-- Identity: a SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, and a line-by-line diff when a publisher changes a network after you approved it.
+- Identity: a SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, and a line-by-line diff when a publisher changes a network or its manifest after you approved it.
 
 You can use it in three ways. On the website, paste a network URL to get a report, approve a version, or compare two versions. In the chat, the Customs Officer (the site's own agent network, running on the visitor's key) inspects networks, explains findings, compares versions and calls partner networks on another site; every partner it calls goes through the guard first. In any other agentic site, one line, `installCustomsGuard(engine)`, inspects each partner network after the visitor's consent card and before any of its agents run. The guard checks the exact objects the runtime compiled, so a partner can't show the inspector one file and run another. A denied partner fails closed with a plain reason the calling agent can pass on, a partner that changed since approval waits for the visitor, and no runtime file is edited.
 
@@ -47,7 +47,7 @@ You can use it in three ways. On the website, paste a network URL to get a repor
 - The guard wraps `engine._compile` on one engine instance. Every partner network passes through that step after it is fetched and validated and before it runs, which is why the guard needs no runtime changes.
 - Fingerprints are SHA-256 over canonical JSON, with a pure JavaScript fallback for browsers without Web Crypto.
 - `DESIGN.md` describes the page: three colors, one live effect in the hero (a WebGL ink shader that stops off screen and holds still under reduced motion), and a replay of a real inspection that a test checks against the engine. The page loads no third-party scripts, because any script on it could read the visitor's AI key.
-- 45 Node tests, including end-to-end runs of the guard inside the real runtime engine with scripted models, plus headless-browser checks of the desktop and phone layouts.
+- 57 Node tests, including end-to-end runs of the guard inside the real runtime engine with scripted models, plus a headless-browser check that clicks through the page on desktop and phone and checks each verdict, the approval dialogs and the model picker.
 - Started and built during the submission period (November 2026).
 
 ### Tools shared with the community
@@ -63,7 +63,7 @@ All are Apache 2.0, in the public repository, and each one works on its own:
 
 Most agentic websites put an assistant in front of a business. This one is about the agentic web itself: it is the checkpoint that makes it reasonable to link your agent to someone else's.
 
-A few choices came straight from the spec's threat model. No verdict comes from a model, because the officer reads text written by attackers, and refusals sent to a calling agent contain only Agent Customs' own rule titles, never the attacker's words. Consent comes first: inspections the officer starts use the runtime's own consent card, and the guard runs after the partner's card, never before. Honest sites are not flagged: the rules understand negation, so "Never ask for passwords" passes and "Never forget to ask for the CVV" does not, and the challenge's own examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared.
+A few choices came straight from the spec's threat model. No verdict comes from a model, because the officer reads text written by attackers, and refusals sent to a calling agent contain only Agent Customs' own rule titles, never the attacker's words. Consent comes first: inspections the officer starts use the runtime's own consent card, and the guard runs after the partner's card, never before. The officer cannot approve a network on its own either; approvals wait for the visitor's click. The checks read everything the model reads, including an agent's `command` text and the input schema a calling model sees, not just its instructions. Honest sites are not flagged: the rules understand negation, so "Never ask for passwords" passes and "Never forget to ask for the CVV" does not, and the challenge's own examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared.
 
 ### What's next
 

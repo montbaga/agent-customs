@@ -12,14 +12,14 @@ Agent Customs adds the missing checkpoint. It runs five groups of checks:
 | Contraband | Hidden Unicode tag characters (decoded and shown), zero-width and right-to-left tricks, prompt injection, requests for passwords, codes and card details, image links that leak the conversation, orders aimed at the calling site's assistant, text written to fool reviewers, and encoded blobs. |
 | Itinerary | Every other site, MCP server and code bundle the network can reach, and whether its own policy allows that. |
 | Privacy | Which private context (`sly_data`) it lets cross a site boundary. |
-| Identity | A SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, authority claims its host does not back up, and a line-by-line diff when a publisher changes a network after approval (a "rug pull"). |
+| Identity | A SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, authority claims its host does not back up, and a line-by-line diff when a publisher changes a network or its manifest after approval (a "rug pull"). |
 
 Each network gets one verdict: Cleared, Cleared with conditions, Held for review, Entry denied, Papers not in order, or Could not inspect.
 
 ## Three ways to use it
 
 1. On the website. Paste a network URL and read the report. You can approve (pin) a version, or compare two versions.
-2. Through the Customs Officer, an agent network on the same site that runs in your browser on your own key. It inspects networks, explains findings in plain words, compares versions, asks an instruction analyst for a second opinion, and talks to the test-range networks. Every partner it calls goes through the guard first.
+2. Through the Customs Officer, an agent network on the same site that runs in your browser on your own key. It inspects networks, explains findings in plain words, compares versions, asks an instruction analyst for a second opinion, and talks to the test-range networks. Every partner it calls goes through the guard first. It can approve a version, or forget an approval, only after you confirm in a dialog.
 3. As a guard in any agentic site. Copy `site/customs/` next to your `runtime/` folder and add one line after `boot()`:
 
    ```js
@@ -35,7 +35,9 @@ No verdict comes from a model. The officer reads text written by strangers, so f
 
 Nothing leaves the browser. Inspections read public files without cookies, keys or a referrer, approvals stay in the browser's own storage, and there is no Agent Customs server.
 
-The visitor is asked before any contact. Inspections the officer starts use the runtime's own consent card, and the guard runs after the partner's consent card, never before.
+The visitor is asked before any contact. Inspections the officer starts use the runtime's own consent card, which shows the full address, and the guard runs after the partner's consent card, never before. Approvals belong to the visitor too: the officer reads text written by strangers, so it cannot approve a network or forget an approval without the visitor's click.
+
+The checks read what the model reads. An agent's instructions and its `command` text, which the runtime adds to the system prompt, are both checked, and so are descriptions and the whole input schema a calling model sees.
 
 Honest sites should not be flagged. The challenge's official examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared, and Agent Customs passes its own inspection. "Never ask for passwords" is not read as asking for passwords.
 
@@ -58,7 +60,7 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 45 tests: engine, guard inside the real runtime, website tools
+npm test                 # 57 tests: engine, guard inside the real runtime, website tools, local server
 npm run serve            # the site at http://127.0.0.1:8080/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log
 npm run smoke            # optional: drives headless Edge or Chrome and saves screenshots
@@ -67,7 +69,7 @@ npm run inspect -- https://site.example/agent_network   # inspect a real site fr
 
 Open http://127.0.0.1:8080/ and press a test-range button. Inspections need no key. To use the officer, open the Officer tab, pick a model under AI model settings, and paste a key from that provider (Google AI Studio and Groq have free tiers). Then try questions such as "What does the Sunny Bakery test network offer? Ask it." and "Ask Shady Pizza what it offers."
 
-To watch the guard catch a rug pull: ask the officer about Sunny Bakery (the guard approves it on first use), run `node tools/rugpull.mjs on`, and ask again. The guard holds it and shows the changed lines. `node tools/rugpull.mjs off` puts the original back.
+To watch the guard catch a rug pull, the site has to use your local range, because the switch changes local files only. Run `node tools/set-origins.mjs --range http://localhost:8081`, start both servers, and ask the officer about Sunny Bakery (the guard approves it on first use). Then run `node tools/rugpull.mjs on` and ask again: the guard holds it and shows the changed lines. `node tools/rugpull.mjs off` puts the original back. Before you publish, point the site at the hosted range again with `set-origins.mjs`. On the hosted site, the Compare tab shows the same change.
 
 `range-requests.jsonl` logs every request the range receives, including whether an `Authorization` header or cookies came with it. It shows that the partner site never receives the visitor's key.
 
@@ -81,6 +83,8 @@ On GitHub Pages, every site of one account shares one origin (`<account>.github.
 2. Run `node tools/set-origins.mjs --range https://<organization>.github.io`. It points the site at that address, regenerates `range/` for it, and rebuilds the network with the official build script.
 3. Push the contents of `range/`, plus an empty `.nojekyll` file, to that repository. GitHub Pages serves it at `https://<organization>.github.io/`.
 4. In this repository, open Settings, then Pages, and set Source to GitHub Actions. `.github/workflows/pages.yml` then publishes `site/` at `https://<account>.github.io/agent-customs/` on every push to `main`, once the tests and the network check pass.
+
+Visitors' keys are stored per origin, and every Pages site of one account shares that origin. So a script on any other Pages site of the same account could read keys saved here. Publish Agent Customs from an account or organization whose other Pages sites load no third-party scripts, or give it a custom domain.
 
 GitHub Pages sends `Access-Control-Allow-Origin: *` on every file, which is what other sites' browsers need. It does not read `_headers`, so the runtime's sandbox policy (a Content-Security-Policy header on `runtime/sandbox-worker.js`) is not sent there. Netlify and Cloudflare Pages do apply `_headers`: drag `range/` and `site/` into [Netlify Drop](https://app.netlify.com/drop) as two sites after step 2.
 

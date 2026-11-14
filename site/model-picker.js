@@ -223,7 +223,7 @@ export function explainProviderError(text, provider = "The AI provider", model =
   let advice;
   if (status === 401 || says(/API_KEY_INVALID|api key not valid|invalid api key|incorrect api key/i)) {
     advice = `${provider} did not accept the key. Paste it again under AI model settings.`;
-  } else if (says(/free[_ ]?tier|limit:s*0|paid tier/i)) {
+  } else if (says(/free[_ ]?tier|limit:\s*0\b|paid tier/i)) {
     // Google answers this way when a model is not part of a free-tier key at all.
     advice = `${model} is not part of this key's free tier. Turn on billing for the key with ${provider}, or choose a model the free tier includes, such as a Flash one.`;
   } else if (status === 429 || says(/RESOURCE_EXHAUSTED|quota|rate limit/i)) {

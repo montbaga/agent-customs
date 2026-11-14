@@ -5,7 +5,7 @@
 // rules. Operations refuse by returning {ok: false, reason} and change nothing.
 // Nothing here talks to a model: inspections are deterministic.
 
-import { compactReport } from "./customs/analyze.js";
+import { compactReport, reanalyze } from "./customs/analyze.js";
 import { diffSnapshots } from "./customs/diff.js";
 import { inspectNetworkUrl } from "./customs/inspect.js";
 import { PinStore, pinFromReport } from "./customs/pins.js";
@@ -26,7 +26,8 @@ export const EXAMPLES = [
   { id: "harbor", group: "official", label: "Marrow Point Harbor Tours", note: "Cognizant example", url: `${RANGE_ORIGIN}/official/harbor_tours_agentified/marrow_point_harbor_tours`, page: `${RANGE_ORIGIN}/official/harbor_tours_agentified/` },
 ];
 
-const NOT_APPROVABLE = new Set(["DENIED", "INVALID", "UNREADABLE"]);
+// Verdicts that can never be approved, on the page or by the officer.
+export const NOT_APPROVABLE = new Set(["DENIED", "INVALID", "UNREADABLE"]);
 
 /**
  * The inspection desk: reports from this visit, approvals (pins) and the border log.
@@ -51,6 +52,9 @@ export class CustomsDesk {
     // Set by site.js: async ({host, purpose}) => true when the visitor allows the contact.
     // Contacts the assistant starts need the visitor's OK first (spec sections 3.2 and 5).
     this.askContact = null;
+    // Set by site.js: async ({action, report, url}) => true when the visitor agrees. The
+    // officer reads text written by strangers, so it cannot change approvals on its own.
+    this.confirmApproval = null;
     this.pins.onChange?.(() => this.emit("pins"));
   }
 
@@ -78,17 +82,21 @@ export class CustomsDesk {
     const input = String(url || "").trim();
     let host;
     let origin;
+    let address;
     try {
       const u = new URL(input);
       if (!/^https?:$/.test(u.protocol)) throw new Error("scheme");
       host = u.host;
       origin = u.origin;
+      // What the inspection requests: the query and fragment are dropped (inspect.js).
+      address = `${u.origin}${u.pathname}`;
     } catch {
       return { ok: false, reason: "That is not a full web address. Give the network URL, starting with https://.", field: "url" };
     }
     if (askFirst && origin !== this.pageOrigin) {
+      // The card shows the whole address, because the officer chose it and its path is sent.
       const allowed = typeof this.askContact === "function"
-        ? await this.askContact({ host, purpose: "Inspection: read its agent-manifest.json, network file and links.json. Sends no chat text, cookies or key." })
+        ? await this.askContact({ host, address, purpose: "Inspection: reads the public agent files at this address. Sends no cookies or key." })
         : false;
       if (!allowed) return { ok: false, reason: `The visitor did not allow contacting ${host}. Nothing was fetched.` };
     }
@@ -151,7 +159,10 @@ export class CustomsDesk {
       return {
         ok: true, network: report.target.url, agent,
         description: `«${revealHidden(a.description)}»`,
-        instructions: `«${clip(revealHidden(a.instructions), 6000)}»`,
+        // Only the part shown is revealed: revealing makes text longer, never shorter.
+        instructions: `«${clip(revealHidden(a.instructions.slice(0, 6000)), 6000)}»`,
+        // The model reads this after the instructions (the runtime adds it to the system prompt).
+        command: a.command ? `«${clip(revealHidden(a.command.slice(0, 3000)), 3000)}»` : undefined,
         tools: a.tools,
         findings: report.findings.filter((f) => f.where?.agent === agent).map((f) => `${f.id} ${f.severity}: ${f.title}`),
         note: quoted + " Invisible characters are shown as ⟦U+XXXX⟧ and hidden tag text as ⟦hidden text: \"…\"⟧.",
@@ -209,30 +220,64 @@ export class CustomsDesk {
   }
 
   /**
-   * Approve (pin) the version inspected in this visit.
+   * Approve (pin) the version inspected in this visit. The page's Approve button calls
+   * this after the visitor's click; the officer's tool passes askFirst, so the visitor
+   * confirms in a dialog first.
+   *
+   * :param url: The inspected network URL.
+   * :param options.askFirst: Ask the visitor before saving.
    */
-  pin(url) {
+  async pin(url, { askFirst = false } = {}) {
     const report = this.reportFor(url);
     if (!report) return { ok: false, reason: "Inspect that network first, so the approval covers what you reviewed.", field: "url" };
     if (!report.snapshot) return { ok: false, reason: "That inspection could not read the network, so there is nothing to approve.", field: "url" };
     if (NOT_APPROVABLE.has(report.verdict.code)) {
       return { ok: false, reason: `Agent Customs does not approve a network whose verdict is "${report.verdict.stamp}".`, field: "url" };
     }
-    const pin = pinFromReport(report, "manual");
+    if (askFirst && !(await this.askVisitor("approve", report.target.url, report))) {
+      return { ok: false, reason: "The visitor did not approve it, so nothing was saved.", field: "url" };
+    }
+    // Redo the report against this approval, so its verdict no longer counts the changes
+    // the visitor has just accepted, and store that verdict with the approval.
+    const fresh = await reanalyze(report, pinFromReport(report, "manual"));
+    const pin = pinFromReport(fresh, "manual");
     this.pins.set(report.target.url, pin);
+    this.replace(report, fresh);
     this.emit("pins");
     return { ok: true, pinned: { url: pin.url, fingerprint: pin.short, verdict: pin.verdict, pinnedAt: pin.pinnedAt } };
   }
 
   /**
-   * Forget an approval.
+   * Forget an approval. The officer's tool passes askFirst, as for pin().
+   *
+   * :param url: The approved network URL.
+   * :param options.askFirst: Ask the visitor before forgetting.
    */
-  unpin(url) {
-    const key = this.reportFor(url)?.target.url || url;
-    const existed = this.pins.delete(key);
-    if (!existed) return { ok: false, reason: "No approval is stored for that URL in this browser.", field: "url" };
+  async unpin(url, { askFirst = false } = {}) {
+    const report = this.reportFor(url);
+    const key = report?.target.url || url;
+    if (!this.pins.get(key)) return { ok: false, reason: "No approval is stored for that URL in this browser.", field: "url" };
+    if (askFirst && !(await this.askVisitor("forget", key, report))) {
+      return { ok: false, reason: "The visitor kept the approval.", field: "url" };
+    }
+    this.pins.delete(key);
+    if (report) this.replace(report, await reanalyze(report, null));
     this.emit("pins");
     return { ok: true, unpinned: normalize(key) };
+  }
+
+  // Ask the visitor about an approval the officer requested. With no dialog wired up, or
+  // if the dialog fails, the answer is no.
+  async askVisitor(action, url, report) {
+    if (typeof this.confirmApproval !== "function") return false;
+    try { return !!(await this.confirmApproval({ action, url, report })); } catch { return false; }
+  }
+
+  // Swap a stored report for its redone version, wherever the desk keeps it.
+  replace(old, fresh) {
+    if (old === fresh) return;
+    for (const [key, value] of this.reports) if (value === old) this.reports.set(key, fresh);
+    if (this.latest === old) this.latest = fresh;
   }
 
   /**

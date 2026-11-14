@@ -108,9 +108,15 @@ try {
     await sleep(500);
     return evaluate("({stamp: document.querySelector('.stamp strong')?.textContent, findings: document.querySelectorAll('.finding').length, summary: document.querySelector('.report-summary')?.textContent})");
   };
-  for (const [label, file] of [["Shady Pizza", "02-shady-pizza"], ["Bank look-alike", "03-bank-lookalike"], ["Loop Maze", "04-loop-maze"], ["Sunny Bakery", "05-sunny-bakery"]]) {
+  for (const [label, file, expected] of [
+    ["Shady Pizza", "02-shady-pizza", "Entry denied"],
+    ["Bank look-alike", "03-bank-lookalike", "Entry denied"],
+    ["Loop Maze", "04-loop-maze", "Held for review"],
+    ["Sunny Bakery", "05-sunny-bakery", "Cleared"],
+  ]) {
     const r = await inspect(label);
     console.log(`  ${label}: ${r.stamp} · ${r.findings} finding(s) · ${r.summary}`);
+    if (r.stamp !== expected) problems.push(`${label}: expected "${expected}", got "${r.stamp}"`);
     await evaluate("document.querySelector('#report-section').scrollIntoView()");
     const box = await evaluate("(() => { const r = document.querySelector('#report').getBoundingClientRect(); return {x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}; })()");
     const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: box.x, y: box.y, width: box.w, height: Math.min(box.h, 5000), scale: 1 } });
@@ -121,6 +127,28 @@ try {
   // Approve the bakery, then compare it with the rug-pulled version.
   await evaluate("[...document.querySelectorAll('.report-actions button')].find(b => /Approve/.test(b.textContent))?.click()");
   await waitFor("document.querySelectorAll('#pins-list li .ptitle').length > 0");
+  await waitFor("[...document.querySelectorAll('.report-actions button')].some((b) => b.textContent === 'Forget approval')");
+  const approved = await evaluate(`({
+    identity: [...document.querySelectorAll('#report .light')].find((l) => /Identity/.test(l.textContent))?.querySelector('.value')?.textContent,
+    notice: document.querySelector('.report-actions .toast')?.textContent || "",
+  })`);
+  console.log(`  after approving: ${approved.identity} · "${approved.notice}"`);
+  if (approved.identity !== "Matches your approval" || !/^Approved/.test(approved.notice)) problems.push(`after approving the bakery: identity "${approved.identity}", message "${approved.notice}"`);
+  // Dialogs: answer one, then report what it asked and what came of it.
+  const answerDialog = (start, button, after = "") => evaluate(`(async () => {
+    const { desk } = await import(new URL("desk.js", location.href).href);
+    const answer = (${start})();
+    await new Promise((r) => setTimeout(r, 300));
+    const dialog = document.querySelector("dialog.customs-review");
+    const title = dialog?.querySelector("h2")?.textContent || "";
+    [...(dialog?.querySelectorAll("button") || [])].find((b) => b.textContent === ${JSON.stringify(button)})?.click();
+    const result = await answer;
+    return { title, result, ${after} };
+  })()`);
+  // When the officer asks to forget an approval, the visitor is asked first. Say no.
+  const asked = await answerDialog("() => desk.unpin(desk.latest.target.url, { askFirst: true })", "Keep it", "kept: !!desk.pins.get(desk.latest.target.url)");
+  console.log(`  officer asks to forget: "${asked.title}" · ${asked.result.ok ? "forgotten" : "kept"}`);
+  if (!/^Forget your approval/.test(asked.title) || asked.result.ok !== false || !asked.kept) problems.push(`the officer's request to forget an approval was not put to the visitor: ${JSON.stringify(asked)}`);
   await evaluate("document.querySelector('#tab-approvals').click(); document.querySelector('#workspace').scrollIntoView()");
   await sleep(300);
   await shot("06a-approvals", { full: false });
@@ -130,6 +158,21 @@ try {
   await evaluate("document.querySelector('#tab-compare').click(); document.querySelector('#compare-demo').click()");
   await waitFor("document.querySelectorAll('#compare-result .changes li').length > 0");
   console.log("  compare:", await evaluate("[...document.querySelectorAll('#compare-result .changes li strong')].map(s => s.textContent).join(' | ')"));
+  // The guard's dialog for a held partner (the rug-pulled bakery): turn it away.
+  const held = await answerDialog(`async () => { const { confirmEntryDialog } = await import(new URL("customs/guard-ui.js", location.href).href);
+    return confirmEntryDialog(desk.comparison.after); }`, "Turn it away");
+  console.log(`  guard asks: "${held.title}" · ${held.result ? "let in" : "turned away"}`);
+  if (!/^Let /.test(held.title) || held.result !== false) problems.push(`the guard's review dialog did not work: ${JSON.stringify(held)}`);
+  // The model picker: choosing another provider shows its models and empties the key field.
+  const picked = await evaluate(`(() => {
+    const key = document.querySelector("#mp-key");
+    key.value = "a key typed for another provider";
+    document.querySelector('#mp-cards input[value="claude"]').click();
+    return { cards: document.querySelectorAll("#mp-cards .mp-card").length, keyCleared: key.value === "",
+      model: document.querySelector("#mp-model").selectedOptions[0]?.textContent || "", link: document.querySelector("#mp-key-link").href };
+  })()`);
+  console.log(`  model picker: ${picked.cards} cards · Claude shows "${picked.model}" · key field ${picked.keyCleared ? "emptied" : "kept"}`);
+  if (picked.cards !== 5 || !picked.keyCleared || !/Claude/.test(picked.model) || !/anthropic/.test(picked.link)) problems.push(`model picker: ${JSON.stringify(picked)}`);
   await evaluate("document.querySelector('#workspace').scrollIntoView()");
   await sleep(300);
   const desk = await evaluate("(() => { const r = document.querySelector('#workspace').getBoundingClientRect(); return {x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}; })()");

@@ -39,6 +39,38 @@ export function targetsFor(input) {
   return { candidates: [{ base: folder(segs.slice(0, -1)), name: last }, { base: folder(segs), name: null }] };
 }
 
+// A file the server did send, but too big to be an agent file. It is not a reading
+// failure, so it must not be reported as one (such as a missing CORS header).
+class FileTooLarge extends Error {}
+
+/**
+ * Read a response body as text, stopping as soon as it passes MAX_BYTES, so a hostile
+ * server cannot fill the visitor's memory.
+ */
+async function readCapped(resp, url) {
+  const tooLarge = () => new FileTooLarge(`${url} is larger than 2 MB, the most Agent Customs reads. Agent files are usually a few kilobytes.`);
+  if (Number(resp.headers?.get?.("content-length")) > MAX_BYTES) throw tooLarge();
+  const reader = resp.body?.getReader?.();
+  if (!reader) {
+    const text = await resp.text();
+    if (text.length > MAX_BYTES) throw tooLarge();
+    return text;
+  }
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BYTES) {
+      reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  return new Blob(chunks).text();
+}
+
 async function fetchPublic(url, fetchImpl, timeoutMs) {
   const controller = typeof AbortController === "function" ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -47,10 +79,10 @@ async function fetchPublic(url, fetchImpl, timeoutMs) {
       credentials: "omit", cache: "no-store", redirect: "follow", referrerPolicy: "no-referrer",
       signal: controller?.signal,
     });
-    const text = resp.ok ? await resp.text() : "";
-    if (text.length > MAX_BYTES) throw new Error(`${url} is larger than 2 MB`);
+    const text = resp.ok ? await readCapped(resp, url) : "";
     return { ok: resp.ok, status: resp.status, text, finalUrl: resp.url || url, redirected: !!resp.redirected };
   } catch (error) {
+    if (error instanceof FileTooLarge) throw error;
     if (error?.name === "AbortError") throw new Error(`No answer from ${hostOf(url)} within ${Math.round(timeoutMs / 1000)} s`);
     throw new Error(`Could not read ${url}: the server is down or unreachable, or it does not allow other sites to read it (no CORS header).`);
   } finally {
@@ -102,6 +134,7 @@ export async function inspectNetworkUrl(input, options = {}) {
       chosen = candidate;
       break;
     } catch (error) {
+      if (error instanceof FileTooLarge) { lastError = error.message; unreachable = false; continue; }
       // The browser could not read it at all: down, unreachable, or no CORS header.
       // That says nothing about the network itself, so it gets its own verdict.
       if (!lastError || unreachable) { lastError = error.message; unreachable = true; }
@@ -174,7 +207,7 @@ export async function inspectNetworkUrl(input, options = {}) {
         } else linksState = "invalid";
       } catch { linksState = "invalid"; }
     }
-  } catch { linksState = "missing"; }
+  } catch (error) { linksState = error instanceof FileTooLarge ? "too-large" : "missing"; }
 
   let network;
   let validation;

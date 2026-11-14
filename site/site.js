@@ -11,7 +11,7 @@
 // Before the runtime mounts, OpenRouter joins its AI providers (providers.js).
 import { desk } from "./desk.js";
 import { installCustomsGuard } from "./customs/guard.js";
-import { confirmEntryDialog } from "./customs/guard-ui.js";
+import { confirmChoice, confirmEntryDialog } from "./customs/guard-ui.js";
 import { addProviders } from "./providers.js";
 import { mountModelPicker } from "./model-picker.js";
 
@@ -23,12 +23,6 @@ export class AssistantMount {
    * The first chat message once the visitor has a key: what the assistant can do here.
    */
   static GREETING = "I'm the Customs Officer. Give me an agent network URL and I'll inspect it, explain the findings, or compare two versions. I can also ask the test-range networks a question, once they pass inspection.";
-
-  /**
-   * This site has no irreversible actions, so it has no dialogs of its own. A partner's
-   * action would get the runtime's dialog.
-   */
-  static DIALOGS = {};
 
   /**
    * Boot the runtime and report the result in the status line.
@@ -54,8 +48,10 @@ export class AssistantMount {
       AssistantMount.defaultConsent = engine.onConsent;
       engine.onConsent = AssistantMount.consent;
 
-      // 1. Contact with another origin, started by the assistant, needs the visitor's OK.
+      // 1. Contact with another origin, started by the assistant, needs the visitor's OK,
+      //    and so does any approval the assistant asks to give or forget.
       desk.askContact = AssistantMount.askContact;
+      desk.confirmApproval = AssistantMount.confirmApproval;
       // 2 and 3. Inspect every partner network before it runs, and log the decision.
       AssistantMount.guard = installCustomsGuard(engine, {
         store: desk.pins,
@@ -85,17 +81,21 @@ export class AssistantMount {
 
   /**
    * Ask the visitor, on the runtime's consent card, before an inspection contacts
-   * another origin. "Always allow" covers that host until the page is reloaded.
+   * another origin. The card shows the full address the officer chose. The runtime
+   * remembers "Always allow" under the value in peerOrigin; giving it the full address
+   * keeps that memory to this one address, apart from the host-wide memory that partner
+   * calls use, so a different path (which could carry chat text) is asked about again.
    *
    * :param request.host: The host to contact.
+   * :param request.address: The address to inspect, without query or fragment.
    * :param request.purpose: What will be read, shown on the card.
    * :return: True when the visitor allows it.
    */
-  static async askContact({ host, purpose }) {
+  static async askContact({ host, address, purpose }) {
     const engine = AssistantMount.engine;
     if (!engine) return false;
     const decision = await engine.requestConsent({
-      kind: "inspect", phase: "call", peerLabel: host, peerOrigin: host, requestText: purpose,
+      kind: "inspect", phase: "call", peerLabel: host, peerOrigin: address, requestText: purpose,
       est: { totalTokens: 0, costText: "no AI calls" },
     });
     return decision !== "decline";
@@ -114,6 +114,38 @@ export class AssistantMount {
     const confirmed = await AssistantMount.defaultReview(items);
     AssistantMount.keepFocusInChat();
     return confirmed;
+  }
+
+  /**
+   * Ask the visitor before the officer approves a network or forgets an approval. The desk
+   * calls this only after its own rules allow the request (desk.pin and desk.unpin).
+   *
+   * :param request.action: "approve" or "forget".
+   * :param request.url: The network URL.
+   * :param request.report: The inspection report, when there is one.
+   * :return: True when the visitor agrees.
+   */
+  static async confirmApproval({ action, url, report }) {
+    const name = report ? `"${report.target.network}" from ${report.target.host}` : url;
+    const question = action === "approve"
+      ? {
+        title: `Approve ${name}?`,
+        paragraphs: [
+          `The Customs Officer asks to approve the version you inspected (${report.verdict.stamp}, fingerprint ${report.identity.short}).`,
+          "This exact version will then run without asking again. If it changes, it will be held for your review.",
+        ],
+        confirmLabel: "Approve",
+        cancelLabel: "Not now",
+      }
+      : {
+        title: `Forget your approval of ${name}?`,
+        paragraphs: ["The Customs Officer asks to forget it. Its next use will be inspected as new."],
+        confirmLabel: "Forget approval",
+        cancelLabel: "Keep it",
+      };
+    const agreed = await confirmChoice({ kicker: "Agent Customs · approval", ...question });
+    AssistantMount.keepFocusInChat();
+    return agreed;
   }
 
   /**
