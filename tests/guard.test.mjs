@@ -11,12 +11,15 @@ import { MemoryStorage, PinStore } from "../site/customs/pins.js";
 import { Engine } from "../site/runtime/engine.js";
 import { AgentNetwork } from "../site/runtime/kernel.js";
 import { TraceBus } from "../site/runtime/trace.js";
+import { RANGE_ORIGIN } from "../site/desk.js";
 import { fsFetch } from "../tools/fs-fetch.mjs";
 import { ScriptedModel } from "./scripted_model.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "http://127.0.0.1:8080";
-const RANGE = "http://localhost:8081";
+const RANGE = RANGE_ORIGIN;
+const RANGE_HOST = new URL(RANGE).host;
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const SUNNY = `${RANGE}/sunny_bakery/sunny_bakery`;
 const SHADY = `${RANGE}/shady_pizza/shady_pizza`;
 
@@ -125,7 +128,7 @@ test("a partner that changed since approval is held; declining stops it, approvi
     assert.equal(held.drift.changed, true);
     assert.ok(held.drift.changes.some((c) => c.kind === "instructions_changed" && c.added.some((l) => /gift card/.test(l))));
     assert.equal(declined.peer.calls.length, 0);
-    assert.match(toolMessage(declined.officer, 1), /held "sunny_bakery" from localhost:8081 for review and the visitor turned it away/);
+    assert.match(toolMessage(declined.officer, 1), new RegExp(`held "sunny_bakery" from ${escapeRe(RANGE_HOST)} for review and the visitor turned it away`));
     assert.equal(store.get(SUNNY).hash, approved, "the old approval stays");
 
     const admitted = makeEngine({
@@ -152,7 +155,7 @@ test("declining the consent card means nothing is fetched or inspected", async (
   await t.engine.runTurn("What does Sunny Bakery offer?");
   assert.equal(requests.length, before, "no request was made");
   assert.equal(t.reports.length, 0);
-  assert.match(toolMessage(t.officer, 1), /The user declined to contact localhost:8081/);
+  assert.match(toolMessage(t.officer, 1), new RegExp(`The user declined to contact ${escapeRe(RANGE_HOST)}`));
 });
 
 test("installing twice reuses the guard, and uninstall restores the engine", async () => {

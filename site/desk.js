@@ -12,7 +12,7 @@ import { PinStore, pinFromReport } from "./customs/pins.js";
 import { revealHidden } from "./customs/unicode.js";
 
 // The test range's address. tools/set-origins.mjs rewrites it for hosting.
-export const RANGE_ORIGIN = "http://localhost:8081";
+export const RANGE_ORIGIN = "https://agent-customs-range.github.io";
 
 export const EXAMPLES = [
   { id: "sunny", label: "Sunny Bakery", note: "honest control", url: `${RANGE_ORIGIN}/sunny_bakery/sunny_bakery`, page: `${RANGE_ORIGIN}/sunny_bakery/` },

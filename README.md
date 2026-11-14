@@ -75,11 +75,16 @@ To watch the guard catch a rug pull: ask the officer about Sunny Bakery (the gua
 
 The site and the range must be on two different origins, so that partner calls cross a real site boundary.
 
-1. Pick the range's address, for example `https://agent-customs-range.netlify.app`.
-2. Run `node tools/set-origins.mjs --range https://agent-customs-range.netlify.app`. It updates the network, manifest and page, regenerates the range for that address, and rebuilds with the official build script.
-3. Deploy `range/` to that address and `site/` to another one (for example by dragging each folder into [Netlify Drop](https://app.netlify.com/drop)). Both folders have a `_headers` file, which Netlify and Cloudflare Pages apply: CORS on the public agent files, and the runtime's sandbox policy.
+On GitHub Pages, every site of one account shares one origin (`<account>.github.io`), so the range needs a second owner, such as a free GitHub organization:
 
-The network URL is then `https://<site host>/agent_customs`.
+1. Create the organization (for example `agent-customs-range`) and, in it, an empty public repository named `<organization>.github.io`.
+2. Run `node tools/set-origins.mjs --range https://<organization>.github.io`. It points the site at that address, regenerates `range/` for it, and rebuilds the network with the official build script.
+3. Push the contents of `range/`, plus an empty `.nojekyll` file, to that repository. GitHub Pages serves it at `https://<organization>.github.io/`.
+4. In this repository, open Settings, then Pages, and set Source to GitHub Actions. `.github/workflows/pages.yml` then publishes `site/` at `https://<account>.github.io/agent-customs/` on every push to `main`, once the tests and the network check pass.
+
+GitHub Pages sends `Access-Control-Allow-Origin: *` on every file, which is what other sites' browsers need. It does not read `_headers`, so the runtime's sandbox policy (a Content-Security-Policy header on `runtime/sandbox-worker.js`) is not sent there. Netlify and Cloudflare Pages do apply `_headers`: drag `range/` and `site/` into [Netlify Drop](https://app.netlify.com/drop) as two sites after step 2.
+
+The network URL is then `https://<site host>/agent_customs`, for example `https://<account>.github.io/agent-customs/agent_customs`.
 
 ## Spec MVP interoperability checks (section 6)
 

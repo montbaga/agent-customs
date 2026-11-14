@@ -11,11 +11,12 @@ import { inspectNetworkUrl, targetsFor } from "../site/customs/inspect.js";
 import { MemoryStorage, PinStore, pinFromReport } from "../site/customs/pins.js";
 import { scanText } from "../site/customs/rules.js";
 import { findMixedScriptWords, normalizeForRules, revealHidden, scanHidden } from "../site/customs/unicode.js";
+import { RANGE_ORIGIN } from "../site/desk.js";
 import { fsFetch } from "../tools/fs-fetch.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "http://127.0.0.1:8080";
-const RANGE = "http://localhost:8081";
+const RANGE = RANGE_ORIGIN;
 const OFFICIAL = "https://official.example";
 const fetchImpl = fsFetch({
   [SITE]: path.join(ROOT, "site"),
@@ -33,8 +34,10 @@ test("the honest bakery is cleared, with every spec check passing", async () => 
   assert.equal(r.verdict.code, "CLEARED", r.verdict.summary);
   assert.equal(r.findings.filter((f) => f.severity !== "info").length, 0);
   assert.equal(r.conformance.failed, 0);
-  // The only warning: the local range is plain HTTP, which is fine on loopback only.
-  assert.deepEqual(r.conformance.checks.filter((c) => c.status === "warn").map((c) => c.id), ["P-HTTPS"]);
+  // A local range is plain HTTP, which is fine on loopback only and the one warning; a hosted
+  // range is HTTPS and has none.
+  const warnings = RANGE.startsWith("https:") ? [] : ["P-HTTPS"];
+  assert.deepEqual(r.conformance.checks.filter((c) => c.status === "warn").map((c) => c.id), warnings);
   assert.match(r.identity.hash, /^sha256:[0-9a-f]{64}$/);
 });
 

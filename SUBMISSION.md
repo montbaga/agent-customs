@@ -77,9 +77,9 @@ JavaScript, HTML, CSS, the Open Agentic Web runtime, Neuro SAN HOCON, Web Crypto
 
 ### Links
 
-- Live site: `https://<site host>/` (network URL `https://<site host>/agent_customs`)
-- Test range: `https://<range host>/`
-- Code: `https://github.com/montbaga/agent-customs`
+- Live site: https://montbaga.github.io/agent-customs/ (network URL `https://montbaga.github.io/agent-customs/agent_customs`)
+- Test range: https://agent-customs-range.github.io/
+- Code: https://github.com/montbaga/agent-customs
 
 ---
 
