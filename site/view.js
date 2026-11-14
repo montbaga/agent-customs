@@ -1,0 +1,543 @@
+// view.js: renders the desk (desk.js) into the page and wires the page's own forms.
+//
+// Everything that comes from an inspected network is inserted with text nodes, never
+// as HTML, so a hostile network cannot put markup into this page.
+import { EXAMPLES, desk } from "./desk.js";
+
+const SEVERITY_TONE = { critical: "bad", high: "warn", medium: "caution", low: "info", info: "info" };
+const SEVERITY_RANK = ["critical", "high", "medium", "low", "info"];
+const $ = (sel) => document.querySelector(sel);
+
+// ---- Workspace tabs: one panel at a time ---------------------------------------------
+const TAB_PANELS = { report: "report-section", approvals: "desk", compare: "compare", officer: "assistant" };
+
+function showTab(name, { focus = false } = {}) {
+  for (const [tab, panelId] of Object.entries(TAB_PANELS)) {
+    const button = document.querySelector(`[role="tab"][data-tab="${tab}"]`);
+    const panel = document.getElementById(panelId);
+    const active = tab === name;
+    if (button) {
+      button.setAttribute("aria-selected", String(active));
+      button.tabIndex = active ? 0 : -1;
+      if (active && focus) button.focus();
+    }
+    if (panel) panel.hidden = !active;
+  }
+  moveHighlight();
+}
+
+function moveHighlight() {
+  const list = document.querySelector(".tabs");
+  const highlight = list?.querySelector(".tabs-highlight");
+  const selected = list?.querySelector('[role="tab"][aria-selected="true"]');
+  if (!highlight || !selected) return;
+  list.style.setProperty("--tabs-w", `${list.scrollWidth}px`);
+  const left = selected.offsetLeft;
+  const right = list.scrollWidth - (left + selected.offsetWidth);
+  highlight.style.clipPath = `inset(4px ${right}px 4px ${left}px round 10px)`;
+}
+
+function revealWorkspace() {
+  document.querySelector("#workspace")?.scrollIntoView({ block: "start" });
+}
+
+function wireTabs() {
+  const tabs = [...document.querySelectorAll('[role="tab"][data-tab]')];
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => showTab(tab.dataset.tab));
+    tab.addEventListener("keydown", (event) => {
+      const i = tabs.indexOf(tab);
+      const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      showTab(tabs[(next + tabs.length) % tabs.length].dataset.tab, { focus: true });
+    });
+  }
+  // Links such as "Officer" in the navigation open their tab.
+  for (const link of document.querySelectorAll("a[data-tab-link]")) {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      showTab(link.dataset.tabLink);
+      revealWorkspace();
+    });
+  }
+  if (location.hash === "#assistant") showTab("officer");
+  // Place the highlight before turning its transition on, so the first paint does not slide.
+  moveHighlight();
+  requestAnimationFrame(() => document.querySelector(".tabs")?.classList.add("ready"));
+  window.addEventListener("resize", moveHighlight, { passive: true });
+  document.fonts?.ready.then(moveHighlight);
+}
+
+/** Build an element. Strings become text nodes. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+/** An icon from the page's SVG sprite. */
+function icon(id, className) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", className);
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(SVG_NS, "use");
+  use.setAttribute("href", `#${id}`);
+  svg.append(use);
+  return svg;
+}
+
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const child of children.flat(Infinity)) {
+    if (child === null || child === undefined || child === false) continue;
+    el.append(child instanceof Node ? child : String(child));
+  }
+  return el;
+}
+
+function fmtDate(iso) {
+  try {
+    return new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return String(iso);
+  }
+}
+
+function stampDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+function worstTone(findings) {
+  const worst = SEVERITY_RANK.find((s) => findings.some((f) => f.severity === s));
+  return worst ? (SEVERITY_TONE[worst] === "info" ? "ok" : SEVERITY_TONE[worst]) : "ok";
+}
+
+function pill(severity) {
+  return h("span", { class: `pill sev-${severity}` }, severity);
+}
+
+// ---- Report ----------------------------------------------------------------------
+
+function renderReport({ animate = false } = {}) {
+  const report = desk.latest;
+  const box = $("#report");
+  if (!report) return;
+  $("#report-empty").hidden = true;
+  box.hidden = false;
+  box.replaceChildren();
+  const tone = report.verdict.tone;
+  const title = report.identity.brand || report.target.network || report.target.host || "Inspection";
+
+  const facts = h("dl", { class: "facts" });
+  const fact = (label, value, mono = false) => {
+    if (value === "" || value === null || value === undefined) return;
+    facts.append(h("div", null, h("dt", null, label), h("dd", { class: mono ? "mono" : null }, value)));
+  };
+  fact("Fingerprint", report.identity.short, true);
+  fact("Agents", report.identity.agents.length || "");
+  fact("Front agent", report.identity.frontMan, true);
+  fact("Model hint", report.identity.model, true);
+  fact("Spec checks", `${report.conformance.passed}/${report.conformance.total} pass`);
+
+  box.append(h("header", { class: "report-head" },
+    h("div", { class: `stamp tone-${tone}${animate ? " animate" : ""}`, role: "img", "aria-label": `Verdict: ${report.verdict.stamp}` },
+      h("strong", null, report.verdict.stamp),
+      h("small", null, h("span", null, "Agent Customs"), h("span", null, stampDate(report.inspectedAt)))),
+    h("div", null,
+      h("h2", { id: "report-title", tabindex: "-1" }, title),
+      h("p", { class: "report-url" }, report.target.url),
+      h("p", { class: "report-summary" }, report.verdict.summary),
+      facts)));
+
+  if (!report.failure) box.append(renderLights(report));
+
+  const main = h("div", { class: "report-main" });
+  const side = h("div", { class: "report-side" });
+  if (!report.failure) main.append(renderFindings(report));
+  main.append(renderPapers(report));
+  if (report.drift?.changed) side.append(renderDrift(report));
+  if (!report.failure) {
+    side.append(renderItinerary(report));
+    if (report.privacy.length) side.append(renderPrivacy(report));
+    if (report.conditions.length) {
+      side.append(h("div", { class: "report-block" }, h("h3", null, "Conditions of entry"),
+        h("ul", { class: "conditions" }, report.conditions.map((c) => h("li", null, c)))));
+    }
+  } else if (report.choices?.length) {
+    side.append(h("div", { class: "report-block" }, h("h3", null, "Networks on this site"),
+      h("ul", { class: "stops" }, report.choices.map((url) => h("li", null,
+        h("button", { type: "button", class: "ghost small", onclick: () => runInspect(url) }, "Inspect"), " ",
+        h("span", { class: "host" }, url))))));
+  }
+  box.append(h("div", { class: "report-body" }, main, side));
+  if (animate) {
+    // One entrance: the stamp lands (lead), the first findings rise after it with
+    // shrinking gaps (support), the lights fade together (decoration).
+    const gaps = [60, 100, 135, 165, 190, 210];
+    [...box.querySelectorAll(".finding")].slice(0, gaps.length).forEach((el, i) => {
+      el.style.setProperty("--sd", `${gaps[i]}ms`);
+      el.classList.add("stagger");
+    });
+    box.querySelectorAll(".light").forEach((el) => { el.style.setProperty("--sd", "40ms"); el.classList.add("stagger"); });
+  }
+  box.append(renderReportActions(report));
+}
+
+function renderLights(report) {
+  const by = (cat) => report.findings.filter((f) => f.category === cat);
+  const external = report.itinerary.filter((s) => !s.sameSite);
+  const pin = desk.pins.get(report.target.url);
+  const pinnedNow = pin && pin.hash === report.identity.hash;
+  const c = report.conformance;
+  const identityFindings = by("identity");
+  let identityValue = "Not approved yet";
+  let identityTone = identityFindings.length ? worstTone(identityFindings) : "info";
+  if (report.drift?.changed) { identityValue = "Changed since approved"; identityTone = "warn"; }
+  else if (pinnedNow) { identityValue = "Matches your approval"; identityTone = identityFindings.length ? worstTone(identityFindings) : "ok"; }
+  if (identityFindings.some((f) => f.rule !== "D-DRIFT") && !report.drift?.changed) identityValue = `${identityFindings.length} finding(s)`;
+  const contraband = by("contraband").filter((f) => f.severity !== "info");
+  const lights = [
+    ["Papers", `${c.passed}/${c.total} pass`, c.failed ? "bad" : c.warned ? "caution" : "ok"],
+    ["Contraband", contraband.length ? `${contraband.length} finding(s)` : "None found", worstTone(contraband)],
+    ["Identity", identityValue, identityTone],
+    ["Itinerary", external.length ? `${external.length} other site(s)` : "Stays home", worstTone(by("itinerary"))],
+    ["Privacy", report.privacy.length ? `${report.privacy.length} sharing rule(s)` : "Shares nothing", worstTone(by("privacy"))],
+    ["Budget", report.budget.maxSteps ? `Up to ${report.budget.maxSteps} steps` : "Runtime default", worstTone(by("budget"))],
+  ];
+  return h("div", { class: "lights" }, lights.map(([name, value, t]) =>
+    h("div", { class: `light tone-${t}` }, h("div", { class: "name" }, h("span", { class: "dot", "aria-hidden": "true" }), name),
+      h("div", { class: "value" }, value))));
+}
+
+function renderFindings(report) {
+  const block = h("div", { class: "report-block" }, h("h3", null, `Findings (${report.findings.length})`));
+  if (!report.findings.length) {
+    block.append(h("p", { class: "none" }, "Nothing found. Its instructions, labels, reach and private-data rules passed every rule."));
+    return block;
+  }
+  report.findings.forEach((f, i) => {
+    const where = [f.where?.agent && `agent ${f.where.agent}`, f.where?.field].filter(Boolean).join(" · ");
+    const body = h("div", { class: "finding-body" },
+      h("p", null, f.detail),
+      f.hidden ? [h("span", { class: "label" }, "Hidden text, decoded"), h("p", { class: "hidden-text" }, f.hidden)] : null,
+      f.evidence ? [h("span", { class: "label" }, "Evidence"), h("pre", { class: "evidence" }, f.evidence)] : null,
+      f.why ? [h("span", { class: "label" }, "Why it matters"), h("p", null, f.why)] : null,
+      f.fix ? [h("span", { class: "label" }, "Fix"), h("p", null, f.fix)] : null);
+    block.append(h("details", { class: `finding sev-${f.severity}`, open: i === 0 && ["critical", "high"].includes(f.severity) },
+      h("summary", null, pill(f.severity), h("span", { class: "ftitle" }, f.title), where ? h("span", { class: "where" }, `${f.id} · ${where}`) : h("span", { class: "where" }, f.id)),
+      body));
+  });
+  return block;
+}
+
+function renderPapers(report) {
+  const c = report.conformance;
+  const marks = { pass: ["i-check", "ok"], warn: ["i-alert", "caution"], fail: ["i-x", "bad"] };
+  const row = (check) => {
+    const [glyph, tone] = marks[check.status] || marks.warn;
+    return h("li", { class: `tone-${tone}` },
+      icon(glyph, "icon"),
+      h("span", null, h("strong", null, check.title), " ", h("span", { class: "sec" }, `§${check.section}`),
+        h("span", { class: "cdetail" }, check.detail),
+        check.status !== "pass" && check.fix ? h("span", { class: "cfix" }, `Fix: ${check.fix}`) : null));
+  };
+  const problems = c.checks.filter((x) => x.status !== "pass");
+  const passes = c.checks.filter((x) => x.status === "pass");
+  const block = h("div", { class: "report-block" }, h("h3", null, `Papers: Open Agentic Web spec (${c.passed}/${c.total})`));
+  if (problems.length) block.append(h("ul", { class: "checks" }, problems.map(row)));
+  if (passes.length) {
+    block.append(h("details", { class: "more", open: !problems.length },
+      h("summary", null, `${passes.length} check(s) passed`), h("ul", { class: "checks" }, passes.map(row))));
+  }
+  return block;
+}
+
+function renderDrift(report) {
+  return h("div", { class: "report-block" },
+    h("h3", null, "Changed since you approved it"),
+    h("p", { class: "none" }, `Approved ${fmtDate(report.drift.pinnedAt)} as ${String(report.drift.pinnedHash).slice(7, 19)}.`),
+    renderChanges(report.drift.changes));
+}
+
+function renderChanges(changes) {
+  if (!changes.length) return h("p", { class: "none" }, "No differences: both versions have the same fingerprint.");
+  return h("ul", { class: "changes" }, changes.map((c) => h("li", { class: `sev-${c.severity}` },
+    h("div", null, pill(c.severity), " ", h("strong", null, c.title)),
+    (c.added || []).slice(0, 8).map((l) => h("pre", { class: "diffline add" }, `+ ${l}`)),
+    (c.removed || []).slice(0, 6).map((l) => h("pre", { class: "diffline del" }, `− ${l}`)))));
+}
+
+function renderItinerary(report) {
+  const stops = report.itinerary.filter((s) => !s.sameSite);
+  const block = h("div", { class: "report-block" }, h("h3", null, "Itinerary"));
+  if (!stops.length) {
+    block.append(h("p", { class: "none" }, "It names no other site, MCP server or code bundle."));
+    return block;
+  }
+  block.append(h("ul", { class: "stops" }, stops.map((s) => h("li", null,
+    h("span", { class: "host" }, s.host),
+    h("div", { class: "tags" }, s.kinds.map((k) => h("span", { class: "tag" }, k)),
+      s.kinds.some((k) => k !== "mentioned in instructions") && !s.allowed ? h("span", { class: "tag no" }, "refused by its own policy") : null)))));
+  return block;
+}
+
+function renderPrivacy(report) {
+  return h("div", { class: "report-block" }, h("h3", null, "Private context it shares"),
+    h("ul", { class: "stops" }, report.privacy.map((p) => h("li", null,
+      h("span", { class: "host" }, p.agent), h("div", { class: "tags" }, h("span", { class: "tag" }, p.direction.replace("_", " ")),
+        p.fields.map((f) => h("span", { class: "tag" }, f)))))));
+}
+
+function renderReportActions(report) {
+  const bar = h("div", { class: "report-actions" });
+  const toast = h("span", { class: "toast", role: "status" });
+  const pin = desk.pins.get(report.target.url);
+  const pinnedNow = pin && pin.hash === report.identity.hash;
+  if (report.snapshot) {
+    if (pinnedNow) {
+      bar.append(h("button", { type: "button", class: "ghost", onclick: () => { desk.unpin(report.target.url); } }, "Forget approval"));
+    } else {
+      const blocked = ["DENIED", "INVALID", "UNREADABLE"].includes(report.verdict.code);
+      bar.append(h("button", {
+        type: "button", class: "primary", disabled: blocked, title: blocked ? "Denied networks cannot be approved." : null,
+        onclick: () => { const r = desk.pin(report.target.url); toast.textContent = r.ok ? "Approved. If this network changes, it will be held for your review." : r.reason; },
+      }, pin ? "Approve this new version" : report.verdict.code === "HOLD" ? "Approve after review" : "Approve this version"));
+    }
+  }
+  bar.append(h("button", { type: "button", class: "ghost", onclick: () => askOfficer(report) }, "Ask the officer about it"));
+  bar.append(h("span", { class: "spacer" }));
+  bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(proofText(report), toast, "Proof copied.") }, "Copy proof"));
+  bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(JSON.stringify({ ...report, snapshot: undefined }, null, 2), toast, "Report JSON copied.") }, "Copy JSON"));
+  bar.append(toast);
+  return bar;
+}
+
+function proofText(report) {
+  const link = `${location.origin}${location.pathname}?inspect=${encodeURIComponent(report.target.url)}`;
+  return [
+    `Agent Customs inspection, ${report.inspectedAt}`,
+    `Network: ${report.target.url}`,
+    `Verdict: ${report.verdict.stamp} (${report.verdict.summary})`,
+    `Fingerprint: ${report.identity.hash || "n/a"}`,
+    `Spec checks: ${report.conformance.passed}/${report.conformance.total} passed (${report.profile || "Open Agentic Web MVP"})`,
+    `Re-check it yourself: ${link}`,
+  ].join("\n");
+}
+
+async function copy(text, toast, done) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.textContent = done;
+  } catch {
+    toast.textContent = "Copy failed: your browser blocked the clipboard.";
+  }
+  setTimeout(() => { toast.textContent = ""; }, 3000);
+}
+
+function askOfficer(report) {
+  const input = document.querySelector("#ns-input");
+  showTab("officer");
+  revealWorkspace();
+  if (!input) return;
+  input.value = `Explain the inspection of ${report.target.url} in plain words, and what the publisher should fix.`;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus({ preventScroll: true });
+}
+
+// ---- Approvals, comparison, border log --------------------------------------------
+
+function renderPins() {
+  const list = $("#pins-list");
+  const pins = desk.pins.list();
+  const count = $("#pins-count");
+  if (count) {
+    if (pins.length > Number(count.textContent || 0)) {
+      count.classList.remove("pop");
+      void count.offsetWidth;
+      count.classList.add("pop");
+    }
+    count.hidden = !pins.length;
+    count.textContent = String(pins.length);
+  }
+  list.replaceChildren();
+  if (!pins.length) {
+    list.append(h("li", { class: "none" }, "Nothing approved yet. To approve a network, inspect it on the Report tab and press Approve this version. The guard also approves a clean partner the first time the officer calls it."));
+    return;
+  }
+  for (const p of pins) {
+    list.append(h("li", null,
+      h("span", { class: "ptitle" }, p.brand || p.network || p.host),
+      h("span", { class: "pmeta" }, p.url),
+      h("span", { class: "pmeta" }, `${p.short} · ${p.verdict} · approved ${fmtDate(p.pinnedAt)}${p.how === "first-use" ? " by the guard on first use" : p.how === "reviewed" ? " after review" : ""}`),
+      h("div", { class: "pactions" },
+        h("button", { type: "button", class: "ghost small", onclick: () => runInspect(p.url) }, "Check for changes"),
+        h("button", { type: "button", class: "danger small", onclick: () => desk.unpin(p.url) }, "Forget"))));
+  }
+}
+
+function renderCompare() {
+  const box = $("#compare-result");
+  const cmp = desk.comparison;
+  box.replaceChildren();
+  if (!cmp) return;
+  const side = (r) => h("div", { class: "v" }, h("span", { class: `pill tone-${r.verdict.tone}`, style: "--tone: var(--" + r.verdict.tone + ")" }, r.verdict.stamp),
+    h("code", null, r.target.url), h("code", null, r.identity.short));
+  box.append(h("div", { class: "versions" }, side(cmp.before), icon("i-arrow", "arrow"), side(cmp.after)));
+  box.append(renderChanges(cmp.changes));
+}
+
+function renderBorderLog() {
+  const list = $("#border-log");
+  list.replaceChildren();
+  if (!desk.borderLog.length) {
+    list.append(h("li", { class: "none" }, "No partner has been called yet. Ask the officer: \"What does the Sunny Bakery test network offer? Ask it.\""));
+    return;
+  }
+  for (const e of desk.borderLog) {
+    const tone = e.decision.startsWith("admitted") ? "ok" : "bad";
+    list.append(h("li", null,
+      h("span", { class: `pill`, style: `--tone: var(--${tone})` }, e.decision || e.stamp),
+      h("span", { class: "bwho" }, `${e.network} · ${e.host}`),
+      h("span", { class: "bwhy" }, `${e.stamp}: ${e.summary} (${e.fingerprint}, ${fmtDate(e.at)})`)));
+  }
+}
+
+// ---- Forms -------------------------------------------------------------------------
+
+async function runInspect(url) {
+  const input = $("#inspect-url");
+  const error = $("#inspect-error");
+  const button = $("#inspect-button");
+  input.value = url;
+  error.hidden = true;
+  button.disabled = true;
+  button.textContent = "Inspecting…";
+  showTab("report");
+  $("#report").classList.add("busy");
+  try {
+    const result = await desk.inspect(url);
+    if (result.ok === false) {
+      error.textContent = result.reason;
+      error.hidden = false;
+      return;
+    }
+    revealWorkspace();
+    document.querySelector("#report-title")?.focus({ preventScroll: true });
+  } catch (err) {
+    error.textContent = `Inspection failed: ${err.message}`;
+    error.hidden = false;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Inspect a network";
+    $("#report").classList.remove("busy");
+  }
+}
+
+async function runCompare(before, after) {
+  const error = $("#compare-error");
+  const button = $("#compare-button");
+  error.hidden = true;
+  button.disabled = true;
+  button.textContent = "Comparing…";
+  try {
+    const result = await desk.compare(before, after);
+    if (result.ok === false) {
+      error.textContent = result.reason;
+      error.hidden = false;
+    }
+  } catch (err) {
+    error.textContent = `Comparison failed: ${err.message}`;
+    error.hidden = false;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Compare versions";
+  }
+}
+
+function wire() {
+  wireTabs();
+  document.addEventListener("customs:inspect", (event) => runInspect(event.detail.url));
+  const examples = $("#examples");
+  // The dot hints at the verdict each test-range network is built to get.
+  const EXAMPLE_TONE = { sunny: "ok", shady: "bad", bank: "bad", maze: "warn", rug: "warn", oven: "ok", guesthouse: "ok", harbor: "ok" };
+  const officialExamples = $("#examples-official");
+  for (const e of EXAMPLES) {
+    (e.group === "official" && officialExamples ? officialExamples : examples).append(h("li", null, h("button", { type: "button", onclick: () => runInspect(e.url), title: e.url },
+      h("span", { class: `dot tone-${EXAMPLE_TONE[e.id] || "info"}`, "aria-hidden": "true" }), e.label, " ", h("small", null, e.note))));
+  }
+  $("#inspect-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const url = $("#inspect-url").value.trim();
+    if (!url) {
+      $("#inspect-error").textContent = "Paste a network URL first.";
+      $("#inspect-error").hidden = false;
+      return;
+    }
+    runInspect(url);
+  });
+  $("#compare-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const before = $("#compare-before").value.trim();
+    const after = $("#compare-after").value.trim();
+    if (!before || !after) {
+      $("#compare-error").textContent = "Give both URLs.";
+      $("#compare-error").hidden = false;
+      return;
+    }
+    runCompare(before, after);
+  });
+  $("#compare-demo").addEventListener("click", () => {
+    const sunny = EXAMPLES.find((e) => e.id === "sunny").url;
+    const rug = EXAMPLES.find((e) => e.id === "rug").url;
+    $("#compare-before").value = sunny;
+    $("#compare-after").value = rug;
+    runCompare(sunny, rug);
+  });
+  $("#copy-guard").addEventListener("click", (event) => {
+    const toast = { set textContent(v) { event.target.textContent = v || "Copy"; } };
+    copy($("#guard-code").textContent, toast, "Copied");
+  });
+  const rangeLink = $("#range-link");
+  if (rangeLink) rangeLink.href = EXAMPLES[0].url.replace(/\/sunny_bakery\/sunny_bakery$/, "/");
+
+  desk.onChange((kind) => {
+    if (kind === "report") renderReport({ animate: true });
+    if (kind === "pins") { renderPins(); renderReport(); }
+    if (kind === "compare") renderCompare();
+    if (kind === "border") renderBorderLog();
+  });
+  renderPins();
+  renderBorderLog();
+
+  // A shared link (?inspect=URL) fills the form. The visitor still presses Inspect, so
+  // no other site is contacted until they choose to.
+  const shared = new URLSearchParams(location.search).get("inspect");
+  if (shared) {
+    $("#inspect-url").value = shared;
+    $("#inspect-button").focus();
+  }
+}
+
+// Back from the officer's Save and start, which reloads the page: reopen the Officer tab and
+// scroll to its model settings before anything else draws. The browser does not restore the
+// old position for this reload (model-picker.js turned that off before reloading), and the
+// head of index.html keeps the page hidden until this has run.
+function returnToOfficer() {
+  let at = 0;
+  try { at = Number(sessionStorage.getItem("agent-customs-after-save") || 0); } catch { /* storage blocked */ }
+  if (at && Date.now() - at < 60_000) {
+    showTab("officer");
+    const picker = document.querySelector("#model-picker");
+    if (picker) window.scrollTo({ top: picker.getBoundingClientRect().top + window.scrollY - 110, behavior: "instant" });
+  }
+  document.documentElement.classList.remove("returning");
+}
+
+wire();
+returnToOfficer();
