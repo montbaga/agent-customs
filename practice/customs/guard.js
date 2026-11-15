@@ -15,6 +15,9 @@
 //    since approved)     the new version.
 //   CONDITIONS/CLEARED-> admitted; the first version seen is pinned.
 //
+// After every decision the visitor gets a notice (guard-notice.js): what was decided, the
+// full list of findings and a link to the full report.
+//
 // It wraps engine._compile on this engine instance only. The runtime files are not
 // edited, and uninstall() restores the original.
 
@@ -36,6 +39,11 @@ export const DEFAULT_POLICY = Object.freeze({
  * :param options.confirmEntry: async (report) => boolean, for held networks. Defaults to
  *   a built-in dialog in a browser and to "refuse" anywhere else.
  * :param options.onReport: Called with every report, for logs and UI.
+ * :param options.notice: false shows the visitor no notice; a function (report) => boolean
+ *   shows your own. By default, in a browser, a notice appears in the chat (guard-notice.js).
+ * :param options.reportPage: The Agent Customs page that "See the full report" opens, with
+ *   the network's address filled in. Defaults to the public Agent Customs site.
+ * :param options.openReport: (url) => void. Shows the full report on this page instead.
  * :return: {store, log, uninstall()}
  */
 export function installCustomsGuard(engine, options = {}) {
@@ -63,14 +71,18 @@ export function installCustomsGuard(engine, options = {}) {
       validation: { errors: compiled.validation?.errors || [], warnings: compiled.validation?.warnings || [] },
       pin,
     });
-    report.guard = { decision: "pending" };
+    report.guard = { decision: "pending", pinned: false };
     log.push(report);
+    // Each decision goes to the site's log and, in a notice, to the visitor.
+    const tell = async () => {
+      options.onReport?.(report);
+      return showNotice(report, options);
+    };
 
     const code = report.verdict.code;
     if (policy.deny.includes(code)) {
       report.guard.decision = "refused";
-      options.onReport?.(report);
-      throw refusal(report);
+      throw refusal(report, false, await tell());
     }
     if (policy.ask.includes(code) || report.drift?.changed) {
       const confirm = options.confirmEntry || defaultConfirm;
@@ -78,16 +90,19 @@ export function installCustomsGuard(engine, options = {}) {
       try { approved = await confirm(report); } catch { approved = false; }
       if (!approved) {
         report.guard.decision = "declined";
-        options.onReport?.(report);
-        throw refusal(report, true);
+        throw refusal(report, true, await tell());
       }
       store.set(networkUrl, pinFromReport(report, "reviewed"));
       report.guard.decision = "admitted after review";
+      report.guard.pinned = true;
     } else {
-      if (!pin && policy.pinOnFirstUse) store.set(networkUrl, pinFromReport(report, "first-use"));
+      if (!pin && policy.pinOnFirstUse) {
+        store.set(networkUrl, pinFromReport(report, "first-use"));
+        report.guard.pinned = true;
+      }
       report.guard.decision = "admitted";
     }
-    options.onReport?.(report);
+    await tell();
     return compiled;
   };
 
@@ -105,15 +120,17 @@ export function installCustomsGuard(engine, options = {}) {
 /**
  * The error the calling agent receives. It names the verdict and our own rule
  * titles only: quoted text from the refused network never reaches the model.
+ * When the visitor got a notice, it says so, so the agent can point to it.
  */
-export function refusal(report, declinedByVisitor = false) {
+export function refusal(report, declinedByVisitor = false, noticeShown = false) {
   const titles = [...new Set(report.findings.filter((f) => ["critical", "high"].includes(f.severity)).map((f) => f.title))].slice(0, 3);
   const failed = report.conformance.checks.filter((c) => c.status === "fail").map((c) => c.title).slice(0, 2);
   const reasons = titles.concat(failed).join("; ") || report.verdict.summary;
   const who = `"${report.target.network}" from ${report.target.host}`;
+  const seen = noticeShown ? " The visitor sees the full list in a notice on the page." : "";
   const message = declinedByVisitor
-    ? `Agent Customs held ${who} for review and the visitor turned it away (${reasons}). Nothing from that network ran.`
-    : `Agent Customs refused entry to ${who}: ${report.verdict.title.toLowerCase()} (${reasons}). Nothing from that network ran.`;
+    ? `Agent Customs held ${who} for review and the visitor turned it away (${reasons}). Nothing from that network ran.${seen}`
+    : `Agent Customs refused entry to ${who}: ${report.verdict.title.toLowerCase()} (${reasons}). Nothing from that network ran.${seen}`;
   const error = new Error(message);
   error.code = "AGENT_CUSTOMS_REFUSED";
   error.report = report;
@@ -124,4 +141,21 @@ async function defaultConfirm(report) {
   if (typeof document === "undefined" || typeof HTMLDialogElement === "undefined") return false;
   const { confirmEntryDialog } = await import("./guard-ui.js");
   return confirmEntryDialog(report);
+}
+
+/**
+ * Show the visitor what the guard decided. A notice never changes a decision.
+ *
+ * :return: true when a notice is on the page.
+ */
+async function showNotice(report, options) {
+  if (options.notice === false) return false;
+  try {
+    if (typeof options.notice === "function") return Boolean(await options.notice(report));
+    if (typeof document === "undefined") return false;
+    const { showGuardNotice } = await import("./guard-notice.js");
+    return showGuardNotice(report, { reportPage: options.reportPage, openReport: options.openReport });
+  } catch {
+    return false;
+  }
 }

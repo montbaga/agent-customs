@@ -27,9 +27,11 @@ Three shops on Main Street publish their own assistants on the [Agent Customs te
 
 | Ask the guide | The guard's stamp | What you see |
 | --- | --- | --- |
-| `Ask Sunny Bakery what it offers.` | Cleared | The bakery's answer |
-| `Ask Shady Pizza what it offers.` | Entry denied | A refusal, with the reasons. Nothing from Shady Pizza runs. |
-| `Ask Loop Maze for a puzzle.` | Held for review | A dialog that lists the problems. Choose **Turn it away**. |
+| `Ask Sunny Bakery what it offers.` | Cleared | A notice that it passed inspection, then the bakery's answer |
+| `Ask Shady Pizza what it offers.` | Entry denied | A notice that lists everything Agent Customs found, with a link to the full report. Nothing from Shady Pizza runs. |
+| `Ask Loop Maze for a puzzle.` | Held for review | A dialog that lists the problems. Choose **Turn it away**, and a notice confirms that nothing ran. |
+
+The notices come with the guard itself: this site added nothing for them. The full report opens on the Agent Customs site, with the shop's address filled in; press **Inspect a network** there.
 
 Before your first message, open **AI model settings** under the chat. Pick a provider, paste your own key, choose a model, and select **Save and start**. Each shop's assistant runs only after you agree on its consent card.
 
@@ -61,7 +63,7 @@ The network URL is https://montbaga.github.io/agent-customs/practice/main_street
 - The consent card shows the shop's name, its host and the first 140 characters of the request. **Always allow** skips the card for every shop on that host until the page is reloaded.
 - A request asks only what the shop offers. The assistant is told never to put names, emails, phone numbers or booking codes in it. The runtime does not filter requests, so check the card.
 - A shop's network runs in this browser, on your key, with none of its own site's tools. It can say what it offers, but not live prices or bookings. A call costs more than the card's token estimate.
-- Before any shop's agents run, the guard inspects them. Shady Pizza is refused, and Loop Maze waits for your answer.
+- Before any shop's agents run, the guard inspects them. Shady Pizza is refused, and Loop Maze waits for your answer. Each decision shows a notice in the chat.
 
 ## Files
 

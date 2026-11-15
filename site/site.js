@@ -7,7 +7,8 @@
 //     runtime's own consent card, before any other origin is contacted.
 //  2. installCustomsGuard() inspects every partner network after its consent card and
 //     before it runs, using the same rules as the page.
-//  3. Each guard decision appears in the page's border log.
+//  3. Each guard decision appears in the page's border log, and as a notice in the chat
+//     whose "See the full report" opens the report on this page.
 // Before the runtime mounts, OpenRouter joins its AI providers (providers.js).
 import { desk } from "./desk.js";
 import { installCustomsGuard } from "./customs/guard.js";
@@ -57,6 +58,9 @@ export class AssistantMount {
         store: desk.pins,
         confirmEntry: confirmEntryDialog,
         onReport: (report) => desk.recordBorderEvent(report),
+        // The notice's "See the full report" shows the report here, on the Report tab.
+        reportPage: siteBase,
+        openReport: (url) => document.dispatchEvent(new CustomEvent("customs:inspect", { detail: { url } })),
       });
 
       const needsKey = !engine.mockLLM && (!engine.byokKey || engine.byokKey === "demo");

@@ -40,7 +40,7 @@ const config = JSON.parse(await readFile(path.join(ROOT, "site", "agent_customs.
 /**
  * An engine for this site with scripted models and the guard installed, as site.js does.
  */
-function makeEngine({ officerSteps, peerSteps = [], store, confirm = async () => false, consent = "allow" }) {
+function makeEngine({ officerSteps, peerSteps = [], store, confirm = async () => false, consent = "allow", notice }) {
   const engine = new Engine({ originUrl: SITE, trace: new TraceBus() });
   const officer = new ScriptedModel(officerSteps);
   const peer = new ScriptedModel(peerSteps);
@@ -57,13 +57,18 @@ function makeEngine({ officerSteps, peerSteps = [], store, confirm = async () =>
   };
   const reports = [];
   const confirmations = [];
+  // What the visitor would see: a copy of each decision as the notice gets it.
+  const notices = [];
   const guard = installCustomsGuard(engine, {
     store,
     confirmEntry: async (report) => { confirmations.push(report); return confirm(report); },
     onReport: (report) => reports.push(report),
+    notice: notice === undefined ? (report) => { notices.push({ ...report.guard }); return true; } : notice,
   });
-  return { engine, officer, peer, reports, confirmations, consents, guard };
+  return { engine, officer, peer, reports, confirmations, consents, guard, notices };
 }
+const SHADY_CALL = [{ tool: "shady_pizza_shady_pizza", arguments: { request: "What do you offer?" } }, { text: "Turned away." }];
+const SUNNY_CALL = [{ tool: "sunny_bakery_sunny_bakery", arguments: { request: "What do you offer?" } }, { text: "Bread." }];
 
 function toolMessage(model, callIndex) {
   return model.calls[callIndex].messages.filter((m) => m.role === "tool").map((m) => m.content).join("\n");
@@ -129,6 +134,7 @@ test("a partner that changed since approval is held; declining stops it, approvi
     assert.ok(held.drift.changes.some((c) => c.kind === "instructions_changed" && c.added.some((l) => /gift card/.test(l))));
     assert.equal(declined.peer.calls.length, 0);
     assert.match(toolMessage(declined.officer, 1), new RegExp(`held "sunny_bakery" from ${escapeRe(RANGE_HOST)} for review and the visitor turned it away`));
+    assert.deepEqual(declined.notices.map((g) => g.decision), ["declined"]);
     assert.equal(store.get(SUNNY).hash, approved, "the old approval stays");
 
     const admitted = makeEngine({
@@ -140,6 +146,7 @@ test("a partner that changed since approval is held; declining stops it, approvi
     assert.equal(admitted.peer.calls.length, 1);
     assert.notEqual(store.get(SUNNY).hash, approved);
     assert.equal(store.get(SUNNY).how, "reviewed");
+    assert.deepEqual(admitted.notices.map((g) => [g.decision, g.pinned]), [["admitted after review", true]]);
   } finally {
     rugPulled = false;
   }
@@ -156,6 +163,33 @@ test("declining the consent card means nothing is fetched or inspected", async (
   assert.equal(requests.length, before, "no request was made");
   assert.equal(t.reports.length, 0);
   assert.match(toolMessage(t.officer, 1), new RegExp(`The user declined to contact ${escapeRe(RANGE_HOST)}`));
+});
+
+test("the visitor gets a notice for every decision, and a refusal tells the agent so", async () => {
+  const store = new PinStore(new MemoryStorage());
+  const denied = makeEngine({ store, officerSteps: SHADY_CALL });
+  await denied.engine.runTurn("Ask Shady Pizza what it offers.");
+  assert.deepEqual(denied.notices.map((g) => g.decision), ["refused"]);
+  assert.match(toolMessage(denied.officer, 1), /Nothing from that network ran\. The visitor sees the full list in a notice on the page\./);
+
+  const first = makeEngine({ store, officerSteps: SUNNY_CALL, peerSteps: [{ text: "Bread and cakes." }] });
+  await first.engine.runTurn("What does Sunny Bakery offer?");
+  assert.deepEqual(first.notices.map((g) => [g.decision, g.pinned]), [["admitted", true]], "cleared, and approved on first use");
+
+  const again = makeEngine({ store, officerSteps: SUNNY_CALL, peerSteps: [{ text: "Bread and cakes." }] });
+  await again.engine.runTurn("What does Sunny Bakery offer?");
+  assert.deepEqual(again.notices.map((g) => [g.decision, g.pinned]), [["admitted", false]], "matches its approval, nothing new pinned");
+  assert.equal(again.reports[0].drift.changed, false);
+});
+
+test("with notices off, or a notice that breaks, the decision stands and the agent is not told of a notice", async () => {
+  for (const notice of [false, () => { throw new Error("the page broke"); }]) {
+    const t = makeEngine({ store: new PinStore(new MemoryStorage()), notice, officerSteps: SHADY_CALL });
+    await t.engine.runTurn("Ask Shady Pizza what it offers.");
+    assert.equal(t.peer.calls.length, 0, "nothing from the partner ran");
+    assert.match(toolMessage(t.officer, 1), /Agent Customs refused entry to "shady_pizza"/);
+    assert.doesNotMatch(toolMessage(t.officer, 1), /notice on the page/);
+  }
 });
 
 test("installing twice reuses the guard, and uninstall restores the engine", async () => {

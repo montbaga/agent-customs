@@ -116,6 +116,24 @@ try {
   await scrollTo("#workspace");
   await element("officer", ".desk-window", 795);
 
+  // The officer calls Shady Pizza: the guard refuses it, the chat shows a notice, and the
+  // notice's "See the full report" opens the report right here, on the Report tab.
+  await b.waitFor("!!window.__nsweb?.engine?.top && !!document.querySelector('#ns-input')", 20000);
+  await scriptModel("shady_pizza_shady_pizza", "What do you offer?");
+  await sendChat("Ask Shady Pizza what it offers.");
+  await b.waitFor(`!!document.querySelector('#ns-msgs .ns-consent-actions button[data-d="allow"]')`, 15000);
+  await b.evaluate(`document.querySelector('#ns-msgs .ns-consent-actions button[data-d="allow"]').click(); true`);
+  await b.waitFor(`!!document.querySelector('#ns-msgs .customs-notice[data-decision="refused"]')`, 30000);
+  const officerNotice = await b.evaluate(`(() => { const n = document.querySelector('#ns-msgs .customs-notice'); const a = n.querySelector('a');
+    return { items: n.querySelectorAll('li').length, link: a.textContent, href: a.href }; })()`);
+  console.log(`  officer notice: ${officerNotice.items} findings, "${officerNotice.link}"`);
+  expect(officerNotice.items >= 6 && officerNotice.link === "See the full report", `officer notice: ${JSON.stringify(officerNotice)}`);
+  await b.evaluate("document.querySelector('#ns-msgs .customs-notice a').click(); true");
+  await b.waitFor("document.querySelector('#tab-report').getAttribute('aria-selected') === 'true' && /Shady Pizza/.test(document.querySelector('#report-title')?.textContent || '') && document.querySelector('#inspect-button').textContent === 'Inspect a network'", 30000);
+  const inPlace = await b.evaluate("document.querySelector('.stamp strong')?.textContent");
+  console.log(`  "See the full report" opened the Report tab: ${inPlace}`);
+  expect(inPlace === "Entry denied", `the officer notice's report link showed "${inPlace}"`);
+
   await b.viewport(390, 844, { mobile: true, scale: 2 });
   await sleep(400);
   await inspect("Shady Pizza");
@@ -147,7 +165,19 @@ try {
   const refused = await lastBotText();
   console.log(`  Shady Pizza: ${refused}`);
   expect(/^Agent Customs refused entry to "shady_pizza"/.test(refused) && /Nothing from that network ran/.test(refused), `practice site: Shady Pizza was not refused: ${refused}`);
-  await element("practice-refused", "[data-ns-slot='chat']");
+  const notice = await b.evaluate(`(() => { const n = document.querySelector('#ns-msgs .customs-notice[data-decision="refused"]'); if (!n) return null;
+    const a = n.querySelector('a'); return { items: n.querySelectorAll('li').length, title: n.querySelector('p').textContent, href: a.href, target: a.target,
+    afterCard: n.previousElementSibling?.classList.contains('ns-consent') || !!n.previousElementSibling?.querySelector('.ns-consent') }; })()`);
+  console.log(`  Shady Pizza notice: ${JSON.stringify(notice)}`);
+  expect(notice && notice.items >= 6 && /^Blocked "shady_pizza"/.test(notice.title) && notice.target === "_blank"
+    && /agent-customs\/\?inspect=https%3A%2F%2Fagent-customs-range\.github\.io%2Fshady_pizza%2Fshady_pizza$/.test(notice.href) && notice.afterCard,
+  `practice site: the refusal notice is wrong: ${JSON.stringify(notice)}`);
+  expect(/The visitor sees the full list in a notice on the page\./.test(refused), "practice site: the agent was not told about the notice");
+  // Show the whole conversation in the screenshot, not just the chat box's last 520 px.
+  await b.evaluate(`(() => { const slot = document.querySelector("#agent-app [data-ns-slot='chat']"); const msgs = document.querySelector("#ns-msgs");
+    slot.style.height = Math.min(1500, slot.offsetHeight + msgs.scrollHeight - msgs.clientHeight + 8) + "px"; return true; })()`);
+  await sleep(300);
+  await element("practice-refused", "[data-ns-slot='chat']", 1500);
 
   // Loop Maze: held, so the guard asks the visitor. Turn it away.
   await open(PRACTICE, PRACTICE_READY);
@@ -166,6 +196,9 @@ try {
   const held = await lastBotText();
   console.log(`  Loop Maze: ${held}`);
   expect(/held "loop_maze" .* turned it away/.test(held), `practice site: Loop Maze was not turned away: ${held}`);
+  const away = await b.evaluate(`document.querySelector('#ns-msgs .customs-notice[data-decision="declined"] p')?.textContent || ""`);
+  console.log(`  Loop Maze notice: "${away}"`);
+  expect(/^Turned away "loop_maze"/.test(away), `practice site: no "turned away" notice for Loop Maze (got "${away}")`);
 
   // The practice page on a phone: nothing scrolls sideways.
   await b.viewport(390, 844, { mobile: true, scale: 2 });
