@@ -108,6 +108,14 @@ That's all. There is no server and no build step, and the runtime is not changed
 | Held for review, or changed since it was approved | The visitor sees what was found and decides. |
 | Entry denied, or Papers not in order | Refused. Nothing from the partner runs, and your assistant is told why in plain words. |
 
+Whatever the guard decides, the visitor also sees a notice in the chat, right under the partner's consent card:
+
+- what was decided;
+- everything Agent Customs found;
+- a link to the full report.
+
+The notice uses only Agent Customs' own words, never the partner's. The decoded hidden text stays in the full report, so no page tool can pass it to the AI.
+
 ```mermaid
 flowchart LR
   A["Your assistant wants<br/>a partner's help"] --> B{"Consent card:<br/>does the visitor agree?"}
@@ -123,6 +131,23 @@ flowchart LR
 
 The guard checks the exact objects the runtime loaded, after the visitor's consent card and before any of the partner's agents run. So a partner can't show the checker one file and run another. Want to see it on a site that isn't Agent Customs? That's what the [practice site](#the-practice-site) is for.
 
+<details>
+<summary><b>Guard options</b></summary>
+
+`installCustomsGuard(engine)` needs no options. These change its defaults:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `notice` | A notice in the chat | `false` shows no notice; a function `(report) => true` shows your own |
+| `reportPage` | The public Agent Customs site | The page that "See the full report" opens, with the partner's address filled in |
+| `openReport` | None | `(url) => {}` shows the full report on your own page instead |
+| `confirmEntry` | A dialog | `(report) => Promise<boolean>` asks the visitor about a held partner your own way |
+| `store` | This browser's storage | Where approvals are kept |
+| `onReport` | None | Called with every report, for your own log |
+| `policy` | Refuse Entry denied and Papers not in order; ask about Held for review | Which verdicts are refused, and which are put to the visitor |
+
+</details>
+
 ## Try it yourself
 
 Three ways, easiest first.
@@ -135,7 +160,7 @@ You need [Node.js](https://nodejs.org/) 22 or newer and nothing else. In the pro
 npm test
 ```
 
-All 67 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held.
+All 75 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held.
 
 ### 2. Inspect a site on the live website: no key
 
@@ -149,7 +174,7 @@ All 67 tests should pass in a few seconds. Some of them put the guard inside Cog
 1. Open the **Officer** tab on the live site, or the chat on the [practice site](https://montbaga.github.io/agent-customs/practice/).
 2. Pick a model and paste your own key. It stays in your browser and goes only to the provider you chose. Google AI Studio and Groq have free tiers.
 3. Type `Ask Shady Pizza what it offers.` and press **Allow** on the card.
-4. The assistant tells you Shady Pizza was refused, and why. Nothing from Shady Pizza ran.
+4. A notice in the chat says Shady Pizza was blocked and lists everything Agent Customs found, and the assistant tells you why. Nothing from Shady Pizza ran. **See the full report** opens the whole inspection.
 5. Type `Ask Sunny Bakery what it offers.` This time you get the bakery's answer.
 
 ## The practice site
@@ -170,11 +195,11 @@ All 67 tests should pass in a few seconds. Some of them put the guard inside Cog
     <td><b>1. You agree first.</b> The runtime's consent card comes before any contact with a shop.</td>
   </tr>
   <tr>
-    <td><img src="docs/images/practice-refused.jpg" alt="After Allow, the reply: Agent Customs refused entry to shady_pizza: entry denied, with three reasons. Nothing from that network ran."></td>
+    <td><img src="docs/images/practice-refused.jpg" alt="After Allow, an Agent Customs notice in the chat: Blocked shady_pizza, Entry denied, with the 9 problems it found and a link to the full report. Then the assistant's reply: nothing from that network ran."></td>
     <td><img src="docs/images/practice-held.jpg" alt="The guard's dialog for Loop Maze: five problems found, with the buttons Let it in this time and Turn it away"></td>
   </tr>
   <tr>
-    <td><b>2. Shady Pizza is refused</b> before any of its agents run, with the reasons.</td>
+    <td><b>2. Shady Pizza is refused</b> before any of its agents run. A notice lists everything Agent Customs found.</td>
     <td><b>3. Loop Maze is held</b>, so the guard lists the problems and asks you.</td>
   </tr>
 </table>
@@ -183,9 +208,9 @@ All 67 tests should pass in a few seconds. Some of them put the guard inside Cog
 
 | Ask the guide | The guard's stamp | What you see |
 | --- | --- | --- |
-| `Ask Sunny Bakery what it offers.` | Cleared | The bakery's answer |
-| `Ask Shady Pizza what it offers.` | Entry denied | A refusal with the reasons. Nothing from Shady Pizza runs. |
-| `Ask Loop Maze for a puzzle.` | Held for review | A dialog that lists the problems. Choose **Turn it away**. |
+| `Ask Sunny Bakery what it offers.` | Cleared | A notice that it passed inspection, then the bakery's answer |
+| `Ask Shady Pizza what it offers.` | Entry denied | A notice that lists all 9 problems, with a link to the full report. Nothing from Shady Pizza runs. |
+| `Ask Loop Maze for a puzzle.` | Held for review | A dialog that lists the problems. Choose **Turn it away**, and a notice confirms that nothing ran. |
 
 [`tests/practice.test.mjs`](tests/practice.test.mjs) checks four things:
 
@@ -266,7 +291,7 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 67 tests: engine, guard inside the real runtime, website tools, practice site, local server
+npm test                 # 75 tests: engine, guard and its notices inside the real runtime, website tools, practice site, local server
 npm run serve            # Agent Customs at http://127.0.0.1:8080/
 npm run serve:practice   # the practice site at http://127.0.0.1:8082/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log
@@ -332,7 +357,7 @@ Everything is plain JavaScript modules, with no dependencies, no build step and 
 
 | Path | What |
 | --- | --- |
-| `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js` and `guard-ui.js` |
+| `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js`, `guard-ui.js` (the visitor's dialogs) and `guard-notice.js` (the visitor's notices) |
 | `site/agent_customs.hocon` | Network source; the build writes `agent_customs.network.json`, `agent-mcp.json`, `.well-known/` and `bridge/` |
 | `site/desk.js`, `site-actions.js`, `view.js`, `site.js` | The page object, the six website tools, the page view, and the runtime mount with the guard |
 | `site/model-picker.js`, `providers.js` | The officer's model picker. It adds OpenRouter to the runtime's providers, lists the models a pasted key can use, remembers each provider's key in this browser, and rewrites provider errors in plain words. It fills in the runtime's own settings form, so the runtime still checks the model before saving |
@@ -370,6 +395,9 @@ No. It means none of the known tricks were found. The rules catch known techniqu
 
 **Why would a website owner add the guard?**
 If a partner's assistant tricks people, it's the owner's visitors who get hurt. The guard costs one folder and two lines, and it runs in each visitor's browser with no server.
+
+**Why doesn't the chat show the hidden sentence itself?**
+On purpose. The notice in the chat uses only Agent Customs' own words: the decision and the name of each problem. So nothing the bad site wrote can reach the AI through the page. The full report, one click away, shows the decoded sentence in red.
 
 **What happens if a partner changes after I approved it?**
 The guard sees that the fingerprint changed, shows what changed, and waits for the visitor. Nothing from the new version runs until then.
