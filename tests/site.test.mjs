@@ -208,13 +208,44 @@ test("the model picker knows every provider it offers, and reads addresses and m
   const { addProviders } = await import("../site/providers.js");
   const { MODEL_CHOICES, choiceForRouter, modelLabel } = await import("../site/model-picker.js");
   addProviders(API_KEY_PROVIDERS);
-  for (const choice of MODEL_CHOICES) assert.ok(API_KEY_PROVIDERS.some((p) => p.name === choice.provider), choice.provider);
+  for (const choice of MODEL_CHOICES.filter((c) => !c.custom)) assert.ok(API_KEY_PROVIDERS.some((p) => p.name === choice.provider), choice.provider);
+  assert.deepEqual(MODEL_CHOICES.filter((c) => c.custom).map((c) => c.id), ["other"], "one card, the last, for any other service");
+  assert.equal(MODEL_CHOICES.at(-1).id, "other");
   assert.equal(choiceForRouter("https://api.anthropic.com/v1/", API_KEY_PROVIDERS)?.id, "claude");
   assert.equal(choiceForRouter("https://openrouter.ai/api/v1", API_KEY_PROVIDERS)?.id, "any");
   assert.equal(choiceForRouter("https://llm.example.invalid/v1", API_KEY_PROVIDERS), null);
   assert.equal(modelLabel("anthropic/claude-sonnet-5.5"), "Claude Sonnet 5.5");
   assert.equal(modelLabel("gemini-3.8-flash"), "Gemini 3.8 Flash");
   assert.equal(modelLabel("someone/custom-model"), "Custom Model");
+});
+
+test("one box for every key: a provider's setup is named after it, another service's after its address", async () => {
+  const { API_KEY_PROVIDERS } = await import("../site/runtime/ui.js");
+  const { addProviders } = await import("../site/providers.js");
+  const { MODEL_CHOICES, setupFor, isServiceAddress } = await import("../site/model-picker.js");
+  addProviders(API_KEY_PROVIDERS);
+  const card = (id) => MODEL_CHOICES.find((c) => c.id === id);
+  assert.deepEqual(setupFor(card("gemini"), { model: "gemini-3.8-flash" }, API_KEY_PROVIDERS),
+    { router: API_KEY_PROVIDERS.find((p) => p.name === "Google AI Studio").router, model: "gemini-3.8-flash", name: "Google AI Studio" });
+  assert.deepEqual(setupFor(card("other"), { address: " https://llm.example.invalid/v1/ ", model: "my-model" }, API_KEY_PROVIDERS),
+    { router: "https://llm.example.invalid/v1", model: "my-model", name: "llm.example.invalid" });
+  for (const ok of ["https://llm.example.invalid/v1", "http://localhost:11434/v1"]) assert.equal(isServiceAddress(ok), true, ok);
+  for (const bad of ["", "llm.example.invalid", "javascript:alert(1)", "ftp://files.example.invalid"]) assert.equal(isServiceAddress(bad), false, bad);
+});
+
+test("exact copies of a saved key are cleared, keeping the one in use or else the newest", async () => {
+  const { duplicateSetups } = await import("../site/model-picker.js");
+  const google = "https://generativelanguage.googleapis.com/v1beta/openai";
+  const profiles = [
+    { id: "a", router: google, key: "AIza-one", updatedAt: "2026-11-14T10:00:00Z" },
+    { id: "b", router: `${google}/`, key: "AIza-one", updatedAt: "2026-11-15T10:00:00Z" },
+    { id: "c", router: google, key: "AIza-two", updatedAt: "2026-11-13T10:00:00Z" },
+    { id: "d", router: "https://api.groq.com/openai/v1", key: "gsk-one", updatedAt: "2026-11-12T10:00:00Z" },
+  ];
+  assert.deepEqual(duplicateSetups(profiles), ["a"], "the newest copy stays; another key for the same provider is not a copy");
+  assert.deepEqual(duplicateSetups(profiles, "a"), ["b"], "the setup in use always stays");
+  assert.deepEqual(duplicateSetups([]), []);
+  assert.deepEqual(duplicateSetups(null), []);
 });
 
 test("the model picker fills the runtime's form, key first, then presses Save and start", async () => {

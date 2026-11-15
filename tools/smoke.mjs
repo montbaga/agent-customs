@@ -120,7 +120,35 @@ try {
       model: document.querySelector("#mp-model").selectedOptions[0]?.textContent || "", link: document.querySelector("#mp-key-link").href };
   })()`);
   console.log(`  model picker: ${picked.cards} cards · Claude shows "${picked.model}" · key field ${picked.keyCleared ? "emptied" : "kept"}`);
-  if (picked.cards !== 5 || !picked.keyCleared || !/Claude/.test(picked.model) || !/anthropic/.test(picked.link)) problems.push(`model picker: ${JSON.stringify(picked)}`);
+  if (picked.cards !== 6 || !picked.keyCleared || !/Claude/.test(picked.model) || !/anthropic/.test(picked.link)) problems.push(`model picker: ${JSON.stringify(picked)}`);
+  // One box for every key: no advanced link, and the runtime's own form never shows. "Other
+  // service" takes an address and a model name and passes them to the runtime's form. The
+  // runtime's Save is stubbed here, so nothing is saved or sent.
+  const other = await evaluate(`(async () => {
+    const shown = (sel) => { const el = document.querySelector(sel); return !!el && !el.hidden && getComputedStyle(el).display !== "none"; };
+    document.querySelector('#mp-cards input[value="other"]').click();
+    const card = { address: shown("#mp-router-row"), keyPage: shown("#mp-key-link"), keyHint: shown("#mp-key-other") };
+    const router = document.querySelector("#mp-router");
+    router.value = "https://ai.invalid/v1";
+    router.dispatchEvent(new Event("change"));
+    document.querySelector("#mp-model-other").value = "test-model";
+    document.querySelector("#mp-key").value = "test-key-not-real";
+    let applied = false;
+    document.querySelector("#ns-apply").click = () => { applied = true; };
+    document.querySelector("#mp-start").click();
+    await new Promise((r) => setTimeout(r, 1500));
+    const form = { router: document.querySelector("#ns-router")?.value, model: document.querySelector("#ns-model")?.value, name: document.querySelector("#ns-profile-name")?.value, applied };
+    try { sessionStorage.removeItem("agent-customs-after-save"); history.scrollRestoration = "auto"; } catch {}
+    document.querySelector('#mp-cards input[value="gemini"]').click();
+    return { card, form, advancedLink: !!document.querySelector("#mp-advanced"),
+      runtimeFormShown: shown('#agent-app [data-ns-slot="settings"]'), backToGemini: { address: shown("#mp-router-row"), keyPage: shown("#mp-key-link") } };
+  })()`);
+  console.log(`  other service: ${JSON.stringify(other)}`);
+  // The picker asked the made-up address for its models; that address never resolves, by design.
+  for (let i = problems.length - 1; i >= 0; i -= 1) if (problems[i].includes("https://ai.invalid/")) problems.splice(i, 1);
+  if (!other.card.address || other.card.keyPage || !other.card.keyHint || other.advancedLink || other.runtimeFormShown
+    || other.form.router !== "https://ai.invalid/v1" || other.form.model !== "test-model" || other.form.name !== "ai.invalid" || !other.form.applied
+    || other.backToGemini.address || !other.backToGemini.keyPage) problems.push(`one key box / other service: ${JSON.stringify(other)}`);
   await evaluate("document.querySelector('#workspace').scrollIntoView()");
   await sleep(300);
   const desk = await evaluate("(() => { const r = document.querySelector('#workspace').getBoundingClientRect(); return {x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}; })()");

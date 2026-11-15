@@ -232,11 +232,11 @@ All 75 tests should pass in a few seconds. Some of them put the guard inside Cog
   </tr>
   <tr>
     <td><img src="docs/images/compare.jpg" alt="Compare: the bakery a week later asks for email addresses and phone numbers and gives orders to the calling assistant. Held for review."></td>
-    <td><img src="docs/images/officer.jpg" alt="The Officer tab: choose Claude, GPT, Gemini, an open model or any model, create a key, paste it and start"></td>
+    <td><img src="docs/images/officer.jpg" alt="The Officer tab's one box for the AI key: choose Claude, GPT, Gemini, an open model, any model or another AI service, create a key, paste it and start"></td>
   </tr>
   <tr>
     <td><b>Compare.</b> A week later, the bakery quietly asks for contact details and gives orders to the calling assistant. You see the changed lines.</td>
-    <td><b>Officer.</b> An AI agent on your own key that inspects, explains and compares. Choose Claude, GPT, Gemini, an open model on Groq, or any model on OpenRouter.</td>
+    <td><b>Officer.</b> An AI agent on your own key that inspects, explains and compares. One box takes the key: choose Claude, GPT, Gemini, an open model on Groq, any model on OpenRouter, or any other AI service by its address.</td>
   </tr>
 </table>
 
@@ -360,7 +360,7 @@ Everything is plain JavaScript modules, with no dependencies, no build step and 
 | `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js`, `guard-ui.js` (the visitor's dialogs) and `guard-notice.js` (the visitor's notices) |
 | `site/agent_customs.hocon` | Network source; the build writes `agent_customs.network.json`, `agent-mcp.json`, `.well-known/` and `bridge/` |
 | `site/desk.js`, `site-actions.js`, `view.js`, `site.js` | The page object, the six website tools, the page view, and the runtime mount with the guard |
-| `site/model-picker.js`, `providers.js` | The officer's model picker. It adds OpenRouter to the runtime's providers, lists the models a pasted key can use, remembers each provider's key in this browser, and rewrites provider errors in plain words. It fills in the runtime's own settings form, so the runtime still checks the model before saving |
+| `site/model-picker.js`, `providers.js` | The officer's model picker, the one place for an AI key. It offers five providers (adding OpenRouter to the runtime's list) and an "Other" card for any service by its address. It lists the models a pasted key can use, keeps one saved key per provider in this browser and rewrites provider errors in plain words. It fills in the runtime's own settings form, which stays hidden, so the runtime still checks the model before saving |
 | `site/index.html`, `styles.css`, `assistant.css`, `effects.js`, `scene-gl.js`, `hero-demo.js`, `hero-data.js`, `fonts/` | The page. The fonts are Geist and Instrument Serif (SIL Open Font License). The page loads no third-party scripts, because any script on it could read the visitor's AI key. `tests/hero-data.test.mjs` checks every value the hero replay shows against the engine |
 | `site/runtime/` | The agentic-web browser runtime, unchanged (Apache 2.0) |
 | `practice/` | The practice site, Main Street Guide. `tools/make-practice.mjs` copies its `runtime/` and `customs/` and builds its network |
@@ -395,6 +395,15 @@ No. It means none of the known tricks were found. The rules catch known techniqu
 
 **Why would a website owner add the guard?**
 If a partner's assistant tricks people, it's the owner's visitors who get hurt. The guard costs one folder and two lines, and it runs in each visitor's browser with no server.
+
+**Where do I put my AI key?**
+In one place: the **AI model settings** box on the Officer tab.
+
+1. Pick a card.
+2. Open its key page.
+3. Paste the key and press **Save and start**.
+
+For an AI service without a card, choose **Other** and type the service's address and model name. The key stays in your browser and goes only to that service. **Forget the saved key** removes it. Checking sites needs no key at all.
 
 **Why doesn't the chat show the hidden sentence itself?**
 On purpose. The notice in the chat uses only Agent Customs' own words: the decision and the name of each problem. So nothing the bad site wrote can reach the AI through the page. The full report, one click away, shows the decoded sentence in red.

@@ -17,7 +17,11 @@
 //
 // The picker fills in the runtime's own settings form and presses its Save and start, so the
 // runtime still checks the model with the provider, saves the setup in this browser and
-// reloads. The runtime's full form stays available under "Another provider (advanced)".
+// reloads. That form stays hidden: this box is the one place for a key. Any service that is
+// not on a card goes under "Other", by its address and model name.
+//
+// One saved key per provider: a new key updates the provider's saved setup in place, setups
+// are named after the provider, and exact duplicates left by older versions are cleared.
 
 // Suggested models per provider, best known first. Ids are each provider's own. The
 // OpenRouter ids come from openrouter.ai/api/v1/models (November 2026), and each can call
@@ -63,7 +67,8 @@ export const OPENROUTER_MODELS = [
 /**
  * The choices, one per card. `provider` names an entry of the runtime's provider list
  * (runtime/ui.js API_KEY_PROVIDERS, plus providers.js), which holds its address and key page.
- * `live: false` keeps the curated list instead of the provider's full catalogue.
+ * `live: false` keeps the curated list instead of the provider's full catalogue. `custom`
+ * marks the last card, where the visitor types any other service's address.
  */
 export const MODEL_CHOICES = [
   { id: "claude", title: "Claude", by: "Anthropic", provider: "Anthropic", cost: "Paid", models: CLAUDE },
@@ -71,7 +76,71 @@ export const MODEL_CHOICES = [
   { id: "gemini", title: "Gemini", by: "Google", provider: "Google AI Studio", cost: "Free tier", models: GEMINI },
   { id: "open", title: "Open model", by: "Groq", provider: "Groq", cost: "Free tier", models: GROQ },
   { id: "any", title: "Any model", by: "OpenRouter", provider: "OpenRouter", cost: "One key for all", models: OPENROUTER_MODELS, live: false },
+  { id: "other", title: "Other", by: "Any AI service", provider: "", cost: "For developers", models: [], custom: true },
 ];
+const OTHER = MODEL_CHOICES.find((c) => c.custom);
+
+const cleanAddress = (url) => String(url || "").trim().replace(/\/+$/, "");
+
+/**
+ * Whether a typed text is a service address the browser can call.
+ *
+ * :param text: What the visitor typed, like https://my-ai.example/v1.
+ * :return: True for an http or https address.
+ */
+export function isServiceAddress(text) {
+  try {
+    const url = new URL(String(text || "").trim());
+    return (url.protocol === "https:" || url.protocol === "http:") && !!url.host;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What Save and start sends to the runtime for a choice: the address, the model and the name
+ * the saved setup gets. A provider's setup is named after the provider; another service's
+ * setup after its host.
+ *
+ * :param choice: A card's choice.
+ * :param fields: {address, model}: the typed address (for "Other service") and the model.
+ * :param providers: The runtime's provider list.
+ * :return: {router, model, name}.
+ */
+export function setupFor(choice, { address = "", model = "" }, providers) {
+  if (choice.custom) {
+    let host = "";
+    try { host = new URL(cleanAddress(address)).host; } catch { /* not an address yet */ }
+    return { router: cleanAddress(address), model, name: host || "Other service" };
+  }
+  const provider = providers.find((p) => p.name === choice.provider);
+  return { router: provider?.router || "", model, name: choice.provider };
+}
+
+/**
+ * Saved setups that only repeat another one: the same address and the same key. One of each
+ * stays: the setup in use when it is one of them, otherwise the newest.
+ *
+ * :param profiles: The runtime's saved setups.
+ * :param selectedId: The id of the setup in use, if any.
+ * :return: The ids to delete.
+ */
+export function duplicateSetups(profiles, selectedId = "") {
+  const groups = new Map();
+  for (const p of profiles || []) {
+    if (!p?.id || !p.key) continue;
+    const tag = `${cleanAddress(p.router)}\n${p.key}`;
+    groups.set(tag, [...(groups.get(tag) || []), p]);
+  }
+  const extra = [];
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const keep = group.find((p) => p.id === selectedId)
+      || [...group].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0];
+    for (const p of group) if (p !== keep) extra.push(p.id);
+  }
+  return extra;
+}
 
 // Catalogue entries that cannot chat: embeddings, images, video, speech, live audio, music.
 const NOT_CHAT = /embed|imagen|image|banana|veo|tts|aqa|whisper|dall-e|moderation|transcribe|realtime|audio|live|robotics|computer-use|lyria/i;
@@ -321,9 +390,19 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
   const keyInput = $("#mp-key");
   const start = $("#mp-start");
   const status = $("#mp-status");
-  const advanced = $("#mp-advanced");
+  const routerRow = $("#mp-router-row");
+  const routerInput = $("#mp-router");
+  const keyOther = $("#mp-key-other");
   const forget = $("#mp-forget");
-  const providerOf = (choice) => providers.find((p) => p.name === choice.provider);
+  // A card's provider, {name, router}. For "Other service" it is the address typed in.
+  const providerOf = (choice) => {
+    if (!choice.custom) return providers.find((p) => p.name === choice.provider);
+    const address = cleanAddress(routerInput?.value);
+    let host = "";
+    try { host = new URL(address).host; } catch { /* not an address yet */ }
+    return { name: host || "that service", router: address };
+  };
+  const nameOf = (choice) => providerOf(choice)?.name || choice.provider;
 
   // What is in use now: the active setup's provider, key and model.
   const hasKey = !!engine && !engine.mockLLM && !!engine.byokKey && engine.byokKey !== "demo";
@@ -331,14 +410,28 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
   const saved = hasKey ? choiceForRouter(router, providers) : null;
   const savedKey = hasKey ? engine.byokKey : "";
   const savedModel = hasKey ? (engine.modelOverride || "") : "";
-  const usesActive = (choice) => !!saved && saved.provider === choice.provider;
+  // A provider's card, or "Other service" for any other address.
+  const active = saved || (hasKey && router ? OTHER : null);
+  const usesActive = (choice) => !!active && active.id === choice.id
+    && (!choice.custom || cleanAddress(routerInput?.value) === cleanAddress(router));
 
   // Every setup saved in this browser, so each provider's key is asked for once: the newest
   // saved setup for a provider brings its key and its model back.
   const savedSetups = () => {
     try { return byok?.loadByokStore?.().profiles || []; } catch { return []; }
   };
-  const savedSetup = (choice) => savedSetupFor(savedSetups(), providerOf(choice), providerForApiKey);
+  // Exact copies (same address, same key) that older versions could leave: keep one of each.
+  try {
+    const store = byok?.loadByokStore?.();
+    for (const id of duplicateSetups(store?.profiles, store?.selectedId)) byok?.deleteByokProfile?.(id);
+  } catch { /* storage blocked */ }
+  const knownRouters = new Set(providers.map((p) => cleanAddress(p.router)));
+  const newestOther = () => savedSetups()
+    .filter((p) => p?.key && p.router && !knownRouters.has(cleanAddress(p.router)))
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0] || null;
+  const savedSetup = (choice) => (choice.custom && !cleanAddress(routerInput?.value)
+    ? newestOther()
+    : savedSetupFor(savedSetups(), providerOf(choice), providerForApiKey));
   const savedKeyFor = (choice) => savedSetup(choice)?.key || (usesActive(choice) ? savedKey : "");
   const usesSavedKey = (choice) => !!savedKeyFor(choice);
   const savedModelFor = (choice) => (usesActive(choice) ? savedModel : (savedSetup(choice)?.model || ""));
@@ -369,8 +462,8 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
   const selected = () => MODEL_CHOICES.find((c) => c.id === root.querySelector('input[name="mp-model"]:checked')?.value) || choiceForProvider("Google AI Studio");
   const chosenModel = () => modelSelect.value || modelOther.value.trim();
   const keyNote = (choice) => (usesSavedKey(choice)
-    ? `Your saved ${choice.provider} key will be used. Paste a new key only to replace it.`
-    : `Your key stays in this browser and goes only to ${choice.provider}.`);
+    ? `Your saved ${nameOf(choice)} key will be used. Paste a new key only to replace it.`
+    : `Your key stays in this browser and goes only to ${nameOf(choice)}.`);
 
   // The model list: options, then "Other" for any name. Keeps the wanted model when listed.
   const renderModels = (models, want) => {
@@ -387,11 +480,13 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
   const catalogue = new Map();
   const modelsFor = async (choice, key) => {
     if (choice.live === false || !key) return { models: null };
+    const address = providerOf(choice)?.router || "";
+    if (choice.custom && !isServiceAddress(address)) return { models: null };
     const keyProvider = providerForApiKey(key);
     if (keyProvider && keyProvider.name !== choice.provider) return { models: null };
-    const tag = `${choice.provider}\n${key}`;
+    const tag = `${address}\n${key}`;
     if (!catalogue.has(tag)) {
-      catalogue.set(tag, listModels(providerOf(choice).router, key).then((result) => {
+      catalogue.set(tag, listModels(address, key).then((result) => {
         if (result.ok) return { models: chatModels(result.ids) };
         if (result.status === 401 || result.status === 403) { catalogue.delete(tag); return { rejected: true }; }
         return { models: null };
@@ -399,7 +494,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     }
     return catalogue.get(tag);
   };
-  const rejectedNote = (choice) => `${choice.provider} did not accept this key. Check that you copied all of it.`;
+  const rejectedNote = (choice) => `${nameOf(choice)} did not accept this key. Check that you copied all of it.`;
 
   // Show the key's models in the list, keeping the chosen one when the key can use it.
   let request = 0;
@@ -408,7 +503,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     if (choice.live === false || !key) return;
     const mine = ++request;
     const wanted = chosenModel();
-    say(`Asking ${choice.provider} which models your key can use…`);
+    say(`Asking ${nameOf(choice)} which models your key can use…`);
     const result = await modelsFor(choice, key);
     if (mine !== request || selected().id !== choice.id) return;
     if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
@@ -419,20 +514,27 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
       : `Your key cannot use ${modelLabel(wanted)}. It can use the ${result.models.length} models in the list; ${modelLabel(chosenModel())} is selected.`);
   };
 
-  let shownProvider = "";
+  let shownId = "";
   const show = (choice, { fromKey = false, note = "" } = {}) => {
     // A key works only with its own provider: a new provider starts with an empty key field.
-    if (!fromKey && shownProvider && shownProvider !== choice.provider) keyInput.value = "";
-    shownProvider = choice.provider;
+    if (!fromKey && shownId && shownId !== choice.id) keyInput.value = "";
+    shownId = choice.id;
     const radio = root.querySelector(`input[name="mp-model"][value="${choice.id}"]`);
     if (radio) radio.checked = true;
+    // "Other service": the address field, filled with the one in use or saved last.
+    if (routerRow) routerRow.hidden = !choice.custom;
+    if (choice.custom && routerInput && !routerInput.value.trim()) {
+      routerInput.value = (active?.custom ? router : newestOther()?.router) || "";
+    }
     const provider = providerOf(choice);
+    keyLink.hidden = !!choice.custom;
+    if (keyOther) keyOther.hidden = !choice.custom;
     keyLink.href = provider?.keyUrl || "#";
     keyLink.querySelector("[data-mp-provider]").textContent = choice.provider;
-    keyInput.placeholder = usesSavedKey(choice) ? `Saved ${choice.provider} key will be used` : `Paste your ${choice.provider} key`;
+    keyInput.placeholder = usesSavedKey(choice) ? `Saved ${nameOf(choice)} key will be used` : `Paste your ${choice.custom ? "service's" : choice.provider} key`;
     if (forget) {
       forget.hidden = !savedSetup(choice);
-      forget.textContent = `Forget the saved ${choice.provider} key`;
+      forget.textContent = `Forget the saved ${nameOf(choice)} key`;
     }
     modelOther.value = "";
     // The model saved with this provider leads the list, even when it is not a suggestion.
@@ -449,9 +551,12 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     modelOther.hidden = !!modelSelect.value;
     if (!modelSelect.value) modelOther.focus();
   });
+  // A new address under "Other service": its saved key and model, and the models it lists.
+  routerInput?.addEventListener("change", () => { if (selected().custom) show(OTHER, { fromKey: true }); });
 
-  // A pasted key that belongs to another provider selects that provider's card; a key for
-  // this provider lists the models it can use.
+  // A pasted key that belongs to another provider selects that provider's card (except under
+  // "Other service", where the visitor names the address); a key for this provider lists the
+  // models it can use.
   let typing = 0;
   keyInput.addEventListener("input", () => {
     clearTimeout(typing);
@@ -459,7 +564,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
       const key = keyInput.value.trim();
       const provider = providerForApiKey(key);
       const match = provider && choiceForProvider(provider.name);
-      if (match && match.id !== selected().id) {
+      if (match && match.id !== selected().id && !selected().custom) {
         show(match, { fromKey: true, note: `That is ${/^[aeiou]/i.test(provider.name) ? "an" : "a"} ${provider.name} key, so ${match.title} is selected.` });
       } else if (key) {
         listForKey(selected());
@@ -527,17 +632,17 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     clearTimeout(typing);
     request += 1;
     const choice = selected();
-    const provider = providerOf(choice);
     const setup = savedSetup(choice);
     const key = keyFor(choice);
     if (!engine) { say("The assistant could not load, so a model cannot be set here. Reload the page to try again.", "warn"); return; }
-    if (!key) { say(`Paste your ${choice.provider} key first.`, "warn"); keyInput.focus(); return; }
+    if (choice.custom && !isServiceAddress(routerInput?.value)) { say("Type the service's address first. It starts with https://.", "warn"); routerInput?.focus(); return; }
+    if (!key) { say(`Paste your ${nameOf(choice)} key first.`, "warn"); keyInput.focus(); return; }
     let model = chosenModel();
     if (!model) { say("Choose a model, or type its name.", "warn"); modelOther.hidden = false; modelOther.focus(); return; }
     start.disabled = true;
     try {
       // Save under the name the provider lists, which is the only name the runtime accepts.
-      say(`Checking ${modelLabel(model)} with ${choice.provider}…`);
+      say(`Checking ${modelLabel(model)} with ${nameOf(choice)}…`);
       const result = await modelsFor(choice, key);
       if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
       if (result.models?.length) {
@@ -556,7 +661,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
         sessionStorage.setItem(RETURN_KEY, String(Date.now()));
         history.scrollRestoration = "manual";
       } catch { /* storage blocked */ }
-      const sent = applyToRuntime(app, { key, profileId: setup?.id || "", router: provider.router, model, name: `${modelLabel(model)} (${choice.provider})` });
+      const sent = applyToRuntime(app, { key, profileId: setup?.id || "", ...setupFor(choice, { address: routerInput?.value, model }, providers) });
       if (!sent) {
         saving = false;
         try { sessionStorage.removeItem(RETURN_KEY); } catch { /* storage blocked */ }
@@ -573,15 +678,15 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
   forget?.addEventListener("click", () => {
     const choice = selected();
     if (!armed) {
-      forget.textContent = `Click again to forget the saved ${choice.provider} key`;
-      armed = setTimeout(() => { armed = 0; forget.textContent = `Forget the saved ${choice.provider} key`; }, 4000);
+      forget.textContent = `Click again to forget the saved ${nameOf(choice)} key`;
+      armed = setTimeout(() => { armed = 0; forget.textContent = `Forget the saved ${nameOf(choice)} key`; }, 4000);
       return;
     }
     clearTimeout(armed);
     armed = 0;
-    const provider = providerOf(choice);
+    const provider = choice.custom && !cleanAddress(routerInput?.value) ? { name: "", router: newestOther()?.router || "" } : providerOf(choice);
     for (const p of savedSetups()) {
-      if (savedSetupFor([p], provider, providerForApiKey)) byok?.deleteByokProfile?.(p.id);
+      if (provider.router && savedSetupFor([p], provider, providerForApiKey)) byok?.deleteByokProfile?.(p.id);
     }
     keyInput.value = "";
     if (usesActive(choice)) {
@@ -594,18 +699,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
       return;
     }
     refreshCards();
-    show(choice, { note: `The saved ${choice.provider} key is forgotten. This browser no longer holds it.` });
-  });
-
-  advanced.addEventListener("click", () => {
-    const open = !app.classList.contains("show-advanced");
-    app.classList.toggle("show-advanced", open);
-    advanced.setAttribute("aria-expanded", String(open));
-    if (open) {
-      const details = app.querySelector(".ns-settings");
-      if (details) details.open = true;
-      details?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
+    show(choice, { note: `The saved ${nameOf(choice)} key is forgotten. This browser no longer holds it.` });
   });
 
   change.addEventListener("click", () => {
@@ -627,7 +721,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
       : "The assistant could not load. The inspection tools above still work.";
     body.hidden = !engine;
   }
-  show(saved || choiceForProvider("Google AI Studio"));
+  show(active || choiceForProvider("Google AI Studio"));
 
   // Back from Save and start's reload. view.js reopened the Officer tab before anything drew;
   // the status line above the picker may have changed height since, so settle once more.
