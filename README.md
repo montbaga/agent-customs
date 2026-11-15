@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="docs/images/hero.jpg" alt="The Agent Customs home page. A replay of a real inspection stamps Shady Pizza Entry denied and shows its hidden sentence in red." width="100%">
-</p>
-
 <h1 align="center">Agent Customs</h1>
 
 <p align="center">
@@ -24,7 +20,7 @@
   <img alt="Built on the Open Agentic Web runtime" src="https://img.shields.io/badge/runtime-Open%20Agentic%20Web-0c1d18">
 </p>
 
-<!-- Demo video: put the link here once it is uploaded. -->
+### Watch the demo
 
 https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 
@@ -220,6 +216,11 @@ All 75 tests should pass in a few seconds. Some of them put the guard inside Cog
 - The guard refuses, admits and holds the three shops as the table says.
 
 ## A tour of the inspection desk
+
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="The Agent Customs home page. A replay of a real inspection stamps Shady Pizza Entry denied and shows its hidden sentence in red." width="100%">
+  <br><sub>The home page. Paste an agent network's address and press <b>Inspect a network</b>. The window on the right replays a real inspection of Shady Pizza.</sub>
+</p>
 
 <table>
   <tr>
