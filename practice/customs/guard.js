@@ -120,7 +120,9 @@ export function installCustomsGuard(engine, options = {}) {
 /**
  * The error the calling agent receives. It names the verdict and our own rule
  * titles only: quoted text from the refused network never reaches the model.
- * When the visitor got a notice, it says so, so the agent can point to it.
+ * It also says plainly what to tell the visitor, because a model that only reads
+ * "error" may describe the partner as if it had answered. When the visitor got a
+ * notice, it says so, so the agent can point to it.
  */
 export function refusal(report, declinedByVisitor = false, noticeShown = false) {
   const titles = [...new Set(report.findings.filter((f) => ["critical", "high"].includes(f.severity)).map((f) => f.title))].slice(0, 3);
@@ -129,8 +131,8 @@ export function refusal(report, declinedByVisitor = false, noticeShown = false) 
   const who = `"${report.target.network}" from ${report.target.host}`;
   const seen = noticeShown ? " The visitor sees the full list in a notice on the page." : "";
   const message = declinedByVisitor
-    ? `Agent Customs held ${who} for review and the visitor turned it away (${reasons}). Nothing from that network ran.${seen}`
-    : `Agent Customs refused entry to ${who}: ${report.verdict.title.toLowerCase()} (${reasons}). Nothing from that network ran.${seen}`;
+    ? `Agent Customs held ${who} for review and the visitor turned it away (${reasons}). Nothing from that network ran, so it gave no answer. Tell the visitor it was not used because they turned it away, and do not call it again in this turn.${seen}`
+    : `Agent Customs refused entry to ${who}: ${report.verdict.title.toLowerCase()} (${reasons}). Nothing from that network ran, so it gave no answer. Tell the visitor that Agent Customs blocked this partner's assistant for safety, and do not call it again in this turn.${seen}`;
   const error = new Error(message);
   error.code = "AGENT_CUSTOMS_REFUSED";
   error.report = report;

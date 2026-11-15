@@ -6,9 +6,9 @@
 //   node tools/readme-shots.mjs [--site <url>] [--practice <url>] [--out docs/images] [--browser <path>]
 //
 // The practice site's chat needs a model, and this script uses no key. A scripted stand-in
-// takes the model's place: it asks one shop, then repeats the tool result word for word, so
-// the refusal on screen is the guard's own message. The consent card, the guard, its dialog
-// and the shops' files are all real. Nothing is sent to an AI provider.
+// takes the model's place: it asks one shop, then repeats what the guard reported (leaving out
+// the sentence that tells the assistant what to say). The consent card, the guard, its notice,
+// its dialog and the shops' files are all real. Nothing is sent to an AI provider.
 // Exits 1 if the guard does not refuse Shady Pizza and hold Loop Maze, or on any page error.
 
 import { mkdir } from "node:fs/promises";
@@ -55,8 +55,9 @@ const scrollTo = async (selector, offset = 0) => {
 const expect = (ok, message) => { if (!ok) failures.push(message); };
 
 /**
- * In the practice site: replace the model with a scripted stand-in that calls one shop's
- * tool, then repeats the tool result (without the runtime's "Error from tool" prefix).
+ * Replace the model with a scripted stand-in that calls one shop's tool, then repeats what
+ * the guard reported: the tool result without the runtime's "Error from tool" prefix, and
+ * without the guard's sentence addressed to the assistant.
  */
 const scriptModel = (tool, request) => b.evaluate(`(() => {
   const engine = window.__nsweb.engine;
@@ -67,7 +68,7 @@ const scriptModel = (tool, request) => b.evaluate(`(() => {
     if (calls === 1) return { content: "", toolCalls: [{ id: "call-1", type: "function",
       function: { name: ${JSON.stringify(tool)}, arguments: JSON.stringify({ request: ${JSON.stringify(request)} }) } }] };
     const result = [...(req.messages || [])].reverse().find((m) => m.role === "tool");
-    return { content: String(result?.content || "").replace(/^Error from tool '[^']+': /, ""), toolCalls: [] };
+    return { content: String(result?.content || "").replace(/^Error from tool '[^']+': /, "").replace(/ Tell the visitor[^.]*\\./, ""), toolCalls: [] };
   } };
   return true;
 })()`);

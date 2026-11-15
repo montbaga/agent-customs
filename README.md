@@ -204,7 +204,7 @@ All 75 tests should pass in a few seconds. Some of them put the guard inside Cog
   </tr>
 </table>
 
-<sub>The screenshots come from <a href="tools/readme-shots.mjs"><code>tools/readme-shots.mjs</code></a>. It runs the real page, runtime, consent card and guard in a headless browser. It uses no AI key, so a scripted stand-in takes the AI's place and repeats the guard's message word for word.</sub>
+<sub>The screenshots come from <a href="tools/readme-shots.mjs"><code>tools/readme-shots.mjs</code></a>. It runs the real page, runtime, consent card and guard in a headless browser. It uses no AI key, so a scripted stand-in takes the AI's place and repeats what the guard reported.</sub>
 
 | Ask the guide | The guard's stamp | What you see |
 | --- | --- | --- |
