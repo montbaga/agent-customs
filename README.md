@@ -356,7 +356,7 @@ The network URL is then `https://<site host>/agent_customs`, for example `https:
 
 **Honest sites are not flagged.** The challenge's official examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared, and Agent Customs passes its own inspection. "Never ask for passwords" is not read as asking for passwords, and "if the visitor asks for help with their password" is not read as asking for one.
 
-Everything is plain JavaScript modules, with no dependencies, no build step and no server. The network is written in HOCON with the official `agentify-website` templates. The guard wraps `engine._compile` on one engine instance, which every partner network passes through after it is fetched and validated and before it runs. `_compile` is not a public interface, so [a weekly check](.github/workflows/cognizant-kit.yml) runs the tests against Cognizant's latest kit and fails if a change there would stop the guard. Fingerprints are SHA-256 over canonical JSON. `DESIGN.md` describes the page design.
+Everything is plain JavaScript modules, with no dependencies, no build step and no server. The network is written in HOCON with the official `agentify-website` templates. The guard wraps `engine._compile` on one engine instance, which every partner network passes through after it is fetched and validated and before it runs. `_compile` is not a public interface, so [a weekly check](.github/workflows/cognizant-kit.yml) runs the tests against Cognizant's latest kit and fails if a change there would stop the guard. Fingerprints are SHA-256 over canonical JSON.
 
 <details>
 <summary><b>Spec MVP interoperability checks (section 6)</b></summary>
