@@ -24,7 +24,9 @@
   <img alt="Built on the Open Agentic Web runtime" src="https://img.shields.io/badge/runtime-Open%20Agentic%20Web-0c1d18">
 </p>
 
-<!-- Demo video: put the YouTube link here once it is uploaded. -->
+<!-- Demo video: put the link here once it is uploaded. -->
+
+https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 
 ## Contents
 
