@@ -255,7 +255,8 @@ export async function analyzeNetwork(input) {
   };
   for (const { hit, field, count } of ruleHits.values()) {
     let severity = hit.rule.severity;
-    let detail = `${count > 1 ? `${count} places. ` : ""}Matched "${clip(hit.match, 60)}".`;
+    const what = hit.detail || `Matched "${clip(hit.match, 60)}"${hit.language ? ` (${hit.language})` : ""}.`;
+    let detail = `${count > 1 ? `${count} places. ` : ""}${what}`;
     if (hit.rule.id === "C-PERSONAL" && field.agent && peerGuarded(field.agent)) {
       severity = "low";
       detail += " It asks on its own site; its peer rule stops this when another site runs it.";

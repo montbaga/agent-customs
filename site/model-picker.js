@@ -511,13 +511,14 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
     if (!result.models?.length) { say(keyNote(choice)); return; }
     const kept = renderModels(mergeModels(choice.models, result.models), wanted);
+    const count = `${result.models.length} model${result.models.length === 1 ? "" : "s"}`;
     say(kept
-      ? `Your key can use ${result.models.length} models. Pick one, then press Save and start.`
-      : `Your key cannot use ${modelLabel(wanted)}. It can use the ${result.models.length} models in the list; ${modelLabel(chosenModel())} is selected.`);
+      ? `Your key can use ${count}. Pick one, then press Save and start.`
+      : `Your key cannot use ${modelLabel(wanted)}. It can use the ${count} in the list; ${modelLabel(chosenModel())} is selected.`);
   };
 
   let shownId = "";
-  const show = (choice, { fromKey = false, note = "" } = {}) => {
+  const show = (choice, { fromKey = false, note = "", model = "" } = {}) => {
     // A key works only with its own provider: a new provider starts with an empty key field.
     if (!fromKey && shownId && shownId !== choice.id) keyInput.value = "";
     shownId = choice.id;
@@ -540,7 +541,7 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     }
     modelOther.value = "";
     // The model saved with this provider leads the list, even when it is not a suggestion.
-    const want = savedModelFor(choice);
+    const want = model || savedModelFor(choice);
     const inUse = want && !listedId(want, choice.models.map((m) => m.id)) ? [{ id: want, name: modelLabel(want) }] : [];
     renderModels([...inUse, ...choice.models], want);
     say(note || keyNote(choice));
@@ -558,7 +559,9 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
 
   // A pasted key that belongs to another provider selects that provider's card (except under
   // "Other service", where the visitor names the address); a key for this provider lists the
-  // models it can use.
+  // models it can use. A key for a service the runtime knows but no card shows, such as
+  // Otari, which sites made with Cognizant's kit use by default, selects "Other" with that
+  // service's address and default model filled in.
   let typing = 0;
   keyInput.addEventListener("input", () => {
     clearTimeout(typing);
@@ -566,8 +569,13 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
       const key = keyInput.value.trim();
       const provider = providerForApiKey(key);
       const match = provider && choiceForProvider(provider.name);
+      const a = (name) => (/^[aeiou]/i.test(name) ? "an" : "a");
       if (match && match.id !== selected().id && !selected().custom) {
-        show(match, { fromKey: true, note: `That is ${/^[aeiou]/i.test(provider.name) ? "an" : "a"} ${provider.name} key, so ${match.title} is selected.` });
+        show(match, { fromKey: true, note: `That is ${a(provider.name)} ${provider.name} key, so ${match.title} is selected.` });
+      } else if (provider && !match && provider.router && !selected().custom && routerInput) {
+        routerInput.value = provider.router;
+        show(OTHER, { fromKey: true, model: provider.model || "",
+          note: `That is ${a(provider.name)} ${provider.name} key, so Other is selected with ${provider.name}'s address.` });
       } else if (key) {
         listForKey(selected());
       }
