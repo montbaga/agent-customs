@@ -482,8 +482,10 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     if (choice.live === false || !key) return { models: null };
     const address = providerOf(choice)?.router || "";
     if (choice.custom && !isServiceAddress(address)) return { models: null };
+    // A card's own provider needs its own key. Under "Other" the visitor chose the address, so
+    // any key is asked there, a Google key at Google's address included.
     const keyProvider = providerForApiKey(key);
-    if (keyProvider && keyProvider.name !== choice.provider) return { models: null };
+    if (!choice.custom && keyProvider && keyProvider.name !== choice.provider) return { models: null };
     const tag = `${address}\n${key}`;
     if (!catalogue.has(tag)) {
       catalogue.set(tag, listModels(address, key).then((result) => {
