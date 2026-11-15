@@ -1,4 +1,4 @@
-// effects.js: the page's motion layers, no dependencies (see DESIGN.md, Motion).
+// effects.js: the page's motion layers, no dependencies.
 //  - Palette: three colours (60-30-10), forest by default; chosen in the footer or with ?palette=, remembered.
 //  - Liquid glass: real refraction where SVG backdrop filters work (Chromium).
 //  - The hero background (scene-gl.js), with its pause button.
