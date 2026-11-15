@@ -135,6 +135,7 @@ test("a partner that changed since approval is held; declining stops it, approvi
     assert.equal(declined.peer.calls.length, 0);
     assert.match(toolMessage(declined.officer, 1), new RegExp(`held "sunny_bakery" from ${escapeRe(RANGE_HOST)} for review and the visitor turned it away`));
     assert.deepEqual(declined.notices.map((g) => g.decision), ["declined"]);
+    assert.match(toolMessage(declined.officer, 1), /gave no answer\. Tell the visitor it was not used because they turned it away, and do not call it again in this turn\./);
     assert.equal(store.get(SUNNY).hash, approved, "the old approval stays");
 
     const admitted = makeEngine({
@@ -170,7 +171,7 @@ test("the visitor gets a notice for every decision, and a refusal tells the agen
   const denied = makeEngine({ store, officerSteps: SHADY_CALL });
   await denied.engine.runTurn("Ask Shady Pizza what it offers.");
   assert.deepEqual(denied.notices.map((g) => g.decision), ["refused"]);
-  assert.match(toolMessage(denied.officer, 1), /Nothing from that network ran\. The visitor sees the full list in a notice on the page\./);
+  assert.match(toolMessage(denied.officer, 1), /Nothing from that network ran, so it gave no answer\. Tell the visitor that Agent Customs blocked this partner's assistant for safety, and do not call it again in this turn\. The visitor sees the full list in a notice on the page\./);
 
   const first = makeEngine({ store, officerSteps: SUNNY_CALL, peerSteps: [{ text: "Bread and cakes." }] });
   await first.engine.runTurn("What does Sunny Bakery offer?");
