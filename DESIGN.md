@@ -33,7 +33,7 @@ Each section fills one screen, on a 12-column grid with equal edges.
 ## Copy
 
 - The main heading says what the product does: "Safety checks for AI agents from other websites." The line "Border control for the agentic web" appears once, at the end.
-- The first screen includes concrete numbers: five checks, and the replay shows 8 findings.
+- The first screen includes concrete numbers: five checks, and the replay shows 9 findings.
 - Headings name things, and buttons say what they do. The main action is "Inspect a network" in the menu bar, the hero and the close.
 - The page copy has no questions, exclamation marks, all-caps labels or filler.
 

@@ -35,9 +35,10 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 - [The practice site](#the-practice-site)
 - [A tour of the inspection desk](#a-tour-of-the-inspection-desk)
 - [The verdicts](#the-verdicts) and [the five checks](#the-five-checks)
+- [How well it catches tricks](#how-well-it-catches-tricks)
 - [The test range](#the-test-range)
 - [Run it on your computer](#run-it-on-your-computer) and [host it](#host-it)
-- [How it is built](#how-it-is-built), [limits](#limits) and [questions](#questions)
+- [How it is built](#how-it-is-built), [similar tools](#similar-tools), [limits](#limits) and [questions](#questions)
 
 ## In one minute
 
@@ -77,7 +78,7 @@ Most people will never visit this website. The website is the showroom; the guar
 | A site owner about to link to a partner | If the partner's assistant tricks people, it's their visitors who get hurt and their site that gets blamed. So they paste the partner's address and read the report first, like checking references before hiring someone. |
 | A site owner who wants protection all the time | One check isn't enough, because the partner can change next week. The guard checks every partner each time it loads, and stops one that changed since it was approved. |
 | A site owner about to launch | Like spell-check before you send an email: it finds mistakes in their files, keys or passwords left public by accident, and risky settings. |
-| Anyone who keeps a list of agentic sites | They can check every site on the list in one go. Before submitting, I checked the 21 networks other contestants had published. |
+| Anyone who keeps a list of agentic sites | They can check every site on the list in one go. Before submitting, I checked the 21 networks other contestants had published ([results](#how-well-it-catches-tricks)). |
 | People who use agentic sites | They never see Agent Customs. They are protected without knowing it, whenever a site they use has the guard. |
 
 ## Add the guard to your site
@@ -156,7 +157,7 @@ You need [Node.js](https://nodejs.org/) 22 or newer and nothing else. In the pro
 npm test
 ```
 
-All 75 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held.
+All 83 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 93 scam and honest sentences in 22 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
 
 ### 2. Inspect a site on the live website: no key
 
@@ -224,7 +225,7 @@ All 75 tests should pass in a few seconds. Some of them put the guard inside Cog
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/report-denied.jpg" alt="Report for Shady Pizza: Entry denied, 8 findings, with the hidden text decoded in red"></td>
+    <td width="50%"><img src="docs/images/report-denied.jpg" alt="Report for Shady Pizza: Entry denied, 9 findings, with the hidden text decoded in red"></td>
     <td width="50%"><img src="docs/images/report-cleared.jpg" alt="Report for Sunny Bakery: Cleared, 15 of 15 spec checks pass"></td>
   </tr>
   <tr>
@@ -268,7 +269,26 @@ All 75 tests should pass in a few seconds. Some of them put the guard inside Cog
 | Check | What it looks at |
 | --- | --- |
 | Papers | Conformance with the MVP spec (profile 0.2), one check at a time, each citing its section and giving the publisher a fix. It uses the runtime's own parser and validator, and flags keys or passwords left in the public files (shown shortened). |
-| Contraband | Hidden Unicode tag characters (decoded and shown), zero-width and right-to-left tricks, prompt injection, requests for passwords, codes and card details, image links that leak the conversation, orders aimed at the calling site's assistant, text written to fool reviewers, and encoded blobs. |
+| Contraband | Hidden Unicode tag characters (decoded and shown), zero-width and right-to-left tricks, prompt injection, requests for passwords, codes and card details (in English and 10 other languages), orders to buy or pay without the visitor's OK, image links that leak the conversation, orders aimed at the calling site's assistant, text written to fool reviewers, and encoded blobs. Text in other languages is held for a person to read. |
+
+## How well it catches tricks
+
+The rules are tested on scam sentences, and on honest sentences that sound close to scams. The lists are in [`tests/attacks.test.mjs`](tests/attacks.test.mjs), and `npm test` checks every one.
+
+| What was tested | Sentences | Result |
+| --- | --- | --- |
+| Scam sentences in English and the 10 checked languages | 32 | All blocked |
+| Scam sentences in 11 other languages | 11 | All held for a person |
+| Honest English sentences, many close to a scam's wording | 27 | None flagged |
+| Honest sentences in other languages | 23 | None blocked |
+
+The 10 checked languages are Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic. In these, a request for a card number, a security code or a password is blocked straight away. Text in any language other than English is also held for a person to read, because only English is checked in full.
+
+Ten of the sentences, nine scams and one honest one, come from a review of this project. At first, 6 of those 10 got the wrong verdict. Now all ten get the right one, and so do new sentences that try the same tricks in other words.
+
+On real sites, I checked the 21 networks other contestants had published, on 15 November 2026. 14 were Cleared, 2 Cleared with conditions, 4 Held for review and 1 had papers not in order. None was denied. The new rules changed only two verdicts: two networks written in Indonesian are now held for a person to read, as intended.
+
+These are sentences written to test the rules. They show what the rules cover, not that nothing gets past them: someone who studies the rules can find wording they miss. That is why the guard also remembers each approved version and holds any change, and why Cleared never means certified safe.
 | Itinerary | Every other site, MCP server and code bundle the network can reach, and whether its own policy allows that. |
 | Privacy | Which private context (`sly_data`) it lets cross a site boundary. |
 | Identity | A SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, authority claims its host does not back up, and a line-by-line diff when a publisher changes a network or its manifest after approval. |
@@ -292,7 +312,7 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 75 tests: engine, guard and its notices inside the real runtime, website tools, practice site, local server
+npm test                 # 83 tests: engine, scam and honest sentences, guard and its notices inside the real runtime, website tools, practice site, local server
 npm run serve            # Agent Customs at http://127.0.0.1:8080/
 npm run serve:practice   # the practice site at http://127.0.0.1:8082/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log
@@ -334,9 +354,9 @@ The network URL is then `https://<site host>/agent_customs`, for example `https:
 
 **The checks read what the model reads.** An agent's instructions and its `command` text, which the runtime adds to the system prompt, are both checked, and so are descriptions and the whole input schema a calling model sees.
 
-**Honest sites are not flagged.** The challenge's official examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared, and Agent Customs passes its own inspection. "Never ask for passwords" is not read as asking for passwords.
+**Honest sites are not flagged.** The challenge's official examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared, and Agent Customs passes its own inspection. "Never ask for passwords" is not read as asking for passwords, and "if the visitor asks for help with their password" is not read as asking for one.
 
-Everything is plain JavaScript modules, with no dependencies, no build step and no server. The network is written in HOCON with the official `agentify-website` templates. The guard wraps `engine._compile` on one engine instance, which every partner network passes through after it is fetched and validated and before it runs. Fingerprints are SHA-256 over canonical JSON. `DESIGN.md` describes the page design.
+Everything is plain JavaScript modules, with no dependencies, no build step and no server. The network is written in HOCON with the official `agentify-website` templates. The guard wraps `engine._compile` on one engine instance, which every partner network passes through after it is fetched and validated and before it runs. `_compile` is not a public interface, so [a weekly check](.github/workflows/cognizant-kit.yml) runs the tests against Cognizant's latest kit and fails if a change there would stop the guard. Fingerprints are SHA-256 over canonical JSON. `DESIGN.md` describes the page design.
 
 <details>
 <summary><b>Spec MVP interoperability checks (section 6)</b></summary>
@@ -358,7 +378,7 @@ Everything is plain JavaScript modules, with no dependencies, no build step and 
 
 | Path | What |
 | --- | --- |
-| `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js`, `guard-ui.js` (the visitor's dialogs) and `guard-notice.js` (the visitor's notices) |
+| `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `languages.js` (requests in 10 other languages, and text in any language other than English), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js`, `guard-ui.js` (the visitor's dialogs) and `guard-notice.js` (the visitor's notices) |
 | `site/agent_customs.hocon` | Network source; the build writes `agent_customs.network.json`, `agent-mcp.json`, `.well-known/` and `bridge/` |
 | `site/desk.js`, `site-actions.js`, `view.js`, `site.js` | The page object, the six website tools, the page view, and the runtime mount with the guard |
 | `site/model-picker.js`, `providers.js` | The officer's model picker, the one place for an AI key. It offers five providers (adding OpenRouter to the runtime's list) and an "Other" card for any service by its address. It lists the models a pasted key can use, keeps one saved key per provider in this browser and rewrites provider errors in plain words. It fills in the runtime's own settings form, which stays hidden, so the runtime still checks the model before saving |
@@ -367,18 +387,28 @@ Everything is plain JavaScript modules, with no dependencies, no build step and 
 | `practice/` | The practice site, Main Street Guide. `tools/make-practice.mjs` copies its `runtime/` and `customs/` and builds its network |
 | `range/` | The test range (generated) |
 | `docs/images/` | The README screenshots, taken by `tools/readme-shots.mjs` |
-| `tests/` | Node tests, with the official examples as fixtures |
+| `tests/` | Node tests, with the official examples as fixtures. `attacks.test.mjs` holds the scam and honest sentences |
 | `tools/` | Range and practice-site generators, origin switcher, rug-pull switch, local server with `_headers`, browser checks (`smoke.mjs`, `readme-shots.mjs`, sharing `cdp.mjs`), command-line inspector |
 | `vendor/agentify-website/` | The official agentify-website files, unchanged, used for their build and check scripts |
 
 </details>
 
+## Similar tools
+
+[Snyk Agent Scan](https://github.com/snyk/agent-scan), first published by Invariant Labs as MCP-Scan, scans the AI agents, MCP servers and skills installed on your own computer for prompt injection, tool poisoning and other problems. It sends tool names and descriptions to its service for analysis. Agent Customs does a similar job for the Open Agentic Web, in a different place:
+
+- It runs in the browser. Nothing is installed, and nothing goes to an Agent Customs server, because there isn't one.
+- It checks a partner at the moment a site is about to use it, through the guard, and remembers the approved version, so a later change is held.
+- It checks everything a partner publishes for this web: its papers against the spec, its instructions, the other sites it can reach and the private context it lets through.
+
 ## Limits
 
-- Pattern rules catch known techniques, not every possible manipulation. The instruction analyst gives a model's second opinion, labeled as an opinion. A network that passes is not certified safe, and the site says so.
+- Pattern rules catch known techniques, not every possible manipulation. Someone who studies the rules can find wording they miss. The instruction analyst gives a model's second opinion, labeled as an opinion. A network that passes is not certified safe, and the site says so.
+- Only English is checked in full. In 10 other languages the rules catch requests for card details and passwords, and a sentence in another language is held for a person to read. A sentence counts as another language when it is mostly in another alphabet, or has at least three common words of one of the 27 other Latin-alphabet languages the rules know. A short sentence, or one in a language they don't know, can pass unread.
 - Approvals are per browser. There is no shared registry of verdicts yet; a later version could publish signed inspection receipts to a registry such as the NANDA Index.
 - A site that sends no CORS header cannot be inspected from a browser, and no caller's browser can run its network either. Agent Customs reports this as Could not inspect.
 - From the runtime: the LLM provider must allow browser calls, and the network file, instructions included, is public.
+- On GitHub Pages, every site of one account shares one origin, so they share saved keys, and the runtime's sandbox header is not sent. See [Host it](#host-it).
 
 ## Questions
 
@@ -404,7 +434,10 @@ In one place: the **AI model settings** box on the Officer tab.
 2. Open its key page.
 3. Paste the key and press **Save and start**.
 
-For an AI service without a card, choose **Other** and type the service's address and model name. The key stays in your browser and goes only to that service. **Forget the saved key** removes it. Checking sites needs no key at all.
+For an AI service without a card, choose **Other** and type the service's address and model name. An Otari key, for the service that sites made with Cognizant's kit use by default, fills in **Other** for you. The key stays in your browser and goes only to that service. **Forget the saved key** removes it. Checking sites needs no key at all.
+
+**Does it work in other languages?**
+Partly, and it says so. In Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic, it blocks requests for card details and passwords. Text in any language other than English is held, so a person reads it before it runs.
 
 **Why doesn't the chat show the hidden sentence itself?**
 On purpose. The notice in the chat uses only Agent Customs' own words: the decision and the name of each problem. So nothing the bad site wrote can reach the AI through the page. The full report, one click away, shows the decoded sentence in red.

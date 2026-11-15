@@ -149,6 +149,34 @@ try {
   if (!other.card.address || other.card.keyPage || !other.card.keyHint || other.advancedLink || other.runtimeFormShown
     || other.form.router !== "https://ai.invalid/v1" || other.form.model !== "test-model" || other.form.name !== "ai.invalid" || !other.form.applied
     || other.backToGemini.address || !other.backToGemini.keyPage) problems.push(`one key box / other service: ${JSON.stringify(other)}`);
+  // A key for a service the runtime knows but no card shows (Otari, the kit's default)
+  // selects "Other" with that service's address and default model. The model list request
+  // is answered here, so nothing reaches Otari.
+  const otari = await evaluate(`(async () => {
+    const realFetch = window.fetch;
+    const router = document.querySelector("#mp-router");
+    const before = router.value;
+    window.fetch = async () => new Response(JSON.stringify({ data: [{ id: "alibaba/qwen3.8-flash" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    try {
+      document.querySelector('#mp-cards input[value="gemini"]').click();
+      const key = document.querySelector("#mp-key");
+      key.value = "otk_" + "x".repeat(24);
+      key.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 900));
+      return { card: document.querySelector("#mp-cards input:checked")?.value, router: router.value,
+        model: document.querySelector("#mp-model").value || document.querySelector("#mp-model-other").value,
+        status: document.querySelector("#mp-status").textContent };
+    } finally {
+      window.fetch = realFetch;
+      document.querySelector("#mp-key").value = "";
+      router.value = before;
+      document.querySelector('#mp-cards input[value="gemini"]').click();
+    }
+  })()`);
+  console.log(`  otari key: ${JSON.stringify(otari)}`);
+  if (otari.card !== "other" || otari.router !== "https://api.otari.ai/api/v1" || otari.model !== "alibaba/qwen3.8-flash" || /did not accept/.test(otari.status)) {
+    problems.push(`otari key: ${JSON.stringify(otari)}`);
+  }
   await evaluate("document.querySelector('#workspace').scrollIntoView()");
   await sleep(300);
   const desk = await evaluate("(() => { const r = document.querySelector('#workspace').getBoundingClientRect(); return {x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}; })()");

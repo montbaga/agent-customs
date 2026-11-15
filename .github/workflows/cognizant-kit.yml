@@ -1,0 +1,35 @@
+# Once a week, runs the tests against Cognizant's latest agentify-website kit. The guard
+# plugs into the runtime's engine._compile, which is not a public interface, so a change
+# there would stop the guard. This run fails if it does, and GitHub emails the repository
+# owner. Nothing is committed or published.
+name: Check against Cognizant's latest kit
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays at 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  latest-kit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch Cognizant's latest kit
+        run: git clone --depth 1 https://github.com/cognizant-ai-labs/agentic-web.git "$RUNNER_TEMP/agentic-web"
+      - name: Use it in place of the copies in this repository
+        run: |
+          rsync -a --delete --exclude LICENSE "$RUNNER_TEMP/agentic-web/skills/agentify-website/" vendor/agentify-website/
+          rsync -a --delete vendor/agentify-website/runtime/ site/runtime/
+          npm run practice
+          npm run build
+      - name: List what changed in the kit
+        run: git status --short vendor site/runtime
+      - run: npm test
+      - run: npm run check
+      - run: npm run check:practice
