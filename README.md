@@ -352,6 +352,8 @@ The network URL is then `https://<site host>/agent_customs`, for example `https:
 
 **The visitor is asked before any contact.** Inspections the officer starts use the runtime's own consent card, which shows the full address, and the guard runs after the partner's consent card, never before. Approvals belong to the visitor too: the officer cannot approve a network or forget an approval without the visitor's click.
 
+**Images in answers never load.** A remote image in an answer could leak the chat as soon as it is shown. Cognizant's runtime shows answers as text, links and tables and drops images, and this page also refuses images from other sites (`img-src 'self'`). A browser test checks both. If your site shows answers with its own renderer, add the same line to its page: `<meta http-equiv="Content-Security-Policy" content="img-src 'self' data: blob:">`.
+
 **The checks read what the model reads.** An agent's instructions and its `command` text, which the runtime adds to the system prompt, are both checked, and so are descriptions and the whole input schema a calling model sees.
 
 **Honest sites are not flagged.** The challenge's official examples (a pizza restaurant, a guesthouse and harbor tours) all come out Cleared, and Agent Customs passes its own inspection. "Never ask for passwords" is not read as asking for passwords, and "if the visitor asks for help with their password" is not read as asking for one.

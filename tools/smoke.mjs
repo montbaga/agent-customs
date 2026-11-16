@@ -174,6 +174,27 @@ try {
     }
   })()`);
   console.log(`  otari key: ${JSON.stringify(otari)}`);
+  // Lock 3: no answer can load a remote image. The runtime's renderers turn image markup into
+  // text or links, and the page's policy refuses remote images anyway. The image addresses use
+  // the reserved .invalid domain, so nothing is ever fetched.
+  const images = await evaluate(`(async () => {
+    const { renderMarkdown, renderSafeHtml } = await import(new URL("runtime/cruse-render.js", location.href).href);
+    const md = document.createElement("div");
+    renderMarkdown(md, "Here: ![x](https://collect.invalid/p.png?q=chat) and <img src=https://collect.invalid/a.png>");
+    const html = document.createElement("div");
+    renderSafeHtml(html, '<p>Hi<img src="https://collect.invalid/b.png"></p>');
+    const refused = await new Promise((resolve) => {
+      const onViolation = (e) => { if (e.violatedDirective.startsWith("img-src")) done(true); };
+      const done = (value) => { document.removeEventListener("securitypolicyviolation", onViolation); resolve(value); };
+      document.addEventListener("securitypolicyviolation", onViolation);
+      new Image().src = "https://collect.invalid/c.png";
+      setTimeout(() => done(false), 1500);
+    });
+    return { markdownImages: md.querySelectorAll("img").length, htmlImages: html.querySelectorAll("img").length, refusedByPolicy: refused };
+  })()`);
+  console.log(`  remote images: ${JSON.stringify(images)}`);
+  for (let i = problems.length - 1; i >= 0; i -= 1) if (problems[i].includes("collect.invalid")) problems.splice(i, 1);
+  if (images.markdownImages || images.htmlImages || !images.refusedByPolicy) problems.push(`remote images: ${JSON.stringify(images)}`);
   if (otari.card !== "other" || otari.router !== "https://api.otari.ai/api/v1" || otari.model !== "alibaba/qwen3.8-flash" || /did not accept/.test(otari.status)) {
     problems.push(`otari key: ${JSON.stringify(otari)}`);
   }
