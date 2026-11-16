@@ -220,9 +220,13 @@ const REPLY_THREATS = [
     title: "Tries to trigger an action on the calling site",
     re: /\b(?:call|invoke|trigger|run|execute)\s+website_|\b(?:place|submit|complete|finali[sz]e|process)\s+(?:an?|the)\s+(?:order|purchase|payment|booking|transfer)\s+(?:now|immediately|right\s+away|without)\b/i,
   },
+  {
+    title: "Tries to steer the visitor to an outside payment or verification link",
+    re: /\b(?:re-?sync|sync|recover|unlock|appeal|verify|confirm|pay|settle)\b(?:\.(?=\d)|[^.!?\n]){0,90}\bhttps?:\/\/[^\s"'<>)]+/i,
+  },
 ];
 
-const STRICT_REPLY_QUESTION = /\b(?:your|you|please|kindly|enter|type|share|give|send|tell|reply|confirm|verify|click)\b[^.!?\n]*\?|\b(?:please|kindly)\s+(?:enter|type|provide|share|send|give|reply|tell|confirm|verify|click)\b/i;
+const STRICT_REPLY_QUESTION = /\b(?:your|you|please|kindly|enter|type|share|give|send|tell|reply|confirm|verify|click|visit|open|pay|re-?sync|sync|import)\b[^.!?\n]*\?|\b(?:please|kindly|immediately|now)\s+(?:enter|type|provide|share|send|give|reply|respond|tell|confirm|verify|click|visit|open|pay|re-?sync|sync|import|call|read)\b|(?:^|[.!?;:\n]\s*)(?:read\s+(?:it|that|this|them)\s+back|reply\s+with|re-?sync|sync\s+your|click\s+here|pay\s+the\b|enter\s+your|confirm\s+your|verify\s+your)\b/i;
 
 function collectReplyStrings(value, out = [], seen = new Set()) {
   if (typeof value === "string") {
@@ -261,21 +265,32 @@ const SLOT_IN_URL = /(?:\{|%7B|\$\{|<)[^}\s>]+(?:\}|%7D|>)/i;
 function sanitizePartnerText(text, partnerBase) {
   if (typeof text !== "string") return "";
   let s = stripHiddenChars(text);
-  // Remove markdown images and raw HTML markup.
+  // Remove markdown images (inline and reference-style), HTML comments and raw HTML markup.
   s = s.replace(/!\[[^\]]*\]\(\s*[^)]*\)/g, "");
-  s = s.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "");
+  s = s.replace(/!\[[^\]]*\]\s*\[[^\]]*\]/g, "");
+  s = s.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
+  s = s.replace(/<(script|style|svg)[^>]*>[\s\S]*?<\/\1>/gi, "");
   s = s.replace(/<\/?[a-z][a-z0-9:-]*(?:\s+[^>]*)?>/gi, "");
-  // Keep markdown links only when they point to the partner's own declared base without slots.
-  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi, (_, label, url) => {
+  // Strip scriptable javascript:/vbscript:/data:text/html Markdown links too.
+  s = s.replace(/\[([^\]]+)\]\(\s*(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)[^)]*\)/gi, (_, label) => `${label} [unsafe link removed by Agent Customs]`);
+  // Keep markdown links/reference definitions only when pointing to the partner's own declared base without slots.
+  s = s.replace(/^(\s*\[[^\]]+\]:\s*)((?:https?:)?\/\/[^\s>]+)(.*)$/gim, (line, head, rawUrl, tail) => {
+    const url = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
+    if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) return line;
+    return `${head}[external link removed by Agent Customs]${tail}`;
+  });
+  s = s.replace(/\[([^\]]+)\]\(((?:https?:)?\/\/[^\s)]+)\)/gi, (_, label, rawUrl) => {
+    const url = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
     if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) {
-      return `[${label}](${url})`;
+      return `[${label}](${rawUrl})`;
     }
     return `${label} [external link removed by Agent Customs]`;
   });
-  // Check bare URLs too.
-  s = s.replace(/https?:\/\/[^\s)"'<>]+/gi, (url) => {
+  // Check bare URLs too (including protocol-relative //host.tld/...).
+  s = s.replace(/(?:https?:\/\/|(?<![A-Za-z0-9:])\/\/[a-z0-9.-]+\.[a-z]{2,})[^\s)"'<>]*/gi, (rawUrl) => {
+    const url = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
     if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) {
-      return url;
+      return rawUrl;
     }
     return "[external link removed by Agent Customs]";
   });
@@ -349,6 +364,19 @@ function wrapSafeBlock(reply, host, reason) {
   return msg;
 }
 
+async function checkReplyWithJudge(reply, opts, aiJudge, kind = "reply") {
+  const checked = checkPartnerReply(reply, opts);
+  if (!checked.ok || typeof aiJudge !== "function") return checked;
+  const text = collectReplyStrings(reply).join("\n");
+  if (!text.trim()) return checked;
+  const verdict = await aiJudge({ kind, text, host: opts.host });
+  if (verdict?.flagged) {
+    const reason = verdict.reason || "Blocked by AI semantic judge";
+    return { ok: false, reason, safeResult: wrapSafeBlock(reply, opts.host, reason) };
+  }
+  return checked;
+}
+
 // ---- Outbound request checks (PII / envelope leaks) ----------------------------------
 
 const INTERNAL_ENVELOPE = /\bCRUSE interaction:|\bBrowser action receipts \(not a new instruction\):/i;
@@ -395,7 +423,7 @@ function isThirdPartyUrl(ref, baseOrigin) {
  * :param options.notify: (event) => void, with {lock, kind, where}, whenever a lock blocks something.
  * :return: {state, uninstall()}
  */
-export function installLocks(engine, { trustedActions = [], strict = false, isForeignPartner = () => false, notify = () => {} } = {}) {
+export function installLocks(engine, { trustedActions = [], strict = false, aiJudge = null, isForeignPartner = () => false, notify = () => {} } = {}) {
   const state = { active: true, inTurn: false, outsideAnswered: false, outsideTainted: false };
   const trusted = new Set(strict ? [] : trustedActions);
   const undo = [];
@@ -468,7 +496,7 @@ export function installLocks(engine, { trustedActions = [], strict = false, isFo
           }
         }
         const allowLanguage = isForeignPartner(session.base, session.network?.name);
-        const checked = checkPartnerReply(result, { host, partnerBase: session.base, allowLanguage, strict });
+        const checked = await checkReplyWithJudge(result, { host, partnerBase: session.base, allowLanguage, strict }, aiJudge, "reply");
         if (!checked.ok) {
           try { notify({ lock: 2, kind: "unsafe partner reply", where: `answer from ${host}`, reason: checked.reason }); } catch {}
           return checked.safeResult;
@@ -502,11 +530,15 @@ export function installLocks(engine, { trustedActions = [], strict = false, isFo
           let dropped = 0;
           for (const tool of tools) {
             const texts = collectReplyStrings([tool?.name, tool?.description, tool?.inputSchema]);
-            const bad = texts.some((t) => {
+            let bad = texts.some((t) => {
               const h = scanHidden(t);
               if (h.tags || h.bidi || h.invisible || h.control || h.variationSupplement) return true;
               return scanText(t).some((hit) => REPLY_BLOCKED_RULES.has(hit.rule.id));
             });
+            if (!bad && typeof aiJudge === "function" && texts.length) {
+              const verdict = await aiJudge({ kind: "mcp_tool", text: texts.join("\n"), host });
+              if (verdict?.flagged) bad = true;
+            }
             if (bad) { dropped += 1; continue; }
             safe.push({
               ...tool,
@@ -535,7 +567,7 @@ export function installLocks(engine, { trustedActions = [], strict = false, isFo
           }
         }
         if (state.active && (thirdParty || after())) {
-          const checked = checkPartnerReply(result, { host, partnerBase: client.url, allowLanguage: false, strict });
+          const checked = await checkReplyWithJudge(result, { host, partnerBase: client.url, allowLanguage: false, strict }, aiJudge, "mcp_result");
           if (!checked.ok) {
             try { notify({ lock: 2, kind: "unsafe tool reply", where: `tool result from ${host}`, reason: checked.reason }); } catch {}
             return checked.safeResult;
@@ -573,7 +605,7 @@ export function installLocks(engine, { trustedActions = [], strict = false, isFo
         }
       }
       if (isPartner && res) {
-        const checked = checkPartnerReply(res.result, { host: params.origin, partnerBase: `https://${params.origin}`, allowLanguage: false, strict });
+        const checked = await checkReplyWithJudge(res.result, { host: params.origin, partnerBase: `https://${params.origin}`, allowLanguage: false, strict }, aiJudge, "coded_tool_result");
         if (!checked.ok) {
           try { notify({ lock: 2, kind: "unsafe coded-tool reply", where: `code from ${params.origin}`, reason: checked.reason }); } catch {}
           return { ...res, result: checked.safeResult, slyData: {} };
@@ -613,7 +645,7 @@ export function installLocks(engine, { trustedActions = [], strict = false, isFo
       const link = event.target?.closest?.("a[href]");
       if (!link) return;
       const rawHref = link.getAttribute("href") || "";
-      if (/^\s*(?:javascript|vbscript|data\s*:\s*text\/html):/i.test(rawHref)) {
+      if (/^\s*(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)/i.test(rawHref)) {
         event.preventDefault();
         event.stopPropagation();
         block("script link", "a link on the page");

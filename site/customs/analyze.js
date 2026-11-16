@@ -578,6 +578,41 @@ export async function reanalyze(report, pin) {
   return report?.inputs ? analyzeNetwork({ ...report.inputs, pin }) : report;
 }
 
+/**
+ * Add a finding (such as an AI semantic judge warning) to a completed report and
+ * recompute counts, verdict and summary consistently. Only escalates; never downgrades.
+ */
+export function escalateReport(report, finding) {
+  if (!report || !finding) return report;
+  const findings = [...(report.findings || []), {
+    id: "",
+    rule: finding.rule || "J-SEMANTIC",
+    category: finding.category || "contraband",
+    severity: finding.severity || "high",
+    title: finding.title || "Flagged by AI semantic review",
+    detail: finding.detail || "",
+    evidence: finding.evidence || "",
+    where: finding.where || {},
+    why: finding.why || "An isolated semantic check spotted manipulative or risky intent beyond exact keywords.",
+    fix: finding.fix || "Review the flagged text carefully before allowing this partner to run.",
+  }];
+  findings.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+  findings.forEach((f, i) => { f.id = `F${i + 1}`; });
+  const counts = Object.fromEntries(SEVERITY_ORDER.map((s) => [s, findings.filter((f) => f.severity === s).length]));
+  const blockingTitles = (report.conformance?.checks || []).filter((c) => c.status === "fail").map((c) => c.title.toLowerCase());
+  let verdict = report.verdict;
+  if (counts.critical) verdict = VERDICTS.DENIED;
+  else if (blockingTitles.length) verdict = VERDICTS.INVALID;
+  else if (counts.high) verdict = VERDICTS.HOLD;
+  else if (counts.medium) verdict = VERDICTS.CONDITIONS;
+  return {
+    ...report,
+    findings,
+    counts,
+    verdict: { ...verdict, summary: summarize(verdict, counts, findings, blockingTitles) },
+  };
+}
+
 function summarize(verdict, counts, findings, blocking) {
   // Lower-case only the first letter, so names such as "Unicode" keep their capital.
   const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1);

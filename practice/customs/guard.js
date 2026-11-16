@@ -25,7 +25,8 @@
 // or IBAN never goes to a partner, and after a partner answers, website actions that change
 // something wait for the visitor's click.
 
-import { analyzeNetwork } from "./analyze.js";
+import { analyzeNetwork, escalateReport } from "./analyze.js";
+import { createEngineJudge } from "./judge.js";
 import { installLocks } from "./locks.js";
 import { PinStore, pinFromReport } from "./pins.js";
 
@@ -77,6 +78,9 @@ export function installCustomsGuard(engine, options = {}) {
   const log = [];
   const partnerInfo = new Map();
   const original = engine._compile;
+  const aiJudge = typeof options.aiJudge === "function"
+    ? options.aiJudge
+    : (options.semanticJudge === false ? null : createEngineJudge(engine));
 
   engine._compile = async function customsCompile(base, manifest, entry, opts = {}) {
     const compiled = await original.call(this, base, manifest, entry, opts);
@@ -87,12 +91,32 @@ export function installCustomsGuard(engine, options = {}) {
     let frontMan = null;
     try { frontMan = network.findFrontMan(); } catch { frontMan = null; }
     const pin = store.get(networkUrl);
-    const report = await analyzeNetwork({
+    let report = await analyzeNetwork({
       networkUrl, manifest, entry, config: network.config, frontMan,
       linkSlots: [...(network.linkSlots || [])],
       validation: { errors: compiled.validation?.errors || [], warnings: compiled.validation?.warnings || [] },
       pin,
     });
+    // Layer 2 Semantic AI Judge: when an isolated non-mock AI is active and static rules
+    // returned CLEARED or CONDITIONS, let the zero-tool judge check for unseen tricks.
+    if (aiJudge && (report.verdict.code === "CLEARED" || report.verdict.code === "CONDITIONS")) {
+      const sampleText = (network.config?.tools || []).map((t) => [
+        t?.name, t?.instructions, t?.command, t?.function?.description,
+        t?.function?.parameters ? JSON.stringify(t.function.parameters) : "",
+      ].filter(Boolean).join("\n")).join("\n---\n");
+      const verdict = await aiJudge({ kind: "network", text: sampleText, host: report.target.host });
+      if (verdict?.flagged) {
+        report = escalateReport(report, {
+          rule: "J-SEMANTIC",
+          category: "contraband",
+          severity: "high",
+          title: "AI semantic check flagged suspicious intent",
+          detail: verdict.reason || "Isolated AI judge flagged hidden or manipulative intent.",
+          evidence: sampleText.slice(0, 220),
+          where: { agent: frontMan || "" },
+        });
+      }
+    }
     report.guard = { decision: "pending", pinned: false };
     log.push(report);
     partnerInfo.set(networkUrl, {
@@ -134,6 +158,7 @@ export function installCustomsGuard(engine, options = {}) {
   const locks = options.locks === false ? null : installLocks(engine, {
     trustedActions: options.trustedActions || [],
     strict,
+    aiJudge,
     isForeignPartner: (base, name) => Boolean(partnerInfo.get(`${String(base).replace(/\/$/, "")}/${name || ""}`)?.allowLanguage),
     notify: (event) => {
       options.onLock?.(event);
