@@ -284,7 +284,7 @@ The rules are tested on scam sentences, and on honest sentences that sound close
 
 The 10 checked languages are Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic. In these, a request for a card number, a security code or a password is blocked straight away. Text in any language other than English is also held for a person to read, because only English is checked in full.
 
-Ten of the sentences, nine scams and one honest one, come from a review of this project. At first, 6 of those 10 got the wrong verdict. Now all ten get the right one, and so do new sentences that try the same tricks in other words.
+Ten of the sentences, nine scams and one honest one, come from a review of this project. At first, 6 of those 10 got the wrong verdict; now all ten get the right one. A second review then tried 23 new sentences, and 10 of them got the wrong verdict. That is the honest lesson: each fix covers wording someone has already tried, and new wording can still get through.
 
 On real sites, I checked the 21 networks other contestants had published, on 15 November 2026. 14 were Cleared, 2 Cleared with conditions, 4 Held for review and 1 had papers not in order. None was denied. The new rules changed only two verdicts: two networks written in Indonesian are now held for a person to read, as intended.
 
