@@ -7,10 +7,13 @@
 //      A sentence counts when it has a request word and a secret word and no negation
 //      word at all, so "never ask for passwords" in any of them is not read as a request.
 //      Rules.js reports these as C-SECRETS, the same as in English.
-//   2. Sentences in any language other than English. The English rules cannot read them,
-//      so rules.js holds the network for a person to look at (C-LANGUAGE).
+//   2. Sentences that are not clearly English, whatever the language. The English rules
+//      cannot read them, so rules.js holds the network for a person to look at (C-LANGUAGE).
+//      english-words.js holds the common English words this check counts.
 //
 // Both run on text that normalizeForRules has already cleaned.
+
+import { isEnglishWord } from "./english-words.js";
 
 // Whole words: no letter, mark or digit right before or after. JavaScript's \b only
 // knows ASCII letters, so it would split "contraseña" after the "ñ".
@@ -224,8 +227,9 @@ export const SECRET_LANGUAGES = [
   },
 ];
 
-// Sentences end at these marks in the scripts above, or at a line break.
-const SENTENCE_END = /[.!?;。！？；؟।\n]+/u;
+// Sentences end at these marks in the scripts above, or at a line break. A Latin full stop
+// ends a sentence only before a space or the end, so web addresses stay whole.
+const SENTENCE_END = /[.!?;]+(?=\s|$)|[。！？；؟।\n]+/u;
 
 function sentences(text) {
   return text.split(SENTENCE_END).map((s) => s.trim()).filter(Boolean);
@@ -259,7 +263,10 @@ export function foreignSecretRequests(normalized) {
 const ENGLISH = new Set(`the and of to in is it you that for on with as are be this your from at by or an not they we can
   will if do what all their has have any when which who our us them about only never always should must would could there these
   those then than into out up use its was were been how more other some such no so but may each also just me my he she his her
-  him where why does did here after before because while very please`.split(/\s+/));
+  him where why does did here after before because while very please anything something everything nothing`.split(/\s+/));
+// The same without words that are also common in other languages (Spanish "no" and "me",
+// German "in" and "so", Dutch "is", Polish "to"), for weighing English against them.
+const STRONG_ENGLISH = new Set([...ENGLISH].filter((w) => !["no", "me", "he", "in", "on", "so", "do", "to", "is", "as", "an"].includes(w)));
 
 // Common function words of other languages written in Latin letters. Words that are also
 // English words ("a", "in", "is", "do", "die"...) are left out, except German "die",
@@ -292,6 +299,10 @@ const LATIN_LANGUAGES = {
   Estonian: "ja ei et oli aga kui siis kas või ka teie meie tema nende kõik ainult mitte kunagi alati",
   Hausa: "da ba na ya ta ga cikin wannan kuma amma don shi ita su ku mu ne ce kada",
   Zulu: "futhi ukuthi kodwa uma noma ngoba wena thina bona",
+  Latvian: "un ir uz par ar kas ka lai bet vai jā nē es tu viņš viņa mēs jūs viņi šis tas tā kā arī pie līdz pēc savu mūsu jūsu lūdzu nav būs bija var ja kad tikai vēl jau ļoti visi kur",
+  Lithuanian: "ir kad bet su į iš ne tai kaip jo jos jūs mes aš tu šis ta tas ar prašome prašau apie nuo už kas kur labai dar jau yra buvo bus savo mūsų jūsų jei kai tik visi",
+  // Hindi and Urdu as many people type them, in Latin letters ("card ka number poochho").
+  "Hindi written in Latin letters": "hai hain ka ki ke ko se mein aur ya nahi nahin kya kyun kaise kab kahan yeh ye woh wo unka unki unke apna apni apne uska uski uske mera meri mere tera teri tum aap hum kar karo karein karna kijiye dijiye batao bataiye poocho poochho puchho puchiye lijiye ho hota hoti tha thi raha rahi wala wali bhi sirf abhi jab tab agar toh liye liya gaya gayi chahiye sakte sakta sakti",
 };
 const LATIN_WORDS = Object.entries(LATIN_LANGUAGES).map(([name, list]) => [name, new Set(list.split(/\s+/))]);
 
@@ -312,19 +323,42 @@ const SCRIPTS = [
 // signs are accents too) do not make a word.
 const LATIN_WORD = /\p{Script=Latin}[\p{Script=Latin}\p{M}]*/gu;
 
+// The name used for a sentence that is not English, in no language the lists know.
+export const UNRECOGNISED = "a language Agent Customs doesn't recognise";
+
+// Addresses, file names, e-mail addresses and code names (website_list_shops) are not
+// words of any language.
+const NOT_WORDS = /https?:\/\/\S+|\b[\w.+-]+@[\w-]+\.[\w.-]+|\b[\w-]+\.(?:com|org|net|io|dev|app|ai|co|uk|json|html|js|md)\b|\b\w*_\w*\b/gi;
+
+// A list of short items, such as "Menu: tapas, paella de marisco, churros con chocolate":
+// dish and product names are often foreign words, so lists are not judged as sentences.
+function looksLikeList(sentence) {
+  const items = sentence.split(/[,:;]|\s(?:and|or|&)\s/i).map((s) => s.trim()).filter(Boolean);
+  const separators = (sentence.match(/[,:;]/g) || []).length;
+  return separators >= 2 && items.every((item) => item.split(/\s+/).length <= 4);
+}
+
 /**
- * The language a sentence is written in, when it is clearly not English.
+ * The language a sentence is written in, when it is not clearly English.
  *
- * A sentence counts when most of it is in another script (three words or more), or when
- * its Latin words include at least three common words of another language, a fifth of
- * all its words, and more than twice as many as English ones. Short phrases and foreign
- * names inside English sentences ("Café de la Paix") do not count.
+ * In this order:
+ * - most of it is in another script (three words or more): that script's language;
+ * - its Latin words include at least three common words of a listed language, a fifth of
+ *   all its words, and more than twice as many as English ones: that language, so foreign
+ *   names inside English sentences ("Café de la Paix") do not count;
+ * - six or more words that are not a list, with no common English word ("the", "and",
+ *   "with" ...), fewer than half of them English words, and a sign of another language
+ *   (accented letters, or a common word of a listed language): that language, or one the
+ *   lists don't know. Names, acronyms and code words don't count either way.
  *
  * :param sentence: One sentence of cleaned text.
  * :return: The language's name, or null for English or too little text to tell.
  */
 export function otherLanguageOf(sentence) {
-  const latin = sentence.toLowerCase().match(LATIN_WORD) || [];
+  // "I'm", "don't", "we're": the ending is part of an English word, not a word of its own.
+  const text = sentence.replace(NOT_WORDS, " ").replace(/'(?:m|s|t|re|ve|ll|d)\b/gi, "");
+  const tokens = [...text.matchAll(LATIN_WORD)].map((m) => m[0]);
+  const latin = tokens.map((w) => w.toLowerCase());
   let best = null;
   for (const script of SCRIPTS) {
     const letters = (sentence.match(script.re) || []).length;
@@ -336,14 +370,23 @@ export function otherLanguageOf(sentence) {
   if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
   if (best && best.units >= 3 && best.units >= latin.length) return best.name;
   if (latin.length < 5) return null;
-  const english = latin.filter((w) => ENGLISH.has(w)).length;
+  const english = latin.filter((w) => STRONG_ENGLISH.has(w)).length;
   let top = null;
   for (const [name, set] of LATIN_WORDS) {
     const count = latin.filter((w) => set.has(w)).length;
     if (!top || count > top.count) top = { name, count };
   }
   if (top.count >= 3 && top.count >= 0.2 * latin.length && top.count > 2 * english) return top.name;
-  return null;
+  // Not clearly English, whatever the language.
+  if (english > 0 || looksLikeList(text)) return null;
+  const judged = tokens.filter((word, i) => !(i > 0 && /^\p{Lu}/u.test(word)) && !/^\p{Lu}{2,}$/u.test(word) && !/\p{Ll}\p{Lu}/u.test(word))
+    .map((word) => word.toLowerCase());
+  if (judged.length < 6) return null;
+  const known = judged.filter((word) => ENGLISH.has(word) || isEnglishWord(word)).length;
+  if (known >= 0.5 * judged.length) return null;
+  const foreignSign = /[^\x00-\x7f]/.test(judged.join("")) || top.count >= 1;
+  if (!foreignSign) return null;
+  return top.count >= 2 ? top.name : UNRECOGNISED;
 }
 
 /**

@@ -157,7 +157,7 @@ You need [Node.js](https://nodejs.org/) 22 or newer and nothing else. In the pro
 npm test
 ```
 
-All 84 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 93 scam and honest sentences in 22 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
+All 85 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 116 scam and honest sentences in 23 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
 
 ### 2. Inspect a site on the live website: no key
 
@@ -269,7 +269,10 @@ All 84 tests should pass in a few seconds. Some of them put the guard inside Cog
 | Check | What it looks at |
 | --- | --- |
 | Papers | Conformance with the MVP spec (profile 0.2), one check at a time, each citing its section and giving the publisher a fix. It uses the runtime's own parser and validator, and flags keys or passwords left in the public files (shown shortened). |
-| Contraband | Hidden Unicode tag characters (decoded and shown), zero-width and right-to-left tricks, prompt injection, requests for passwords, codes and card details (in English and 10 other languages), orders to buy or pay without the visitor's OK, image links that leak the conversation, orders aimed at the calling site's assistant, text written to fool reviewers, and encoded blobs. Text in other languages is held for a person to read. |
+| Contraband | Hidden Unicode tag characters (decoded and shown), zero-width and right-to-left tricks, prompt injection, requests for passwords, codes and card details (in English and 10 other languages), orders to buy or pay without the visitor's OK, image links that leak the conversation, orders aimed at the calling site's assistant, text written to fool reviewers, and encoded blobs. Text that isn't clearly English is held for a person to read. |
+| Itinerary | Every other site, MCP server and code bundle the network can reach, and whether its own policy allows that. |
+| Privacy | Which private context (`sly_data`) it lets cross a site boundary. |
+| Identity | A SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, authority claims its host does not back up, and a line-by-line diff when a publisher changes a network or its manifest after approval. |
 
 ## How well it catches tricks
 
@@ -277,21 +280,19 @@ The rules are tested on scam sentences, and on honest sentences that sound close
 
 | What was tested | Sentences | Result |
 | --- | --- | --- |
+| A second review's sentences, written to get past the rules | 23 | All get the right verdict now |
 | Scam sentences in English and the 10 checked languages | 32 | All blocked |
 | Scam sentences in 11 other languages | 11 | All held for a person |
 | Honest English sentences, many close to a scam's wording | 27 | None flagged |
 | Honest sentences in other languages | 23 | None blocked |
 
-The 10 checked languages are Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic. In these, a request for a card number, a security code or a password is blocked straight away. Text in any language other than English is also held for a person to read, because only English is checked in full.
+The 10 checked languages are Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic. In these, a request for a card number, a security code or a password is blocked straight away. A sentence that isn't clearly English is also held for a person to read, whatever the language, because only English is checked in full.
 
-Ten of the sentences, nine scams and one honest one, come from a review of this project. At first, 6 of those 10 got the wrong verdict; now all ten get the right one. A second review then tried 23 new sentences, and 10 of them got the wrong verdict. That is the honest lesson: each fix covers wording someone has already tried, and new wording can still get through.
+Ten of the sentences, nine scams and one honest one, come from a review of this project, and at first 6 of them got the wrong verdict. A second review then tried 23 new sentences, and 10 of those got the wrong verdict too. Both sets are now in the tests and pass, with one change made on purpose: the second review expected an honest Latvian sentence to be Cleared, but honest text in another language is held, like its French one. That is the honest lesson: each fix covers wording someone has already tried, and new wording can still get through.
 
 On real sites, I checked the 21 networks other contestants had published, on 15 November 2026. 14 were Cleared, 2 Cleared with conditions, 4 Held for review and 1 had papers not in order. None was denied. The new rules changed only two verdicts: two networks written in Indonesian are now held for a person to read, as intended.
 
 These are sentences written to test the rules. They show what the rules cover, not that nothing gets past them: someone who studies the rules can find wording they miss. That is why the guard also remembers each approved version and holds any change, and why Cleared never means certified safe.
-| Itinerary | Every other site, MCP server and code bundle the network can reach, and whether its own policy allows that. |
-| Privacy | Which private context (`sly_data`) it lets cross a site boundary. |
-| Identity | A SHA-256 fingerprint of the version you approved, look-alike letters from other alphabets, authority claims its host does not back up, and a line-by-line diff when a publisher changes a network or its manifest after approval. |
 
 ## The test range
 
@@ -312,7 +313,7 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 84 tests: engine, scam and honest sentences, guard and its notices inside the real runtime, website tools, practice site, local server
+npm test                 # 85 tests: engine, scam and honest sentences, guard and its notices inside the real runtime, website tools, practice site, local server
 npm run serve            # Agent Customs at http://127.0.0.1:8080/
 npm run serve:practice   # the practice site at http://127.0.0.1:8082/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log
@@ -406,7 +407,7 @@ Everything is plain JavaScript modules, with no dependencies, no build step and 
 ## Limits
 
 - Pattern rules catch known techniques, not every possible manipulation. Someone who studies the rules can find wording they miss. The instruction analyst gives a model's second opinion, labeled as an opinion. A network that passes is not certified safe, and the site says so.
-- Only English is checked in full. In 10 other languages the rules catch requests for card details and passwords, and a sentence in another language is held for a person to read. A sentence counts as another language when it is mostly in another alphabet, or has at least three common words of one of the 27 other Latin-alphabet languages the rules know. A short sentence, or one in a language they don't know, can pass unread.
+- Only English is checked in full. In 10 other languages the rules catch requests for card details and passwords. A sentence is held as another language when it is mostly in another alphabet, has at least three common words of one of the 30 Latin-alphabet languages the rules know, or has no common English words at all and shows a sign of another language (accented letters, or a common word of a known language). Very short sentences, lists of names such as a menu, and a language the rules don't know written without accents can still pass unread.
 - Approvals are per browser. There is no shared registry of verdicts yet; a later version could publish signed inspection receipts to a registry such as the NANDA Index.
 - A site that sends no CORS header cannot be inspected from a browser, and no caller's browser can run its network either. Agent Customs reports this as Could not inspect.
 - From the runtime: the LLM provider must allow browser calls, and the network file, instructions included, is public.
