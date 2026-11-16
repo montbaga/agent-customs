@@ -72,6 +72,13 @@ try {
     console.log(`  screenshot ${file}.png`);
   }
 
+  // Sunny Bakery has a signed stamp (receipts/), and it fits the version just inspected.
+  const stamp = await waitFor("document.querySelector('.receipt-line') && !document.querySelector('.receipt-line').hidden", 8000)
+    .then(() => evaluate("({ state: document.querySelector('.receipt-line').dataset.state, text: document.querySelector('.receipt-line').textContent })"))
+    .catch(() => ({ state: "missing", text: "" }));
+  console.log(`  signed stamp: ${stamp.state} · ${stamp.text}`);
+  if (stamp.state !== "ok" || !/Signed stamp verified: Cleared/.test(stamp.text)) problems.push(`signed stamp: ${JSON.stringify(stamp)}`);
+
   // Approve the bakery, then compare it with the rug-pulled version.
   await evaluate("[...document.querySelectorAll('.report-actions button')].find(b => /Approve/.test(b.textContent))?.click()");
   await waitFor("document.querySelectorAll('#pins-list li .ptitle').length > 0");
@@ -136,7 +143,8 @@ try {
     let applied = false;
     document.querySelector("#ns-apply").click = () => { applied = true; };
     document.querySelector("#mp-start").click();
-    await new Promise((r) => setTimeout(r, 1500));
+    // The picker first asks the made-up address for its models; that lookup can take a while to fail.
+    for (let waited = 0; !applied && waited < 12000; waited += 250) await new Promise((r) => setTimeout(r, 250));
     const form = { router: document.querySelector("#ns-router")?.value, model: document.querySelector("#ns-model")?.value, name: document.querySelector("#ns-profile-name")?.value, applied };
     try { sessionStorage.removeItem("agent-customs-after-save"); history.scrollRestoration = "auto"; } catch {}
     document.querySelector('#mp-cards input[value="gemini"]').click();
@@ -278,6 +286,9 @@ try {
 } finally {
   close();
 }
+
+// The made-up addresses (.invalid) never resolve, by design; a late failed lookup is not a problem.
+for (let i = problems.length - 1; i >= 0; i -= 1) if (/https:\/\/(?:ai|collect)\.invalid\//.test(problems[i])) problems.splice(i, 1);
 
 if (problems.length) {
   console.log("\nProblems:");

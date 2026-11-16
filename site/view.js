@@ -4,6 +4,7 @@
 // as HTML, so a hostile network cannot put markup into this page.
 import { EXAMPLES, NOT_APPROVABLE, desk } from "./desk.js";
 import { matchesPin } from "./customs/diff.js";
+import { verifyReceipt } from "./customs/receipts.js";
 
 const SEVERITY_TONE = { critical: "bad", high: "warn", medium: "caution", low: "info", info: "info" };
 const SEVERITY_RANK = ["critical", "high", "medium", "low", "info"];
@@ -145,6 +146,9 @@ function renderReport({ animate = false } = {}) {
   fact("Front agent", report.identity.frontMan, true);
   fact("Model hint", report.identity.model, true);
   fact("Spec checks", `${report.conformance.passed}/${report.conformance.total} pass`);
+  // Agent Customs' signed stamp for this network, when one is published (receipts/).
+  const receiptLine = h("p", { class: "receipt-line", hidden: true, "aria-live": "polite" });
+  if (!report.failure) showReceipt(report, receiptLine);
 
   box.append(h("header", { class: "report-head" },
     h("div", { class: `stamp tone-${tone}${animate ? " animate" : ""}`, role: "img", "aria-label": `Verdict: ${report.verdict.stamp}` },
@@ -154,6 +158,7 @@ function renderReport({ animate = false } = {}) {
       h("h2", { id: "report-title", tabindex: "-1" }, title),
       h("p", { class: "report-url" }, report.target.url),
       h("p", { class: "report-summary" }, report.verdict.summary),
+      receiptLine,
       facts)));
 
   if (!report.failure) box.append(renderLights(report));
@@ -427,6 +432,48 @@ function renderBorderLog() {
 }
 
 // ---- Forms -------------------------------------------------------------------------
+
+// ---- Signed stamps (receipts) ----------------------------------------------------------
+// Published at receipts/ with an index, and checked with the public key at
+// .well-known/agent-customs-key.json. Both are loaded once, from this site.
+let receiptIndex = null;
+let receiptKey = null;
+
+async function loadJson(relative) {
+  const response = await fetch(new URL(relative, location.href), { cache: "no-store" });
+  if (!response.ok) throw new Error(String(response.status));
+  return response.json();
+}
+
+async function findReceipt(networkUrl) {
+  receiptIndex ||= loadJson("receipts/index.json").catch(() => ({ receipts: [] }));
+  receiptKey ||= loadJson(".well-known/agent-customs-key.json").catch(() => null);
+  const [index, key] = await Promise.all([receiptIndex, receiptKey]);
+  const entry = (index.receipts || []).find((e) => e.network === networkUrl);
+  if (!entry || !key) return null;
+  const url = new URL(`receipts/${entry.path}`, location.href).href;
+  return { signed: await loadJson(url), key, url };
+}
+
+// Shows whether the signed stamp checks out and still fits this exact version.
+async function showReceipt(report, line) {
+  try {
+    const found = await findReceipt(report.target.url);
+    if (!found || desk.latest !== report) return;
+    const check = await verifyReceipt(found.signed, found.key.publicKey, { fingerprint: report.identity.hash });
+    const r = check.receipt;
+    let state = "ok";
+    let text = `Signed stamp verified: ${r?.stamp}, ${stampDate(r?.inspectedAt)}. It matches this exact version.`;
+    if (!check.valid) { state = "bad"; text = `A signed stamp was found, but it fails the check: ${check.reason}`; }
+    else if (check.matches === false) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) is for an earlier version: this network has changed since.`; }
+    else if (check.expired) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) has expired.`; }
+    line.replaceChildren(h("span", null, text), " ", h("a", { href: found.url, target: "_blank", rel: "noopener noreferrer" }, "See the signed receipt"));
+    line.dataset.state = state;
+    line.hidden = false;
+  } catch {
+    // No stamp is shown when it can't be checked.
+  }
+}
 
 async function runInspect(url) {
   const input = $("#inspect-url");
