@@ -239,12 +239,17 @@ export async function analyzeNetwork(input) {
   // ---- Contraband: text rules ------------------------------------------------
   const textFields = collectTextFields(manifest, config);
   const ruleHits = new Map();
+  const agentRuleSeen = new Set();
   for (const field of textFields) {
     for (const hit of scanText(field.text)) {
+      if (field.crossField && agentRuleSeen.has(`${hit.rule.id}|${field.agent || ""}`)) continue;
       const key = `${hit.rule.id}|${field.agent || ""}|${field.field}`;
       const prev = ruleHits.get(key);
       if (prev) { prev.count += 1; continue; }
       ruleHits.set(key, { hit, field, count: 1 });
+      if (field.agent && (field.field === "instructions" || field.field === "command")) {
+        agentRuleSeen.add(`${hit.rule.id}|${field.agent}`);
+      }
     }
   }
   // The template's peer rule ("When you have no website_* tools ... Do not ask for
@@ -274,7 +279,7 @@ export async function analyzeNetwork(input) {
     }
   }
   if (foreignTools.size) {
-    add({ rule: "C-FOREIGN-TOOLS", category: "contraband", severity: "medium",
+    add({ rule: "C-FOREIGN-TOOLS", category: "contraband", severity: "high",
       title: "Names website tools it does not publish",
       detail: `Mentions ${[...foreignTools].join(", ")}, which its manifest does not list in actions.agentTools.`,
       where: {}, why: "Run as a partner it has no website tools, so naming them can only aim at the calling site's tools through its answer.",
@@ -304,12 +309,14 @@ export async function analyzeNetwork(input) {
     ...labels,
     { text: target.network, field: "network name" },
     ...agents.map((a) => ({ text: a.name, field: "agent name", agent: a.name })),
+    ...textFields.filter((f) => f.agent && !f.crossField && f.field !== "agent name"),
   ];
   const lookalikes = new Map();
   for (const item of nameChecks) {
     for (const m of findMixedScriptWords(item.text)) {
       const entry = lookalikes.get(m.word) || { word: m.word, scripts: m.scripts, fields: [] };
-      entry.fields.push(item.agent ? `agent ${item.agent}` : item.field);
+      const where = item.agent ? `agent ${item.agent}` : item.field;
+      if (!entry.fields.includes(where)) entry.fields.push(where);
       lookalikes.set(m.word, entry);
     }
   }
@@ -706,6 +713,29 @@ function walkStrings(value, fn, path = []) {
   }
 }
 
+function collectSchemaProperties(node, emit) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) { node.forEach((item) => collectSchemaProperties(item, emit)); return; }
+  if (node.properties && typeof node.properties === "object" && !Array.isArray(node.properties)) {
+    for (const [k, spec] of Object.entries(node.properties)) {
+      if (spec && typeof spec === "object") {
+        const parts = [k.replace(/[_-]+/g, " ")];
+        for (const key of ["title", "description", "default"]) {
+          if (typeof spec[key] === "string" && spec[key].trim()) parts.push(spec[key].trim());
+        }
+        if (Array.isArray(spec.enum)) {
+          for (const v of spec.enum) if (typeof v === "string" && v.trim()) parts.push(v.trim());
+        }
+        if (parts.length > 1) emit(parts.join(" "));
+      }
+      collectSchemaProperties(spec, emit);
+    }
+  }
+  for (const [k, v] of Object.entries(node)) {
+    if (k !== "properties" && v && typeof v === "object") collectSchemaProperties(v, emit);
+  }
+}
+
 function placeOf(path, config) {
   if (path[0] === "network" && path[1] === "tools" && typeof path[2] === "number") {
     const agent = config.tools?.[path[2]]?.name;
@@ -729,15 +759,29 @@ const onlyMentioned = (kinds) => [...kinds].every((k) => k === MENTIONED);
 
 function collectTextFields(manifest, config) {
   const out = [];
-  const push = (text, field, agent = null) => { if (typeof text === "string" && text.trim()) out.push({ text, field, agent }); };
+  const push = (text, field, agent = null, extra = {}) => {
+    if (typeof text === "string" && text.trim()) out.push({ text, field, agent, ...extra });
+  };
   for (const agent of config.tools || []) {
     if (!agent || typeof agent !== "object") continue;
+    if (typeof agent.name === "string" && agent.name.trim()) {
+      push(agent.name.replace(/[_-]+/g, " "), "agent name", agent.name);
+    }
     push(agent.instructions, "instructions", agent.name);
     push(agent.command, "command", agent.name);
+    // The runtime joins instructions + command into one system prompt, so scan both
+    // joined with a space too, catching a phrase split across the two fields.
+    if (typeof agent.instructions === "string" && agent.instructions.trim()
+      && typeof agent.command === "string" && agent.command.trim()) {
+      push(`${agent.instructions.trim()} ${agent.command.trim()}`, "instructions + command", agent.name, { crossField: true });
+    }
     push(agent.function?.description, "function.description", agent.name);
     // A calling model reads the whole input schema: property names, enums and defaults
     // as well as descriptions. walkStrings passes object keys too.
     walkStrings(agent.function?.parameters || {}, (text) => push(text, "parameters", agent.name));
+    // Also join each schema property name with its own description/title/default/enum so
+    // splitting a request across key + description ("ask_for": "their card number") stays together.
+    collectSchemaProperties(agent.function?.parameters, (text) => push(text, "parameters", agent.name, { crossField: true }));
   }
   push(config.metadata?.description, "metadata.description");
   for (const q of config.metadata?.sample_queries || []) push(q, "metadata.sample_queries");

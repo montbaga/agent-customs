@@ -35,11 +35,20 @@ export const DEFAULT_POLICY = Object.freeze({
   pinOnFirstUse: true,
 });
 
+export const STRICT_POLICY = Object.freeze({
+  deny: ["DENIED", "INVALID"],
+  ask: ["HOLD", "CONDITIONS", "CLEARED"],
+  pinOnFirstUse: false,
+});
+
 /**
  * Install the guard on a runtime engine.
  *
  * :param engine: The Engine from the runtime's boot().
  * :param options.policy: Override DEFAULT_POLICY fields.
+ * :param options.strict: Zero-trust mode: ask before every partner, never pin on first use,
+ *   ignore trustedActions once a partner answers, block PII outbound and require
+ *   declarative facts-only partner replies.
  * :param options.store: A PinStore (defaults to this origin's localStorage).
  * :param options.confirmEntry: async (report) => boolean, for held networks. Defaults to
  *   a built-in dialog in a browser and to "refuse" anywhere else.
@@ -49,20 +58,24 @@ export const DEFAULT_POLICY = Object.freeze({
  * :param options.reportPage: The Agent Customs page that "See the full report" opens, with
  *   the network's address filled in. Defaults to the public Agent Customs site.
  * :param options.openReport: (url) => void. Shows the full report on this page instead.
- * :param options.locks: false turns off the two locks (locks.js). They are on by default.
+ * :param options.locks: false turns off the runtime locks and reply quarantine (locks.js).
+ *   They are on by default.
  * :param options.trustedActions: Names of website actions that only change harmless things
  *   on the page, or ask the visitor themselves, so the action lock lets them run.
- * :param options.onLock: Called with {lock, kind, where} whenever a lock keeps a secret back.
- * :return: {store, log, locks, uninstall()}
+ * :param options.onLock: Called with {lock, kind, where, reason} whenever a lock blocks
+ *   something.
+ * :return: {store, log, policy, locks, uninstall()}
  */
 export function installCustomsGuard(engine, options = {}) {
   if (!engine || typeof engine._compile !== "function") {
     throw new Error("Agent Customs: this runtime has no _compile step to guard.");
   }
   if (engine.__agentCustoms) return engine.__agentCustoms;
-  const policy = { ...DEFAULT_POLICY, ...(options.policy || {}) };
+  const strict = Boolean(options.strict);
+  const policy = { ...(strict ? STRICT_POLICY : DEFAULT_POLICY), ...(options.policy || {}) };
   const store = options.store || new PinStore();
   const log = [];
+  const partnerInfo = new Map();
   const original = engine._compile;
 
   engine._compile = async function customsCompile(base, manifest, entry, opts = {}) {
@@ -82,6 +95,9 @@ export function installCustomsGuard(engine, options = {}) {
     });
     report.guard = { decision: "pending", pinned: false };
     log.push(report);
+    partnerInfo.set(networkUrl, {
+      allowLanguage: report.findings.some((f) => f.rule === "C-LANGUAGE"),
+    });
     // Each decision goes to the site's log and, in a notice, to the visitor.
     const tell = async () => {
       options.onReport?.(report);
@@ -117,6 +133,8 @@ export function installCustomsGuard(engine, options = {}) {
 
   const locks = options.locks === false ? null : installLocks(engine, {
     trustedActions: options.trustedActions || [],
+    strict,
+    isForeignPartner: (base, name) => Boolean(partnerInfo.get(`${String(base).replace(/\/$/, "")}/${name || ""}`)?.allowLanguage),
     notify: (event) => {
       options.onLock?.(event);
       showLockNoticeSafe(event, options);

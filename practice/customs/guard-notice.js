@@ -148,24 +148,29 @@ export function showGuardNotice(report, { reportPage, openReport } = {}) {
 }
 
 /**
- * Show that a lock kept a card number or IBAN back (locks.js).
+ * Show that a lock kept a secret back or blocked an unsafe runtime reply (locks.js).
  *
- * :param event: {kind, where} from the lock.
+ * :param event: {lock, kind, where, reason} from the lock.
  * :return: true once the notice is on the page.
  */
-export function showLockNotice({ kind, where }) {
+export function showLockNotice({ lock = 1, kind, where, reason = "" }) {
   const tone = TONE.bad;
   const ink = `color-mix(in oklab, ${tone} 72%, currentColor)`;
   const box = el("section", "", `margin:10px 0;padding:12px 14px 12px 16px;border-radius:14px;border:1px solid color-mix(in oklab, ${tone} 45%, transparent);border-left:4px solid ${tone};background:color-mix(in oklab, ${tone} 9%, transparent);font-family:inherit;font-size:14px;line-height:1.5;max-width:680px;overflow-wrap:anywhere`);
   box.className = "customs-notice";
   box.dataset.lock = kind;
   box.setAttribute("role", "status");
-  box.setAttribute("aria-label", `Agent Customs kept a ${kind} back`);
+  const isReplyBlock = lock === 2;
+  box.setAttribute("aria-label", isReplyBlock ? `Agent Customs blocked an ${kind}` : `Agent Customs kept a ${kind} back`);
   const head = el("div", "", "display:flex;align-items:center;justify-content:space-between;gap:10px");
   head.append(el("span", "Agent Customs", `font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${ink}`),
-    el("span", "Kept safe", `flex:none;font:700 11px/1 ui-monospace,"Geist Mono",Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:${ink};border:2px double ${tone};border-radius:6px;padding:4px 7px;transform:rotate(-3deg)`));
-  box.append(head, el("p", `Kept a ${kind} out of ${where}`, "margin:6px 0 4px;font-size:15px;font-weight:600"),
-    el("p", "Card numbers and bank account numbers never go to a partner's assistant, an outside tool or a website action a partner could have prompted. Nothing was sent.", "margin:0 0 4px;opacity:.88"),
+    el("span", isReplyBlock ? "Blocked" : "Kept safe", `flex:none;font:700 11px/1 ui-monospace,"Geist Mono",Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:${ink};border:2px double ${tone};border-radius:6px;padding:4px 7px;transform:rotate(-3deg)`));
+  const titleText = isReplyBlock ? `Blocked ${kind} in ${where}` : `Kept a ${kind} out of ${where}`;
+  const detailText = isReplyBlock
+    ? `${reason ? `${reason}. ` : ""}Nothing from that reply reached the assistant or the page.`
+    : "Card numbers, bank account numbers, keys and passwords never go to a partner's assistant, an outside tool or a website action a partner could have prompted. Nothing was sent.";
+  box.append(head, el("p", titleText, "margin:6px 0 4px;font-size:15px;font-weight:600"),
+    el("p", detailText, "margin:0 0 4px;opacity:.88"),
     el("div", "", "display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px"));
   place(box);
   return true;
