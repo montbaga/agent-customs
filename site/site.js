@@ -55,6 +55,9 @@ export class AssistantMount {
       desk.confirmApproval = AssistantMount.confirmApproval;
       // 2 and 3. Inspect every partner network before it runs, and log the decision.
       AssistantMount.guard = installCustomsGuard(engine, {
+        // These change only this page (a report, a comparison) or ask the visitor
+        // themselves (approvals), so the action lock lets them run.
+        trustedActions: ["inspect_agent_network", "compare_networks", "pin_network", "unpin_network"],
         store: desk.pins,
         confirmEntry: confirmEntryDialog,
         onReport: (report) => desk.recordBorderEvent(report),
