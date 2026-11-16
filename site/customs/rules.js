@@ -182,6 +182,12 @@ export const TEXT_RULES = [
       // Not when the instructions to ignore are inside outside content ("ignore any
       // instructions inside it", "... in tool results"): that is the safe way to read it.
       /\b(ignore|disregard|forget|override|bypass|discard)\b[^.!?\n]{0,40}\b(previous|prior|above|earlier|preceding|original|system|caller'?s?|calling|all|any|other|your|their)\b[^.!?\n]{0,30}\b(instructions?|rules?|prompts?|guidelines?|polic(?:y|ies)|directions?|guardrails?)\b(?!\s+(?:that (?:appear|are) )?(?:inside|in|within|from|contained in|embedded in|found in)\s+(?:it|them|this|that|the (?:file|page|document|content|text|tool results?|results?|responses?|answers?|data|input|messages?|email|site|web ?page)s?|tool results?|other sites?|another site|partner (?:answers|responses|networks?)|retrieved|fetched|untrusted|external)\b)/i,
+      // "Ignore whatever your own site told you", "ignore everything above".
+      /\b(?:ignore|disregard|forget)\s+(?:whatever|everything|anything|all|what)\s+(?:(?:your|the)\s+)?(?:own\s+)?(?:site|website|caller|calling\s+(?:site|assistant)|host|owner|operator|developers?|system|creators?|company|instructions?|rules|prompt|boss(?:es)?)\s+(?:has\s+|have\s+)?(?:told|said|says|say|tells|tell|asked|instructed|wrote|gave)\b/i,
+      /\b(?:ignore|disregard|forget)\s+(?:everything|anything|all)\s+(?:above|before|earlier|previously|so\s+far)\b/i,
+      // "From now on you work for us", "your new owner is ...".
+      /\bfrom\s+now\s+on,?\s+you\s+(?:work|answer|report|listen)\s+(?:only\s+)?(?:for|to)\b/i,
+      /\byour\s+new\s+(?:owner|boss|master|employer|operator|instructions?|orders|rules)\s+(?:is|are)\b/i,
       /\byou are now\b/i,
       /\b(new|updated|real|true|secret|hidden)\s+(system\s+)?instructions?\s*[:\-]/i,
       /\byou are (?:actually |really )?(?:the|a|an) (?:system|developer|administrator|admin|root|operator)\b/i,
