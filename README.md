@@ -145,6 +145,7 @@ The guard checks the exact objects the runtime loaded, after the visitor's conse
 | `policy` | Refuse Entry denied and Papers not in order; ask about Held for review | Which verdicts are refused, and which are put to the visitor |
 | `locks` | On | `false` turns off the two locks that hold whatever a scam says (see [the locks](#locks-that-dont-depend-on-wording)) |
 | `trustedActions` | None | Names of website actions that only change harmless things on the page, or ask the visitor themselves, so the action lock lets them run |
+| `strict` | `false` | `true` enforces zero-trust mode: asks before every partner (`STRICT_POLICY`, never pins on first use), ignores `trustedActions`, blocks PII outbound and requires declarative facts-only partner replies |
 | `onLock` | None | Called with `{lock, kind, where}` whenever a lock keeps a card number or IBAN back |
 
 </details>
@@ -161,7 +162,7 @@ You need [Node.js](https://nodejs.org/) 22 or newer and nothing else. In the pro
 npm test
 ```
 
-All 96 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 116 scam and honest sentences in 23 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
+All 107 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 116 scam and honest sentences in 23 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
 
 ### 2. Inspect a site on the live website: no key
 
@@ -347,7 +348,7 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 96 tests: engine, scam and honest sentences, guard, locks and notices inside the real runtime, signed stamps, website tools, practice site, local server
+npm test                 # 107 tests: engine, scam and honest sentences, guard, locks and notices inside the real runtime, signed stamps, website tools, practice site, local server
 npm run serve            # Agent Customs at http://127.0.0.1:8080/
 npm run serve:practice   # the practice site at http://127.0.0.1:8082/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log

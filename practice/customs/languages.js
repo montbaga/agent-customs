@@ -230,9 +230,17 @@ export const SECRET_LANGUAGES = [
 // Sentences end at these marks in the scripts above, or at a line break. A Latin full stop
 // ends a sentence only before a space or the end, so web addresses stay whole.
 const SENTENCE_END = /[.!?;]+(?=\s|$)|[。！？；؟।\n]+/u;
+const PARA_END = /[.!?;]+(?=\s|$)|[。！？；؟।]+|\n\s*\n+|\n(?=\s*(?:[-*•+]|\d+[.)]|#)\s)/u;
 
 function sentences(text) {
   return text.split(SENTENCE_END).map((s) => s.trim()).filter(Boolean);
+}
+
+// Soft-wrapped lines inside one paragraph (no blank line, no bullet) are joined so a
+// line break mid-sentence does not hide a foreign request or split a short sentence.
+function wrappedSentences(text) {
+  const joined = text.replace(/([^\n.!?;:。！？；؟।])\n(?!\s*(?:[-*•+]|\d+[.)]|#)\s)/gu, "$1 ");
+  return joined.split(PARA_END).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean);
 }
 
 /**
@@ -244,11 +252,14 @@ function sentences(text) {
  */
 export function foreignSecretRequests(normalized) {
   const hits = [];
-  for (const sentence of sentences(normalized)) {
+  const seen = new Set();
+  for (const sentence of [...sentences(normalized), ...wrappedSentences(normalized)]) {
     for (const lang of SECRET_LANGUAGES) {
       const secret = sentence.match(lang.secrets);
       if (!secret || !lang.asks.test(sentence)) continue;
       if (lang.negations.some((re) => re.test(sentence))) continue;
+      if (seen.has(sentence)) break;
+      seen.add(sentence);
       hits.push({ match: secret[0], excerpt: sentence, language: lang.name });
       break;
     }
@@ -384,7 +395,8 @@ export function otherLanguageOf(sentence) {
   if (judged.length < 6) return null;
   const known = judged.filter((word) => ENGLISH.has(word) || isEnglishWord(word)).length;
   if (known >= 0.5 * judged.length) return null;
-  const foreignSign = /[^\x00-\x7f]/.test(judged.join("")) || top.count >= 1;
+  const realKnown = judged.filter((word) => word.length > 1 && (ENGLISH.has(word) || isEnglishWord(word))).length;
+  const foreignSign = /[^\x00-\x7f]/.test(judged.join("")) || top.count >= 1 || (realKnown === 0 && judged.length >= 6);
   if (!foreignSign) return null;
   return top.count >= 2 ? top.name : UNRECOGNISED;
 }
@@ -398,9 +410,14 @@ export function otherLanguageOf(sentence) {
  */
 export function otherLanguageSentences(normalized) {
   const hits = [];
-  for (const sentence of sentences(normalized)) {
+  const seen = new Set();
+  for (const sentence of [...sentences(normalized), ...wrappedSentences(normalized)]) {
+    if (seen.has(sentence)) continue;
     const language = otherLanguageOf(sentence);
-    if (language) hits.push({ match: language, excerpt: sentence, language });
+    if (language) {
+      seen.add(sentence);
+      hits.push({ match: language, excerpt: sentence, language });
+    }
   }
   return hits;
 }

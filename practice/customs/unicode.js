@@ -160,6 +160,11 @@ export function scanHidden(text) {
     }
   }
   out.tagText = out.tagText.replace(/\s+/g, " ").trim();
+  const zalgo = text.match(/\p{M}{3,}/gu);
+  if (zalgo) {
+    out.invisible += zalgo.length;
+    out.invisibleNames.add("EXCESSIVE COMBINING MARKS");
+  }
   out.total = out.tags + out.invisible + out.bidi + out.variation + out.privateUse + out.control;
   return out;
 }
@@ -233,6 +238,97 @@ const CONFUSABLE_SCRIPTS = [
   ["Cherokee", /\p{Script=Cherokee}/u],
 ];
 
+// Look-alike letters from Cyrillic, Greek, Armenian, Cherokee and IPA/Latin-extended
+// mapped to their ASCII Latin skeleton.
+const CONFUSABLE_CHARS = new Map([
+  // Cyrillic
+  ["а", "a"], ["А", "A"], ["В", "B"], ["е", "e"], ["Е", "E"], ["ё", "e"], ["Ё", "E"],
+  ["і", "i"], ["І", "I"], ["ї", "i"], ["Ї", "I"], ["ј", "j"], ["Ј", "J"], ["К", "K"],
+  ["М", "M"], ["Н", "H"], ["о", "o"], ["О", "O"], ["р", "p"], ["Р", "P"], ["с", "c"],
+  ["С", "C"], ["Т", "T"], ["у", "y"], ["У", "Y"], ["х", "x"], ["Х", "X"], ["ѕ", "s"],
+  ["Ѕ", "S"], ["һ", "h"], ["ԁ", "d"], ["ԍ", "g"], ["ԛ", "q"], ["Ԛ", "Q"], ["ԝ", "w"],
+  ["Ԝ", "W"], ["ѵ", "v"], ["ӏ", "l"],
+  // Greek
+  ["α", "a"], ["Α", "A"], ["β", "b"], ["Β", "B"], ["ε", "e"], ["Ε", "E"], ["ζ", "z"],
+  ["Ζ", "Z"], ["η", "n"], ["Η", "H"], ["ι", "i"], ["Ι", "I"], ["κ", "k"], ["Κ", "K"],
+  ["μ", "u"], ["Μ", "M"], ["ν", "v"], ["Ν", "N"], ["ο", "o"], ["Ο", "O"], ["ρ", "p"],
+  ["Ρ", "P"], ["ς", "s"], ["σ", "s"], ["τ", "t"], ["Τ", "T"], ["υ", "u"], ["Υ", "Y"],
+  ["χ", "x"], ["Χ", "X"], ["γ", "y"], ["ω", "w"],
+  // Armenian & Cherokee & Latin/IPA lookalikes
+  ["օ", "o"], ["Օ", "O"], ["ս", "u"], ["հ", "h"], ["Տ", "S"], ["Ք", "P"],
+  ["Ꭺ", "A"], ["Ꮀ", "F"], ["Ꮐ", "G"], ["Ꮋ", "H"], ["Ꭻ", "J"], ["Ꮮ", "L"], ["Ꮇ", "M"],
+  ["Ꮲ", "P"], ["Ꭱ", "R"], ["Ꮪ", "S"], ["Ꮦ", "T"], ["Ꮩ", "V"], ["Ꮃ", "W"], ["Ꮓ", "Z"],
+  ["Ꮟ", "b"], ["Ꭵ", "i"], ["Ꮥ", "d"],
+  ["ɑ", "a"], ["ɒ", "a"], ["ɓ", "b"], ["ᴄ", "c"], ["ɗ", "d"], ["ɛ", "e"], ["ɡ", "g"],
+  ["ɢ", "G"], ["ʜ", "H"], ["ɪ", "i"], ["ɩ", "i"], ["ʝ", "j"], ["ᴋ", "k"], ["ʟ", "l"],
+  ["ɴ", "N"], ["ᴏ", "o"], ["ɵ", "o"], ["ᴘ", "p"], ["ʀ", "R"], ["ʂ", "s"], ["ᴛ", "t"],
+  ["ᴜ", "u"], ["ʋ", "v"], ["ᴡ", "w"], ["ʏ", "Y"], ["ᴢ", "z"], ["ı", "i"], ["ſ", "s"],
+]);
+
+const HAS_CONFUSABLE_SCRIPT = /\p{Script=Cyrillic}|\p{Script=Greek}|\p{Script=Armenian}|\p{Script=Cherokee}/u;
+
+function foldWordChars(word) {
+  let out = "";
+  for (const ch of word) out += CONFUSABLE_CHARS.get(ch) ?? ch;
+  return out;
+}
+
+function isAllConfusableLetters(word) {
+  let letters = 0;
+  for (const ch of word) {
+    if (!/\p{L}/u.test(ch)) continue;
+    letters += 1;
+    if (!CONFUSABLE_CHARS.has(ch)) return false;
+  }
+  return letters > 0;
+}
+
+/**
+ * Fold look-alike characters (Cyrillic, Greek, etc.) to their Latin skeleton where
+ * words mix scripts, or where an all-confusable word sits inside a predominantly Latin
+ * line. Genuine non-Latin text (Russian, Greek...) is left untouched so language checks
+ * still read it accurately.
+ *
+ * :param text: Normalized text.
+ * :return: Text with confusable tokens folded to ASCII Latin.
+ */
+export function foldConfusableTokens(text) {
+  if (typeof text !== "string" || !text) return "";
+  return text.split("\n").map((line) => {
+    const words = line.split(/(\s+)/);
+    const latinCount = words.filter((w) => /\p{Script=Latin}/u.test(w) && !HAS_CONFUSABLE_SCRIPT.test(w)).length;
+    const nonLatinNative = words.filter((w) => HAS_CONFUSABLE_SCRIPT.test(w) && !/\p{Script=Latin}/u.test(w) && !isAllConfusableLetters(w)).length;
+    const mostlyLatin = latinCount >= 2 && latinCount > nonLatinNative;
+    return words.map((tok) => {
+      if (!tok || /^\s+$/.test(tok)) return tok;
+      const hasLatin = /\p{Script=Latin}/u.test(tok);
+      const hasConfusable = HAS_CONFUSABLE_SCRIPT.test(tok) || [...tok].some((ch) => CONFUSABLE_CHARS.has(ch));
+      if (!hasConfusable) return tok;
+      if (hasLatin || (mostlyLatin && isAllConfusableLetters(tok))) return foldWordChars(tok);
+      return tok;
+    }).join("");
+  }).join("\n");
+}
+
+/**
+ * Remove hidden tag, bidi, invisible, non-emoji variation, private-use and control
+ * characters from runtime text while keeping ordinary writing and emoji intact.
+ *
+ * :param text: Any runtime string.
+ * :return: Cleaned text.
+ */
+export function stripHiddenChars(text) {
+  if (typeof text !== "string" || !text) return String(text ?? "");
+  const chars = Array.from(withoutFlagTags(text));
+  let out = "";
+  for (let i = 0; i < chars.length; i += 1) {
+    const cp = chars[i].codePointAt(0);
+    if (isTag(cp) || isHiddenAt(chars, i)) continue;
+    out += chars[i];
+  }
+  return out;
+}
+
 /**
  * Find words that mix Latin letters with look-alike letters from another script,
  * such as "Sаvings" with a Cyrillic "а". These fool people, not models.
@@ -243,12 +339,19 @@ const CONFUSABLE_SCRIPTS = [
 export function findMixedScriptWords(text) {
   if (typeof text !== "string" || !text) return [];
   const found = [];
-  for (const word of text.split(/[\s_\-./:]+/u)) {
-    if (!/\p{Script=Latin}/u.test(word)) continue;
-    const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
-    if (scripts.length) found.push({ word, scripts });
+  const tokens = text.split(/[\s_\-./:]+/u).filter(Boolean);
+  const latinWords = tokens.filter((w) => /\p{Script=Latin}/u.test(w) && !HAS_CONFUSABLE_SCRIPT.test(w)).length;
+  for (const word of tokens) {
+    if (/\p{Script=Latin}/u.test(word)) {
+      const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
+      if (scripts.length) found.push({ word, scripts });
+    } else if (latinWords >= 2 && isAllConfusableLetters(word) && HAS_CONFUSABLE_SCRIPT.test(word)) {
+      const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
+      if (scripts.length) found.push({ word, scripts });
+    }
   }
-  // Fullwidth Latin letters (Ｐａｙ) look like ASCII but are different characters.
+  // Fullwidth Latin letters (Ｐａｙ) and Mathematical styled letters (𝐩𝐚𝐬𝐬) look like ASCII.
   if (/[Ａ-Ｚａ-ｚ]/u.test(text)) found.push({ word: text, scripts: ["Fullwidth Latin"] });
+  if (/[\u{1D400}-\u{1D7FF}]/u.test(text)) found.push({ word: text, scripts: ["Mathematical styled Latin"] });
   return found;
 }
