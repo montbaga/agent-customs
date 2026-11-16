@@ -46,9 +46,18 @@ function clauses(text) {
   return text.split(/(?<=[.!?])\s+|[;\n]+|\s(?:but|however|then|and then)\s/i).map((s) => s.trim()).filter(Boolean);
 }
 
-// True when a negation comes before the asking verb in the same clause.
+// Verbs that turn a negation round: "never skip asking", "don't forget to ask", "never stop
+// asking" all mean "ask".
+const UNDOES_NEGATION = /\b(?:forget|forgets|forgetting|fail|fails|failing|neglect|neglects|neglecting|hesitate|hesitating|skip|skips|skipping|omit|omits|omitting|miss|misses|missing|stop|stops|stopping|cease|ceasing|leave\s+out|leaving\s+out|delay|delaying)\b/i;
+const NEGATIONS = new RegExp(NEGATION.source, "gi");
+
+// True when a negation comes before the asking verb in the same clause, and applies to that
+// verb: the last negation before it, with no verb like "skip" in between.
 function negatedBefore(clause, verbIndex) {
-  return NEGATION.test(clause.slice(0, verbIndex));
+  const before = clause.slice(0, verbIndex);
+  const all = [...before.matchAll(NEGATIONS)];
+  if (!all.length) return false;
+  return !UNDOES_NEGATION.test(before.slice(all[all.length - 1].index));
 }
 
 // Describing what to watch for, as safety checkers do ("Look for attempts to override the
