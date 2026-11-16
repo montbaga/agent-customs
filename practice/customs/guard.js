@@ -20,8 +20,13 @@
 //
 // It wraps engine._compile on this engine instance only. The runtime files are not
 // edited, and uninstall() restores the original.
+//
+// It also puts on two locks that hold whatever a scam says (locks.js): a real card number
+// or IBAN never goes to a partner, and after a partner answers, website actions that change
+// something wait for the visitor's click.
 
 import { analyzeNetwork } from "./analyze.js";
+import { installLocks } from "./locks.js";
 import { PinStore, pinFromReport } from "./pins.js";
 
 export const DEFAULT_POLICY = Object.freeze({
@@ -44,7 +49,11 @@ export const DEFAULT_POLICY = Object.freeze({
  * :param options.reportPage: The Agent Customs page that "See the full report" opens, with
  *   the network's address filled in. Defaults to the public Agent Customs site.
  * :param options.openReport: (url) => void. Shows the full report on this page instead.
- * :return: {store, log, uninstall()}
+ * :param options.locks: false turns off the two locks (locks.js). They are on by default.
+ * :param options.trustedActions: Names of website actions that only change harmless things
+ *   on the page, or ask the visitor themselves, so the action lock lets them run.
+ * :param options.onLock: Called with {lock, kind, where} whenever a lock keeps a secret back.
+ * :return: {store, log, locks, uninstall()}
  */
 export function installCustomsGuard(engine, options = {}) {
   if (!engine || typeof engine._compile !== "function") {
@@ -106,10 +115,19 @@ export function installCustomsGuard(engine, options = {}) {
     return compiled;
   };
 
+  const locks = options.locks === false ? null : installLocks(engine, {
+    trustedActions: options.trustedActions || [],
+    notify: (event) => {
+      options.onLock?.(event);
+      showLockNoticeSafe(event, options);
+    },
+  });
+
   const guard = {
-    store, log, policy,
+    store, log, policy, locks,
     uninstall() {
       engine._compile = original;
+      locks?.uninstall();
       delete engine.__agentCustoms;
     },
   };
@@ -150,6 +168,14 @@ async function defaultConfirm(report) {
  *
  * :return: true when a notice is on the page.
  */
+async function showLockNoticeSafe(event, options) {
+  if (options.notice === false || typeof options.notice === "function" || typeof document === "undefined") return;
+  try {
+    const { showLockNotice } = await import("./guard-notice.js");
+    showLockNotice(event);
+  } catch { /* a notice never changes a decision */ }
+}
+
 async function showNotice(report, options) {
   if (options.notice === false) return false;
   try {

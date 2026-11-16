@@ -195,6 +195,22 @@ try {
   console.log(`  remote images: ${JSON.stringify(images)}`);
   for (let i = problems.length - 1; i >= 0; i -= 1) if (problems[i].includes("collect.invalid")) problems.splice(i, 1);
   if (images.markdownImages || images.htmlImages || !images.refusedByPolicy) problems.push(`remote images: ${JSON.stringify(images)}`);
+  // Lock 1: the page never follows a link that carries a real card number, and says so.
+  const linkLock = await evaluate(`(async () => {
+    const link = document.createElement("a");
+    link.href = "https://collect.invalid/pay?c=4242424242424242";
+    link.textContent = "pay";
+    (document.querySelector("#ns-msgs") || document.body).append(link);
+    const followed = link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    const notice = document.querySelector('.customs-notice[data-lock="card number"]');
+    const result = { followed, notice: notice ? notice.querySelector("p")?.textContent : null };
+    link.remove();
+    document.querySelectorAll(".customs-notice[data-lock]").forEach((n) => n.remove());
+    return result;
+  })()`);
+  console.log(`  card-number link: ${JSON.stringify(linkLock)}`);
+  if (linkLock.followed || !/Kept a card number out of a link to collect\.invalid/.test(linkLock.notice || "")) problems.push(`card-number link: ${JSON.stringify(linkLock)}`);
   if (otari.card !== "other" || otari.router !== "https://api.otari.ai/api/v1" || otari.model !== "alibaba/qwen3.8-flash" || /did not accept/.test(otari.status)) {
     problems.push(`otari key: ${JSON.stringify(otari)}`);
   }
