@@ -437,7 +437,10 @@ In one place: the **AI model settings** box on the Officer tab.
 For an AI service without a card, choose **Other** and type the service's address and model name. An Otari key, for the service that sites made with Cognizant's kit use by default, fills in **Other** for you. The key stays in your browser and goes only to that service. **Forget the saved key** removes it. Checking sites needs no key at all.
 
 **Does it work in other languages?**
-Partly, and it says so. In Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic, it blocks requests for card details and passwords. Text in any language other than English is held, so a person reads it before it runs.
+Partly, and it says so. In Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic, it blocks requests for card details and passwords. Text in other languages is held, so a person reads it before it runs.
+
+**Can an honest site in another language be Cleared?**
+No. Agent Customs can't read it fully, so it is always held, even when it is honest, and its visitors are asked once before it runs. Publishers can avoid this by adding their instructions in English too.
 
 **Why doesn't the chat show the hidden sentence itself?**
 On purpose. The notice in the chat uses only Agent Customs' own words: the decision and the name of each problem. So nothing the bad site wrote can reach the AI through the page. The full report, one click away, shows the decoded sentence in red.
