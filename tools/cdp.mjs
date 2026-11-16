@@ -34,6 +34,10 @@ export function findBrowser(preferred = "") {
  *   every page exception, console.error and error log entry.
  */
 export async function openBrowser({ browserPath, port = 9333 }) {
+  // A browser left over from an interrupted run would answer on the same port, and its old
+  // approvals and settings would leak into this run's results.
+  const leftover = await fetch(`http://127.0.0.1:${port}/json/version`).then(() => true, () => false);
+  if (leftover) throw new Error(`Another browser is already using port ${port}. Close it (it may be left over from an interrupted run) and try again.`);
   const profile = await mkdtemp(path.join(os.tmpdir(), "agent-customs-browser-"));
   const browser = spawn(browserPath, [`--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--headless=new",
     "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--window-size=1366,900", "about:blank"], { stdio: "ignore" });
@@ -84,7 +88,24 @@ export async function openBrowser({ browserPath, port = 9333 }) {
     const { data } = await send("Page.captureScreenshot", { format: "png", ...params });
     await writeFile(file, Buffer.from(data, "base64"));
   };
-  const close = () => { try { ws.close(); } finally { browser.kill(); } };
+  // Close through DevTools: on Windows, killing the launched process leaves Edge itself
+  // running, and the next run on this port would attach to it.
+  const close = () => new Promise((resolve) => {
+    let timer = null;
+    const done = () => {
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* already closed */ }
+      browser.kill();
+      resolve();
+    };
+    timer = setTimeout(done, 5000);
+    fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json()).then(({ webSocketDebuggerUrl }) => {
+      const root = new WebSocket(webSocketDebuggerUrl);
+      root.addEventListener("open", () => root.send(JSON.stringify({ id: 1, method: "Browser.close" })), { once: true });
+      root.addEventListener("close", done, { once: true });
+      root.addEventListener("error", done, { once: true });
+    }, done);
+  });
 
   await send("Page.enable");
   await send("Runtime.enable");
