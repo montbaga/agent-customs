@@ -36,6 +36,7 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 - [A tour of the inspection desk](#a-tour-of-the-inspection-desk)
 - [The verdicts](#the-verdicts) and [the five checks](#the-five-checks)
 - [How well it catches tricks](#how-well-it-catches-tricks) and [locks that don't depend on wording](#locks-that-dont-depend-on-wording)
+- [Signed stamps](#signed-stamps)
 - [The test range](#the-test-range)
 - [Run it on your computer](#run-it-on-your-computer) and [host it](#host-it)
 - [How it is built](#how-it-is-built), [similar tools](#similar-tools), [limits](#limits) and [questions](#questions)
@@ -160,7 +161,7 @@ You need [Node.js](https://nodejs.org/) 22 or newer and nothing else. In the pro
 npm test
 ```
 
-All 92 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 116 scam and honest sentences in 23 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
+All 96 tests should pass in a few seconds. Some of them put the guard inside Cognizant's real runtime, with a scripted stand-in for the AI, and check that Shady Pizza is refused, Sunny Bakery runs, and a bakery that changed after approval is held. Others feed the rules 116 scam and honest sentences in 23 languages (see [How well it catches tricks](#how-well-it-catches-tricks)).
 
 ### 2. Inspect a site on the live website: no key
 
@@ -309,6 +310,24 @@ Rules read words, and words can always be changed. So the guard also puts on loc
 
 Locks 1 and 2 come with the guard, so every site that adds it gets them, and tests run them inside Cognizant's real runtime. They have limits too: passwords, security codes and one-time codes have no check digits, so for those the rules and the visitor are the defence, and a website action the site marks as trusted runs without a click.
 
+## Signed stamps
+
+A verdict on a web page can be copied or faked. So Agent Customs also signs its stamp for some networks, like a passport stamp with a tamper seal. Anyone can check that a stamp came from this site, wasn't changed, and still fits the network as it is today.
+
+- Each stamp holds the network's address, its fingerprint, the verdict, the rules it broke, the date and an expiry date 35 days later. It holds no text from the network. The list is at [receipts/index.json](https://montbaga.github.io/agent-customs/receipts/index.json).
+- Stamps are signed with ECDSA P-256 (ES256), which every browser and Node.js can check without extra software. The public key is at [.well-known/agent-customs-key.json](https://montbaga.github.io/agent-customs/.well-known/agent-customs-key.json). The private key never goes in the repository.
+- Inspect a stamped network on the website, such as Sunny Bakery or Shady Pizza, and the report says "Signed stamp verified", or that the network has changed since it was stamped.
+
+To check one from the command line (`--live` inspects the network again and compares fingerprints):
+
+```shell
+npm run receipts -- verify https://montbaga.github.io/agent-customs/receipts/agent-customs-range.github.io/shady_pizza/shady_pizza.json --live
+```
+
+On the 1st of each month, [a workflow](.github/workflows/receipts.yml) inspects the networks in [tools/receipt-sites.json](tools/receipt-sites.json) again and signs fresh stamps. To get a stamp for your network, open a pull request that adds its address to that file. A directory of agents can link to a network's stamp, and its visitors can check it with the public key. Like Cleared, a stamp records what the rules found on that day. It doesn't certify a network as safe.
+
+Running your own copy? `npm run receipts -- key` makes your own key pair, with the private half saved outside the repository, and `npm run receipts -- sign` signs stamps with it.
+
 ## The test range
 
 [`range/`](range/) is a second website of small networks for demos and tests, written by `tools/make-range.mjs` and published at https://agent-customs-range.github.io/. None is a real business, and every attacker address uses the reserved `.invalid` domain, which never resolves.
@@ -328,13 +347,14 @@ The range also serves Cognizant's three official example sites under `official/`
 You need Node.js 22 or newer. There is nothing to install, because there are no dependencies.
 
 ```shell
-npm test                 # 92 tests: engine, scam and honest sentences, guard, locks and notices inside the real runtime, website tools, practice site, local server
+npm test                 # 96 tests: engine, scam and honest sentences, guard, locks and notices inside the real runtime, signed stamps, website tools, practice site, local server
 npm run serve            # Agent Customs at http://127.0.0.1:8080/
 npm run serve:practice   # the practice site at http://127.0.0.1:8082/
 npm run serve:range      # the test range at http://localhost:8081/ (a second origin), with a request log
 npm run smoke            # optional: clicks through the site in headless Edge or Chrome and saves screenshots
 npm run shots            # optional: retakes the README screenshots and checks the practice site in a browser
 npm run inspect -- https://site.example/agent_network   # inspect a real site from this computer, including CORS
+npm run receipts -- verify <stamp address> --live       # check a signed stamp (see Signed stamps)
 ```
 
 Open http://127.0.0.1:8080/ and press a test-range button. Inspections need no key. To use the officer, open the Officer tab, pick a model under AI model settings, and paste a key from that provider.
@@ -396,17 +416,18 @@ Everything is plain JavaScript modules, with no dependencies, no build step and 
 
 | Path | What |
 | --- | --- |
-| `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `languages.js` (requests in 10 other languages, and text that isn't clearly English), `english-words.js` (common English words for that check), `locks.js` (the locks), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js`, `guard-ui.js` (the visitor's dialogs) and `guard-notice.js` (the visitor's notices) |
+| `site/customs/` | The inspection engine and guard: `analyze.js` (all checks and the verdict), `rules.js` (text rules), `languages.js` (requests in 10 other languages, and text that isn't clearly English), `english-words.js` (common English words for that check), `locks.js` (the locks), `unicode.js` (hidden characters), `canonical.js` (fingerprints), `diff.js` (snapshots and diffs), `pins.js` (approvals), `inspect.js` (fetching like a caller), `guard.js`, `guard-ui.js` (the visitor's dialogs) and `guard-notice.js` (the visitor's notices) and `receipts.js` (signing and checking stamps) |
 | `site/agent_customs.hocon` | Network source; the build writes `agent_customs.network.json`, `agent-mcp.json`, `.well-known/` and `bridge/` |
 | `site/desk.js`, `site-actions.js`, `view.js`, `site.js` | The page object, the six website tools, the page view, and the runtime mount with the guard |
 | `site/model-picker.js`, `providers.js` | The officer's model picker, the one place for an AI key. It offers five providers (adding OpenRouter to the runtime's list) and an "Other" card for any service by its address. It lists the models a pasted key can use, keeps one saved key per provider in this browser and rewrites provider errors in plain words. It fills in the runtime's own settings form, which stays hidden, so the runtime still checks the model before saving |
 | `site/index.html`, `styles.css`, `assistant.css`, `effects.js`, `scene-gl.js`, `hero-demo.js`, `hero-data.js`, `fonts/` | The page. The fonts are Geist and Instrument Serif (SIL Open Font License). The page loads no third-party scripts, because any script on it could read the visitor's AI key. `tests/hero-data.test.mjs` checks every value the hero replay shows against the engine |
 | `site/runtime/` | The agentic-web browser runtime, unchanged (Apache 2.0) |
 | `practice/` | The practice site, Main Street Guide. `tools/make-practice.mjs` copies its `runtime/` and `customs/` and builds its network |
+| `site/receipts/`, `site/.well-known/agent-customs-key.json` | The signed stamps, their index and the public key that checks them |
 | `range/` | The test range (generated) |
 | `docs/images/` | The README screenshots, taken by `tools/readme-shots.mjs` |
 | `tests/` | Node tests, with the official examples as fixtures. `attacks.test.mjs` holds the scam and honest sentences |
-| `tools/` | Range and practice-site generators, origin switcher, rug-pull switch, local server with `_headers`, browser checks (`smoke.mjs`, `readme-shots.mjs`, sharing `cdp.mjs`), command-line inspector |
+| `tools/` | Range and practice-site generators, origin switcher, rug-pull switch, local server with `_headers`, browser checks (`smoke.mjs`, `readme-shots.mjs`, sharing `cdp.mjs`), command-line inspector, stamp signer (`receipts.mjs`, with the list of stamped networks in `receipt-sites.json`) |
 | `vendor/agentify-website/` | The official agentify-website files, unchanged, used for their build and check scripts |
 
 </details>
