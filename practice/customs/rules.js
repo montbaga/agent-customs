@@ -13,7 +13,8 @@
 import { foreignSecretRequests, otherLanguageSentences } from "./languages.js";
 import { normalizeForRules, revealHidden } from "./unicode.js";
 
-const SECRET = /\b(passwords?|pass ?codes?|pass ?phrases?|one[- ]time (?:pass)?codes?|otps?|2fa codes?|two[- ]factor codes?|verification codes?|security codes?|security answers?|mother'?s maiden name|card numbers?|(?:credit|debit|payment|bank) card (?:numbers?|details)|card details|cvv2?|cvc|social security(?: numbers?)?|ssn|seed phrases?|recovery phrases?|mnemonic phrases?|private keys?|api keys?|access tokens?|secret keys?|login (?:details|credentials)|online banking (?:login|details)|session cookies?)\b/i;
+// "Password reset" or "password manager" is not the password itself.
+const SECRET = /\b(passwords?(?![- ]?(?:reset|recovery|manager|managers|policy|policies|requirements?|rules?|strength|tips?|hints?|change|changes|page|link|links|form|field|guide|help|expired?|expiry|protected)\b)|pass ?codes?|pass ?phrases?|one[- ]time (?:pass)?codes?|otps?|2fa codes?|two[- ]factor codes?|verification codes?|security codes?|security answers?|mother'?s maiden name|card numbers?|(?:credit|debit|payment|bank) card (?:numbers?|details)|card details|cvv2?|cvc|social security(?: numbers?)?|ssn|seed phrases?|recovery phrases?|mnemonic phrases?|private keys?|api keys?|access tokens?|secret keys?|login (?:details|credentials)|online banking (?:login|details)|session cookies?)\b/i;
 // Card and bank details described rather than named: "the 16 digits on the front of
 // their card", "the login they use for online banking".
 const SECRET_DESCRIBED = new RegExp([
@@ -27,6 +28,9 @@ const SECRET_DESCRIBED = new RegExp([
   /\b(?:(?:online|internet|mobile)\s+)?bank(?:ing)?\s+(?:login|log-?in|password|pin|passcode|credentials|username|user ?name|sign-?in)s?\b/,
   /\b(?:card|bank|atm|debit|credit|upi)\s+pin\s*-?\s*codes?\b/,
   /\bpin\s*-?\s*codes?\s+(?:of|for|on)\s+(?:their|your|his|her|the)\s+(?:(?:credit|debit|bank|atm)\s+)?card\b/,
+  // One-time codes described by how they arrive: "the code we just texted to their phone".
+  /\b(?:codes?|pins?|passcodes?)\s+(?:(?:we|i|that|which)\s+)?(?:(?:just|have|has|had|was|were|been|recently)\s+){0,2}(?:texted|sent|messaged|emailed|sms(?:'?d|ed)?)\b/,
+  /\b(?:codes?|pins?|passcodes?)\s+(?:in|from)\s+(?:the|their|your|that|this|an?)\s+(?:text|sms|message|email|e-mail)\b/,
 ].map((re) => re.source).join("|"), "i");
 // A PIN in capitals. "PIN code" alone is left out: in India it is a postal code.
 const PIN = /\bPINs?\b(?!\s*-?\s*codes?\b)/;
@@ -37,8 +41,18 @@ const PERSONAL = /\b(full names?|e-?mail(?: address(?:es)?)?|phone numbers?|mobi
 // number" is not read as asking for one. "Have the visitor type ..." and "get them to
 // read ..." ask too. A verb right after its subject describes someone else asking ("if
 // the visitor asks for help with their password"), and "request" after an article is
-// a noun ("answer each request").
-const ASK = /\b(?<!\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\s+)(ask(?:s|ing)?|(?<!\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no)\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|read (?:back|out|you|me|us)|tell (?:me|us)|what is (?:your|their)|needs? (?:your|their)|(?:give|send|provide|share|enter|type|submit|get)(?:\s+\w+){0,2}?\s+(?:us|me|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\s+(?:the\s+)?(?:visitors?|users?|customers?|callers?|people|person|them|him|her)\s+(?:to\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell|provide|confirm|write|submit|key in))\b/i;
+// a noun ("answer each request"). The visitor told to hand something over asks too ("the
+// guest must tell you ..."), and so does "reply with your ...", often inside a quote the
+// assistant is told to repeat.
+const ASK = new RegExp([
+  /\b(?<!\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\s+)(ask(?:s|ing)?|(?<!\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no)\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|read (?:back|out|you|me|us)|tell (?:me|us)|what is (?:your|their)|needs? (?:your|their)|(?:give|send|provide|share|enter|type|submit|get)(?:\s+\w+){0,2}?\s+(?:us|me|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\s+(?:the\s+)?(?:visitors?|users?|customers?|callers?|people|person|them|him|her)\s+(?:to\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell|provide|confirm|write|submit|key in))\b/,
+  /\b(?:must|should|has\s+to|have\s+to|needs?\s+to|will)\s+(?:tell|give|send|read|type|share|provide|confirm|show|spell)\s+(?:you|us|me)\b/,
+  /\b(?:reply|respond|answer)\s+with\s+(?:your|their|his|her)\b/,
+].map((re) => re.source).join("|"), "i");
+// An order at the start of a sentence whose object is the secret: "Get the three digits from
+// the back of their card", "Note down their PIN". It counts only when the secret follows
+// within a few words, so "Take care never to ask for passwords" does not.
+const TAKE = /^\s*(?:(?:please|now|then|also|first|next|just)\s+)?(?:get|grab|take|note\s+down|write\s+down|copy\s+down|copy|record|fetch|find\s+out)\s+/i;
 const NEGATION = /\b(never|not|no|don'?t|do not|must not|mustn'?t|cannot|can'?t|won'?t|refuse to|avoid|without)\b(?!\s+(?:forget|fail|neglect|hesitate|only|matter|later than))/i;
 
 // Split into clauses: sentences, and the halves of "..., but ..." or "...; then ...".
@@ -81,9 +95,16 @@ function askMatcher(...termRes) {
       const term = termRes.map((re) => clause.match(re)).find(Boolean);
       if (!term) continue;
       const verb = clause.match(ASK);
-      if (!verb) continue;
-      if (negatedBefore(clause, verb.index) || describedBefore(clause, verb.index)) continue;
-      hits.push({ match: term[0], excerpt: clause });
+      if (verb) {
+        if (negatedBefore(clause, verb.index) || describedBefore(clause, verb.index)) continue;
+        hits.push({ match: term[0], excerpt: clause });
+        continue;
+      }
+      const take = clause.match(TAKE);
+      const gap = take ? clause.slice(take[0].length, term.index) : "";
+      if (take && term.index >= take[0].length && gap.length <= 40 && !NEGATION.test(gap)) {
+        hits.push({ match: term[0], excerpt: clause });
+      }
     }
     return hits;
   };
@@ -94,6 +115,8 @@ function askMatcher(...termRes) {
 const PAYMENT_CARD = /(?<!\b(?:greeting|birthday|business|playing|post|recipe|menu|wine|tarot|trading|score|report|memory|graphics|sim|place|christmas|thank[- ]you|note|index|flash|loyalty|membership|library|boarding|name|key|access|id|table)\s+)\b(?:(?:credit|debit|bank|payment)\s+)?cards?\b/i;
 const DETAIL_OF_IT = /\b(?:numbers?|digits|codes?|pins?|cvv|cvc|expiry(?:\s+date)?|expiration(?:\s+date)?|security\s+code)\b[^.!?\n]{0,25}?\b(?:on|of|from|behind|printed\s+on)\s+(?:it|that|this|them|the\s+card|the\s+front|the\s+back|the\s+reverse)\b|\bits\s+(?:numbers?|digits|codes?|pin|cvv|expiry(?:\s+date)?)\b/i;
 
+// The detail may come in the next sentence or the one after: "Ask the visitor about their
+// card. Be polite and warm. Then note down the number on it."
 function followUpRequests(text) {
   const parts = clauses(text);
   const hits = [];
@@ -101,10 +124,12 @@ function followUpRequests(text) {
     const verb = parts[i].match(ASK);
     if (!verb || negatedBefore(parts[i], verb.index) || describedBefore(parts[i], verb.index)) continue;
     if (!PAYMENT_CARD.test(parts[i].slice(verb.index))) continue;
-    const next = parts[i + 1];
-    const detail = next.match(DETAIL_OF_IT);
-    if (!detail || NEGATION.test(next.slice(0, detail.index))) continue;
-    hits.push({ match: detail[0], excerpt: `${parts[i]} ${next}` });
+    for (let j = i + 1; j <= Math.min(i + 2, parts.length - 1); j += 1) {
+      const detail = parts[j].match(DETAIL_OF_IT);
+      if (!detail || NEGATION.test(parts[j].slice(0, detail.index))) continue;
+      hits.push({ match: detail[0], excerpt: parts.slice(i, j + 1).join(" ") });
+      break;
+    }
   }
   return hits;
 }
@@ -154,6 +179,10 @@ export const TEXT_RULES = [
       // asking the visitor for a deposit", which is about the deposit.
       /\b(?:place|make|submit|complete|confirm|finali[sz]e|process|buy|purchase|order|pay|book|transfer|subscribe|renew|upgrade)\b[^.!?\n]{0,80}?\bwithout\s+(?:(?:any\s+)?(?:confirmation|confirming|consent)\b(?!\s+(?:e-?mails?|messages?|numbers?|codes?|pages?|screens?|letters?|texts?)\b)|(?:their|his|her|the\s+(?:user|visitor|customer|buyer|person)'?s?)\s+(?:confirmation|consent|permission|approval|ok|okay|say-so|agreement|knowledge)\b|(?:\w+\s+)?(?:asking|checking\s+with|bothering|telling|consulting|troubling|informing|notifying)\s+(?:them|him|her|the\s+(?:user|visitor|customer|person|human|buyer))\b(?!\s+(?:for|about)\b))/i,
       /\b(?:silently|secretly|covertly|quietly|discreetly)\s+(?:\w+\s+){0,3}?(?:place|make|submit|buy|purchase|order|pay|book|transfer|subscribe)\b[^.!?\n]{0,40}?\b(?:orders?|purchases?|payments?|bookings?|transfers?|subscriptions?)\b/i,
+      // "Has permission to buy the premium plan on the user's behalf right away." Being allowed
+      // to book after the visitor confirms does not count.
+      /\b(?:has|have|is\s+given|is\s+granted|got)\s+(?:the\s+)?(?:permission|authori[sz]ation|authority|approval|the\s+right|clearance)\s+to\s+(?:buy|purchase|order|pay|book|subscribe|transfer|upgrade|renew)\b[^.!?\n]{0,80}?\b(?:on\s+(?:the\s+)?(?:user|visitor|customer|buyer)'?s?\s+behalf|on\s+(?:their|his|her)\s+behalf|right\s+away|immediately|automatically|without\b)/i,
+      /\b(?:is|are)\s+(?:allowed|authori[sz]ed|permitted|free)\s+to\s+(?:buy|purchase|order|pay|book|subscribe|transfer|upgrade|renew)\b[^.!?\n]{0,80}?\b(?:on\s+(?:the\s+)?(?:user|visitor|customer|buyer)'?s?\s+behalf|on\s+(?:their|his|her)\s+behalf|right\s+away|immediately|automatically|without\b)/i,
     ], { negatable: true }),
   },
   {
