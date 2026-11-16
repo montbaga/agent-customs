@@ -7,20 +7,21 @@
 // site without the CORS header shows "Could not inspect" in the page, and no other site's
 // agent can call it.
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { inspectNetworkUrl } from "../site/customs/inspect.js";
 import { fsFetch } from "./fs-fetch.mjs";
 
 // The Origin a caller's browser would send, so servers answer as they would to a caller.
 const CALLER = "https://caller.example";
 
-async function inspectFolder(arg) {
+export async function inspectFolder(arg) {
   const folder = path.resolve(path.dirname(arg));
   const name = path.basename(arg);
   const origin = "https://inspect.local";
   return inspectNetworkUrl(`${origin}/${name}`, { fetchImpl: fsFetch({ [origin]: folder }), pageOrigin: "https://customs.local" });
 }
 
-async function inspectWeb(url) {
+export async function inspectWeb(url) {
   const unreadable = new Set();
   const fetchImpl = async (target, init = {}) => {
     const resp = await fetch(target, { ...init, headers: { Origin: CALLER } });
@@ -42,10 +43,13 @@ async function inspectWeb(url) {
   return report;
 }
 
-for (const arg of process.argv.slice(2)) {
-  const report = /^https?:\/\//i.test(arg) ? await inspectWeb(arg) : await inspectFolder(arg);
-  console.log(`\n== ${arg}\n   ${report.verdict.code}: ${report.verdict.summary}`);
-  console.log(`   conformance ${report.conformance.passed}/${report.conformance.total}; fingerprint ${report.identity.short || "none"}`);
-  for (const c of report.conformance.checks.filter((c) => c.status !== "pass")) console.log(`   [${c.status}] ${c.id} ${c.title}: ${c.detail}`);
-  for (const f of report.findings) console.log(`   ${f.severity.padEnd(8)} ${f.rule.padEnd(16)} ${f.title} | ${f.where?.agent || ""} ${f.where?.field || ""} | ${(f.evidence || f.detail || "").slice(0, 140)}`);
+// Run as a command, not when another tool imports inspectWeb.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  for (const arg of process.argv.slice(2)) {
+    const report = /^https?:\/\//i.test(arg) ? await inspectWeb(arg) : await inspectFolder(arg);
+    console.log(`\n== ${arg}\n   ${report.verdict.code}: ${report.verdict.summary}`);
+    console.log(`   conformance ${report.conformance.passed}/${report.conformance.total}; fingerprint ${report.identity.short || "none"}`);
+    for (const c of report.conformance.checks.filter((c) => c.status !== "pass")) console.log(`   [${c.status}] ${c.id} ${c.title}: ${c.detail}`);
+    for (const f of report.findings) console.log(`   ${f.severity.padEnd(8)} ${f.rule.padEnd(16)} ${f.title} | ${f.where?.agent || ""} ${f.where?.field || ""} | ${(f.evidence || f.detail || "").slice(0, 140)}`);
+  }
 }
