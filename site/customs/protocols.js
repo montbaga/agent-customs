@@ -36,6 +36,9 @@ export function detectProtocol(doc, url = "") {
   if (typeof doc.protocol === "string" && /model context protocol|\bmcp\b/i.test(doc.protocol)) {
     return "mcp";
   }
+  if ((typeof doc.$schema === "string" && /modelcontextprotocol\.io/i.test(doc.$schema)) || (typeof doc.name === "string" && (Array.isArray(doc.packages) || Array.isArray(doc.remotes)))) {
+    return "mcp";
+  }
   const rpcTools = doc.result?.tools;
   if (Array.isArray(rpcTools) || (Array.isArray(doc.tools) && doc.tools.some((t) => t && typeof t === "object" && ("inputSchema" in t || "annotations" in t)))) {
     return "mcp";
@@ -191,11 +194,50 @@ function normalizeMcpCatalog(doc, targetUrl) {
   const rawPrompts = Array.isArray(root.prompts) ? root.prompts : [];
   const rawResources = Array.isArray(root.resources) ? root.resources : [];
   const rawServers = root.mcpServers && typeof root.mcpServers === "object" ? root.mcpServers : {};
+  const rawPackages = Array.isArray(root.packages) ? root.packages : [];
+  const rawRemotes = Array.isArray(root.remotes) ? root.remotes : [];
   const targetOrigin = originOf(targetUrl);
 
   const normalizedTools = [];
   const frontRefs = [];
   const allowedPeers = [];
+
+  for (const pkg of rawPackages) {
+    if (!pkg || typeof pkg !== "object") continue;
+    const pkgName = safeSlug(pkg.identifier || pkg.name) || "mcp_package";
+    frontRefs.push(pkgName);
+    normalizedTools.push({
+      name: pkgName,
+      instructions: pkg.transport?.type ? `Transport: ${pkg.transport.type}` : "",
+      command: "",
+      function: {
+        description: String(`${pkg.registryType || "package"} ${pkg.identifier || ""} ${pkg.version || ""}`.trim()),
+        parameters: { type: "object", properties: {} },
+      },
+      tools: [],
+      _rawProtocolItem: "mcp_package",
+    });
+  }
+
+  for (let i = 0; i < rawRemotes.length; i += 1) {
+    const rem = rawRemotes[i];
+    if (!rem || typeof rem !== "object") continue;
+    const remName = safeSlug(rem.name || `remote_${i + 1}`) || `remote_${i + 1}`;
+    frontRefs.push(remName);
+    const refs = [];
+    if (typeof rem.url === "string" && /^https?:\/\//i.test(rem.url)) {
+      refs.push({ url: rem.url, type: "mcp" });
+      if (originOf(rem.url) === targetOrigin) allowedPeers.push(targetOrigin);
+    }
+    normalizedTools.push({
+      name: remName,
+      instructions: rem.transportType ? `Remote transport: ${rem.transportType}` : "",
+      command: "",
+      function: { description: `Remote MCP endpoint (${rem.transportType || "http"})`, parameters: { type: "object", properties: {} } },
+      tools: refs,
+      _rawProtocolItem: "mcp_remote",
+    });
+  }
 
   // Map remote or stdio mcpServers entries cleanly so transport URLs, secrets and shell args are checked.
   for (const [name, spec] of Object.entries(rawServers)) {
@@ -430,26 +472,29 @@ export function evaluateForeignPapers({ protocol, target, rawDoc = {}, manifest 
   const mcpRoot = rawDoc?.result && typeof rawDoc.result === "object" ? rawDoc.result : rawDoc;
   const tools = Array.isArray(mcpRoot?.tools) ? mcpRoot.tools : [];
   const servers = mcpRoot?.mcpServers && typeof mcpRoot.mcpServers === "object" ? Object.entries(mcpRoot.mcpServers) : [];
-  const hasItems = tools.length > 0 || servers.length > 0 || (Array.isArray(mcpRoot?.prompts) && mcpRoot.prompts.length > 0);
+  const packages = Array.isArray(mcpRoot?.packages) ? mcpRoot.packages : [];
+  const remotes = Array.isArray(mcpRoot?.remotes) ? mcpRoot.remotes : [];
+  const hasItems = tools.length > 0 || servers.length > 0 || packages.length > 0 || remotes.length > 0 || (Array.isArray(mcpRoot?.prompts) && mcpRoot.prompts.length > 0);
   addCheck({
     id: "P-MCP-SCHEMA",
     section: "MCP Spec",
     title: "Publishes valid MCP tools or server entries",
     status: hasItems ? "pass" : "fail",
-    detail: hasItems ? `${tools.length} tool(s), ${servers.length} server entry/entries.` : "No tools[] or mcpServers found.",
-    fix: "Publish valid tools[] definitions or mcpServers config entries.",
+    detail: hasItems ? `${tools.length} tool(s), ${servers.length + packages.length + remotes.length} server/package entry/entries.` : "No tools[], mcpServers, or packages[] found.",
+    fix: "Publish valid tools[], packages[], or mcpServers config entries.",
   });
   if (!hasItems) blocking.push("the MCP manifest lists no tools or servers");
 
   const missingDesc = tools.filter((t) => !t?.description).map((t) => t?.name || "unnamed");
   const missingSchema = tools.filter((t) => t?.inputSchema?.type !== "object").map((t) => t?.name || "unnamed");
+  const serverCount = servers.length + packages.length + remotes.length;
   addCheck({
     id: "P-MCP-TOOLS",
     section: "MCP Tools",
     title: "Every MCP tool has a description and object inputSchema",
-    status: !tools.length ? "warn" : (missingDesc.length || missingSchema.length) ? "warn" : "pass",
+    status: !tools.length ? (serverCount ? "pass" : "warn") : (missingDesc.length || missingSchema.length) ? "warn" : "pass",
     detail: !tools.length
-      ? "No direct tools[] array (config manifest only)."
+      ? (packages.length ? `MCP registry manifest declaring ${packages.length} package(s).` : "No direct tools[] array (config manifest only).")
       : (missingDesc.length || missingSchema.length)
         ? `Incomplete tool specs: ${[...new Set([...missingDesc, ...missingSchema])].slice(0, 5).join(", ")}.`
         : `${tools.length} tool(s) expose structured JSON schemas.`,

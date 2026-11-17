@@ -432,3 +432,18 @@ test("real-world public MCP and A2A schemas produce zero false positives", async
     assert.equal(r.findings.filter((f) => f.severity !== "info").length, 0, `${id} had unexpected findings: ${JSON.stringify(r.findings)}`);
   }
 });
+
+test("official MCP Registry server.json (Playwright MCP) is parsed cleanly and flags unbacked host authority honestly", async () => {
+  const url = "https://raw.githubusercontent.com/microsoft/playwright-mcp/main/server.json";
+  const doc = {
+    $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    name: "io.github.microsoft/playwright-mcp",
+    description: "Playwright Tools for MCP",
+    version: "0.0.85",
+    packages: [{ registryType: "npm", identifier: "@playwright/mcp", version: "0.0.85", transport: { type: "stdio" } }],
+  };
+  const r = await inspectNetworkUrl(url, { fetchImpl: mockRoutes({ [url]: doc }), pageOrigin: "https://customs.example" });
+  assert.equal(r.protocol, "mcp");
+  assert.equal(r.verdict.code, "CONDITIONS");
+  assert.ok(r.findings.some((f) => f.rule === "I-AUTHORITY"));
+});
