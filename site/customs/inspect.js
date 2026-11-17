@@ -44,6 +44,9 @@ export function targetsFor(input) {
   if (/\.json$/i.test(last)) {
     return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }], directUrl: u.href, strictForeign: false };
   }
+  if (/^mcp$/i.test(last)) {
+    return { candidates: [{ base: folder(segs), name: null }, { base: folder(segs.slice(0, -1)), name: null }], directUrl: u.href, strictForeign: false };
+  }
   // Usually ".../<network>"; it may also be a site folder without its trailing slash.
   return { candidates: [{ base: folder(segs.slice(0, -1)), name: last }, { base: folder(segs), name: null }] };
 }
@@ -199,8 +202,8 @@ export async function inspectNetworkUrl(input, options = {}) {
     }
   }
 
-  // Step 3: When agent-manifest.json cleanly 404s, probe well-known A2A / MCP endpoints.
-  if (!manifestInfo && !unreachable && !sawTooLarge) {
+  // Step 3: Probe well-known A2A / MCP endpoints whenever no manifest was found (many hosts omit CORS on 404s for agent-manifest.json while enabling CORS on .well-known/agent-card.json).
+  if (!manifestInfo && !sawTooLarge) {
     const seenBases = new Set();
     for (const candidate of candidates) {
       if (!candidate.base || seenBases.has(candidate.base)) continue;
