@@ -3,6 +3,7 @@
 // Everything that comes from an inspected network is inserted with text nodes, never
 // as HTML, so a hostile network cannot put markup into this page.
 import { EXAMPLES, NOT_APPROVABLE, desk } from "./desk.js";
+import { certificateFilename, certificateMeta, certificateSvg } from "./certificate.js";
 import { matchesPin } from "./customs/diff.js";
 import { verifyReceipt } from "./customs/receipts.js";
 
@@ -39,8 +40,8 @@ function moveHighlight() {
   highlight.style.clipPath = `inset(4px ${right}px 4px ${left}px round 10px)`;
 }
 
-function revealWorkspace() {
-  document.querySelector("#workspace")?.scrollIntoView({ block: "start" });
+function revealWorkspace(behavior = "smooth") {
+  document.querySelector("#workspace")?.scrollIntoView({ block: "start", behavior });
 }
 
 function wireTabs() {
@@ -335,14 +336,168 @@ function renderReportActions(report) {
   }
   bar.append(h("button", { type: "button", class: "ghost", onclick: () => askOfficer(report) }, "Ask the officer about it"));
   bar.append(h("span", { class: "spacer" }));
+  const cleared = report.verdict.code === "CLEARED";
+  const certLabel = cleared ? "Clearance certificate" : "Inspection advisory";
+  const certTone = cleared ? "is-cleared" : report.verdict.code === "HOLD" ? "is-hold" : "is-denied";
+  bar.append(h("button", { type: "button", class: `small cert-trigger ${certTone}`, onclick: () => openCertificateDialog(report, toast) },
+    certificateSealIcon(cleared), h("span", null, certLabel)));
   bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(proofText(report), toast, "Proof copied.") }, "Copy proof"));
   bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(JSON.stringify({ ...report, snapshot: undefined }, null, 2), toast, "Report JSON copied.") }, "Copy JSON"));
   bar.append(toast);
   return bar;
 }
 
+function certificateSealIcon(cleared) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "cert-seal-ico");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("aria-hidden", "true");
+  const ribbon = document.createElementNS(SVG_NS, "path");
+  ribbon.setAttribute("d", "M6.8 14.3 L5.6 18.8 L10 16.9 L14.4 18.8 L13.2 14.3");
+  const ring = document.createElementNS(SVG_NS, "circle");
+  ring.setAttribute("cx", "10");
+  ring.setAttribute("cy", "9");
+  ring.setAttribute("r", "6.2");
+  const mark = document.createElementNS(SVG_NS, "path");
+  mark.setAttribute("d", cleared ? "M7.5 9.2 L9.3 11 L12.7 7.4" : "M10 6.3 V9.6 M10 11.7 V11.9");
+  svg.append(ribbon, ring, mark);
+  return svg;
+}
+
+function reportVerifyUrl(report) {
+  const link = new URL(location.href);
+  link.search = `?inspect=${encodeURIComponent(report.target.url)}`;
+  link.hash = "";
+  return link.href;
+}
+
+function activePaletteTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const pick = (name) => cs.getPropertyValue(name).trim() || undefined;
+  return {
+    bgMid: pick("--c1"),
+    parchment: pick("--c2"),
+    cleared: pick("--c3"),
+    ok: pick("--ok"),
+    caution: pick("--caution"),
+    warn: pick("--warn"),
+    bad: pick("--bad"),
+  };
+}
+
+function downloadBlob(blob, filename) {
+  const href = URL.createObjectURL(blob);
+  const link = h("a", { href, download: filename });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1500);
+}
+
+async function svgImageToPngBlob(img, width = 2800, height = 1880) {
+  if (!img.complete) await new Promise((resolve, reject) => {
+    img.addEventListener("load", resolve, { once: true });
+    img.addEventListener("error", () => reject(new Error("Could not render certificate image.")), { once: true });
+  });
+  if (typeof img.decode === "function") await img.decode().catch(() => {});
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("PNG export blocked by browser."))), "image/png");
+  });
+}
+
+let activeCertUrl = null;
+function revokeCertUrl() {
+  if (!activeCertUrl) return;
+  URL.revokeObjectURL(activeCertUrl);
+  activeCertUrl = null;
+}
+
+async function openCertificateDialog(report, reportToast) {
+  const verified = await verifyReportReceipt(report);
+  const receiptCheck = verified?.check || null;
+  const meta = certificateMeta(report, receiptCheck);
+  const verifyUrl = reportVerifyUrl(report);
+  const svg = certificateSvg(report, { receiptCheck, verifyUrl, theme: activePaletteTheme() });
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  revokeCertUrl();
+  activeCertUrl = URL.createObjectURL(svgBlob);
+
+  let dialog = $("#cert-dialog");
+  if (!dialog) {
+    dialog = h("dialog", { id: "cert-dialog", class: "cert-dialog", "aria-labelledby": "cert-dialog-title" });
+    dialog.addEventListener("close", revokeCertUrl);
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    document.body.append(dialog);
+  }
+
+  const titleText = report.identity.brand || report.identity.network || report.target.host || "Network";
+  const img = h("img", { class: "cert-preview-img", src: activeCertUrl, alt: `${meta.documentTitle} for ${titleText}` });
+  const reverifyHit = h("a", {
+    class: "cert-reverify-hit",
+    href: verifyUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    title: `Click to re-verify live: ${verifyUrl}`,
+    "aria-label": `Re-verify live and open result page: ${verifyUrl}`,
+  }, "Open live result ↗");
+  const dialogToast = h("span", { class: "toast", role: "status" });
+  const statusTone = meta.clearanceAllowed
+    ? (receiptCheck?.valid && !receiptCheck.expired && receiptCheck.matches !== false ? "ok" : "caution")
+    : (meta.code === "HOLD" ? "warn" : "bad");
+
+  dialog.replaceChildren(
+    h("div", { class: "cert-shell" },
+      h("header", { class: "cert-head" },
+        h("div", { class: "cert-head-meta" },
+          h("h3", { id: "cert-dialog-title" }, meta.documentTitle),
+          h("span", { class: `pill tone-${statusTone}`, style: `--tone: var(--${statusTone})` }, meta.signedStatus)),
+        h("button", { type: "button", class: "ghost small", "aria-label": "Close certificate preview", onclick: () => dialog.close() }, "Close")),
+      h("div", { class: "cert-stage" },
+        h("div", { class: "cert-stage-frame" }, img, reverifyHit)),
+      h("footer", { class: "cert-foot" },
+        h("p", { class: "cert-note" },
+          meta.signedDetail,
+          " · ",
+          h("a", { class: "cert-verify-link", href: verifyUrl, target: "_blank", rel: "noopener noreferrer" }, "Re-verify live ↗")),
+        h("div", { class: "cert-buttons" },
+          dialogToast,
+          h("button", { type: "button", class: "ghost small", onclick: () => {
+            document.body.classList.add("printing-cert");
+            const clearPrint = () => document.body.classList.remove("printing-cert");
+            window.addEventListener("afterprint", clearPrint, { once: true });
+            window.print();
+            setTimeout(clearPrint, 1000);
+          } }, "Print / PDF"),
+          h("button", { type: "button", class: "ghost small", onclick: () => {
+            downloadBlob(svgBlob, certificateFilename(report, "svg"));
+            dialogToast.textContent = "Saved SVG.";
+            setTimeout(() => { dialogToast.textContent = ""; }, 2500);
+          } }, "Download SVG"),
+          h("button", { type: "button", class: "primary small", onclick: async () => {
+            try {
+              const png = await svgImageToPngBlob(img);
+              downloadBlob(png, certificateFilename(report, "png"));
+              dialogToast.textContent = "Saved 2× PNG.";
+              if (reportToast) reportToast.textContent = "Certificate downloaded.";
+            } catch (err) {
+              dialogToast.textContent = err.message;
+            }
+            setTimeout(() => { dialogToast.textContent = ""; if (reportToast) reportToast.textContent = ""; }, 2500);
+          } }, "Download PNG")))));
+
+  if (typeof dialog.showModal === "function") dialog.showModal();
+  else dialog.setAttribute("open", "");
+}
+
 function proofText(report) {
-  const link = `${location.origin}${location.pathname}?inspect=${encodeURIComponent(report.target.url)}`;
+  const link = reportVerifyUrl(report);
   return [
     `Agent Customs inspection, ${report.inspectedAt}`,
     `Network: ${report.target.url}`,
@@ -438,6 +593,7 @@ function renderBorderLog() {
 // .well-known/agent-customs-key.json. Both are loaded once, from this site.
 let receiptIndex = null;
 let receiptKey = null;
+const receiptCache = new WeakMap();
 
 async function loadJson(relative) {
   const response = await fetch(new URL(relative, location.href), { cache: "no-store" });
@@ -455,52 +611,81 @@ async function findReceipt(networkUrl) {
   return { signed: await loadJson(url), key, url };
 }
 
-// Shows whether the signed stamp checks out and still fits this exact version.
-async function showReceipt(report, line) {
-  try {
-    const found = await findReceipt(report.target.url);
-    if (!found || desk.latest !== report) return;
-    const check = await verifyReceipt(found.signed, found.key.publicKey, { fingerprint: report.identity.hash });
-    const r = check.receipt;
-    let state = "ok";
-    let text = `Signed stamp verified: ${r?.stamp}, ${stampDate(r?.inspectedAt)}. It matches this exact version.`;
-    if (!check.valid) { state = "bad"; text = `A signed stamp was found, but it fails the check: ${check.reason}`; }
-    else if (check.matches === false) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) is for an earlier version: this network has changed since.`; }
-    else if (check.expired) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) has expired.`; }
-    line.replaceChildren(h("span", null, text), " ", h("a", { href: found.url, target: "_blank", rel: "noopener noreferrer" }, "See the signed receipt"));
-    line.dataset.state = state;
-    line.hidden = false;
-  } catch {
-    // No stamp is shown when it can't be checked.
+async function verifyReportReceipt(report) {
+  if (!report || report.failure) return null;
+  if (!receiptCache.has(report)) {
+    receiptCache.set(report, (async () => {
+      try {
+        const found = await findReceipt(report.target.url);
+        if (!found) return null;
+        const check = await verifyReceipt(found.signed, found.key.publicKey, { fingerprint: report.identity.hash });
+        return { found, check };
+      } catch {
+        return null;
+      }
+    })());
   }
+  return receiptCache.get(report);
 }
 
-async function runInspect(url) {
+// Shows whether the signed stamp checks out and still fits this exact version.
+async function showReceipt(report, line) {
+  const verified = await verifyReportReceipt(report);
+  if (!verified || desk.latest !== report) return;
+  const { found, check } = verified;
+  const r = check.receipt;
+  let state = "ok";
+  let text = `Signed stamp verified: ${r?.stamp}, ${stampDate(r?.inspectedAt)}. It matches this exact version.`;
+  if (!check.valid) { state = "bad"; text = `A signed stamp was found, but it fails the check: ${check.reason}`; }
+  else if (check.matches === false) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) is for an earlier version: this network has changed since.`; }
+  else if (check.expired) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) has expired.`; }
+  line.replaceChildren(h("span", null, text), " ", h("a", { href: found.url, target: "_blank", rel: "noopener noreferrer" }, "See the signed receipt"));
+  line.dataset.state = state;
+  line.hidden = false;
+}
+
+async function runInspect(url, { scrollBehavior = "smooth" } = {}) {
   const input = $("#inspect-url");
   const error = $("#inspect-error");
   const button = $("#inspect-button");
+  const reportBox = $("#report");
+  const emptyTitle = $("#report-empty h3");
+  const emptyCopy = $("#report-empty p");
   input.value = url;
   error.hidden = true;
   button.disabled = true;
   button.textContent = "Inspecting…";
   showTab("report");
-  $("#report").classList.add("busy");
+  reportBox.classList.add("busy");
+  if (reportBox.hidden && emptyTitle && emptyCopy) {
+    emptyTitle.textContent = "Checking network…";
+    emptyCopy.textContent = url;
+  }
   try {
     const result = await desk.inspect(url);
     if (result.ok === false) {
       error.textContent = result.reason;
       error.hidden = false;
+      if (reportBox.hidden && emptyTitle && emptyCopy) {
+        emptyTitle.textContent = "Could not inspect";
+        emptyCopy.textContent = result.reason;
+      }
       return;
     }
-    revealWorkspace();
+    revealWorkspace(scrollBehavior);
     document.querySelector("#report-title")?.focus({ preventScroll: true });
   } catch (err) {
-    error.textContent = `Inspection failed: ${err.message}`;
+    const msg = `Inspection failed: ${err.message}`;
+    error.textContent = msg;
     error.hidden = false;
+    if (reportBox.hidden && emptyTitle && emptyCopy) {
+      emptyTitle.textContent = "Inspection failed";
+      emptyCopy.textContent = err.message;
+    }
   } finally {
     button.disabled = false;
     button.textContent = "Inspect a network";
-    $("#report").classList.remove("busy");
+    reportBox.classList.remove("busy");
   }
 }
 
@@ -580,12 +765,15 @@ function wire() {
   renderPins();
   renderBorderLog();
 
-  // A shared link (?inspect=URL) fills the form. The visitor still presses Inspect, so
-  // no other site is contacted until they choose to.
+  // A shared or certificate re-verify link (?inspect=URL) opens the Report tab and
+  // runs a live check so the visitor immediately sees CLEARED, HOLD, or DENIED.
   const shared = new URLSearchParams(location.search).get("inspect");
   if (shared) {
-    $("#inspect-url").value = shared;
-    $("#inspect-button").focus();
+    const targetUrl = shared.trim();
+    $("#inspect-url").value = targetUrl;
+    showTab("report");
+    revealWorkspace("instant");
+    runInspect(targetUrl, { scrollBehavior: "instant" });
   }
 }
 
