@@ -26,6 +26,13 @@ export const EXAMPLES = [
   { id: "harbor", group: "official", label: "Marrow Point Harbor Tours", note: "Cognizant example", url: `${RANGE_ORIGIN}/official/harbor_tours_agentified/marrow_point_harbor_tours`, page: `${RANGE_ORIGIN}/official/harbor_tours_agentified/` },
 ];
 
+export const PROTOCOL_SAMPLES = [
+  { id: "a2a-clean", tone: "ok", label: "Metro Transit Guide", note: "Google A2A", path: "samples/a2a-clean/.well-known/agent.json" },
+  { id: "mcp-poison", tone: "bad", label: "Suspicious Math MCP", note: "tool poisoning", path: "samples/mcp-poisoned/mcp.json" },
+  { id: "mcp-trifecta", tone: "warn", label: "DevOps MCP", note: "Lethal Trifecta", path: "samples/trifecta-polite/mcp.json" },
+  { id: "transitive-hub", tone: "bad", label: "Partner Hub", note: "transitive chain", path: "samples/transitive-hub/hub" },
+];
+
 // Verdicts that can never be approved, on the page or by the officer.
 export const NOT_APPROVABLE = new Set(["DENIED", "INVALID", "UNREADABLE"]);
 
@@ -76,9 +83,10 @@ export class CustomsDesk {
    *
    * :param url: A network URL (or a site URL with one network).
    * :param options.askFirst: Ask before contacting another origin.
+   * :param options.transitive: Also inspect cross-origin linked partners and MCP endpoints.
    * :return: The full report, or {ok: false, reason} when the visitor declined or the URL is unusable.
    */
-  async inspect(url, { askFirst = false } = {}) {
+  async inspect(url, { askFirst = false, transitive = false } = {}) {
     const input = String(url || "").trim();
     let host;
     let origin;
@@ -104,7 +112,7 @@ export class CustomsDesk {
     this.emit("busy");
     let report;
     try {
-      report = await inspectNetworkUrl(input, { fetchImpl: this.fetchImpl || undefined, pins: this.pins, pageOrigin: this.pageOrigin });
+      report = await inspectNetworkUrl(input, { fetchImpl: this.fetchImpl || undefined, pins: this.pins, pageOrigin: this.pageOrigin, transitive });
     } finally {
       this.busy = false;
     }

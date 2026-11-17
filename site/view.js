@@ -2,13 +2,15 @@
 //
 // Everything that comes from an inspected network is inserted with text nodes, never
 // as HTML, so a hostile network cannot put markup into this page.
-import { EXAMPLES, NOT_APPROVABLE, desk } from "./desk.js";
+import { EXAMPLES, NOT_APPROVABLE, PROTOCOL_SAMPLES, desk } from "./desk.js";
 import { certificateFilename, certificateMeta, certificateSvg } from "./certificate.js";
 import { matchesPin } from "./customs/diff.js";
 import { verifyReceipt } from "./customs/receipts.js";
 
 const SEVERITY_TONE = { critical: "bad", high: "warn", medium: "caution", low: "info", info: "info" };
 const SEVERITY_RANK = ["critical", "high", "medium", "low", "info"];
+const PROTOCOL_LABELS = { "open-agentic-web": "Open Agentic Web", a2a: "Google A2A", mcp: "MCP Catalog" };
+const PAPER_TITLES = { "open-agentic-web": "Open Agentic Web spec", a2a: "A2A Agent Card checks", mcp: "MCP catalog checks" };
 const $ = (sel) => document.querySelector(sel);
 
 // ---- Workspace tabs: one panel at a time ---------------------------------------------
@@ -142,6 +144,7 @@ function renderReport({ animate = false } = {}) {
     if (value === "" || value === null || value === undefined) return;
     facts.append(h("div", null, h("dt", null, label), h("dd", { class: mono ? "mono" : null }, value)));
   };
+  fact("Protocol", PROTOCOL_LABELS[report.protocol] || report.protocol || "Open Agentic Web");
   fact("Fingerprint", report.identity.short, true);
   fact("Agents", report.identity.agents.length || "");
   fact("Front agent", report.identity.frontMan, true);
@@ -171,6 +174,10 @@ function renderReport({ animate = false } = {}) {
   if (report.drift?.changed) side.append(renderDrift(report));
   if (!report.failure) {
     side.append(renderItinerary(report));
+    if (report.capabilities && (report.capabilities.trifecta || report.capabilities.sensitiveAccess?.length || report.capabilities.externalEgress?.length)) {
+      side.append(renderCapabilities(report));
+    }
+    if (report.transitive?.checked?.length) side.append(renderTransitive(report));
     if (report.privacy.length) side.append(renderPrivacy(report));
     if (report.conditions.length) {
       side.append(h("div", { class: "report-block" }, h("h3", null, "Conditions of entry"),
@@ -260,7 +267,8 @@ function renderPapers(report) {
   };
   const problems = c.checks.filter((x) => x.status !== "pass");
   const passes = c.checks.filter((x) => x.status === "pass");
-  const block = h("div", { class: "report-block" }, h("h3", null, `Papers: Open Agentic Web spec (${c.passed}/${c.total})`));
+  const paperHeading = PAPER_TITLES[report.protocol] || PAPER_TITLES["open-agentic-web"];
+  const block = h("div", { class: "report-block" }, h("h3", null, `Papers: ${paperHeading} (${c.passed}/${c.total})`));
   if (problems.length) block.append(h("ul", { class: "checks" }, problems.map(row)));
   if (passes.length) {
     block.append(h("details", { class: "more", open: !problems.length },
@@ -303,6 +311,34 @@ function renderPrivacy(report) {
     h("ul", { class: "stops" }, report.privacy.map((p) => h("li", null,
       h("span", { class: "host" }, p.agent), h("div", { class: "tags" }, h("span", { class: "tag" }, p.direction.replace("_", " ")),
         p.fields.map((f) => h("span", { class: "tag" }, f)))))));
+}
+
+function renderCapabilities(report) {
+  const cap = report.capabilities;
+  const rows = [
+    ["Untrusted input", cap.untrustedInput?.[0]?.detail || "None detected"],
+    ["Sensitive access", cap.sensitiveAccess?.length ? cap.sensitiveAccess.map((s) => s.detail).slice(0, 2).join("; ") : "None detected"],
+    ["External egress", cap.externalEgress?.length ? cap.externalEgress.map((e) => e.detail).slice(0, 2).join("; ") : "Stays local"],
+  ];
+  const block = h("div", { class: `report-block${cap.trifecta ? " trifecta-alert" : ""}` },
+    h("h3", null, cap.trifecta ? "Capability flow (Lethal Trifecta)" : "Capability profile"),
+    h("ul", { class: "stops" }, rows.map(([label, val]) => h("li", null,
+      h("span", { class: "host" }, label),
+      h("p", { class: "none" }, val)))));
+  if (cap.paths?.length) {
+    block.append(h("p", { class: "trifecta-path" }, `Path: ${cap.paths[0].from} → ${cap.paths[0].through} → ${cap.paths[0].to}`));
+  }
+  return block;
+}
+
+function renderTransitive(report) {
+  const checked = report.transitive?.checked || [];
+  return h("div", { class: "report-block" }, h("h3", null, `Transitive dependencies (${checked.length})`),
+    h("ul", { class: "stops" }, checked.map((c) => h("li", null,
+      h("span", { class: "host" }, c.url),
+      h("div", { class: "tags" },
+        h("span", { class: "tag" }, PROTOCOL_LABELS[c.protocol] || c.protocol),
+        h("span", { class: `tag${c.verdict === "DENIED" ? " no" : ""}` }, c.verdict))))));
 }
 
 // A message for the next report drawing. Approving redraws the report, so a message put
@@ -644,7 +680,7 @@ async function showReceipt(report, line) {
   line.hidden = false;
 }
 
-async function runInspect(url, { scrollBehavior = "smooth" } = {}) {
+async function runInspect(url, { scrollBehavior = "smooth", transitive = $("#inspect-transitive")?.checked || false } = {}) {
   const input = $("#inspect-url");
   const error = $("#inspect-error");
   const button = $("#inspect-button");
@@ -662,7 +698,7 @@ async function runInspect(url, { scrollBehavior = "smooth" } = {}) {
     emptyCopy.textContent = url;
   }
   try {
-    const result = await desk.inspect(url);
+    const result = await desk.inspect(url, { transitive });
     if (result.ok === false) {
       error.textContent = result.reason;
       error.hidden = false;
@@ -720,6 +756,14 @@ function wire() {
   for (const e of EXAMPLES) {
     (e.group === "official" && officialExamples ? officialExamples : examples).append(h("li", null, h("button", { type: "button", onclick: () => runInspect(e.url), title: e.url },
       h("span", { class: `dot tone-${EXAMPLE_TONE[e.id] || "info"}`, "aria-hidden": "true" }), e.label, " ", h("small", null, e.note))));
+  }
+  const protocolExamples = $("#examples-protocols");
+  if (protocolExamples) {
+    for (const s of PROTOCOL_SAMPLES) {
+      const sampleUrl = new URL(s.path, location.href).href;
+      protocolExamples.append(h("li", null, h("button", { type: "button", onclick: () => runInspect(sampleUrl), title: sampleUrl },
+        h("span", { class: `dot tone-${s.tone || "info"}`, "aria-hidden": "true" }), s.label, " ", h("small", null, s.note))));
+    }
   }
   $("#inspect-form").addEventListener("submit", (event) => {
     event.preventDefault();
