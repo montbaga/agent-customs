@@ -28,5 +28,8 @@ test("the local server refuses paths outside its folder and survives malformed e
   assert.equal(await status("/..%2fpackage.json"), 403);
   // A sibling whose name starts with the folder's name, like range-requests.jsonl next to range/.
   assert.equal(await status("/..%2fsite-notes.txt"), 403);
+  const missingResp = await fetch(`http://127.0.0.1:${port}/samples/a2a-clean/agent-manifest.json`);
+  assert.equal(missingResp.status, 404);
+  assert.equal(missingResp.headers.get("access-control-allow-origin"), "*");
   assert.equal(await status("/index.html"), 200, "the server is still running");
 });
