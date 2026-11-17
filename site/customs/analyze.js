@@ -5,11 +5,11 @@
 // compiled. Both get the same report, so a page inspection and a live guard always
 // agree.
 //
-// The report has five parts, named after a border crossing:
-//   papers     - conformance with the Open Agentic Web MVP spec (profile 0.2)
+// The report covers five border-crossing gates plus capability flow:
+//   papers     - conformance with Open Agentic Web (profile 0.2), Google A2A, or MCP
 //   contraband - hidden characters and instruction text that works against the visitor
 //   itinerary  - every other origin the network can contact or mentions
-//   privacy    - private context (sly_data) the network lets cross a boundary
+//   privacy    - private context (sly_data), leaked secrets, and Lethal Trifecta paths
 //   identity   - the network's fingerprint, and what changed since it was approved
 // and a verdict: CLEARED, CONDITIONS, HOLD, DENIED or INVALID.
 
@@ -48,6 +48,8 @@ const LOOPBACK = /^(localhost|127(?:\.\d+){3}|\[::1\])$/i;
  * :param input.validation: {errors, warnings} from the runtime validator, if run.
  * :param input.transport: What inspect.js learned while fetching, if it fetched.
  * :param input.pin: The approved pin for this URL, if any.
+ * :param input.protocol: "open-agentic-web", "a2a", or "mcp".
+ * :param input.profile: Optional protocol version/profile string.
  * :return: The report.
  */
 export async function analyzeNetwork(input) {

@@ -42,7 +42,7 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 <tr>
 <td width="33.3%" valign="top">
   <strong>1 · Inspect any link</strong><br><br>
-  Paste a partner network's URL without using an API key. Get a full verdict, decoded invisible characters, reachable origins, and plain-English fixes.
+  Paste an Open Agentic Web network, Google A2A Agent Card, or MCP catalog/<code>server.json</code> URL without an API key. Get a verdict, decoded invisible text, capability flow, and fixes.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · Pin against rug pulls</strong><br><br>
@@ -145,7 +145,7 @@ Three ways to explore Agent Customs, fastest first:
   <strong>1 · Automatic Test Suite</strong><br><br>
   No browser or API key needed:<br><br>
   <code>npm test</code><br><br>
-  Runs 111 checks across attacks, Unicode obfuscation, locks, receipts, and the practice site.
+  Runs 132 checks across attacks, Unicode obfuscation, A2A/MCP schemas, capability flow, locks, receipts, and the practice site.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · Inspection Desk (No Key)</strong><br><br>
@@ -153,6 +153,7 @@ Three ways to explore Agent Customs, fastest first:
   • <strong>Shady Pizza</strong> → <em>Entry denied</em><br>
   • <strong>Bank look-alike</strong> → <em>Entry denied</em><br>
   • <strong>Sunny Bakery</strong> → <em>Cleared</em><br>
+  • <strong>A2A, MCP &amp; chains</strong> → 1-click protocol samples<br>
   • <strong>Compare</strong> → <em>Try the rug-pull sample</em>
 </td>
 <td width="33.3%" valign="top">
@@ -211,7 +212,7 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
 | **`Cleared with conditions`** | Minor hygiene notes listed | Admits partner with visible conditions and pins it |
 | **`Held for review`** | Unusual limits, unfamiliar language, or post-approval drift | Pauses and asks the visitor to approve or turn it away |
 | **`Entry denied`** | Hidden commands, injection, phishing, or leak links | Blocks execution completely; explains why safely |
-| **`Papers not in order`** | Invalid against Open Agentic Web MVP Profile 0.2 | Refuses broken network before runtime crash |
+| **`Papers not in order`** | Invalid Open Agentic Web, A2A, or MCP schema | Refuses broken manifest before execution |
 | **`Could not inspect`** | Unreachable host or missing CORS header | Nothing loads or executes |
 
 ### Desk Gallery
@@ -280,6 +281,13 @@ Agent Customs publishes ECDSA P-256 signed inspection receipts ([`receipts/index
 ```sh
 npm run receipts -- verify https://montbaga.github.io/agent-customs/receipts/agent-customs-range.github.io/shady_pizza/shady_pizza.json --live
 ```
+
+### 4 · Multi-protocol adapters, capability flow & clearance certificates
+
+- **Open Agentic Web, Google A2A & MCP (`protocols.js`):** Discovers `agent-manifest.json`/`.network.json`, Google A2A Agent Cards (`.well-known/agent.json`, `.well-known/agent-card.json`, including `supportedInterfaces`), MCP catalogs/`mcpServers`/Streamable HTTP discovery endpoints, and official MCP Registry `server.json` (`packages` and `remotes`) — scanning tool descriptions, JSON Schema properties, shell runners, `destructiveHint` flags, and cross-origin endpoints.
+- **Structural "Lethal Trifecta" analysis (`capabilities.js`, `S-TRIFECTA`):** Flags paths combining untrusted inputs, sensitive tools/schema fields/private context, and external egress even when written in polite prose.
+- **Bounded transitive checks (`R-TRANSITIVE`):** Follows same-origin partner references automatically (up to depth 2, 6 targets, cycle-safe) and supports opting in to cross-origin downstream checks on the Desk.
+- **Clearance Certificates & Advisories (`certificate.js`):** Export standalone vector SVG or 2× PNG cards with embedded ES256 verification status and a clickable live re-verify link.
 
 ---
 
@@ -381,13 +389,13 @@ The site and the test range must sit on **two separate origins** so partner call
 
 | Path | Purpose |
 | :--- | :--- |
-| [`site/customs/`](site/customs/) | Core engine (`analyze.js`, `rules.js`, `languages.js`, `locks.js`, `unicode.js`, `canonical.js`, `diff.js`, `pins.js`, `inspect.js`, `guard.js`, `receipts.js`) |
+| [`site/customs/`](site/customs/) | Core engine (`analyze.js`, `protocols.js`, `capabilities.js`, `rules.js`, `languages.js`, `locks.js`, `unicode.js`, `canonical.js`, `diff.js`, `pins.js`, `inspect.js`, `guard.js`, `judge.js`, `receipts.js`) |
 | [`site/agent_customs.hocon`](site/agent_customs.hocon) | Officer + analyst network definition |
-| [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`site.js`](site/site.js) | Inspection desk UI, actions, and guard wiring |
+| [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`certificate.js`](site/certificate.js), [`site.js`](site/site.js) | Inspection desk UI, clearance certificates, actions, and guard wiring |
 | [`site/runtime/`](site/runtime/) | Upstream Cognizant Open Agentic Web runtime (unmodified, Apache 2.0) |
 | [`practice/`](practice/) | Main Street Guide demo app generated by `tools/make-practice.mjs` |
 | [`tools/`](tools/) | CLI inspector, server with `_headers`, range/practice builders, CDP smoke/screenshot scripts, receipt signer |
-| [`tests/`](tests/) | Node native test runner suite (`111` tests) + official spec fixtures |
+| [`tests/`](tests/) | Node native test runner suite (`132` tests) + official spec fixtures |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Upstream kit scripts & templates (unmodified) |
 
 </details>
@@ -395,11 +403,11 @@ The site and the test range must sit on **two separate origins** so partner call
 <details>
 <summary><b>Honest limits & FAQ</b></summary>
 
-- **Not a general website scanner:** Built specifically for Open Agentic Web sites publishing `agent-manifest.json` and `.network.json` files (not regular HTML shops).
-- **`Cleared` ≠ certified safe:** It means known attack vectors were not found — which is why version pinning + Luhn/IBAN/action locks remain armed at runtime.
+- **Agent manifests, not general HTML:** Built for AI agent manifests and catalogs — Open Agentic Web (`agent-manifest.json`, `.network.json`), Google A2A Agent Cards (`.well-known/agent.json`, `agent-card.json`), and MCP (`mcp.json`, `server.json`, `mcpServers`, `tools/list`), not regular HTML websites.
+- **`Cleared` ≠ certified safe:** It means known attack vectors were not found — which is why version pinning + Luhn/IBAN/action locks remain armed at runtime. Manifests naming third-party brands on generic hosts (such as `raw.githubusercontent.com`) surface an `I-AUTHORITY` hygiene notice (`Cleared with conditions`) because the host itself does not verify publisher identity.
 - **Language scope:** English is checked in full; 10 additional languages check secret/card/password phishing; unfamiliar scripts/languages are held for human review.
 - **CORS requirement:** Sites that omit `Access-Control-Allow-Origin` cannot be fetched by browsers or inspected from the web desk (`npm run inspect -- https://...` checks CORS from CLI and reports this explicitly).
-- **Similar tools:** Unlike local MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan), Agent Customs runs 100% inside the browser with no external analysis backend, guards partner calls at runtime, and pins SHA-256 versions against rug pulls.
+- **Similar tools:** Unlike CLI-only MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan), Agent Customs runs 100% inside the browser (plus optional local CLI) across Open Agentic Web, A2A, and MCP catalogs with no external backend, guards partner calls at runtime, and pins SHA-256 versions against rug pulls.
 
 </details>
 
