@@ -7,17 +7,20 @@
 
 import { parseHocon } from "../runtime/hocon.js";
 import { AgentNetwork, validateNetwork } from "../runtime/kernel.js";
-import { VERDICTS, analyzeNetwork } from "./analyze.js";
+import { VERDICTS, analyzeNetwork, escalateReport } from "./analyze.js";
+import { detectProtocol, foreignDiscoveryCandidates, normalizeForeignSpec } from "./protocols.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_BYTES = 2 * 1024 * 1024;
+const MAX_TRANSITIVE_CHILDREN = 6;
+const DIRECT_FOREIGN_URL = /(?:\/\.well-known\/agent(?:-card)?\.json|\/agent(?:-card)?\.json|\/\.well-known\/mcp\.json|\/mcp\.json|\/tools\/list)$/i;
 
 /**
  * Work out the site base and network name from what a person pasted: a network URL,
- * a site page, a folder, or the manifest's own URL.
+ * a site page, a folder, the manifest's own URL, or a foreign A2A/MCP endpoint.
  *
  * :param input: A URL string.
- * :return: {candidates: [{base, name}]}, tried in order; name null means "ask the manifest".
+ * :return: {candidates: [{base, name}], directUrl?: string}.
  */
 export function targetsFor(input) {
   const raw = String(input || "").trim();
@@ -29,11 +32,17 @@ export function targetsFor(input) {
   const segs = u.pathname.split("/").filter(Boolean);
   const folder = (parts) => `${u.origin}${parts.length ? "/" + parts.join("/") : ""}`;
   if (/agent-manifest\.json$/i.test(u.pathname)) return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }] };
+  if (DIRECT_FOREIGN_URL.test(u.pathname)) {
+    return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }], directUrl: u.href, strictForeign: true };
+  }
   if (!segs.length || u.pathname.endsWith("/")) return { candidates: [{ base: folder(segs), name: null }] };
   const last = segs[segs.length - 1];
   if (/\.(html?|php|aspx?)$/i.test(last)) return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }] };
   if (/\.network\.json$/i.test(last)) {
     return { candidates: [{ base: folder(segs.slice(0, -1)), name: last.replace(/\.network\.json$/i, "") }] };
+  }
+  if (/\.json$/i.test(last)) {
+    return { candidates: [{ base: folder(segs.slice(0, -1)), name: null }], directUrl: u.href, strictForeign: false };
   }
   // Usually ".../<network>"; it may also be a site folder without its trailing slash.
   return { candidates: [{ base: folder(segs.slice(0, -1)), name: last }, { base: folder(segs), name: null }] };
@@ -104,18 +113,67 @@ export async function inspectNetworkUrl(input, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch.bind(globalThis);
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
   const pageOrigin = options.pageOrigin || (typeof location !== "undefined" ? location.origin : null);
-  let candidates;
+  const pin = options.pins ? options.pins.get(String(input || "").trim()) : null;
+  const visited = options._visited || new Set();
+  const depth = options._depth || 0;
+  const maxDepth = options.maxDepth ?? 2;
+
+  let parsedTargets;
   try {
-    ({ candidates } = targetsFor(input));
+    parsedTargets = targetsFor(input);
   } catch (error) {
     return failureReport(String(input), "P-URL", "3.2", "Network URL is usable", error.message);
   }
+  const { candidates, directUrl, strictForeign } = parsedTargets;
+  visited.add(normalizeTargetUrl(input));
 
   const redirects = [];
   let manifestInfo = null;
   let lastError = null;
   let unreachable = false;
+  let sawTooLarge = false;
   let chosen = null;
+
+  // Step 1: If the pasted URL directly targets an A2A card, MCP catalog, or standalone JSON file.
+  if (directUrl) {
+    try {
+      const got = await fetchPublic(directUrl, fetchImpl, timeoutMs);
+      if (got.ok) {
+        let doc = null;
+        try { doc = JSON.parse(got.text); } catch {
+          if (strictForeign) return failureReport(directUrl, "P-PARSE", "Format", "Endpoint returns valid JSON", `${directUrl} is not valid JSON.`);
+        }
+        const proto = detectProtocol(doc, directUrl);
+        if (proto === "a2a" || proto === "mcp") {
+          if (got.redirected) redirects.push({ from: directUrl, to: got.finalUrl, crossOrigin: originOf(got.finalUrl) !== originOf(directUrl) });
+          const report = await analyzeForeignTarget({
+            doc, targetUrl: directUrl, protocol: proto, pageOrigin, redirects, sizeBytes: got.text.length, pin, options,
+          });
+          return applyTransitive(report, { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth });
+        }
+        if (strictForeign) {
+          return failureReport(directUrl, proto === "a2a" ? "P-A2A-CARD" : "P-MCP-SCHEMA", "Format",
+            "Recognized A2A or MCP schema", `${directUrl} did not match A2A Agent Card or MCP tool schema structure.`);
+        }
+      } else if (strictForeign) {
+        return failureReport(directUrl, /mcp/i.test(directUrl) ? "P-MCP-SCHEMA" : "P-A2A-CARD", "Discovery",
+          "Endpoint is published", `${directUrl} answered HTTP ${got.status}.`);
+      }
+    } catch (error) {
+      if (error instanceof FileTooLarge) {
+        return failureReport(directUrl, "P-MANIFEST-FOUND", "Size", "File within 2 MB limit", error.message);
+      }
+      if (strictForeign) {
+        const rep = failureReport(directUrl, "P-CORS", "Discovery", "Public files readable by other sites (CORS)", error.message);
+        rep.verdict = { ...VERDICTS.UNREADABLE, summary: error.message };
+        return rep;
+      }
+      lastError = error.message;
+      unreachable = true;
+    }
+  }
+
+  // Step 2: Standard Open Agentic Web discovery (agent-manifest.json).
   for (const candidate of candidates) {
     const manifestUrl = `${candidate.base}/agent-manifest.json`;
     try {
@@ -134,12 +192,41 @@ export async function inspectNetworkUrl(input, options = {}) {
       chosen = candidate;
       break;
     } catch (error) {
-      if (error instanceof FileTooLarge) { lastError = error.message; unreachable = false; continue; }
+      if (error instanceof FileTooLarge) { lastError = error.message; unreachable = false; sawTooLarge = true; continue; }
       // The browser could not read it at all: down, unreachable, or no CORS header.
       // That says nothing about the network itself, so it gets its own verdict.
       if (!lastError || unreachable) { lastError = error.message; unreachable = true; }
     }
   }
+
+  // Step 3: When agent-manifest.json cleanly 404s, probe well-known A2A / MCP endpoints.
+  if (!manifestInfo && !unreachable && !sawTooLarge) {
+    const seenBases = new Set();
+    for (const candidate of candidates) {
+      if (!candidate.base || seenBases.has(candidate.base)) continue;
+      seenBases.add(candidate.base);
+      for (const probe of foreignDiscoveryCandidates(candidate.base)) {
+        try {
+          const got = await fetchPublic(probe.url, fetchImpl, timeoutMs);
+          if (!got.ok) continue;
+          let doc = null;
+          try { doc = JSON.parse(got.text); } catch { continue; }
+          const proto = detectProtocol(doc, probe.url);
+          if (proto === "a2a" || proto === "mcp") {
+            if (got.redirected) redirects.push({ from: probe.url, to: got.finalUrl, crossOrigin: originOf(got.finalUrl) !== originOf(probe.url) });
+            const report = await analyzeForeignTarget({
+              doc, targetUrl: probe.url, protocol: proto, pageOrigin, redirects, sizeBytes: got.text.length,
+              pin: options.pins ? (options.pins.get(probe.url) || pin) : null, options,
+            });
+            return applyTransitive(report, { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth });
+          }
+        } catch {
+          // Ignore probe errors cleanly so existing P-MANIFEST-FOUND semantics remain intact.
+        }
+      }
+    }
+  }
+
   if (!manifestInfo) {
     const report = failureReport(String(input), "P-MANIFEST-FOUND", "3.2, 3.3", "agent-manifest.json is published", lastError || "No manifest found.",
       "Publish agent-manifest.json in the folder of the network URL, with Access-Control-Allow-Origin: *.");
@@ -221,13 +308,107 @@ export async function inspectNetworkUrl(input, options = {}) {
   }
 
   const cors = !pageOrigin ? "unchecked" : originOf(networkUrl) === pageOrigin ? "same-origin" : "ok";
-  const pin = options.pins ? options.pins.get(networkUrl) : null;
-  return analyzeNetwork({
+  const netPin = options.pins ? options.pins.get(networkUrl) : null;
+  const report = await analyzeNetwork({
     networkUrl, manifest, entry, config: network.config, frontMan,
     linkSlots: [...(network.linkSlots || [])], validation,
     transport: { cors, redirects, links: linksState, sizeBytes: file.text.length, hoconUrl },
-    pin,
+    pin: netPin,
+    protocol: "open-agentic-web",
   });
+  return applyTransitive(report, { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth });
+}
+
+async function analyzeForeignTarget({ doc, targetUrl, protocol, pageOrigin, redirects, sizeBytes, pin, options }) {
+  const norm = normalizeForeignSpec(doc, targetUrl, protocol);
+  const cors = !pageOrigin ? "unchecked" : originOf(targetUrl) === pageOrigin ? "same-origin" : "ok";
+  return analyzeNetwork({
+    networkUrl: targetUrl,
+    manifest: norm.manifest,
+    entry: norm.entry,
+    config: norm.config,
+    frontMan: norm.frontMan,
+    linkSlots: norm.linkSlots,
+    validation: null,
+    transport: { cors, redirects, links: "not-applicable", sizeBytes, hoconUrl: targetUrl },
+    pin: options?.pins ? (options.pins.get(targetUrl) || pin) : pin,
+    protocol: norm.protocol,
+    profile: norm.profile,
+    rawDoc: norm.rawDoc,
+  });
+}
+
+async function applyTransitive(report, options) {
+  if (!report || report.failure || options.deep === false) return report;
+  const depth = options._depth || 0;
+  const maxDepth = options.maxDepth ?? 2;
+  if (depth >= maxDepth) return report;
+
+  const visited = options._visited || new Set([normalizeTargetUrl(report.target.url)]);
+  const crossOriginAllowed = !!options.transitive;
+  const candidateUrls = [];
+
+  for (const stop of report.itinerary || []) {
+    if (!stop.sameSite && !crossOriginAllowed) continue;
+    if ((stop.kinds || []).every((k) => k === "mentioned in instructions")) continue;
+    for (const u of stop.urls || []) {
+      const key = normalizeTargetUrl(u);
+      if (visited.has(key)) continue;
+      if (!candidateUrls.includes(u)) candidateUrls.push(u);
+    }
+  }
+  if (!candidateUrls.length) return report;
+
+  const checked = [];
+  let updated = report;
+  for (const subUrl of candidateUrls.slice(0, MAX_TRANSITIVE_CHILDREN)) {
+    const key = normalizeTargetUrl(subUrl);
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const subReport = await inspectNetworkUrl(subUrl, {
+      ...options,
+      pins: undefined,
+      _visited: visited,
+      _depth: depth + 1,
+    });
+    if (subReport.failure && ["P-MANIFEST-FOUND", "P-A2A-CARD", "P-MCP-SCHEMA"].includes(subReport.conformance?.checks?.[0]?.id)) {
+      // Skip non-agent API endpoints silently so REST URLs don't cause noisy false alerts.
+      continue;
+    }
+    checked.push({
+      url: subReport.target?.url || subUrl,
+      protocol: subReport.protocol || "open-agentic-web",
+      verdict: subReport.verdict?.code || "INVALID",
+      hash: subReport.identity?.short || "",
+      summary: subReport.verdict?.summary || "",
+    });
+    if (subReport.verdict?.code === "DENIED" || subReport.verdict?.code === "HOLD" || subReport.verdict?.code === "INVALID") {
+      updated = escalateReport(updated, {
+        rule: "R-TRANSITIVE",
+        category: "itinerary",
+        severity: subReport.verdict.code === "DENIED" ? "critical" : "high",
+        title: `Downstream dependency flagged (${subReport.verdict.stamp})`,
+        detail: `Referenced target ${subUrl} evaluated as ${subReport.verdict.code}: ${subReport.verdict.summary}`,
+        where: { field: "transitive dependency" },
+        why: "Even a clean front agent exposes the visitor to compromised or risky behavior when it delegates to a dangerous partner or MCP endpoint.",
+        fix: "Remove or replace the compromised downstream dependency, or isolate it behind explicit visitor approval.",
+      });
+    }
+  }
+
+  if (checked.length) {
+    updated = { ...updated, transitive: { depth: depth + 1, checked } };
+  }
+  return updated;
+}
+
+function normalizeTargetUrl(url) {
+  try {
+    const u = new URL(String(url ?? "").trim());
+    return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return String(url || "").trim();
+  }
 }
 
 function failureReport(url, id, section, title, detail, fix = "", extra = {}) {
@@ -248,7 +429,11 @@ function failureReport(url, id, section, title, detail, fix = "", extra = {}) {
 
 function resolveUrl(base, path) {
   if (/^https?:\/\//i.test(path)) return path;
-  return base.replace(/\/$/, "") + (path.startsWith("/") ? path : "/" + path);
+  try {
+    return new URL(path, `${base.replace(/\/$/, "")}/`).href;
+  } catch {
+    return base.replace(/\/$/, "") + (path.startsWith("/") ? path : "/" + path);
+  }
 }
 
 function hostOf(url) {

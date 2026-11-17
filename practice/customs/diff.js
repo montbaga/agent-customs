@@ -45,7 +45,7 @@ export function snapshotOf(config, manifest, fingerprint) {
   const agents = {};
   for (const agent of config?.tools || []) {
     if (!agent || typeof agent.name !== "string") continue;
-    agents[agent.name] = {
+    const record = {
       description: String(agent.function?.description || ""),
       instructions: String(agent.instructions || ""),
       // The runtime adds "command" to the system prompt after the instructions.
@@ -55,6 +55,8 @@ export function snapshotOf(config, manifest, fingerprint) {
       allow: JSON.stringify(agent.allow || null),
       limits: JSON.stringify({ max_steps: agent.max_steps, max_execution_seconds: agent.max_execution_seconds }),
     };
+    if (agent.annotations) record.annotations = JSON.stringify(agent.annotations);
+    agents[agent.name] = record;
   }
   return {
     hash: fingerprint?.hash || "",
@@ -165,6 +167,10 @@ export function diffSnapshots(before, after) {
     if (a.limits !== b.limits) {
       add({ kind: "limits_changed", severity: "medium", agent: name, title: `Execution limits of "${name}" changed`,
         added: [b.limits], removed: [a.limits] });
+    }
+    if ((a.annotations || "") !== (b.annotations || "")) {
+      add({ kind: "annotations_changed", severity: "medium", agent: name, title: `Safety annotations of "${name}" changed`,
+        added: [b.annotations || ""], removed: [a.annotations || ""] });
     }
   }
   if (before.description !== after.description) {
