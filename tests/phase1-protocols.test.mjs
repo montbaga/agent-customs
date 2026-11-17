@@ -291,7 +291,9 @@ test("same-origin transitive scan flags poisoned downstream partner and survives
 test("protocol detector accurately distinguishes Open Agentic Web, A2A, and MCP", () => {
   assert.equal(detectProtocol({ tools: [{ name: "a", instructions: "hi" }] }), "open-agentic-web");
   assert.equal(detectProtocol({ name: "Card", skills: [] }), "a2a");
+  assert.equal(detectProtocol({ name: "Card v1", supportedInterfaces: [{ url: "https://v1.example/a2a" }] }), "a2a");
   assert.equal(detectProtocol({ tools: [{ name: "t", inputSchema: { type: "object" } }] }), "mcp");
+  assert.equal(detectProtocol({ name: "Commons", protocol: "Model Context Protocol, Streamable HTTP", tools: ["read_entries", "list_files"] }), "mcp");
   const normalized = normalizeForeignSpec({ name: "Ping", description: "Pings.", url: "https://p.example/a2a", skills: [] }, "https://p.example/.well-known/agent.json", "a2a");
   assert.equal(normalized.protocol, "a2a");
 });

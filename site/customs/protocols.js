@@ -24,17 +24,20 @@ const SHELL_RUNNER = /(?:^|\s)(?:ba?sh|sh|zsh|cmd(?:\.exe)?|powershell(?:\.exe)?
 export function detectProtocol(doc, url = "") {
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) return null;
   if (Array.isArray(doc.networks)) return "open-agentic-web";
-  if (Array.isArray(doc.tools) && doc.tools.some((t) => t && ("instructions" in t || "command" in t || "function" in t || "class" in t || "toolbox" in t))) {
+  if (Array.isArray(doc.tools) && doc.tools.some((t) => t && typeof t === "object" && ("instructions" in t || "command" in t || "function" in t || "class" in t || "toolbox" in t))) {
     return "open-agentic-web";
   }
-  if (typeof doc.name === "string" && (Array.isArray(doc.skills) || doc.capabilities || doc.defaultInputModes || doc.preferredTransport)) {
+  if (typeof doc.name === "string" && (Array.isArray(doc.skills) || Array.isArray(doc.supportedInterfaces) || doc.capabilities || doc.defaultInputModes || doc.preferredTransport)) {
     return "a2a";
   }
   if (doc.mcpServers && typeof doc.mcpServers === "object" && !Array.isArray(doc.mcpServers)) {
     return "mcp";
   }
+  if (typeof doc.protocol === "string" && /model context protocol|\bmcp\b/i.test(doc.protocol)) {
+    return "mcp";
+  }
   const rpcTools = doc.result?.tools;
-  if (Array.isArray(rpcTools) || (Array.isArray(doc.tools) && doc.tools.some((t) => t && ("inputSchema" in t || "annotations" in t)))) {
+  if (Array.isArray(rpcTools) || (Array.isArray(doc.tools) && doc.tools.some((t) => t && typeof t === "object" && ("inputSchema" in t || "annotations" in t)))) {
     return "mcp";
   }
   if (doc.serverInfo || Array.isArray(doc.prompts) || Array.isArray(doc.resources) || Array.isArray(doc.result?.prompts)) {
@@ -76,20 +79,27 @@ export function normalizeForeignSpec(doc, targetUrl, protocol = detectProtocol(d
   return null;
 }
 
+function a2aServiceUrl(card) {
+  if (typeof card?.url === "string" && card.url.trim()) return card.url.trim();
+  const iface = [...(card?.supportedInterfaces || []), ...(card?.additionalInterfaces || [])].find((i) => typeof i?.url === "string" && i.url.trim());
+  return iface ? iface.url.trim() : "";
+}
+
 function normalizeA2aCard(doc, targetUrl) {
   const card = doc && typeof doc === "object" ? doc : {};
   const cardOrigin = originOf(targetUrl);
-  const rpcOrigin = originOf(card.url);
+  const serviceUrl = a2aServiceUrl(card);
+  const rpcOrigin = originOf(serviceUrl);
   const entryName = safeSlug(card.name) || "a2a_agent";
   const skills = Array.isArray(card.skills) ? card.skills : [];
   const allExamples = [];
   const frontTools = [];
   const tools = [];
 
-  if (typeof card.url === "string" && rpcOrigin && cardOrigin && rpcOrigin !== cardOrigin) {
-    frontTools.push(card.url);
+  if (serviceUrl && rpcOrigin && cardOrigin && rpcOrigin !== cardOrigin) {
+    frontTools.push(serviceUrl);
   }
-  for (const iface of Array.isArray(card.additionalInterfaces) ? card.additionalInterfaces : []) {
+  for (const iface of [...(card.supportedInterfaces || []), ...(card.additionalInterfaces || [])]) {
     if (typeof iface?.url === "string" && originOf(iface.url) && originOf(iface.url) !== cardOrigin) {
       frontTools.push(iface.url);
     }
@@ -139,7 +149,7 @@ function normalizeA2aCard(doc, targetUrl) {
   };
 
   const allowedPeers = [];
-  if (typeof card.url === "string" && rpcOrigin === cardOrigin) allowedPeers.push(rpcOrigin);
+  if (serviceUrl && rpcOrigin === cardOrigin) allowedPeers.push(rpcOrigin);
 
   const manifest = {
     brand: String(card.provider?.organization || card.name || ""),
@@ -214,7 +224,8 @@ function normalizeMcpCatalog(doc, targetUrl) {
   }
 
   for (let i = 0; i < rawTools.length; i += 1) {
-    const t = rawTools[i] && typeof rawTools[i] === "object" ? rawTools[i] : { name: `tool_${i + 1}` };
+    const raw = rawTools[i];
+    const t = raw && typeof raw === "object" ? raw : { name: typeof raw === "string" ? raw : `tool_${i + 1}` };
     const name = String(t.name || `tool_${i + 1}`);
     frontRefs.push(name);
     const refs = [];
@@ -336,7 +347,7 @@ export function evaluateForeignPapers({ protocol, target, rawDoc = {}, manifest 
 
   if (protocol === "a2a") {
     const hasName = typeof rawDoc.name === "string" && rawDoc.name.trim().length > 0;
-    const urlStr = typeof rawDoc.url === "string" ? rawDoc.url.trim() : "";
+    const urlStr = a2aServiceUrl(rawDoc);
     let urlValid = false;
     let parsedUrl = null;
     try {
