@@ -239,7 +239,6 @@ function normalizeMcpCatalog(doc, targetUrl) {
     });
   }
 
-  // Map remote or stdio mcpServers entries cleanly so transport URLs, secrets and shell args are checked.
   for (const [name, spec] of Object.entries(rawServers)) {
     if (!spec || typeof spec !== "object") continue;
     const entryName = safeSlug(name) || "mcp_endpoint";
@@ -358,9 +357,7 @@ function normalizeMcpCatalog(doc, targetUrl) {
 }
 
 /**
- * Evaluate protocol-specific Papers conformance and safety checks for A2A & MCP.
- * Keeps analyze.js open-agentic-web checks untouched while giving fair, exact checks
- * for foreign protocols.
+ * Evaluate Papers conformance and safety checks for Google A2A Agent Cards and MCP catalogs.
  */
 export function evaluateForeignPapers({ protocol, target, rawDoc = {}, manifest = {}, config = {}, addFinding, addCheck, secretResult }) {
   const { published = [], publishedList = "" } = secretResult || {};
@@ -474,39 +471,43 @@ export function evaluateForeignPapers({ protocol, target, rawDoc = {}, manifest 
   const servers = mcpRoot?.mcpServers && typeof mcpRoot.mcpServers === "object" ? Object.entries(mcpRoot.mcpServers) : [];
   const packages = Array.isArray(mcpRoot?.packages) ? mcpRoot.packages : [];
   const remotes = Array.isArray(mcpRoot?.remotes) ? mcpRoot.remotes : [];
-  const hasItems = tools.length > 0 || servers.length > 0 || packages.length > 0 || remotes.length > 0 || (Array.isArray(mcpRoot?.prompts) && mcpRoot.prompts.length > 0);
+  const serverCount = servers.length + packages.length + remotes.length;
+  const hasItems = tools.length > 0 || serverCount > 0 || (Array.isArray(mcpRoot?.prompts) && mcpRoot.prompts.length > 0);
   addCheck({
     id: "P-MCP-SCHEMA",
     section: "MCP Spec",
     title: "Publishes valid MCP tools or server entries",
     status: hasItems ? "pass" : "fail",
-    detail: hasItems ? `${tools.length} tool(s), ${servers.length + packages.length + remotes.length} server/package entry/entries.` : "No tools[], mcpServers, or packages[] found.",
+    detail: hasItems ? `${tools.length} tool(s), ${serverCount} server/package ${serverCount === 1 ? "entry" : "entries"}.` : "No tools[], mcpServers, or packages[] found.",
     fix: "Publish valid tools[], packages[], or mcpServers config entries.",
   });
   if (!hasItems) blocking.push("the MCP manifest lists no tools or servers");
 
-  const missingDesc = tools.filter((t) => !t?.description).map((t) => t?.name || "unnamed");
-  const missingSchema = tools.filter((t) => t?.inputSchema?.type !== "object").map((t) => t?.name || "unnamed");
-  const serverCount = servers.length + packages.length + remotes.length;
+  const objectTools = tools.filter((t) => t && typeof t === "object");
+  const missingDesc = objectTools.filter((t) => !t.description).map((t) => t.name || "unnamed");
+  const missingSchema = objectTools.filter((t) => t.inputSchema?.type !== "object").map((t) => t.name || "unnamed");
+  const stringOnlyTools = tools.length > 0 && objectTools.length === 0;
   addCheck({
     id: "P-MCP-TOOLS",
     section: "MCP Tools",
     title: "Every MCP tool has a description and object inputSchema",
-    status: !tools.length ? (serverCount ? "pass" : "warn") : (missingDesc.length || missingSchema.length) ? "warn" : "pass",
+    status: !tools.length ? (serverCount ? "pass" : "warn") : (stringOnlyTools || missingDesc.length || missingSchema.length) ? "warn" : "pass",
     detail: !tools.length
       ? (packages.length ? `MCP registry manifest declaring ${packages.length} package(s).` : "No direct tools[] array (config manifest only).")
-      : (missingDesc.length || missingSchema.length)
-        ? `Incomplete tool specs: ${[...new Set([...missingDesc, ...missingSchema])].slice(0, 5).join(", ")}.`
-        : `${tools.length} tool(s) expose structured JSON schemas.`,
+      : stringOnlyTools
+        ? `Lists ${tools.length} tool name(s) without inline JSON schemas.`
+        : (missingDesc.length || missingSchema.length)
+          ? `Incomplete tool specs: ${[...new Set([...missingDesc, ...missingSchema])].slice(0, 5).join(", ")}.`
+          : `${tools.length} tool(s) expose structured JSON schemas.`,
     fix: "Add clear description and type:\"object\" inputSchema for every MCP tool.",
   });
 
   const destructive = [];
   const undocumentedPower = [];
-  for (const t of tools) {
-    const ann = t?.annotations || {};
+  for (const t of objectTools) {
+    const ann = t.annotations || {};
     if (ann.destructiveHint === true) destructive.push(t.name);
-    else if (DESTRUCTIVE_NAME.test(String(t?.name || "")) && ann.readOnlyHint !== true && ann.destructiveHint === undefined) {
+    else if (DESTRUCTIVE_NAME.test(String(t.name || "")) && ann.readOnlyHint !== true && ann.destructiveHint === undefined) {
       undocumentedPower.push(t.name);
     }
   }
@@ -535,7 +536,6 @@ export function evaluateForeignPapers({ protocol, target, rawDoc = {}, manifest 
     });
   }
 
-  // Flag stdio shell pipelines in mcpServers manifests.
   const shellServers = [];
   const plainHttpServers = [];
   for (const [name, spec] of servers) {
