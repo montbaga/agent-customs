@@ -30,7 +30,7 @@ const TYPES = {
 
 async function loadHeaderRules() {
   try {
-    const text = await readFile(path.join(root, "_headers"), "utf8");
+    const text = (await readFile(path.join(root, "_headers"), "utf8")).replace(/^\uFEFF/, "");
     const rules = [];
     let current = null;
     for (const line of text.split(/\r?\n/)) {
@@ -73,12 +73,12 @@ const server = http.createServer(async (req, res) => {
     if (info.isDirectory()) file = path.join(file, "index.html");
     body = await readFile(file);
     headers["Content-Type"] = TYPES[path.extname(file).toLowerCase()] || "application/octet-stream";
-    for (const rule of await loadHeaderRules()) if (matches(rule.pattern, urlPath)) Object.assign(headers, rule.headers);
   } catch {
     status = 404;
     body = "Not found";
     headers["Content-Type"] = "text/plain; charset=utf-8";
   }
+  for (const rule of await loadHeaderRules()) if (matches(rule.pattern, urlPath)) Object.assign(headers, rule.headers);
   res.writeHead(status, headers);
   res.end(req.method === "HEAD" ? undefined : body);
   if (logFile) {

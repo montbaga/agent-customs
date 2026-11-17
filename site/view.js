@@ -2,7 +2,7 @@
 //
 // Everything that comes from an inspected network is inserted with text nodes, never
 // as HTML, so a hostile network cannot put markup into this page.
-import { EXAMPLES, NOT_APPROVABLE, desk } from "./desk.js";
+import { EXAMPLES, NOT_APPROVABLE, PROTOCOL_SAMPLES, desk } from "./desk.js";
 import { certificateFilename, certificateMeta, certificateSvg } from "./certificate.js";
 import { matchesPin } from "./customs/diff.js";
 import { verifyReceipt } from "./customs/receipts.js";
@@ -680,7 +680,7 @@ async function showReceipt(report, line) {
   line.hidden = false;
 }
 
-async function runInspect(url, { scrollBehavior = "smooth" } = {}) {
+async function runInspect(url, { scrollBehavior = "smooth", transitive = $("#inspect-transitive")?.checked || false } = {}) {
   const input = $("#inspect-url");
   const error = $("#inspect-error");
   const button = $("#inspect-button");
@@ -698,7 +698,7 @@ async function runInspect(url, { scrollBehavior = "smooth" } = {}) {
     emptyCopy.textContent = url;
   }
   try {
-    const result = await desk.inspect(url);
+    const result = await desk.inspect(url, { transitive });
     if (result.ok === false) {
       error.textContent = result.reason;
       error.hidden = false;
@@ -756,6 +756,14 @@ function wire() {
   for (const e of EXAMPLES) {
     (e.group === "official" && officialExamples ? officialExamples : examples).append(h("li", null, h("button", { type: "button", onclick: () => runInspect(e.url), title: e.url },
       h("span", { class: `dot tone-${EXAMPLE_TONE[e.id] || "info"}`, "aria-hidden": "true" }), e.label, " ", h("small", null, e.note))));
+  }
+  const protocolExamples = $("#examples-protocols");
+  if (protocolExamples) {
+    for (const s of PROTOCOL_SAMPLES) {
+      const sampleUrl = new URL(s.path, location.href).href;
+      protocolExamples.append(h("li", null, h("button", { type: "button", onclick: () => runInspect(sampleUrl), title: sampleUrl },
+        h("span", { class: `dot tone-${s.tone || "info"}`, "aria-hidden": "true" }), s.label, " ", h("small", null, s.note))));
+    }
   }
   $("#inspect-form").addEventListener("submit", (event) => {
     event.preventDefault();
