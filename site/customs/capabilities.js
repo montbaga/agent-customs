@@ -96,7 +96,6 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
     externalEgress.push({ sink: "any origin (open policy)", kind: "open_policy", detail: "peer_policy.mode is open with active external refs" });
   }
 
-  // Deduplicate by detail string while preserving order.
   const uniq = (arr) => {
     const seen = new Set();
     return arr.filter((item) => {
