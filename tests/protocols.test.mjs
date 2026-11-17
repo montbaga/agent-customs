@@ -1,6 +1,6 @@
-// Phase 1 tests: Multi-protocol discovery & normalization (Google A2A + MCP),
-// structural "Lethal Trifecta" capability analysis, and safe transitive scanning.
-// Run from project root: node --test tests/phase1-protocols.test.mjs
+// Tests for Google A2A and MCP protocol adapters, structural capability analysis,
+// and bounded transitive dependency inspection.
+// Run from the project folder: node --test tests/protocols.test.mjs
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
@@ -282,18 +282,22 @@ test("same-origin transitive scan flags poisoned downstream partner and survives
   assert.equal(hubReport.transitive.checked.length, 1);
   assert.equal(hubReport.transitive.checked[0].verdict, "DENIED");
 
-  // Cycle A <-> Cycle B must finish cleanly without infinite recursion.
+  // Cycle A <-> Cycle B must finish without infinite recursion.
   const cycleReport = await inspectNetworkUrl(`${base}/cycle_a`, { fetchImpl, pageOrigin: "https://customs.example" });
   assert.equal(cycleReport.verdict.code, "CLEARED");
   assert.equal(cycleReport.transitive.checked.length, 1);
 });
 
-test("protocol detector accurately distinguishes Open Agentic Web, A2A, and MCP", () => {
+test("protocol detector accurately distinguishes Open Agentic Web, A2A, and MCP", async () => {
   assert.equal(detectProtocol({ tools: [{ name: "a", instructions: "hi" }] }), "open-agentic-web");
   assert.equal(detectProtocol({ name: "Card", skills: [] }), "a2a");
   assert.equal(detectProtocol({ name: "Card v1", supportedInterfaces: [{ url: "https://v1.example/a2a" }] }), "a2a");
   assert.equal(detectProtocol({ tools: [{ name: "t", inputSchema: { type: "object" } }] }), "mcp");
-  assert.equal(detectProtocol({ name: "Commons", protocol: "Model Context Protocol, Streamable HTTP", tools: ["read_entries", "list_files"] }), "mcp");
+  const streamableDoc = { name: "Commons", protocol: "Model Context Protocol, Streamable HTTP", tools: ["read_entries", "list_files"] };
+  assert.equal(detectProtocol(streamableDoc), "mcp");
+  const streamableReport = await inspectNetworkUrl("https://commons.example/mcp", { fetchImpl: mockRoutes({ "https://commons.example/mcp": streamableDoc }), pageOrigin: "https://customs.example" });
+  const toolsCheck = streamableReport.conformance.checks.find((c) => c.id === "P-MCP-TOOLS");
+  assert.doesNotMatch(toolsCheck.detail, /unnamed/);
   const normalized = normalizeForeignSpec({ name: "Ping", description: "Pings.", url: "https://p.example/a2a", skills: [] }, "https://p.example/.well-known/agent.json", "a2a");
   assert.equal(normalized.protocol, "a2a");
 });

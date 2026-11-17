@@ -74,7 +74,7 @@ const VERDICT_META = {
   },
 };
 
-/** Escape XML special characters cleanly and strip disallowed control characters. */
+/** Escape XML special characters and strip disallowed control characters. */
 export function escapeXml(value) {
   return String(value ?? "")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
@@ -257,7 +257,7 @@ function buildFingerprintCrest(hash, x, y, cellSize, color, borderColor) {
   return `<rect x="${x - 8}" y="${y - 8}" width="${size + 15}" height="${size + 15}" rx="8" fill="#faf5e8" stroke="${escapeXml(borderColor)}" stroke-width="1"/>${cells.join("")}`;
 }
 
-/** Build radial guilloche rosette petal paths centered cleanly around (cx, cy). */
+/** Build radial guilloche rosette petal paths centered around (cx, cy). */
 function buildGuillocheRosette(cx, cy, rOuter, rInner, petals = 18) {
   const paths = [];
   for (let i = 0; i < petals; i++) {

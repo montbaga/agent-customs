@@ -105,11 +105,12 @@ async function fetchPublic(url, fetchImpl, timeoutMs) {
 /**
  * Inspect a network by URL.
  *
- * :param input: A network URL, or a site/manifest URL with exactly one network.
+ * :param input: A network URL, a site/manifest URL, or an A2A Agent Card / MCP catalog URL.
  * :param options.fetchImpl: fetch, or a stand-in for tests.
  * :param options.pins: A PinStore, to compare with the approved version.
  * :param options.pageOrigin: The inspecting page's origin, to tell whether CORS was exercised.
  * :param options.timeoutMs: Per-file timeout.
+ * :param options.transitive: Also inspect cross-origin linked partners and MCP endpoints.
  * :return: The report. Failures that stop the inspection give an INVALID report.
  */
 export async function inspectNetworkUrl(input, options = {}) {
@@ -137,26 +138,32 @@ export async function inspectNetworkUrl(input, options = {}) {
   let sawTooLarge = false;
   let chosen = null;
 
-  // Step 1: If the pasted URL directly targets an A2A card, MCP catalog, or standalone JSON file.
+  const transitiveOpts = { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth };
+  const inspectForeignResponse = async (sourceUrl, got, foreignPin) => {
+    let doc = null;
+    try { doc = JSON.parse(got.text); } catch { return { invalidJson: true, proto: null, report: null }; }
+    const proto = detectProtocol(doc, sourceUrl);
+    if (proto !== "a2a" && proto !== "mcp") return { invalidJson: false, proto, report: null };
+    if (got.redirected) redirects.push({ from: sourceUrl, to: got.finalUrl, crossOrigin: originOf(got.finalUrl) !== originOf(sourceUrl) });
+    const report = await analyzeForeignTarget({
+      doc, targetUrl: sourceUrl, protocol: proto, pageOrigin, redirects, sizeBytes: got.text.length,
+      pin: foreignPin, options,
+    });
+    return { invalidJson: false, proto, report: await applyTransitive(report, transitiveOpts) };
+  };
+
+  // Direct A2A Agent Card, MCP catalog, or standalone JSON endpoint.
   if (directUrl) {
     try {
       const got = await fetchPublic(directUrl, fetchImpl, timeoutMs);
       if (got.ok) {
-        let doc = null;
-        try { doc = JSON.parse(got.text); } catch {
-          if (strictForeign) return failureReport(directUrl, "P-PARSE", "Format", "Endpoint returns valid JSON", `${directUrl} is not valid JSON.`);
-        }
-        const proto = detectProtocol(doc, directUrl);
-        if (proto === "a2a" || proto === "mcp") {
-          if (got.redirected) redirects.push({ from: directUrl, to: got.finalUrl, crossOrigin: originOf(got.finalUrl) !== originOf(directUrl) });
-          const report = await analyzeForeignTarget({
-            doc, targetUrl: directUrl, protocol: proto, pageOrigin, redirects, sizeBytes: got.text.length, pin, options,
-          });
-          return applyTransitive(report, { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth });
-        }
+        const res = await inspectForeignResponse(directUrl, got, pin);
+        if (res.report) return res.report;
         if (strictForeign) {
-          return failureReport(directUrl, proto === "a2a" ? "P-A2A-CARD" : "P-MCP-SCHEMA", "Format",
-            "Recognized A2A or MCP schema", `${directUrl} did not match A2A Agent Card or MCP tool schema structure.`);
+          return res.invalidJson
+            ? failureReport(directUrl, "P-PARSE", "Format", "Endpoint returns valid JSON", `${directUrl} is not valid JSON.`)
+            : failureReport(directUrl, res.proto === "a2a" ? "P-A2A-CARD" : "P-MCP-SCHEMA", "Format",
+                "Recognized A2A or MCP schema", `${directUrl} did not match A2A Agent Card or MCP tool schema structure.`);
         }
       } else if (strictForeign) {
         return failureReport(directUrl, /mcp/i.test(directUrl) ? "P-MCP-SCHEMA" : "P-A2A-CARD", "Discovery",
@@ -176,7 +183,7 @@ export async function inspectNetworkUrl(input, options = {}) {
     }
   }
 
-  // Step 2: Standard Open Agentic Web discovery (agent-manifest.json).
+  // Standard Open Agentic Web discovery via agent-manifest.json.
   for (const candidate of candidates) {
     const manifestUrl = `${candidate.base}/agent-manifest.json`;
     try {
@@ -202,7 +209,7 @@ export async function inspectNetworkUrl(input, options = {}) {
     }
   }
 
-  // Step 3: Probe well-known A2A / MCP endpoints whenever no manifest was found (many hosts omit CORS on 404s for agent-manifest.json while enabling CORS on .well-known/agent-card.json).
+  // Probe well-known A2A and MCP paths when no manifest exists (some hosts omit CORS on 404s for agent-manifest.json).
   if (!manifestInfo && !sawTooLarge) {
     const seenBases = new Set();
     for (const candidate of candidates) {
@@ -212,19 +219,10 @@ export async function inspectNetworkUrl(input, options = {}) {
         try {
           const got = await fetchPublic(probe.url, fetchImpl, timeoutMs);
           if (!got.ok) continue;
-          let doc = null;
-          try { doc = JSON.parse(got.text); } catch { continue; }
-          const proto = detectProtocol(doc, probe.url);
-          if (proto === "a2a" || proto === "mcp") {
-            if (got.redirected) redirects.push({ from: probe.url, to: got.finalUrl, crossOrigin: originOf(got.finalUrl) !== originOf(probe.url) });
-            const report = await analyzeForeignTarget({
-              doc, targetUrl: probe.url, protocol: proto, pageOrigin, redirects, sizeBytes: got.text.length,
-              pin: options.pins ? (options.pins.get(probe.url) || pin) : null, options,
-            });
-            return applyTransitive(report, { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth });
-          }
+          const res = await inspectForeignResponse(probe.url, got, options.pins ? (options.pins.get(probe.url) || pin) : null);
+          if (res.report) return res.report;
         } catch {
-          // Ignore probe errors cleanly so existing P-MANIFEST-FOUND semantics remain intact.
+          // Fall through to the final P-MANIFEST-FOUND / P-CORS report.
         }
       }
     }
@@ -319,7 +317,7 @@ export async function inspectNetworkUrl(input, options = {}) {
     pin: netPin,
     protocol: "open-agentic-web",
   });
-  return applyTransitive(report, { ...options, fetchImpl, timeoutMs, pageOrigin, _visited: visited, _depth: depth, maxDepth });
+  return applyTransitive(report, transitiveOpts);
 }
 
 async function analyzeForeignTarget({ doc, targetUrl, protocol, pageOrigin, redirects, sizeBytes, pin, options }) {
@@ -375,7 +373,7 @@ async function applyTransitive(report, options) {
       _depth: depth + 1,
     });
     if (subReport.failure && ["P-MANIFEST-FOUND", "P-A2A-CARD", "P-MCP-SCHEMA"].includes(subReport.conformance?.checks?.[0]?.id)) {
-      // Skip non-agent API endpoints silently so REST URLs don't cause noisy false alerts.
+      // Non-agent endpoints (such as plain REST APIs) are expected and left alone.
       continue;
     }
     checked.push({
