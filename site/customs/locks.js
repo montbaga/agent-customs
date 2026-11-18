@@ -21,7 +21,7 @@
 
 import { detectCanaryLeak, generateCanaryToken } from "./canary.js";
 import { canonicalJson, sha256Hex } from "./canonical.js";
-import { scanText } from "./rules.js";
+import { EMAIL_LOGIN_INDIRECT_RE, INLINE_ROLE_OVERRIDE_RE, scanText } from "./rules.js";
 import { scanHidden, stripHiddenChars } from "./unicode.js";
 
 // ---- Real card numbers, IBANs and API keys -------------------------------------------
@@ -54,8 +54,8 @@ function foldUnicodeDigits(text) {
   return changed ? out.join("") : text;
 }
 
-// 13 to 19 digits, separated by up to 3 spaces, commas, dashes, dots, slashes, '+' or colons.
-const CARD_CANDIDATE = /(?<![\d-])(?:\d(?:\r\n|[\s.,_+:/-]{1,3})?){12,18}\d(?![\d-])/g;
+// 13 to 19 digits, separated by up to 4 spaces, commas, dashes, dots, slashes, '+' or colons.
+const CARD_CANDIDATE = /(?<![\d-])(?:\d(?:\r\n|[\s.,_+:/-]{1,4})?){12,18}\d(?![\d-])/g;
 // The first digits card networks use: Visa, Mastercard, American Express, Diners, JCB,
 // Discover, UnionPay and Maestro. Other long numbers (orders, parcels) mostly start elsewhere.
 const CARD_PREFIX = /^(?:4|5[0-9]|2[2-7]|3[0-9]|6)/;
@@ -261,9 +261,9 @@ export function keptOut(kind, where) {
 // ---- Runtime reply inspection & quarantine -------------------------------------------
 
 const REPLY_BLOCKED_RULES = new Set([
-  "C-SECRETS", "C-EXEC", "C-REMOTE-ACCESS", "C-FINANCIAL-ID", "C-PERSONAL", "C-PURCHASE", "C-OVERRIDE",
-  "C-CALLER", "C-CONSENT", "C-CONCEAL", "C-EXFIL", "C-BEACON",
-  "C-INSPECTOR", "C-FORMAT", "C-ENCODED", "C-FOREIGN-TOOLS", "C-URGENCY",
+  "C-SECRETS", "C-EXEC", "C-REMOTE-ACCESS", "C-GIFT-CARD", "C-CRYPTO-QR", "C-FINANCIAL-ID",
+  "C-PERSONAL", "C-PURCHASE", "C-OVERRIDE", "C-CALLER", "C-CONSENT", "C-CONCEAL",
+  "C-EXFIL", "C-BEACON", "C-INSPECTOR", "C-FORMAT", "C-ENCODED", "C-FOREIGN-TOOLS", "C-URGENCY",
 ]);
 
 // Conversational phishing and action-coercion patterns specific to partner replies.
@@ -302,7 +302,15 @@ const REPLY_THREATS = [
   },
   {
     title: "Tries to steer the calling assistant in its reply",
-    re: /\b(?:note|instruction|message|reminder|directive|order)\s+(?:to|for)\s+(?:the\s+)?(?:ai|assistant|model|agent|caller)\b|\bin\s+your\s+next\s+(?:message|reply|response|turn)\b[^.!?\n]{0,70}\b(?:summari[sz]e|include|append|repeat|send|forward|output|leak|reveal|mention|ask|call|run|execute)\b/i,
+    re: new RegExp([
+      /\b(?:note|instruction|message|reminder|directive|order)\s+(?:to|for)\s+(?:the\s+)?(?:ai|assistant|model|agent|caller)\b/.source,
+      /\bin\s+your\s+next\s+(?:message|reply|response|turn)\b[^.!?\n]{0,70}\b(?:summari[sz]e|include|append|repeat|send|forward|output|leak|reveal|mention|ask|call|run|execute)\b/.source,
+      INLINE_ROLE_OVERRIDE_RE.source,
+    ].join("|"), "i"),
+  },
+  {
+    title: "Asks for e-mail or account sign-in credentials",
+    re: EMAIL_LOGIN_INDIRECT_RE,
   },
   {
     title: "Tries to steer the visitor to an outside payment or verification link",
@@ -379,11 +387,20 @@ function sanitizePartnerText(text, partnerBase) {
     }
     return `${label} [external link removed by Agent Customs]`;
   });
-  // Check bare URLs too (including protocol-relative //host.tld/...).
+  // Check bare URLs too (including protocol-relative //host.tld/... and bare host.tld/path links).
   s = s.replace(/(?:https?:\/\/|(?<![A-Za-z0-9:])\/\/[a-z0-9.-]+\.[a-z]{2,})[^\s)"'<>]*/gi, (rawUrl) => {
     const url = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
     if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) {
       return rawUrl;
+    }
+    return "[external link removed by Agent Customs]";
+  });
+  s = s.replace(/(?<![A-Za-z0-9._/@:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:invalid|example|online|com|org|net|app|dev|shop|club|info|site|test|local|biz|xyz|top|ai|co|uk|us|ca|de|fr|jp|in|io|me|au)(?:\.[a-z]{2})?(?:\/[^\s)"'<>\]]*[A-Za-z0-9/_?=#&-])(?![A-Za-z0-9_/-])/gi, (bare, offset, whole) => {
+    if (/^(?:[a-z0-9-]+\.)?(?:json|html?|mjs|js|css|md|txt|pdf|png|jpe?g|svg|ya?ml|xml)\//i.test(bare)) return bare;
+    if (whole.slice(Math.max(0, offset - 3), offset).includes("://")) return bare;
+    const url = `https://${bare}`;
+    if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) {
+      return bare;
     }
     return "[external link removed by Agent Customs]";
   });
@@ -712,7 +729,18 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
           const digest = await mcpToolsDigest(tools);
           const prevPin = store ? store.get(pinKey) : mcpFallbackPins.get(pinKey);
           if (!prevPin) {
-            const entry = { url: pinKey, kind: "mcp-tools", hash: digest, count: tools.length, pinnedAt: new Date().toISOString() };
+            const entry = {
+              url: pinKey,
+              kind: "mcp-tools",
+              brand: `${host} (MCP tools)`,
+              network: host,
+              host,
+              hash: digest,
+              short: digest.slice(7, 19),
+              verdict: "PINNED",
+              count: tools.length,
+              pinnedAt: new Date().toISOString(),
+            };
             if (store) store.set(pinKey, entry);
             else mcpFallbackPins.set(pinKey, entry);
           } else if (prevPin.hash !== digest) {
@@ -721,7 +749,7 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
                 lock: 2,
                 kind: "MCP tool list changed",
                 where: `tool list from ${host}`,
-                reason: "MCP tool definitions changed since initial approval (possible MCP rug pull)",
+                reason: "MCP tool definitions changed since initial approval (possible MCP rug pull). Forget the MCP pin in the Inspection Desk Approvals tab to allow an intentional update.",
               });
             } catch {}
             return [];

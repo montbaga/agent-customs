@@ -108,10 +108,12 @@ export function pinFromReport(report, how = "manual") {
 }
 
 function normalize(url) {
+  const raw = String(url || "").trim();
+  if (raw.startsWith("mcp:")) return `mcp:${normalize(raw.slice(4))}`;
   try {
-    const u = new URL(url);
+    const u = new URL(raw);
     return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
   } catch {
-    return String(url || "").trim();
+    return raw;
   }
 }
