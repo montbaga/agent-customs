@@ -1,16 +1,29 @@
-// capabilities.js: structural "Lethal Trifecta" capability & data-flow analyzer.
+// capabilities.js: name- and schema-based "Lethal Trifecta" capability & data-flow analyzer.
 //
-// Text rules inspect what an agent *says*. Capability analysis inspects what an agent
-// can structurally *do*: combining Untrusted Input + Sensitive Access + External Egress
-// creates an exfiltration path even if the published wording looks completely polite.
+// Text rules inspect what an agent *says*. Capability analysis inspects what declared tools,
+// parameter schemas, and external endpoints allow an agent to *do*: combining Untrusted Input
+// + Sensitive Access + External Egress creates an exfiltration path even in polite prose.
+// MCP self-declared annotations can raise risk when present, but never suppress name,
+// schema, REST toolbox, or off-origin URL signals.
 
-const UNTRUSTED_TOOL = /\b(fetch|scrape|browse|crawl|search_web|web_search|read_email|read_mail|get_emails|read_page|fetch_url|webhook_listen)\b/i;
-const SENSITIVE_TOOL = /\b(read_file|list_files|read_env|get_env|secrets|credentials|wallet|bank_account|payment_method|credit_card|order_history|inbox|messages|db_query|sql_query|private_data)\b/i;
-const SENSITIVE_PARAM = /\b(token|secret|password|passwd|cookie|session|auth_header|credential|api_key|private_key|ssh_key|ssn|iban)\b/i;
-const EGRESS_TOOL = /\b(http_post|send_email|send_message|post_message|webhook|exfil|upload|export_data|publish|write_file|push_data|transfer_funds)\b/i;
+function splitWords(value) {
+  return String(value || "")
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/[_\-./:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const UNTRUSTED_TOOL = /\b(?:fetch|scrape|browse|crawl|search web|web search|read emails?|read mails?|get emails?|read pages?|fetch url|webhook listen|receive webhook)\b/i;
+const SENSITIVE_TOOL = /\b(?:read files?|list files?|read env|get env|get config|read config|dump config|env(?:ironment)? settings?|env(?:ironment)? variables?|secrets?|credentials?|wallet|bank accounts?|payment methods?|credit cards?|order history|inbox|messages?|db query|sql query|private data)\b/i;
+const SENSITIVE_PARAM = /\b(?:token|secret|password|passwd|cookie|session|auth(?:orization)?|auth header|credential|api key|private key|ssh key|ssn|iban)\b/i;
+const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|credentials?|private files?|secret keys?|ssh keys?|access tokens?)\b/i;
+const EGRESS_TOOL = /\b(?:http post|send email|send message|post message|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|send telemetry)\b/i;
+const EGRESS_DESC = /\b(?:send webhook|telemetry payload|send telemetry|external webhook|post to external|exfiltrate|notify team)\b/i;
 
 /**
- * Analyze structural input, sensitivity, and egress capabilities across agents/tools.
+ * Analyze declared input, sensitivity, and egress capabilities across agents/tools.
  *
  * :param input.agents: Normalized agents/tools array from config.tools.
  * :param input.itinerary: Evaluated itinerary stops array (or Map values).
@@ -40,17 +53,19 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
   for (const agent of agents) {
     const name = agent.name || "agent";
     const ann = agent.annotations || {};
-    const toolId = String(name);
+    const toolWords = splitWords(name);
+    const descWords = splitWords([agent.function?.description, agent.instructions].filter(Boolean).join(" "));
+    const schemaInfo = collectSchemaInfo(agent.function?.parameters);
+    const agentToolHit = [...agentTools].some((t) => SENSITIVE_TOOL.test(splitWords(t)));
 
-    if (UNTRUSTED_TOOL.test(toolId) || (ann.openWorldHint === true && ann.readOnlyHint === true)) {
+    if (UNTRUSTED_TOOL.test(toolWords) || (ann.openWorldHint === true && ann.readOnlyHint === true)) {
       untrustedInput.push({ source: name, kind: "external_read", detail: `"${name}" ingests external/open-world content` });
     }
-    if (SENSITIVE_TOOL.test(toolId) || [...agentTools].some((t) => SENSITIVE_TOOL.test(t))) {
-      sensitiveAccess.push({ source: name, kind: "sensitive_tool", detail: `"${name}" accesses potentially sensitive data or files` });
+    if (SENSITIVE_TOOL.test(toolWords) || SENSITIVE_DESC.test(descWords) || SENSITIVE_DESC.test(schemaInfo.descWords) || agentToolHit) {
+      sensitiveAccess.push({ source: name, kind: "sensitive_tool", detail: `"${name}" accesses potentially sensitive data, config, or files` });
     }
 
-    const paramKeys = schemaPropertyNames(agent.function?.parameters);
-    const sensitiveParams = paramKeys.filter((k) => SENSITIVE_PARAM.test(k));
+    const sensitiveParams = schemaInfo.keys.filter((k) => SENSITIVE_PARAM.test(splitWords(k)));
     if (sensitiveParams.length) {
       sensitiveAccess.push({
         source: name,
@@ -59,8 +74,16 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
       });
     }
 
-    if (EGRESS_TOOL.test(toolId) || (ann.openWorldHint === true && ann.readOnlyHint === false) || ann.destructiveHint === true) {
-      externalEgress.push({ sink: name, kind: ann.destructiveHint ? "destructive_action" : "outbound_tool", detail: `"${name}" performs external or state-changing egress` });
+    // Hints can raise risk (e.g. destructiveHint: true or openWorld write), never lower or suppress
+    // name/description/URL/REST egress findings when a server lies about readOnlyHint/openWorldHint.
+    const hintRaisesEgress = ann.destructiveHint === true || (ann.openWorldHint === true && ann.readOnlyHint === false);
+    const toolExternalUrl = toolOffOriginUrl(agent, targetOrigin);
+    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl) {
+      externalEgress.push({
+        sink: toolExternalUrl || name,
+        kind: toolExternalUrl ? "external_endpoint" : ann.destructiveHint === true ? "destructive_action" : "outbound_tool",
+        detail: toolExternalUrl ? `"${name}" sends tool requests off-origin (${toolExternalUrl})` : `"${name}" performs external or state-changing egress`,
+      });
     }
 
     if (agent.toolbox && typeof agent.args?.url === "string") {
@@ -109,13 +132,11 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
   const secrets = uniq(sensitiveAccess);
   const egress = uniq(externalEgress);
 
-  // Only treat external egress as a Trifecta when there is concrete sensitive access
-  // (beyond generic caller prompts + external web fetches with zero sensitive reads).
+  // Only treat external egress as a Trifecta when there is concrete sensitive access.
   const concreteSensitive = secrets.filter((s) => s.kind === "private_context" || s.kind === "sensitive_tool" || s.kind === "sensitive_param");
   const concreteEgress = egress.filter((e) => e.kind !== "code_bundle");
 
-  // External stops + external partner calls make cross-origin exfiltration concrete.
-  const crossOriginEgress = concreteEgress.some((e) => externalStops.some((s) => e.sink === s.host) || e.kind === "rest_toolbox" || e.kind === "outbound_tool");
+  const crossOriginEgress = concreteEgress.some((e) => externalStops.some((s) => e.sink === s.host) || e.kind === "rest_toolbox" || e.kind === "outbound_tool" || e.kind === "external_endpoint");
   const trifecta = inputs.length > 0 && concreteSensitive.length > 0 && concreteEgress.length > 0 && (crossOriginEgress || protocol === "mcp");
 
   const paths = [];
@@ -144,20 +165,40 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
   };
 }
 
-function schemaPropertyNames(node, out = []) {
-  if (!node || typeof node !== "object") return out;
+function toolOffOriginUrl(agent, targetOrigin) {
+  const candidates = [];
+  if (typeof agent?.url === "string") candidates.push(agent.url);
+  for (const ref of agent?.tools || []) {
+    if (typeof ref === "string" && /^https?:\/\//i.test(ref)) candidates.push(ref);
+    else if (ref && typeof ref === "object" && typeof ref.url === "string") candidates.push(ref.url);
+  }
+  for (const raw of candidates) {
+    try {
+      const u = new URL(raw, targetOrigin || undefined);
+      if (/^https?:$/.test(u.protocol) && (!targetOrigin || u.origin !== targetOrigin)) return u.href;
+    } catch { /* ignore invalid */ }
+  }
+  return "";
+}
+
+function collectSchemaInfo(node, keys = [], descs = []) {
+  if (!node || typeof node !== "object") return { keys, descWords: splitWords(descs.join(" ")) };
   if (Array.isArray(node)) {
-    for (const item of node) schemaPropertyNames(item, out);
-    return out;
+    for (const item of node) collectSchemaInfo(item, keys, descs);
+    return { keys, descWords: splitWords(descs.join(" ")) };
   }
   if (node.properties && typeof node.properties === "object" && !Array.isArray(node.properties)) {
     for (const [k, v] of Object.entries(node.properties)) {
-      out.push(k);
-      schemaPropertyNames(v, out);
+      keys.push(k);
+      if (v && typeof v === "object") {
+        if (typeof v.title === "string") descs.push(v.title);
+        if (typeof v.description === "string") descs.push(v.description);
+      }
+      collectSchemaInfo(v, keys, descs);
     }
   }
   for (const [k, v] of Object.entries(node)) {
-    if (k !== "properties" && v && typeof v === "object") schemaPropertyNames(v, out);
+    if (k !== "properties" && v && typeof v === "object") collectSchemaInfo(v, keys, descs);
   }
-  return out;
+  return { keys, descWords: splitWords(descs.join(" ")) };
 }
