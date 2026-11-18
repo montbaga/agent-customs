@@ -13,7 +13,10 @@
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { findBrowser, openBrowser, sleep } from "./cdp.mjs";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
@@ -91,7 +94,7 @@ try {
   await element("hidden-sentence", "#hidden .moment-wrap", 900, 56);
 
   const inspect = async (label) => {
-    await b.evaluate(`[...document.querySelectorAll('#examples button')].find((x) => x.textContent.startsWith(${JSON.stringify(label)})).click()`);
+    await b.evaluate(`[...document.querySelectorAll('.example-list button')].find((x) => x.textContent.startsWith(${JSON.stringify(label)})).click()`);
     await b.waitFor("!document.querySelector('#report').hidden && document.querySelector('#inspect-button').textContent === 'Inspect a network'", 30000);
     await sleep(600);
     return b.evaluate("document.querySelector('.stamp strong')?.textContent");
@@ -112,6 +115,42 @@ try {
   await scrollTo("#workspace");
   await element("compare", ".desk-window", 1250);
 
+  // Phase 1: MCP Lethal Trifecta & capability flow
+  await b.evaluate("document.querySelector('#tab-report').click(); true");
+  const trifecta = await inspect("DevOps MCP");
+  expect(trifecta === "Held for review", `DevOps MCP report: expected "Held for review", got "${trifecta}"`);
+  await scrollTo("#report-section");
+  await element("phase1-mcp-trifecta", "#report", 1250);
+
+  // Phase 2: Verify signed receipt + live check
+  await b.evaluate("document.querySelector('#tab-verify').click(); true");
+  await b.waitFor("!document.querySelector('#verify-panel').hidden");
+  const { root: verifyRoot } = await b.send("DOM.getDocument", { depth: -1 });
+  const { nodeId: verifyInputId } = await b.send("DOM.querySelector", { nodeId: verifyRoot.nodeId, selector: "#verify-file" });
+  await b.send("DOM.setFileInputFiles", {
+    nodeId: verifyInputId,
+    files: [path.join(ROOT, "site/receipts/agent-customs-range.github.io/sunny_bakery/sunny_bakery.json")],
+  });
+  await b.waitFor("document.querySelectorAll('#verify-result .verify-card').length > 0 && !/Checking .* live/.test(document.querySelector('#verify-result .verify-live')?.textContent || '')", 20000);
+  await sleep(300);
+  await scrollTo("#workspace");
+  await element("phase2-verify", ".desk-window", 900);
+
+  // Phase 2 + 3: Attack lab + Agent Customs Bench scorecard
+  await b.waitFor("document.querySelectorAll('#arena-picks button').length > 0 && document.querySelectorAll('#bench-strip li').length === 4", 15000);
+  await scrollTo("#lab", -20);
+  await element("phase2-attack-lab", "#lab", 1250, 24);
+
+  // Phase 3: Builders card with CLI tab active
+  await b.evaluate("document.querySelector('[data-code-tab=\"cli\"]')?.click(); true");
+  await sleep(200);
+  await scrollTo("#guard", 0);
+  await element("phase3-builders", "#guard", 900, 0);
+  await b.evaluate("document.querySelector('[data-code-tab=\"site\"]')?.click(); true");
+
+  // Reset to Officer tab and Shady Pizza before scrolling to Officer notice test.
+  await b.evaluate("document.querySelector('#tab-report').click(); true");
+  await inspect("Shady Pizza");
   await b.evaluate("document.querySelector('#tab-officer').click(); true");
   await sleep(500);
   await scrollTo("#workspace");
