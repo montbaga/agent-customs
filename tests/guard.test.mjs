@@ -308,7 +308,7 @@ test("semantic AI judge is opt-in by default (deterministic, zero extra model ca
   assert.equal(judgeInvoked, 0, "default guard must not invoke AI semantic judge unless semanticJudge: true");
 });
 
-test("F11: MCP tool list pinning detects description changes on later listTools calls and drops tools", async () => {
+test("MCP tool list pinning detects description changes on later listTools calls and drops tools", async () => {
   const engine = new Engine({ originUrl: SITE, trace: new TraceBus() });
   const store = new PinStore(new MemoryStorage());
   const lockEvents = [];

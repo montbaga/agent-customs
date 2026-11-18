@@ -208,7 +208,7 @@ test("all Attack Lab scenarios execute against real analyzer, locks, canary, and
   assert.match(rugRun.protected.outcome, /Held for review/);
 });
 
-test("F1: guard arms the host system prompt with Lock 3 canary, catches dynamic offset exfiltration from messages[0], and restores on uninstall", async () => {
+test("guard arms the host system prompt with Lock 3 canary, catches dynamic offset exfiltration from messages[0], and restores on uninstall", async () => {
   const prevFetch = globalThis.fetch;
   globalThis.fetch = (url, init) => serve(url, init);
   try {
