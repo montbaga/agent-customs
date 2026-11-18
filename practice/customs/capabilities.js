@@ -16,67 +16,78 @@ function splitWords(value) {
 }
 
 const UNTRUSTED_TOOL = /\b(?:fetch|scrape|browse|crawl|search web|web search|read emails?|read mails?|get emails?|read pages?|fetch url|webhook listen|receive webhook)\b/i;
-const SENSITIVE_TOOL = /\b(?:read files?|list files?|read env|get env|get config|read config|dump config|env(?:ironment)? settings?|env(?:ironment)? variables?|secrets?|credentials?|wallet|bank accounts?|payment methods?|credit cards?|order history|inbox|(?:read|get|search|list)\s+(?:an?\s+)?emails?|(?:read|get|list|fetch|search|dump)\s+(?:private\s+|direct\s+|user\s+)?messages?|db query|sql query|private data)\b/i;
-const NON_VISITOR_TOOL_SECRET = /\b(?:(?:rotate|roll|revoke|verify|create|generate|regenerate|reset|set|update|delete)\s+(?:the\s+|your\s+|a\s+|an\s+)?(?:webhook|signing|forward|client|app|room)?\s*secrets?|(?:webhook|signing|forward)\s+secrets?)\b/i;
+const SENSITIVE_TOOL = /\b(?:read files?|list files?|read env|get env|get config|read config|dump config|env(?:ironment)? settings?|env(?:ironment)? variables?|secrets?|credentials?|(?<!\b(?:phone|sms)\s)wallet|bank accounts?|payment methods?|credit cards?|order history|inbox|(?:read|get|search|list)\s+(?:an?\s+)?emails?|(?:read|get|list|fetch|search|dump)\s+(?:private\s+|direct\s+|user\s+)?messages?|db query|sql query|private data)\b/i;
+const NON_VISITOR_TOOL_SECRET = /\b(?:(?:rotate|roll|revoke|renew|verify|create|generate|regenerate|reset|set|update|delete)\s+(?:the\s+|your\s+|a\s+|an\s+)?(?:webhook|signing|forward|client|app|room)?\s*secrets?|(?:webhook|signing|forward)\s+secrets?)\b/i;
+const CREDENTIAL_LIFECYCLE_ONLY = /\b(?:rotate|roll|revoke|renew|regenerate|reset)\b/i;
+const NO_SECRET_VALUES_RETURNED = /\bvalues?\s+(?:are|is)\s+write-?only\b[^.!?\n]{0,35}\bnever\s+(?:returned|exposed|readable)\b/i;
+const STORED_SECRET_AUDIT_RISK = /\b(?:users?|visitors?|customers?|members?|employees?|vault|all\s+credentials|\.env|passwords?)\b/i;
 const SENSITIVE_PARAM = /\b(?:tokens?|secrets?|passwords?|passwd|passcodes?|passphrases?|cookies?|session (?:cookie|secret|key|data|state)|auth(?:orization)?|auth header|credentials?|api key|private key|ssh key|ssn|iban)\b/i;
 const UNIVERSAL_SECRET_PARAM = /\b(?:passwords?|passwd|passcodes?|passphrases?|cookies?|session (?:cookie|secret|key)|auth code|private key|ssh key|ssn|iban)\b/i;
-const SECRET_COMPOUND_MODIFIER = /\b(?:access|auth(?:entication)?|bearer|refresh|oauth|id|api|secret|private|signing|user|visitor|account|client|personal|l402|bank|github|gitlab|twitter|google|aws|stripe|slack|discord|openai|anthropic|callrail|third[- ]party)\s+(?:token|credential|secret)s?\b/i;
-const CRYPTO_OR_TEMPLATE_TOKEN_DESC = /\b(?:coingecko|erc-?20|spl|solana|base:0x|0x\s*address|contract address|token address|symbol|ticker|mint|liquidity|swap|token substitutions?|design tokens?|template tokens?|brand colou?rs?|html references?|css tokens?)\b/i;
-const SERVER_HANDLE_PROVENANCE_DESC = /\b(?:returned|issued|generated|created|obtained|received|assigned|provided)\s+(?:by|from)\b|\bfrom\s+(?:create|register|signup|initialize|start|verify|get|request|publish|open|join|previous)_[a-z0-9_]+\b|\bfrom\s+(?:register(?:_agent)?|signup|a\s+previous\s+session|verify_?(?:payment|login))\b|\b(?:one[- ]time|single[- ]use)\b[^.]{0,30}\b(?:token|code)\b|\(\s*[a-z]{2,5}_[a-z0-9_….*-]{1,20}\s*[),]|\b(?:your|an?)\s+[a-z]{2,6}_\s+(?:api\s+)?(?:key|token)\b|\b(?:only\s+(?:if\s+you\s+have\s+no\s+app\s+sign-in|(?:needed\s+)?if\s+(?:your\s+client\s+|you\s+)?can(?:not|'?t)\s+(?:send|set)\b[^.]{0,40}\b(?:authorization|bearer|header)\b)|when\s+you\s+cannot\s+set\s+authorization\s+headers|never\s+send\s+this\s+key\s+to\s+any\s+host\s+except|optional\s+partner|partner\s+api\s+key)\b/i;
-const PASSWORD_GATE_DESC = /\b(?:password[- ]?gat(?:e|ing)|pass\s+(?:an?\s+)?empty\s+string\s+to\s+remove|optional\s+password\s+to\s+(?:protect|lock|gate))\b/i;
-const THIRD_PARTY_SERVICE_DESC = /\b(?:twitter|x\.com|github|gitlab|slack|discord|google|gmail|aws|azure|stripe|paypal|callrail|twilio|openai|anthropic|bank(?:ing)?)\b/i;
+const SECRET_COMPOUND_MODIFIER = /\b(?:access|auth(?:entication)?|bearer|refresh|oauth|id|api|secret|private|signing|user|visitor|account|client|personal|l402|third[- ]party)\s+(?:token|credential|secret)s?\b/i;
+const SAFE_OPAQUE_HANDLE_NAME = /^(?:delete|status|cancel|retry|page|pagination|cursor|next|prev|previous|idempotency|upload|download|lease|claim|approval|csrf|xsrf|webhook|signing)\s+(?:token|key|secret)$/i;
+const NON_SECRET_TOKEN_METRIC = /\btokens?\s+(?:budget|limit|cap|count|max|min|size|price|amount|decimals|saved)\b/i;
+const CRYPTO_OR_TEMPLATE_TOKEN_DESC = /\b(?:coingecko|erc-?20|spl|solana|base:0x|0x\s*address|contract address|token address|symbol|ticker|mint|liquidity|swap|swapping|dex aggregator|token swap|token substitutions?|design tokens?|template tokens?|brand colou?rs?|html references?|css tokens?)\b/i;
+const BARE_TOKEN_NONSECRET_CONTEXT = /\b(?:concurrency|e-?tag|precondition|css\s+custom|brand\s+kits?)\b/i;
+const OWN_SERVER_PROVENANCE_RE = /\b(?:returned|issued|generated|created|obtained|received|assigned|provided)\s+(?:by|from)\s+(?:this\s+(?:server|service|mcp|api)|a\s+(?:previous|prior)\s+(?:call|session|step))\b|\b(?:returned|received|obtained|copied)\s+(?:with|from|in)\s+(?:a|an|the)?\s*(?:previous|prior|earlier)?\s*(?:result|response|payload|call|retry\w*|creation|session)\b|\bfrom\s+(?:a|an|the)\s+(?:previous|prior|earlier|ready)\s+(?:result|response|payload|report)\b|\baccepted\s+and\s+ignored\b|\(\s*[a-z]{2,5}_[a-z0-9_….*-]{1,20}\s*[),]|\b(?:your|an?)\s+[a-z]{2,6}_\s+(?:api\s+)?(?:key|token)\b|\bauthorization\s*:\s*bearer\s+header\b|\boptional\s+(?:partner\s+)?api\s+key\b/i;
+const PASSWORD_GATE_DESC = /\boptional\s+password\s+to\b|\b(?:set|add|remove|clear|protect|lock|gate)\s+(?:a|an|this|the|optional)?\s*password\b[^.]{0,30}\b(?:page|site|link|url|file|room|document|pdf)\b|\bpassword[- ]?(?:gate|protect(?:ed)?)\s+(?:a|an|this|the)?\s*(?:page|site|link|url|file|room|document|pdf)\b/i;
+const PASSWORD_REUSE_RISK = /\b(?:same\s+password|reuse|online\s+bank|banking|e-?mail|account\s+password|existing\s+password)\b/i;
+const USER_OWNED_PARAM_DESC = /\b(?:user's|users'|visitor's|visitors'|customer's|customers'|guest's|guests'|(?:the|your)\s+(?:user|visitor|customer|guest)\b|(?:user|visitor|customer|guest)\s+account|their|dashboard)\b/i;
+const HANDLE_CREDENTIAL_RISK_DESC = /\b(?:password|passcode|login|bank|banking|wallet|exchange|e-?mail\s+account|third[- ]party)\b/i;
 
-function extractServerBrandTerms(targetOrigin, manifest) {
-  const out = new Set();
-  try {
-    const host = new URL(targetOrigin).hostname.toLowerCase();
-    for (const part of host.split(".")) {
-      if (part.length >= 3 && !/^(?:www|api|mcp|app|v1|v2|dev|docs|open|public|run|com|org|net|ai|io|co|uk)$/.test(part)) {
-        out.add(part);
-      }
-    }
-  } catch { /* ignore invalid */ }
-  for (const w of splitWords(manifest?.brand || "").split(" ")) {
-    if (w.length >= 3) out.add(w);
+function mentionsOwnToolProvenance(desc, ownToolNames) {
+  if (!desc || !ownToolNames.size) return false;
+  if (!/\b(?:from|by|via|call(?:ing)?|returned|issued|generated|created)\b/i.test(desc)) return false;
+  const lower = desc.toLowerCase();
+  const normalized = splitWords(desc);
+  for (const name of ownToolNames) {
+    if (name.length >= 4 && (lower.includes(name) || normalized.includes(splitWords(name)))) return true;
   }
-  return out;
+  return false;
 }
 
-function isSensitiveSchemaParam(key, description, toolWords, toolDescWords, serverBrandTerms) {
+function hasOwnServerProvenance(param, ownToolNames) {
+  const kw = splitWords(param.key);
+  if (!kw || !SENSITIVE_PARAM.test(kw) || UNIVERSAL_SECRET_PARAM.test(kw)) return false;
+  const desc = String(param.description || "");
+  return mentionsOwnToolProvenance(desc, ownToolNames)
+    || (OWN_SERVER_PROVENANCE_RE.test(desc) && !USER_OWNED_PARAM_DESC.test(desc));
+}
+
+function isSensitiveSchemaParam({ key, type, description }, toolWords, toolDescWords, ownToolNames, provenancedKeys) {
   const kw = splitWords(key);
   if (!kw || !SENSITIVE_PARAM.test(kw)) return false;
-  // Identifiers ending in _id / Id or OAuth/auth state params are object references or state tags.
+  if (type === "boolean") return false;
+  if ((type === "integer" || type === "number") && /\btokens?\b/i.test(kw)) return false;
+  if (NON_SECRET_TOKEN_METRIC.test(kw)) return false;
   if (/\bid$/i.test(kw) || /\b(?:auth )?state$/i.test(kw)) return false;
   if (/\bpasswords? (?:setup|reset|change|recovery|policy)(?: (?:link|url|page|token))?\b/i.test(kw)) return false;
   const desc = String(description || "");
-  if (PASSWORD_GATE_DESC.test(desc) && !/^(?:login|sign in|auth)/i.test(toolWords)) return false;
+  if (PASSWORD_GATE_DESC.test(desc) && !/^(?:login|sign in|auth)/i.test(toolWords) && !PASSWORD_REUSE_RISK.test(desc)) {
+    return false;
+  }
   if (UNIVERSAL_SECRET_PARAM.test(kw)) return true;
 
-  // Bare "auth" (e.g. exfil helper params) stays sensitive unless provenance proves otherwise.
-  const combinedDesc = `${desc} ${toolDescWords}`;
-  if (CRYPTO_OR_TEMPLATE_TOKEN_DESC.test(desc) || CRYPTO_OR_TEMPLATE_TOKEN_DESC.test(toolDescWords)) return false;
-  if (SERVER_HANDLE_PROVENANCE_DESC.test(desc) && !THIRD_PARTY_SERVICE_DESC.test(desc)) return false;
+  if (!SECRET_COMPOUND_MODIFIER.test(kw) && (CRYPTO_OR_TEMPLATE_TOKEN_DESC.test(desc) || CRYPTO_OR_TEMPLATE_TOKEN_DESC.test(toolDescWords))) {
+    return false;
+  }
+  if ((kw === "token" || kw === "tokens") && (BARE_TOKEN_NONSECRET_CONTEXT.test(desc) || BARE_TOKEN_NONSECRET_CONTEXT.test(toolDescWords))) {
+    return false;
+  }
+  if (mentionsOwnToolProvenance(desc, ownToolNames)) return false;
+  if (OWN_SERVER_PROVENANCE_RE.test(desc) && !USER_OWNED_PARAM_DESC.test(desc)) return false;
+  if (!desc.trim() && provenancedKeys.has(kw)) return false;
 
   // Plural "tokens" (CSS/template/UI/LLM token counts) is not a secret unless explicitly a secret modifier.
   if (/\btokens$/i.test(kw) && !SECRET_COMPOUND_MODIFIER.test(kw)) return false;
 
-  // Compound "<object> token / credential / secret" (guestToken, leaseToken, room_credential, etc.)
-  // is treated as an opaque handle unless it carries a recognized credential modifier.
-  if (/\b\w+\s+(?:token|credential|secret)s?$/i.test(kw) && !SECRET_COMPOUND_MODIFIER.test(kw)) {
+  // Only explicitly known lifecycle/pagination handles are exempt; unknown <service>_token/secret/credential
+  // fails closed unless provenance proved it came from one of this server's own tools.
+  if (SAFE_OPAQUE_HANDLE_NAME.test(kw) && !HANDLE_CREDENTIAL_RISK_DESC.test(desc)) {
     return false;
-  }
-
-  // Own-service account API keys (named after the server or explicitly own-account signup) are not third-party secrets.
-  if (/^api ?key$/i.test(kw) && !THIRD_PARTY_SERVICE_DESC.test(combinedDesc)) {
-    const dl = desc.toLowerCase();
-    for (const brand of serverBrandTerms) {
-      if (dl.includes(brand)) return false;
-    }
-    if (SERVER_HANDLE_PROVENANCE_DESC.test(desc)) return false;
   }
   return true;
 }
-const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|access tokens?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|config(?:uration)?\s+files?|private\s+data))\b/i;
+const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|access\s+tokens?|config(?:uration)?\s+files?|private\s+data))\b/i;
 const EGRESS_TOOL = /\b(?:http post|send email|send message|post message|send reply|send to|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|transfer domain|domain transfer|send telemetry)\b/i;
 const EGRESS_PARAM_URL = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient)\s*(?:url|uri|webhook|hook|email))\b/i;
 const EGRESS_PARAM_WEAK = /\b(?:destination|recipient|endpoint|callback|forward\s*to)\b/i;
@@ -103,7 +114,17 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
   const externalStops = [...itinerary].filter((s) => !s.sameSite && s.contacted);
   const openPolicy = (manifest?.peer_policy || manifest?.web_policy)?.mode === "open";
   const agentTools = new Set(manifest?.actions?.agentTools || []);
-  const serverBrandTerms = extractServerBrandTerms(targetOrigin, manifest);
+  const ownToolNames = new Set(agents.map((a) => String(a?.name || "").toLowerCase()).filter(Boolean));
+  const EGRESS_HINT_TOOL = /\b(?:post|send|share|publish|submit|upload|export|transfer|forward|relay|notify|broadcast|webhook|e-?mail|exfil|transmit|dispatch|push)\b/i;
+  const EGRESS_HINT_DESC = /\b(?:send|sends|post|posts|share|shares|publish|publishes|upload|uploads|export|exports|transfer|transfers|forward|forwards|relay|relays|notify|notifies|broadcast|broadcasts|transmit|transmits|e-?mail|e-?mails)\s+(?:a|an|the|this|given|your|user|external|it|data|text|message|report|file|content|to)\b/i;
+
+  const toolSchemas = agents.map((agent) => collectSchemaInfo(agent.function?.parameters));
+  const provenancedKeys = new Set();
+  for (const schemaInfo of toolSchemas) {
+    for (const param of schemaInfo.paramSpecs) {
+      if (hasOwnServerProvenance(param, ownToolNames)) provenancedKeys.add(splitWords(param.key));
+    }
+  }
 
   // Front agent receives arbitrary caller/user text or partner outputs.
   if (frontMan) {
@@ -112,24 +133,30 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
     untrustedInput.push({ source: agents[0].name || "entry", kind: "tool_input", detail: "Exposes tool inputs reachable by a model" });
   }
 
-  for (const agent of agents) {
+  for (let i = 0; i < agents.length; i++) {
+    const agent = agents[i];
     const name = agent.name || "agent";
     const ann = agent.annotations || {};
     const toolWords = splitWords(name);
     const descWords = splitWords([agent.function?.description, agent.instructions].filter(Boolean).join(" "));
-    const schemaInfo = collectSchemaInfo(agent.function?.parameters);
+    const schemaInfo = toolSchemas[i];
     const agentToolHit = [...agentTools].some((t) => SENSITIVE_TOOL.test(splitWords(t)));
 
     if (UNTRUSTED_TOOL.test(toolWords) || (ann.openWorldHint === true && ann.readOnlyHint === true)) {
       untrustedInput.push({ source: name, kind: "external_read", detail: `"${name}" ingests external/open-world content` });
     }
-    const sensitiveToolName = SENSITIVE_TOOL.test(toolWords) && !NON_VISITOR_TOOL_SECRET.test(toolWords);
+    const sensitiveMatch = toolWords.match(SENSITIVE_TOOL);
+    const onlyOwnCredentialLifecycle = sensitiveMatch
+      && /^(?:secrets?|credentials?)$/i.test(sensitiveMatch[0])
+      && ((CREDENTIAL_LIFECYCLE_ONLY.test(`${toolWords} ${descWords}`) && !STORED_SECRET_AUDIT_RISK.test(`${toolWords} ${descWords}`))
+        || (ann.readOnlyHint === true && NO_SECRET_VALUES_RETURNED.test(descWords)));
+    const sensitiveToolName = Boolean(sensitiveMatch) && !NON_VISITOR_TOOL_SECRET.test(toolWords) && !onlyOwnCredentialLifecycle;
     if (sensitiveToolName || SENSITIVE_DESC.test(descWords) || SENSITIVE_DESC.test(schemaInfo.descWords) || agentToolHit) {
       sensitiveAccess.push({ source: name, kind: "sensitive_tool", detail: `"${name}" accesses potentially sensitive data, config, or files` });
     }
 
     const sensitiveParams = schemaInfo.paramSpecs
-      .filter(({ key, description }) => isSensitiveSchemaParam(key, description, toolWords, descWords, serverBrandTerms))
+      .filter((param) => isSensitiveSchemaParam(param, toolWords, descWords, ownToolNames, provenancedKeys))
       .map((p) => p.key);
     if (sensitiveParams.length) {
       sensitiveAccess.push({
@@ -139,9 +166,9 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
       });
     }
 
-    // Self-declared annotations alone (readOnlyHint/openWorldHint/destructiveHint) never suppress
-    // real egress findings, nor turn local server CRUD into an external exfiltration trifecta;
-    // destructiveHint is surfaced separately by M-DESTRUCTIVE.
+    // Hints may raise risk (openWorld mutating tools with sharing/outbound semantics), never lower concrete findings.
+    const hintRaisesEgress = ann.openWorldHint === true && ann.readOnlyHint === false
+      && (EGRESS_HINT_TOOL.test(toolWords) || EGRESS_HINT_DESC.test(descWords));
     const toolExternalUrl = toolOffOriginUrl(agent, targetOrigin);
     const egressParams = schemaInfo.paramSpecs.filter(({ key, format, description }) => {
       const kw = splitWords(key);
@@ -152,7 +179,7 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
       }
       return false;
     }).map((p) => p.key);
-    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || toolExternalUrl || egressParams.length) {
+    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length) {
       externalEgress.push({
         sink: toolExternalUrl || (egressParams.length ? `${name}(${egressParams[0]})` : name),
         kind: toolExternalUrl ? "external_endpoint" : egressParams.length ? "egress_param" : "outbound_tool",
@@ -271,9 +298,9 @@ function collectSchemaInfo(node, keys = [], descs = [], paramSpecs = []) {
       if (v && typeof v === "object") {
         if (typeof v.title === "string") descs.push(v.title);
         if (typeof v.description === "string") descs.push(v.description);
-        paramSpecs.push({ key: k, format: v.format || "", description: v.description || "" });
+        paramSpecs.push({ key: k, type: String(v.type || "").toLowerCase(), format: v.format || "", description: v.description || "" });
       } else {
-        paramSpecs.push({ key: k, format: "", description: "" });
+        paramSpecs.push({ key: k, type: "", format: "", description: "" });
       }
       collectSchemaInfo(v, keys, descs, paramSpecs);
     }

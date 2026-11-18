@@ -234,12 +234,16 @@ const SENTENCE_END = /[.!?;]+(?=\s|$)|[。！？；؟।\n]+/u;
 const PARA_END = /[.!?;]+(?=\s|$)|[。！？；؟।]+|\n\s*\n+|\n(?=\s*(?:[-*•+]|\d+[.)]|#)\s)/u;
 
 function maskAbbreviations(text) {
-  const dots = [];
-  const masked = text.replace(ABBREV_DOT, (m) => {
-    dots.push(m);
-    return `\u0000ABBR${dots.length - 1}\u0000`;
-  });
-  return { masked, unmask: (s) => s.replace(/\u0000ABBR(\d+)\u0000/g, (_, i) => dots[Number(i)]) };
+  const saved = [];
+  const hold = (m) => {
+    saved.push(m);
+    return `\u0000ABBR${saved.length - 1}\u0000`;
+  };
+  let masked = text.replace(/\([^()\n]{1,80}\)/g, (paren) =>
+    /\./.test(paren) ? paren.replace(/\.(?=\s)/g, hold) : paren,
+  );
+  masked = masked.replace(ABBREV_DOT, hold);
+  return { masked, unmask: (s) => s.replace(/\u0000ABBR(\d+)\u0000/g, (_, i) => saved[Number(i)]) };
 }
 
 function sentences(text) {
@@ -277,6 +281,129 @@ export function foreignSecretRequests(normalized) {
     }
   }
   return hits;
+}
+
+const hostileSeq = (verbs, objects, gap = 60) =>
+  new RegExp(`${EDGE_BEFORE}(?:${verbs})${EDGE_AFTER}[^.!?\n]{0,${gap}}${EDGE_BEFORE}(?:${objects})${EDGE_AFTER}`, "iu");
+
+// Takeover, conversation-exfil, and download-and-run orders across the 10 checked languages plus
+// Turkish and Polish (for tool/parameter descriptions where plain C-LANGUAGE is CONDITIONS).
+const HOSTILE_ACTION_LANGUAGES = [
+  {
+    name: "German",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "de").negations,
+    override: hostileSeq("ignorier\\p{L}*|missacht\\p{L}*|vergiss|vergesst|vergessen|[uü]berschreib\\p{L}*|aufheb\\p{L}*|umgeh\\p{L}*", "anweisung\\p{L}*|regel\\p{L}*|vorgabe\\p{L}*|richtlinie\\p{L}*|systemprompt\\p{L}*|instruktion\\p{L}*", 55),
+    exfil: hostileSeq("send\\p{L}*|schick\\p{L}*|[uü]bermittel\\p{L}*|weiterleit\\p{L}*|kopier\\p{L}*|f[uü]g\\p{L}*", "chatverlauf\\p{L}*|gespr[aä]chsverlauf\\p{L}*|verlauf|systemprompt\\p{L}*|unterhaltung\\p{L}*|konversation\\p{L}*"),
+    exec: hostileSeq("herunterladen|runterladen|lad\\p{L}*\\s+herunter|installier\\p{L}*", "ausf[uü]hr\\p{L}*|start(?:e|en|est)?"),
+  },
+  {
+    name: "Spanish",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "es").negations,
+    override: hostileSeq("ignora\\p{L}*|desestima\\p{L}*|olvida\\p{L}*|anula\\p{L}*|salt\\p{L}*", "instrucci[oó]n\\p{L}*|reglas?|directrices|pautas|indicaci[oó]n\\p{L}*", 55),
+    exfil: hostileSeq("env[ií][ae]\\p{L}*|manda\\p{L}*|reenv[ií]\\p{L}*|incluy\\p{L}*|adjunt\\p{L}*|compart\\p{L}*|filtr\\p{L}*", "historial(?:\\s+del?\\s+chat)?|conversaci[oó]n|mensajes?\\s+del\\s+(?:usuario|visitante)|prompt\\s+del\\s+sistema"),
+    exec: hostileSeq("descarg\\p{L}*|instal(?:a|e|ar)", "ejecut\\p{L}*|abr(?:e|ir|a)"),
+  },
+  {
+    name: "French",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "fr").negations,
+    override: hostileSeq("ignor(?:ez|er|e(?:\\s+(?:les?|toutes?|ces?|vos?|tes?)))|oubli\\p{L}*|outrepass\\p{L}*|annul\\p{L}*|contourn\\p{L}*", "(?:les?\\s+|toutes?\\s+(?:les\\s+)?)?instructions?|r[eè]gles?|consignes?|directives?|(?:le|ce|ton|votre)\\s+prompt", 55),
+    exfil: hostileSeq("envoi\\p{L}*|envoy\\p{L}*|transmet\\p{L}*|partage\\p{L}*|copi\\p{L}*", "historique(?:\\s+(?:du\\s+)?chat)?|conversation|prompt\\s+syst[eè]me"),
+    exec: hostileSeq("t[eé]l[eé]charg\\p{L}*|installe(?:r|z)", "ex[eé]cut(?:er|ez|e\\s+(?:le|la|ce|un))|lanc(?:er|ez)"),
+  },
+  {
+    name: "Portuguese",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "pt").negations,
+    override: hostileSeq("ignor\\p{L}*|esque[cç]\\p{L}*|anul\\p{L}*|desconsider\\p{L}*", "instru[cç][oõ]es|regras?|diretrizes|comandos", 55),
+    exfil: hostileSeq("envi\\p{L}*|mand\\p{L}*|compartilh\\p{L}*|encaminh\\p{L}*|copi\\p{L}*", "hist[oó]rico(?:\\s+d[oa]\\s+(?:chat|conversa))?|conversa|prompt\\s+do\\s+sistema"),
+    exec: hostileSeq("baix\\p{L}*|descarreg\\p{L}*|instal(?:e|ar|a)", "execut(?:e|ar|a)|rod(?:e|ar|a)"),
+  },
+  {
+    name: "Italian",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "it").negations,
+    override: hostileSeq("ignor(?:a|i|are)|dimentic\\p{L}*|annull\\p{L}*|aggir\\p{L}*", "istruzioni|regole|direttive|(?:il|questo|tuo|vostro)\\s+prompt", 55),
+    exfil: hostileSeq("invi\\p{L}*|mand\\p{L}*|inoltr\\p{L}*|condivid\\p{L}*", "cronologia|storico(?:\\s+(?:della\\s+)?chat)?|conversazione|prompt\\s+di\\s+sistema"),
+    exec: hostileSeq("scaric\\p{L}*|install(?:a|are|i)", "esegu\\p{L}*|avvi\\p{L}*"),
+  },
+  {
+    name: "Polish",
+    negations: [words("nie", "nigdy", "bez", "zakaz", "unikaj")],
+    override: hostileSeq("zignoruj\\p{L}*|ignoruj\\p{L}*|pomi[nń]\\p{L}*|zapomnij\\p{L}*|nadpisz\\p{L}*", "instrukcj\\p{L}*|zasad\\p{L}*|regu[lł]\\p{L}*|poleceni\\p{L}*|wytyczn\\p{L}*", 55),
+    exfil: hostileSeq("wy[sś]lij\\p{L}*|prze[sś]lij\\p{L}*|przekaz\\p{L}*|udost[eę]pnij\\p{L}*|do[lł][aą]cz\\p{L}*", "histori[eęaą](?:\\s+(?:rozmow\\p{L}*|czat\\p{L}*))?|czat\\p{L}*|konwersacj\\p{L}*|prompt\\p{L}*"),
+    exec: hostileSeq("pobierz\\p{L}*|zainstaluj\\p{L}*", "uruchom\\p{L}*|wykonaj\\p{L}*"),
+  },
+  {
+    name: "Turkish",
+    negations: [words("de[gğ]il", "asla", "hi[cç]", "sak[iı]n", "yasak", "olmadan")],
+    override: hostileSeq("yok\\s*say\\p{L}*|g[oö]rmezden\\s+gel\\p{L}*|unut\\p{L}*|ge[cç]ersiz\\s+k[iı]l\\p{L}*", "talimat\\p{L}*|kural\\p{L}*|y[oö]nerge\\p{L}*", 55),
+    exfil: hostileSeq("g[oö]nder\\p{L}*|ilet\\p{L}*|aktar\\p{L}*|payla[sş]\\p{L}*", "sohbet\\s+ge[cç]mi[sş]\\p{L}*|konu[sş]ma\\s+ge[cç]mi[sş]\\p{L}*|sistem\\s+istem\\p{L}*"),
+    exec: hostileSeq("indir(?:ip)?|y[uü]kle(?:yip)?", "[cç]al[iı][sş]t[iı]r\\p{L}*|y[uü]r[uü]t\\p{L}*"),
+  },
+  {
+    name: "Russian",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "ru").negations,
+    override: hostileSeq("игнорируй\\p{L}*|проигнорируй\\p{L}*|забудь\\p{L}*|отмени\\p{L}*", "инструкц\\p{L}*|правил\\p{L}*|указан\\p{L}*|системн\\p{L}*\\s+пром\\p{L}*", 55),
+    exfil: hostileSeq("отправь\\p{L}*|перешли\\p{L}*|слей\\p{L}*", "истори\\p{L}*\\s+(?:чат\\p{L}*|переписк\\p{L}*|диалог\\p{L}*)|системн\\p{L}*\\s+пром\\p{L}*"),
+    exec: hostileSeq("скачай\\p{L}*|загрузи\\p{L}*|установи\\p{L}*", "запусти\\p{L}*|выполни\\p{L}*"),
+  },
+  {
+    name: "Chinese",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "zh").negations,
+    override: /(?:忽略|无视|無視|忘记|忘記|覆盖|覆蓋).{0,20}(?:指令|指示|规则|規則|提示词|提示詞)/iu,
+    exfil: /(?:发送|發送|转发|轉發|传给|傳給|泄露|洩露).{0,24}(?:聊天记录|聊天記錄|对话历史|對話歷史|系统提示|系統提示)/iu,
+    exec: /(?:下载|下載|安装|安裝).{0,24}(?:运行|運行|执行|執行)/iu,
+  },
+  {
+    name: "Japanese",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "ja").negations,
+    override: /(?:指示|ルール|システムプロンプト).{0,20}(?:無視|忘れ)/iu,
+    exfil: /(?:会話履歴|チャット履歴|プロンプト).{0,20}(?:送信|転送|送っ)/iu,
+    exec: /(?:ダウンロード|インストール).{0,24}(?:実行|起動)/iu,
+  },
+  {
+    name: "Hindi",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "hi").negations,
+    override: /(?:निर्देशों|नियमों).{0,24}(?:अनदेखा|भूल|नज़रअंदाज़)/iu,
+    exfil: /(?:चैट\s+इतिहास|वार्तालाप|सिस्टम\s+प्रॉम्प्ट).{0,24}(?:भेजें|साझा)/iu,
+    exec: /(?:डाउनलोड|इंस्टॉल).{0,24}(?:चलाएं|निष्पादित)/iu,
+  },
+  {
+    name: "Arabic",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "ar").negations,
+    override: /(?:تجاهل|انسَ|انسى).{0,24}(?:التعليمات|القواعد|الأوامر)/iu,
+    exfil: /(?:أرسل|ارسل|مرر).{0,24}(?:سجل\s+المحادثة|المحادثة|موجه\s+النظام)/iu,
+    exec: /(?:نز[ّ]?ل|حم[ّ]?ل|ثب[ّ]?ت).{0,24}(?:شغ[ّ]?ل|نف[ّ]?ذ)/iu,
+  },
+];
+
+export function foreignHostileRequests(normalized, kind) {
+  const hits = [];
+  const seen = new Set();
+  for (const rawSentence of [...sentences(normalized), ...wrappedSentences(normalized)]) {
+    const joined = rawSentence.replace(/[()[\]]/g, " ").replace(/\s+/g, " ").trim();
+    for (const candidate of joined === rawSentence ? [rawSentence] : [rawSentence, joined]) {
+      for (const lang of HOSTILE_ACTION_LANGUAGES) {
+        const re = lang[kind];
+        if (!re) continue;
+        const m = candidate.match(re);
+        if (!m) continue;
+        if (lang.negations.some((nre) => nre.test(candidate))) continue;
+        if (seen.has(rawSentence)) break;
+        seen.add(rawSentence);
+        hits.push({ match: m[0], excerpt: rawSentence, language: lang.name });
+        break;
+      }
+    }
+  }
+  return hits;
+}
+
+function hasForeignHostileText(chunk) {
+  if (!chunk) return false;
+  if (foreignSecretRequests(chunk).length) return true;
+  for (const lang of HOSTILE_ACTION_LANGUAGES) {
+    if (lang.override?.test(chunk) || lang.exfil?.test(chunk) || lang.exec?.test(chunk)) return true;
+  }
+  return false;
 }
 
 // ---- Which language a sentence is in --------------------------------------------
@@ -378,24 +505,46 @@ function looksLikeList(sentence) {
 }
 
 function extractProse(sentence) {
-  // "I'm", "don't", "we're": the ending is part of an English word, not a word of its own.
-  const cleaned = sentence.replace(NOT_WORDS, " ").replace(/'(?:m|s|t|re|ve|ll|d)\b/gi, "");
+  // Expand English n't contractions and strip 's/'m/'re/'ve/'ll/'d endings so contractions count as English.
+  const cleaned = sentence.replace(NOT_WORDS, " ")
+    .replace(/\bcan't\b/gi, "can")
+    .replace(/\bwon't\b/gi, "will")
+    .replace(/\b([a-z]+)n't\b/gi, "$1")
+    .replace(/'(?:m|s|t|re|ve|ll|d)\b/gi, "");
   const prose = cleaned.split(/\s+/).map((c) => c.replace(OUTER_PUNCT, "")).filter((c) => c && !CODE_CHUNK.test(c)).join(" ");
   const tokens = [...prose.matchAll(LATIN_WORD)].map((m) => m[0]);
   return { cleaned, tokens, latin: tokens.map((w) => w.toLowerCase()) };
 }
 
 function stripInlineExamples(sentence) {
-  let out = sentence.replace(/\([^()\n]{1,60}\)/g, (m) => {
-    const words = m.slice(1, -1).trim().split(/\s+/).filter(Boolean);
-    return words.length <= 5 ? " " : m;
+  let parenGroups = 0;
+  let parenWords = 0;
+  const afterParens = sentence.replace(/\([^()\n]{1,70}\)/g, (m) => {
+    const inner = m.slice(1, -1).trim();
+    if (/https?:\/\//i.test(inner) || hasForeignHostileText(inner)) return m;
+    const words = inner.split(/\s+/).filter(Boolean);
+    if (words.length > 5) return m;
+    parenGroups += 1;
+    parenWords += words.length;
+    return " ";
   });
-  out = out.replace(/"[^"\n]{1,40}"|'[^'\n]{1,40}'|«[^»\n]{1,40}»/g, (m) => {
-    const words = [...m.slice(1, -1).matchAll(LATIN_WORD)];
-    return words.length <= 2 ? " " : m;
+  let out = parenGroups <= 2 && parenWords <= 6 ? afterParens : sentence;
+
+  let quoteGroups = 0;
+  let quoteWords = 0;
+  const afterQuotes = out.replace(/"[^"\n]{1,90}"|'[^'\n]{1,90}'|«[^»\n]{1,90}»/g, (m) => {
+    const inner = m.slice(1, -1).trim();
+    if (/https?:\/\//i.test(inner) || hasForeignHostileText(inner)) return m;
+    const words = [...inner.matchAll(LATIN_WORD)];
+    if (words.length > 8) return m;
+    quoteGroups += 1;
+    quoteWords += words.length;
+    return " ";
   });
-  return out;
+  return quoteGroups <= 2 && quoteWords <= 8 ? afterQuotes : out;
 }
+
+const QUOTED_TOOL_EXAMPLE_LINE = /^\s*(?:[-*•>→]+\s*)?(['"])([^'"\n]{1,100})\1\s*(?:→|->|=>|:)\s*[a-z_][a-z0-9_]*\s*\(/i;
 
 /**
  * The language a sentence is written in, when it is not clearly English.
@@ -427,8 +576,18 @@ export function otherLanguageOf(sentence) {
   if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
   if (best && best.units >= 3) return best.name;
 
-  // If short parenthetical glosses (<= 5 words) or short quoted examples (<= 2 words) sit
-  // inside a clearly ASCII English phrase, judge the outer English sentence rather than its glosses.
+  // A short quoted sample query (<= 8 words) pointing at a tool call in English documentation is not foreign instructions.
+  const qm = sentence.match(QUOTED_TOOL_EXAMPLE_LINE);
+  if (qm) {
+    const qInner = qm[2].trim();
+    const qWords = qInner.split(/\s+/).filter(Boolean);
+    if (qWords.length <= 8 && !hasForeignHostileText(qInner) && !/https?:\/\//i.test(qInner)) {
+      return null;
+    }
+  }
+
+  // If benign short parenthetical glosses or short quoted examples sit inside a clearly ASCII
+  // English phrase, judge the outer English sentence rather than its glosses/examples.
   const withoutExamples = stripInlineExamples(sentence);
   if (withoutExamples !== sentence) {
     const outer = extractProse(withoutExamples);

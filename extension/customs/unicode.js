@@ -340,15 +340,11 @@ export function findMixedScriptWords(text) {
   if (typeof text !== "string" || !text) return [];
   const found = [];
   const tokens = text.split(/[\s_\-./:]+/u).filter(Boolean);
-  const latinWords = tokens.filter((w) => /\p{Script=Latin}/u.test(w) && !HAS_CONFUSABLE_SCRIPT.test(w)).length;
-  for (const word of tokens) {
-    if (/\p{Script=Latin}/u.test(word)) {
-      const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
-      if (scripts.length) found.push({ word, scripts });
-    } else if (latinWords >= 2 && isAllConfusableLetters(word) && HAS_CONFUSABLE_SCRIPT.test(word)) {
-      const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
-      if (scripts.length) found.push({ word, scripts });
-    }
+  for (const raw of tokens) {
+    const word = raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    if (!word || !/\p{Script=Latin}/u.test(word)) continue;
+    const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
+    if (scripts.length) found.push({ word, scripts });
   }
   // Fullwidth Latin letters (Ｐａｙ) and Mathematical styled letters (𝐩𝐚𝐬𝐬) look like ASCII.
   if (/[Ａ-Ｚａ-ｚ]/u.test(text)) found.push({ word: text, scripts: ["Fullwidth Latin"] });
