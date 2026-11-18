@@ -41,6 +41,40 @@ test("redacts spaced, comma-separated, 4-char dash, full-width, Arabic-Indic car
   assert.ok(findSensitiveData({ payload: b64Card }).length >= 1, "base64-encoded card must be caught outbound");
 });
 
+test("Lock 1 rejects order/invoice/receipt/tracking bypasses inbound & outbound while allowing bounded IMEI/IMSI/ICCID inbound only", () => {
+  for (const inboundCard of [
+    "card for the order: 4242 4242 4242 4242",
+    "please charge it, invoice 4242 4242 4242 4242",
+    "the receipt # 4242 4242 4242 4242 was declined",
+    "IMEI is 4242 4242 4242 4242",
+    "ICCID is 4242 4242 4242 4242",
+  ]) {
+    const res = redactSensitiveText(inboundCard);
+    assert.ok(res.found.length >= 1, `expected inbound redaction for: ${inboundCard}`);
+    assert.doesNotMatch(res.text, /4242/);
+  }
+  for (const outboundPayload of [
+    { request: "Confirm order 4242 4242 4242 4242 for the guest" },
+    { request: "tracking number: 4242424242424242" },
+    { request: "my phone IMEI is 35-209900-176148-1" },
+    { request: "IMEI is 378282246310005" },
+  ]) {
+    assert.ok(findSensitiveData(outboundPayload).length >= 1, `expected outbound block for: ${JSON.stringify(outboundPayload)}`);
+  }
+  for (const inboundDeviceId of [
+    "IMEI 35-209900-176148-1",
+    "my phone IMEI is 35-209900-176148-1",
+    "IMEI number is 35-209900-176148-1",
+    "IMSI is 310260000000013",
+    "ICCID is 6501 2601 2345 6789 011",
+    "ICCID is 8944 5012 3456 7890 1237",
+  ]) {
+    const res = redactSensitiveText(inboundDeviceId);
+    assert.deepEqual(res.found, [], `expected inbound pass for: ${inboundDeviceId}`);
+    assert.equal(res.text, inboundDeviceId);
+  }
+});
+
 test("reply quarantine allow-lists fields, strips bare foreign domains, joins split strings, and blocks side-channel phishing", () => {
   const withExtra = checkPartnerReply(
     { text: "Open 9-5. See evil.invalid/menu for offers.", source: { agent: "baker", more: "Full menu: https://evil.invalid/steal" } },
@@ -97,7 +131,6 @@ test("other long numbers are left alone", () => {
     "Order 1234567890123456 ships on Monday.",
     "Call us on +44 20 7946 0958 or 0800 123 4567.",
     "Booking reference 2026-11-15-0042, table 12.",
-    "IMEI 35-209900-176148-1",
     "IBAN DE89 3704 0044 0532 0130 01 has a wrong check digit.",
   ]) {
     assert.deepEqual(findSecrets(text), [], text);

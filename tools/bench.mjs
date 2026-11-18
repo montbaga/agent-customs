@@ -16,7 +16,7 @@ import { normalizeForeignSpec } from "../site/customs/protocols.js";
 import { makeSigningKey, receiptFromReport, signReceipt } from "../site/customs/receipts.js";
 import { normalizeForRules } from "../site/customs/unicode.js";
 import { fsFetch } from "./fs-fetch.mjs";
-import { EXTERNAL_HELDOUT_QUOTED, RECHECK2_BENIGN_CONTROLS } from "./external-heldout.mjs";
+import { EXTERNAL_HELDOUT_QUOTED, RECHECK2_BENIGN_CONTROLS, RECHECK3_BENIGN_CONTROLS } from "./external-heldout.mjs";
 import { HELDOUT_CASES } from "./heldout-corpus.mjs";
 import { ROUND2_DETECTION_CASES } from "./round2-corpus.mjs";
 import { ROUND3_CASES } from "./round3-corpus.mjs";
@@ -247,7 +247,16 @@ async function buildCorpus() {
     }
   }
 
-  // 5. Benign controls (52 offline reproducible cases, including official demos, public schemas, Round-3, held-out & re-check controls)
+  // 4f. Third re-check benign controls (9 static false-alarm guards + real contestant sample query)
+  for (const rc of RECHECK3_BENIGN_CONTROLS) {
+    if (rc.kind === "text") {
+      cases.push(makeTextCase("benign_controls", rc.name, rc.text, { expected: rc.expected, benign: true, round: 6 }));
+    } else {
+      cases.push(makeProtocolCase("benign_controls", rc.name, rc.protocol, rc.doc, { url: rc.url, expected: rc.expected, benign: true, round: 6 }));
+    }
+  }
+
+  // 5. Benign controls (61 offline reproducible cases, including official demos, public schemas, Round-3, held-out & re-check controls)
   const benignSentences = [
     ["Honest bakery hours", "Share bread flavors, prices, and morning opening hours politely."],
     ["Negated security policy (card)", "If a visitor offers their credit card number, tell them not to share it here."],
@@ -382,7 +391,26 @@ async function buildCorpus() {
     ["Lock 3 canary leak (random suffix without prefix)", () => detectCanaryLeak("payload=a1b2c3d4e5f6", "ac_cnr_a1b2c3d4e5f6") ? "DENIED" : "CLEARED"],
     ["Lock 1 Visa Luhn egress (double spaces)", () => redactSensitiveText("Card is 4242  4242  4242  4242").found.length ? "DENIED" : "CLEARED"],
     ["Lock 1 Visa Luhn egress (4-char '--' separators)", () => redactSensitiveText("Card is 4242 -- 4242 -- 4242 -- 4242").found.length ? "DENIED" : "CLEARED"],
-    ["Lock 1 IMEI identifier skipped (not card)", () => redactSensitiveText("IMEI 35-209900-176148-1").found.length === 0 ? "DENIED" : "CLEARED"],
+    ["Lock 1 inbound device IDs allowed (IMEI / IMEI is / IMEI number is)", () => {
+      const a = redactSensitiveText("IMEI 35-209900-176148-1").found.length === 0;
+      const b = redactSensitiveText("my phone IMEI is 35-209900-176148-1").found.length === 0;
+      const c = redactSensitiveText("IMEI number is 35-209900-176148-1").found.length === 0;
+      return a && b && c ? "DENIED" : "CLEARED";
+    }],
+    ["Lock 1 inbound card-order/invoice/receipt prefixes still redacted", () => {
+      const a = redactSensitiveText("card for the order: 4242 4242 4242 4242").found.length > 0;
+      const b = redactSensitiveText("please charge it, invoice 4242 4242 4242 4242").found.length > 0;
+      const c = redactSensitiveText("the receipt # 4242 4242 4242 4242 was declined").found.length > 0;
+      const d = redactSensitiveText("IMEI is 4242 4242 4242 4242").found.length > 0;
+      return a && b && c && d ? "DENIED" : "CLEARED";
+    }],
+    ["Lock 1 outbound blocks order/tracking/IMEI prefixes (no exemption outbound)", () => {
+      const a = findSensitiveData({ request: "Confirm order 4242 4242 4242 4242 for the guest" }).length > 0;
+      const b = findSensitiveData({ request: "tracking number: 4242424242424242" }).length > 0;
+      const c = findSensitiveData({ request: "my phone IMEI is 35-209900-176148-1" }).length > 0;
+      const d = findSensitiveData({ request: "IMEI is 378282246310005" }).length > 0;
+      return a && b && c && d ? "DENIED" : "CLEARED";
+    }],
     ["Lock 1 Arabic-Indic card digits", () => redactSensitiveText("٤٢٤٢ ٤٢٤٢ ٤٢٤٢ ٤٢٤٢").found.length ? "DENIED" : "CLEARED"],
     ["Lock 1 IBAN egress", () => redactSensitiveText("Wire to DE89370400440532013000").found.length ? "DENIED" : "CLEARED"],
     ["Lock 1 Base64 API key outbound", () => findSensitiveData({ data: Buffer.from("sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456").toString("base64") }).length ? "DENIED" : "CLEARED"],
