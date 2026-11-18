@@ -1,0 +1,497 @@
+{
+ "url": "https://opencancer.ai/api/mcp",
+ "doc": {
+  "name": "OpenCancer",
+  "version": "2.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "OpenCancer is a cancer patient expert: plain-language, guideline-grounded education for patients and caregivers, recruiting clinical trials, and a path to a human expert review. Scope: cancer only; educational information, not a diagnosis or a treatment decision. Every answer includes its sources, any safety guidance, a disclaimer, and a link to OpenCancer's care team.",
+  "tools": [
+   {
+    "name": "ask_opencancer",
+    "title": "Ask OpenCancer",
+    "description": "Answers a cancer patient or caregiver question in plain language, grounded in NCCN Guidelines for Patients and medical literature. Covers what a diagnosis, stage, biomarker or test result means; treatment options; side effects and their management; questions for the oncologist; second opinions; living with cancer. Answers in the language of the question. Returns the answer, its sources, a disclaimer, a link to OpenCancer's care team, and an answer id. Emergencies, prognosis or life-expectancy questions, and questions about children return a safety message that routes to the care team instead of an answer. Educational information, not medical advice. Accepts no personal identifiers",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "question": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "The question in plain language, in the user's language, without personal identifiers."
+      },
+      "cancer_type": {
+       "type": "string",
+       "maxLength": 160,
+       "description": "Optional cancer type, to focus the guidelines used, e.g. \"colon cancer\"."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Optional general context such as stage or treatments tried, e.g. \"stage 3, finished FOLFOX\". No identifiers."
+      }
+     },
+     "required": [
+      "question"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "answer": {
+       "type": "string"
+      },
+      "answer_id": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "review_status": {
+       "type": "string",
+       "enum": [
+        "ai_only",
+        "expert_reviewed"
+       ]
+      },
+      "grounding": {
+       "type": "object",
+       "properties": {
+        "basis": {
+         "type": "string"
+        },
+        "guidelines": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "retrieved": {
+         "type": "string"
+        }
+       }
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title"
+        ]
+       }
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "needs_human_review": {
+       "type": "boolean"
+      },
+      "care_team_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "answer",
+      "answer_id",
+      "review_status",
+      "sources",
+      "disclaimer",
+      "needs_human_review",
+      "care_team_url"
+     ]
+    },
+    "annotations": {
+     "title": "Ask OpenCancer",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "find_clinical_trials",
+    "title": "Find recruiting clinical trials",
+    "description": "Lists clinical trials recruiting now for a cancer type, from ClinicalTrials.gov, optionally near a city, state or country and filtered by a biomarker, drug or treatment keyword and by phase. Returns up to 8 trials with NCT number, phase, sponsor, the sites closest to the requested place, a registry link, a link to the full search, and a link to an OpenCancer expert who can build a trial shortlist for a specific case. Listing a trial is not an eligibility decision; only the trial team can confirm eligibility",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "condition": {
+       "type": "string",
+       "maxLength": 160,
+       "description": "Cancer type or condition, e.g. \"pancreatic cancer\"."
+      },
+      "location": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Optional city, state, or country, e.g. \"Boston\" or \"Germany\" (city level, not a street address)."
+      },
+      "keyword": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Optional biomarker, drug, or treatment, e.g. \"KRAS G12C\" or \"CAR-T\"."
+      },
+      "phase": {
+       "type": "string",
+       "enum": [
+        "1",
+        "2",
+        "3",
+        "4"
+       ],
+       "description": "Optional trial phase."
+      }
+     },
+     "required": [
+      "condition"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "total": {
+       "type": "number"
+      },
+      "trials": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "nct_id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "phase": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "sponsor": {
+          "type": "string"
+         },
+         "sites": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "nct_id",
+         "title",
+         "url"
+        ]
+       }
+      },
+      "search_url": {
+       "type": "string"
+      },
+      "expert_help_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "total",
+      "trials",
+      "search_url",
+      "expert_help_url"
+     ]
+    },
+    "annotations": {
+     "title": "Find recruiting clinical trials",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_trial_details",
+    "title": "Get clinical trial details",
+    "description": "Returns one clinical trial from ClinicalTrials.gov by its NCT number: what it tests, phase, status, last registry update, ages, the inclusion and exclusion criteria in their original wording, recruiting sites with their status, study contacts, and the registry link. Eligibility is confirmed only by the study team",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "nct_id": {
+       "type": "string",
+       "pattern": "^NCT[0-9]{8}$",
+       "description": "ClinicalTrials.gov ID, e.g. \"NCT05902169\"."
+      }
+     },
+     "required": [
+      "nct_id"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "nct_id": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "official_title": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string"
+      },
+      "phase": {
+       "type": "string"
+      },
+      "last_updated": {
+       "type": "string"
+      },
+      "sponsor": {
+       "type": "string"
+      },
+      "summary": {
+       "type": "string"
+      },
+      "conditions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "interventions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "ages": {
+       "type": "string"
+      },
+      "sex": {
+       "type": "string"
+      },
+      "inclusion_criteria": {
+       "type": "string"
+      },
+      "exclusion_criteria": {
+       "type": "string"
+      },
+      "sites": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "site": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "site"
+        ]
+       }
+      },
+      "site_count": {
+       "type": "number"
+      },
+      "contacts": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "phone": {
+          "type": "string"
+         },
+         "email": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "url": {
+       "type": "string"
+      },
+      "expert_help_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "nct_id",
+      "title",
+      "status",
+      "url",
+      "expert_help_url"
+     ]
+    },
+    "annotations": {
+     "title": "Get clinical trial details",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "open_case",
+    "title": "Get the expert review link",
+    "description": "Returns a link where a patient can start an expert review of their case by OpenCancer and Cancer Commons scientists (records, options, trial shortlist, next step). The link only opens an intake page: no case is created and no records are sent. The patient enters their own details and personally confirms consent on that page. Accepts no names, contact details or records.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "cancer_type": {
+       "type": "string",
+       "maxLength": 160,
+       "description": "Optional cancer type, e.g. \"prostate cancer\"."
+      },
+      "question": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Optional: what the patient wants experts to look at, without personal identifiers."
+      },
+      "preferred_destinations": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "cancer_commons",
+         "vivantx",
+         "palitra"
+        ]
+       },
+       "uniqueItems": true
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "intake_url": {
+       "type": "string"
+      },
+      "consent_required": {
+       "type": "boolean"
+      },
+      "case_created": {
+       "type": "boolean"
+      },
+      "preferred_destinations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "available_intake_destinations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "message": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "intake_url",
+      "consent_required",
+      "case_created",
+      "message"
+     ]
+    },
+    "annotations": {
+     "title": "Get the expert review link",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "send_feedback",
+    "title": "Flag an answer or send feedback",
+    "description": "Flags an OpenCancer answer for human expert review, or sends feedback to the OpenCancer team. Used when the user says an OpenCancer answer was wrong, unsafe, or incomplete, or wants to tell OpenCancer something (answer_id identifies the answer; message holds the user's words). Also used to report that an OpenCancer tool returned no usable answer (kind \"missing_answer\" with answer_id or tool, no message). Feedback is read by the OpenCancer team; it is not an urgent-care channel and no reply is sent through it.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "wrong_or_unsafe",
+        "missing_answer",
+        "bug",
+        "idea",
+        "praise"
+       ],
+       "description": "wrong_or_unsafe, missing_answer, bug, idea, or praise."
+      },
+      "message": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Optional. The user's feedback in their own words. Contact details are not accepted."
+      },
+      "answer_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional. The answer id from an OpenCancer answer."
+      },
+      "tool": {
+       "type": "string",
+       "enum": [
+        "ask_opencancer",
+        "find_clinical_trials",
+        "get_trial_details",
+        "open_case"
+       ],
+       "description": "Optional. Which OpenCancer tool this is about."
+      }
+     },
+     "required": [
+      "kind"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "saved": {
+       "type": "boolean"
+      },
+      "in_review_queue": {
+       "type": "boolean"
+      },
+      "duplicate": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "saved",
+      "in_review_queue"
+     ]
+    },
+    "annotations": {
+     "title": "Flag an answer or send feedback",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

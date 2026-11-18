@@ -1,0 +1,182 @@
+{
+ "url": "https://malinois.app/mcp",
+ "doc": {
+  "name": "Malinois",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Malinois checks a deployed web app from the outside for the leaks AI-built apps most often ship: database tables anyone can read (Supabase RLS off, open Firebase rules), secret keys in the JavaScript bundle, and downloadable .env/.git files. It is passive — only the requests a visitor's browser would make. Only check an app the user owns or is authorized to test: ask the user to confirm before setting i_own_this. After the user fixes something, run scan_app again to confirm.",
+  "tools": [
+   {
+    "name": "scan_app",
+    "title": "Check a deployed app for data leaks",
+    "description": "Runs a passive, outside-in security check of a live web app and returns a letter grade (A–F), each issue in plain language with fix steps, and a report link.\nUse when the user asks whether their deployed app is safe, before launch, or after a redeploy to confirm a fix. It checks for publicly readable Supabase/Firebase data, secret keys (Stripe, OpenAI, Supabase service_role…) in client JavaScript, downloadable .env/.git files, source maps, permissive CORS and missing security headers.\nDo not use it for apps the user does not own or is not authorized to test, for localhost or private addresses, or to review source code — it only sees what the public URL serves.\nBehavior: sends ordinary GET requests like a browser (no login, exploitation or load testing); takes about 10–30 seconds; saves the result as a report page on malinois.app, linked in the response; secrets appear only masked. Each app can be checked at most 20 times per hour.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Public http(s) address of the deployed app, e.g. https://my-app.lovable.app (scheme optional)."
+      },
+      "i_own_this": {
+       "type": "boolean",
+       "description": "Must be true. Set it only after the user has explicitly confirmed they own this app or are authorized to test it; without it the check is refused."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "ko",
+        "es",
+        "ja",
+        "pt",
+        "fr",
+        "de",
+        "zh"
+       ],
+       "description": "Language for the explanations (default: en)."
+      }
+     },
+     "required": [
+      "url",
+      "i_own_this"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "grade": {
+       "type": "string",
+       "description": "A (best) to F"
+      },
+      "score": {
+       "type": "number",
+       "description": "0–100"
+      },
+      "host": {
+       "type": "string"
+      },
+      "platform": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Detected builder/host, e.g. lovable, replit"
+      },
+      "limited": {
+       "type": "boolean",
+       "description": "True when the app exposed little to a passive check; a good grade is then not proof of safety."
+      },
+      "report_url": {
+       "type": "string"
+      },
+      "findings": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "rule_id": {
+          "type": "string"
+         },
+         "severity": {
+          "type": "string",
+          "enum": [
+           "critical",
+           "high",
+           "medium",
+           "low",
+           "info"
+          ]
+         },
+         "title": {
+          "type": "string"
+         },
+         "what_it_means": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "what_to_do": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "evidence": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Masked evidence; secrets are never returned in full."
+         }
+        },
+        "required": [
+         "rule_id",
+         "severity",
+         "title"
+        ]
+       },
+       "description": "Most serious first."
+      }
+     },
+     "required": [
+      "grade",
+      "score",
+      "host",
+      "limited",
+      "report_url",
+      "findings"
+     ]
+    },
+    "annotations": {
+     "title": "Check a deployed app for data leaks",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "explain_finding",
+    "title": "Explain a Malinois finding",
+    "description": "Returns the plain-language meaning and step-by-step fix for one Malinois finding.\nUse it while helping the user fix an issue reported by scan_app, or when they ask what a finding means. Pass the rule_id exactly as scan_app returned it. Read-only, no network, instant.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "rule_id": {
+       "type": "string",
+       "description": "The rule_id of a finding, e.g. supabase_missing_rls"
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "ko",
+        "es",
+        "ja",
+        "pt",
+        "fr",
+        "de",
+        "zh"
+       ],
+       "description": "Language for the explanations (default: en)."
+      }
+     },
+     "required": [
+      "rule_id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Explain a Malinois finding",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

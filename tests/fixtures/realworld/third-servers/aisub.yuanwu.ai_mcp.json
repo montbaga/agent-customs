@@ -1,0 +1,2011 @@
+{
+ "url": "https://aisub.yuanwu.ai/mcp",
+ "doc": {
+  "name": "AISub AI subscription prices",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "AISub (https://aisub.yuanwu.ai) tracks published AI subscription prices by country and region, including website and App Store sources. Available products and periods depend on reviewed data. Claude website reference prices use get_reference_prices and have no country.\nStart with compare_prices for rankings across regions or get_region_prices for one country; call list_catalog when you need plan keys or region codes.\nReference prices prefer the tax-inclusive amount and use the tax-exclusive amount only when it is strictly lower. tax=unknown means the source does not state whether tax is included; it does not mean tax-free. Actual charges, including tax, are confirmed at checkout.\nApp Store yearly amounts are full-year totals. Billing periods are explicit only when stated in the source; same-item monthly/yearly amount pairs may be inferred and retain both pieces of evidence. Unlabeled single amounts follow the global period policy; monthly defaults remain inferred, while manual assignments have their own provenance. Unknown observations can be queried with interval=unknown and are not subscription quotes.\nChatGPT Business and Business 5x are priced per seat: the monthly amount is the per-seat monthly price, and the yearly amount is the per-seat monthly equivalent when paying yearly (full-year reference = yearly monthly equivalent × 12).\nEvery price response states when the quotes and the exchange rates were last updated (UTC). Quote these times and link the source URL when answering. A listed price does not prove that a user can buy the plan in that region.",
+  "tools": [
+   {
+    "name": "list_catalog",
+    "title": "List products, plans and regions",
+    "description": "List the AI subscription products, sales channels, plan keys, billing intervals and regions that AISub tracks. Call without arguments for an overview; pass a product (and optionally a channel) to also get its region codes and the currencies available for conversion. Use the returned plan keys and region codes with the other tools.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "product": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "chatgpt",
+          "claude",
+          "gemini",
+          "perplexity",
+          "grok"
+         ]
+        },
+        {
+         "type": "string",
+         "pattern": "^app_[1-9]\\d{5,14}$"
+        }
+       ],
+       "description": "Product key returned by list_catalog, including dynamically registered app_<apple-id> products."
+      },
+      "channel": {
+       "description": "Sales channel: web (regional website prices) or app_store (iOS). Defaults to web for ChatGPT and app_store for other products. Claude website reference prices use get_reference_prices.",
+       "type": "string",
+       "enum": [
+        "web",
+        "app_store"
+       ]
+      },
+      "locale": {
+       "default": "en",
+       "description": "Language for region and plan names: en (default) or zh.",
+       "type": "string",
+       "enum": [
+        "zh",
+        "en"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "List products, plans and regions",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "products": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "product": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string"
+         },
+         "channels": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "channel": {
+             "type": "string",
+             "enum": [
+              "web",
+              "app_store"
+             ]
+            },
+            "quoteScope": {
+             "type": "string",
+             "const": "regional"
+            },
+            "plans": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "key": {
+                "type": "string"
+               },
+               "name": {
+                "type": "string"
+               },
+               "unit": {
+                "type": "string",
+                "enum": [
+                 "person",
+                 "seat",
+                 "unknown"
+                ]
+               },
+               "intervals": {
+                "type": "array",
+                "items": {
+                 "type": "string",
+                 "enum": [
+                  "month",
+                  "year"
+                 ]
+                }
+               },
+               "hasUnknownPeriod": {
+                "type": "boolean"
+               }
+              },
+              "required": [
+               "key",
+               "name",
+               "unit",
+               "intervals",
+               "hasUnknownPeriod"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "regionCount": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "pricedRegionCount": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "regions": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "code": {
+                "type": "string"
+               },
+               "name": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "code",
+               "name"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "currencies": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            }
+           },
+           "required": [
+            "channel",
+            "quoteScope",
+            "plans",
+            "regionCount",
+            "pricedRegionCount"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "product",
+         "name",
+         "provider",
+         "channels"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "products"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "compare_prices",
+    "title": "Compare a plan's price across regions",
+    "description": "Rank the price of one subscription plan (e.g. ChatGPT Plus, Claude Pro, Google AI Pro) across countries and regions, converted to one currency. Answers questions like \"where is ChatGPT Plus cheapest?\" or \"how much is Claude Pro in Turkey?\". Prices are monthly equivalents; for yearly billing the full-year total is also given. Each response includes when the prices and exchange rates were last updated.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "product": {
+       "default": "chatgpt",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "chatgpt",
+          "claude",
+          "gemini",
+          "perplexity",
+          "grok"
+         ]
+        },
+        {
+         "type": "string",
+         "pattern": "^app_[1-9]\\d{5,14}$"
+        }
+       ],
+       "description": "Product key returned by list_catalog, including dynamically registered app_<apple-id> products."
+      },
+      "channel": {
+       "description": "Sales channel: web (regional website prices) or app_store (iOS). Defaults to web for ChatGPT and app_store for other products. Claude website reference prices use get_reference_prices.",
+       "type": "string",
+       "enum": [
+        "web",
+        "app_store"
+       ]
+      },
+      "plan": {
+       "description": "Plan key from list_catalog, e.g. plus, pro, business (ChatGPT), claude_pro, gemini_ai_pro, perplexity_pro, supergrok. Defaults to the product's main plan.",
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+      },
+      "interval": {
+       "default": "month",
+       "description": "Use unknown for observed App Store prices without a resolved period; these have no ranking or monthly equivalent.",
+       "type": "string",
+       "enum": [
+        "month",
+        "year",
+        "unknown"
+       ]
+      },
+      "currency": {
+       "description": "ISO 4217 currency for converted reference prices, e.g. USD, CNY, EUR. Defaults to USD for en and CNY for zh.",
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      },
+      "tax": {
+       "default": "all",
+       "description": "Only regions whose reference price has this tax label.",
+       "type": "string",
+       "enum": [
+        "all",
+        "inclusive",
+        "exclusive",
+        "unknown"
+       ]
+      },
+      "sort": {
+       "default": "asc",
+       "description": "asc: cheapest first (default); desc: most expensive first; name: alphabetical.",
+       "type": "string",
+       "enum": [
+        "asc",
+        "desc",
+        "name"
+       ]
+      },
+      "region": {
+       "description": "Optional filter by region code, name or currency, e.g. JP, Japan, 日本, EUR.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "limit": {
+       "default": 10,
+       "description": "Rows per page, 1–50.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "page": {
+       "default": 1,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 1000
+      },
+      "locale": {
+       "default": "en",
+       "description": "Language for region and plan names: en (default) or zh.",
+       "type": "string",
+       "enum": [
+        "zh",
+        "en"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "Compare a plan's price across regions",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string"
+      },
+      "channel": {
+       "type": "string"
+      },
+      "plan": {
+       "type": "string"
+      },
+      "planName": {
+       "type": "string"
+      },
+      "unit": {
+       "type": "string"
+      },
+      "interval": {
+       "type": "string",
+       "enum": [
+        "month",
+        "year",
+        "unknown"
+       ]
+      },
+      "currency": {
+       "type": "string"
+      },
+      "summary": {
+       "type": "object",
+       "properties": {
+        "pricedRegions": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "matchingRegions": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "cheapest": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "regionCode": {
+             "type": "string"
+            },
+            "regionName": {
+             "type": "string"
+            },
+            "referencePrice": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "tax": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "regionCode",
+            "regionName",
+            "referencePrice",
+            "tax"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "median": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "highest": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "usReference": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "pricedRegions",
+        "matchingRegions",
+        "cheapest",
+        "median",
+        "highest",
+        "usReference"
+       ],
+       "additionalProperties": false
+      },
+      "observations": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "regionCode": {
+          "type": "string"
+         },
+         "regionName": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "amount": {
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "fetchedAt": {
+          "type": "string"
+         },
+         "period": {
+          "type": "string",
+          "const": "unknown"
+         }
+        },
+        "required": [
+         "regionCode",
+         "regionName",
+         "name",
+         "amount",
+         "currency",
+         "fetchedAt",
+         "period"
+        ],
+        "additionalProperties": false
+       },
+       "description": "Original App Store observations with unknown billing periods, independent of the requested known interval."
+      },
+      "historicalObservations": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "planKey": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "amount": {
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "fetchedAt": {
+          "type": "string"
+         },
+         "interval": {
+          "type": "string",
+          "enum": [
+           "month",
+           "year"
+          ]
+         },
+         "intervalSource": {
+          "type": "string"
+         },
+         "state": {
+          "type": "string",
+          "const": "not_observed"
+         },
+         "regionCode": {
+          "type": "string"
+         },
+         "regionName": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "planKey",
+         "name",
+         "amount",
+         "currency",
+         "fetchedAt",
+         "state",
+         "regionCode",
+         "regionName"
+        ],
+        "additionalProperties": false
+       },
+       "description": "Historical amounts omitted from the latest partial Apple list; not current quotes and excluded from ranking, conversions, budgets and alerts."
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "periodBasis": {
+          "type": "string",
+          "enum": [
+           "source",
+           "pair",
+           "default",
+           "manual",
+           "unknown"
+          ]
+         },
+         "position": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         },
+         "regionCode": {
+          "type": "string"
+         },
+         "regionName": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "ok",
+           "missing_quote",
+           "missing_rate",
+           "unknown_basis"
+          ]
+         },
+         "localAmount": {
+          "description": "Reference price in the local currency for the billing interval; App Store yearly amounts are full-year totals.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "localCurrency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "amountBasis": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "monthly",
+             "annual",
+             "unknown"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "tax": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "inclusive",
+             "exclusive",
+             "unknown"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "referencePrice": {
+          "description": "Monthly-equivalent reference price converted to the requested currency.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "yearlyTotal": {
+          "description": "Full-year reference amount in the requested currency (yearly billing only).",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "vsUs": {
+          "description": "Percent difference from the United States reference price.",
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "quoteUpdatedAt": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "stale": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "periodBasis",
+         "position",
+         "regionCode",
+         "regionName",
+         "status",
+         "localAmount",
+         "localCurrency",
+         "amountBasis",
+         "tax",
+         "referencePrice",
+         "yearlyTotal",
+         "vsUs",
+         "quoteUpdatedAt",
+         "stale"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "page": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "totalPages": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "dataUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "oldestQuoteUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "fxUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "staleQuotes": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "fxStale": {
+       "type": "boolean"
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "product",
+      "channel",
+      "plan",
+      "planName",
+      "unit",
+      "interval",
+      "currency",
+      "summary",
+      "observations",
+      "historicalObservations",
+      "rows",
+      "page",
+      "totalPages",
+      "dataUpdatedAt",
+      "oldestQuoteUpdatedAt",
+      "fxUpdatedAt",
+      "staleQuotes",
+      "fxStale",
+      "notes",
+      "url"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_region_prices",
+    "title": "All plan prices in one region",
+    "description": "Show every plan price of one product in one country or region, for each sales channel and billing interval, with its rank among all regions and its difference from the United States. Answers questions like \"how much does ChatGPT cost in Japan?\" or \"is Claude cheaper in India than in the US?\".",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "product": {
+       "default": "chatgpt",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "chatgpt",
+          "claude",
+          "gemini",
+          "perplexity",
+          "grok"
+         ]
+        },
+        {
+         "type": "string",
+         "pattern": "^app_[1-9]\\d{5,14}$"
+        }
+       ],
+       "description": "Product key returned by list_catalog, including dynamically registered app_<apple-id> products."
+      },
+      "region": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 60,
+       "description": "Country or region as an ISO 3166 code (JP), English name (Japan) or Chinese name (日本)."
+      },
+      "currency": {
+       "description": "ISO 4217 currency for converted reference prices, e.g. USD, CNY, EUR. Defaults to USD for en and CNY for zh.",
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      },
+      "locale": {
+       "default": "en",
+       "description": "Language for region and plan names: en (default) or zh.",
+       "type": "string",
+       "enum": [
+        "zh",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "region"
+     ]
+    },
+    "annotations": {
+     "title": "All plan prices in one region",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string"
+      },
+      "region": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "currency": {
+       "type": "string"
+      },
+      "prices": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "periodBasis": {
+          "type": "string",
+          "enum": [
+           "source",
+           "pair",
+           "default",
+           "manual",
+           "unknown"
+          ]
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "ok",
+           "missing_quote",
+           "missing_rate",
+           "unknown_basis"
+          ]
+         },
+         "localAmount": {
+          "description": "Reference price in the local currency for the billing interval; App Store yearly amounts are full-year totals.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "localCurrency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "amountBasis": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "monthly",
+             "annual",
+             "unknown"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "tax": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "inclusive",
+             "exclusive",
+             "unknown"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "referencePrice": {
+          "description": "Monthly-equivalent reference price converted to the requested currency.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "yearlyTotal": {
+          "description": "Full-year reference amount in the requested currency (yearly billing only).",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "vsUs": {
+          "description": "Percent difference from the United States reference price.",
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "quoteUpdatedAt": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "stale": {
+          "type": "boolean"
+         },
+         "channel": {
+          "type": "string"
+         },
+         "plan": {
+          "type": "string"
+         },
+         "planName": {
+          "type": "string"
+         },
+         "unit": {
+          "type": "string"
+         },
+         "interval": {
+          "type": "string",
+          "enum": [
+           "month",
+           "year"
+          ]
+         },
+         "rank": {
+          "anyOf": [
+           {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Position among priced regions, cheapest = 1."
+         },
+         "pricedRegions": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         }
+        },
+        "required": [
+         "periodBasis",
+         "status",
+         "localAmount",
+         "localCurrency",
+         "amountBasis",
+         "tax",
+         "referencePrice",
+         "yearlyTotal",
+         "vsUs",
+         "quoteUpdatedAt",
+         "stale",
+         "channel",
+         "plan",
+         "planName",
+         "unit",
+         "interval",
+         "rank",
+         "pricedRegions"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "observations": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "amount": {
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "fetchedAt": {
+          "type": "string"
+         },
+         "planKey": {
+          "type": "string"
+         },
+         "period": {
+          "type": "string",
+          "const": "unknown"
+         }
+        },
+        "required": [
+         "name",
+         "amount",
+         "currency",
+         "fetchedAt",
+         "planKey",
+         "period"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "historicalObservations": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "planKey": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "amount": {
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "fetchedAt": {
+          "type": "string"
+         },
+         "interval": {
+          "type": "string",
+          "enum": [
+           "month",
+           "year"
+          ]
+         },
+         "intervalSource": {
+          "type": "string"
+         },
+         "state": {
+          "type": "string",
+          "const": "not_observed"
+         }
+        },
+        "required": [
+         "planKey",
+         "name",
+         "amount",
+         "currency",
+         "fetchedAt",
+         "state"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "missing": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "channel": {
+          "type": "string"
+         },
+         "plan": {
+          "type": "string"
+         },
+         "interval": {
+          "type": "string",
+          "enum": [
+           "month",
+           "year"
+          ]
+         },
+         "reason": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "channel",
+         "plan",
+         "interval",
+         "reason"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "dataUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "fxUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "product",
+      "region",
+      "currency",
+      "prices",
+      "observations",
+      "historicalObservations",
+      "missing",
+      "dataUpdatedAt",
+      "fxUpdatedAt",
+      "notes",
+      "url"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_price_history",
+    "title": "Price change history",
+    "description": "List the recorded price changes of one plan in one region, newest first, with the previous and new local price. Use it for questions like \"has ChatGPT Plus gotten more expensive in Brazil?\".",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "product": {
+       "default": "chatgpt",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "chatgpt",
+          "claude",
+          "gemini",
+          "perplexity",
+          "grok"
+         ]
+        },
+        {
+         "type": "string",
+         "pattern": "^app_[1-9]\\d{5,14}$"
+        }
+       ],
+       "description": "Product key returned by list_catalog, including dynamically registered app_<apple-id> products."
+      },
+      "channel": {
+       "description": "Sales channel: web (regional website prices) or app_store (iOS). Defaults to web for ChatGPT and app_store for other products. Claude website reference prices use get_reference_prices.",
+       "type": "string",
+       "enum": [
+        "web",
+        "app_store"
+       ]
+      },
+      "plan": {
+       "description": "Plan key from list_catalog, e.g. plus, pro, business (ChatGPT), claude_pro, gemini_ai_pro, perplexity_pro, supergrok. Defaults to the product's main plan.",
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+      },
+      "interval": {
+       "default": "month",
+       "description": "Billing interval: month (default) or year.",
+       "type": "string",
+       "enum": [
+        "month",
+        "year"
+       ]
+      },
+      "region": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 60,
+       "description": "Country or region as an ISO 3166 code (JP), English name (Japan) or Chinese name (日本)."
+      },
+      "limit": {
+       "default": 10,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20
+      },
+      "locale": {
+       "default": "en",
+       "description": "Language for region and plan names: en (default) or zh.",
+       "type": "string",
+       "enum": [
+        "zh",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "region"
+     ]
+    },
+    "annotations": {
+     "title": "Price change history",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string"
+      },
+      "channel": {
+       "type": "string"
+      },
+      "plan": {
+       "type": "string"
+      },
+      "planName": {
+       "type": "string"
+      },
+      "interval": {
+       "type": "string",
+       "enum": [
+        "month",
+        "year"
+       ]
+      },
+      "region": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "changes": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "reviewMethod": {
+          "type": "string",
+          "enum": [
+           "automatic",
+           "manual",
+           "unreviewed"
+          ]
+         },
+         "previousPeriodConfidence": {
+          "type": "string",
+          "enum": [
+           "explicit",
+           "inferred",
+           "unknown"
+          ]
+         },
+         "periodConfidence": {
+          "type": "string",
+          "enum": [
+           "explicit",
+           "inferred",
+           "unknown"
+          ]
+         },
+         "percent": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "changedAt": {
+          "type": "string",
+          "description": "When AISub first recorded the new price; not necessarily when it took effect."
+         },
+         "previousObservedAt": {
+          "type": "string"
+         },
+         "previous": {
+          "type": "object",
+          "properties": {
+           "amount": {
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "tax": {
+            "type": "string",
+            "enum": [
+             "inclusive",
+             "exclusive",
+             "unknown"
+            ]
+           },
+           "amountBasis": {
+            "type": "string",
+            "enum": [
+             "monthly",
+             "annual",
+             "unknown"
+            ]
+           },
+           "unit": {
+            "type": "string",
+            "enum": [
+             "person",
+             "seat",
+             "unknown"
+            ]
+           }
+          },
+          "required": [
+           "amount",
+           "currency",
+           "tax",
+           "amountBasis",
+           "unit"
+          ],
+          "additionalProperties": false
+         },
+         "current": {
+          "type": "object",
+          "properties": {
+           "amount": {
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "tax": {
+            "type": "string",
+            "enum": [
+             "inclusive",
+             "exclusive",
+             "unknown"
+            ]
+           },
+           "amountBasis": {
+            "type": "string",
+            "enum": [
+             "monthly",
+             "annual",
+             "unknown"
+            ]
+           },
+           "unit": {
+            "type": "string",
+            "enum": [
+             "person",
+             "seat",
+             "unknown"
+            ]
+           }
+          },
+          "required": [
+           "amount",
+           "currency",
+           "tax",
+           "amountBasis",
+           "unit"
+          ],
+          "additionalProperties": false
+         },
+         "changePercent": {
+          "type": [
+           "number",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "changedAt",
+         "previousObservedAt",
+         "previous",
+         "current",
+         "changePercent"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "trackedSince": {
+       "description": "Earliest observation AISub retains for this series; no changes before it are known.",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "product",
+      "channel",
+      "plan",
+      "planName",
+      "interval",
+      "region",
+      "changes",
+      "trackedSince",
+      "url"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_recent_price_changes",
+    "title": "Recent price changes",
+    "description": "List monthly subscription price changes AISub recorded across all regions in the last N days, newest first. Use it for questions like \"which countries changed ChatGPT prices this month?\".",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "days": {
+       "default": 30,
+       "description": "Look-back window in days, 1–90.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 90
+      },
+      "product": {
+       "description": "Only changes for this product.",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "chatgpt",
+          "claude",
+          "gemini",
+          "perplexity",
+          "grok"
+         ]
+        },
+        {
+         "type": "string",
+         "pattern": "^app_[1-9]\\d{5,14}$"
+        }
+       ]
+      },
+      "limit": {
+       "default": 20,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "locale": {
+       "default": "en",
+       "description": "Language for region and plan names: en (default) or zh.",
+       "type": "string",
+       "enum": [
+        "zh",
+        "en"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "Recent price changes",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "days": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "total": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "changes": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "reviewMethod": {
+          "type": "string",
+          "enum": [
+           "automatic",
+           "manual",
+           "unreviewed"
+          ]
+         },
+         "previousPeriodConfidence": {
+          "type": "string",
+          "enum": [
+           "explicit",
+           "inferred",
+           "unknown"
+          ]
+         },
+         "periodConfidence": {
+          "type": "string",
+          "enum": [
+           "explicit",
+           "inferred",
+           "unknown"
+          ]
+         },
+         "percent": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "changedAt": {
+          "type": "string"
+         },
+         "product": {
+          "type": "string"
+         },
+         "channel": {
+          "type": "string"
+         },
+         "plan": {
+          "type": "string"
+         },
+         "planName": {
+          "type": "string"
+         },
+         "regionCode": {
+          "type": "string"
+         },
+         "regionName": {
+          "type": "string"
+         },
+         "previous": {
+          "type": "object",
+          "properties": {
+           "amount": {
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "tax": {
+            "type": "string",
+            "enum": [
+             "inclusive",
+             "exclusive",
+             "unknown"
+            ]
+           },
+           "amountBasis": {
+            "type": "string",
+            "enum": [
+             "monthly",
+             "annual",
+             "unknown"
+            ]
+           },
+           "unit": {
+            "type": "string",
+            "enum": [
+             "person",
+             "seat",
+             "unknown"
+            ]
+           }
+          },
+          "required": [
+           "amount",
+           "currency",
+           "tax",
+           "amountBasis",
+           "unit"
+          ],
+          "additionalProperties": false
+         },
+         "current": {
+          "type": "object",
+          "properties": {
+           "amount": {
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "tax": {
+            "type": "string",
+            "enum": [
+             "inclusive",
+             "exclusive",
+             "unknown"
+            ]
+           },
+           "amountBasis": {
+            "type": "string",
+            "enum": [
+             "monthly",
+             "annual",
+             "unknown"
+            ]
+           },
+           "unit": {
+            "type": "string",
+            "enum": [
+             "person",
+             "seat",
+             "unknown"
+            ]
+           }
+          },
+          "required": [
+           "amount",
+           "currency",
+           "tax",
+           "amountBasis",
+           "unit"
+          ],
+          "additionalProperties": false
+         },
+         "changePercent": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "changedAt",
+         "product",
+         "channel",
+         "plan",
+         "planName",
+         "regionCode",
+         "regionName",
+         "previous",
+         "current",
+         "changePercent",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "trackedSince": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "days",
+      "total",
+      "changes",
+      "trackedSince",
+      "url"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "compare_credits",
+    "title": "Compare credit pack prices",
+    "description": "Compare credit pack prices (extra usage credits sold on top of a subscription, such as ChatGPT credits) across regions, normalised to the price per 100 credits in one currency. Answers questions like \"where are ChatGPT credits cheapest?\".",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "product": {
+       "default": "chatgpt",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "chatgpt",
+          "claude",
+          "gemini",
+          "perplexity",
+          "grok"
+         ]
+        },
+        {
+         "type": "string",
+         "pattern": "^app_[1-9]\\d{5,14}$"
+        }
+       ],
+       "description": "Product key returned by list_catalog, including dynamically registered app_<apple-id> products."
+      },
+      "channel": {
+       "description": "Sales channel: web (regional website prices) or app_store (iOS). Defaults to web for ChatGPT and app_store for other products. Claude website reference prices use get_reference_prices.",
+       "type": "string",
+       "enum": [
+        "web",
+        "app_store"
+       ]
+      },
+      "currency": {
+       "description": "ISO 4217 currency for converted reference prices, e.g. USD, CNY, EUR. Defaults to USD for en and CNY for zh.",
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      },
+      "pack": {
+       "default": "all",
+       "description": "all (default), unit for single-credit prices, or a pack quantity such as 1000.",
+       "type": "string",
+       "pattern": "^(?:all|unit|[1-9]\\d{0,30})$"
+      },
+      "sort": {
+       "default": "price_asc",
+       "description": "price_asc: cheapest per 100 credits first (default); price_desc; region: alphabetical.",
+       "type": "string",
+       "enum": [
+        "price_asc",
+        "price_desc",
+        "region"
+       ]
+      },
+      "region": {
+       "description": "Optional filter by region code or name.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "limit": {
+       "default": 10,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "page": {
+       "default": 1,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 1000
+      },
+      "locale": {
+       "default": "en",
+       "description": "Language for region and plan names: en (default) or zh.",
+       "type": "string",
+       "enum": [
+        "zh",
+        "en"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "Compare credit pack prices",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string"
+      },
+      "channel": {
+       "type": "string"
+      },
+      "currency": {
+       "type": "string"
+      },
+      "pack": {
+       "type": "string"
+      },
+      "availablePacks": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "position": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         },
+         "regionCode": {
+          "type": "string"
+         },
+         "regionName": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "unit",
+           "pack"
+          ]
+         },
+         "quantity": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "localAmount": {
+          "type": "string"
+         },
+         "localCurrency": {
+          "type": "string"
+         },
+         "per100Local": {
+          "type": "string",
+          "description": "Price per 100 credits in the local currency."
+         },
+         "per100": {
+          "description": "Price per 100 credits converted to the requested currency.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "updatedAt": {
+          "type": "string"
+         },
+         "stale": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "position",
+         "regionCode",
+         "regionName",
+         "name",
+         "kind",
+         "quantity",
+         "localAmount",
+         "localCurrency",
+         "per100Local",
+         "per100",
+         "updatedAt",
+         "stale"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "matchingOffers": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "page": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "totalPages": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "dataUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "fxUpdatedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "product",
+      "channel",
+      "currency",
+      "pack",
+      "availablePacks",
+      "rows",
+      "matchingOffers",
+      "page",
+      "totalPages",
+      "dataUpdatedAt",
+      "fxUpdatedAt",
+      "url"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_reference_prices",
+    "title": "Read website reference prices",
+    "description": "Read reviewed Claude website reference prices in their original currency. These have no country, ranking, exchange conversion or purchase eligibility guarantee. Unverified currencies are never returned.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "product": {
+       "type": "string",
+       "const": "claude"
+      }
+     },
+     "required": [
+      "product"
+     ]
+    },
+    "annotations": {
+     "title": "Read website reference prices",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "quoteScope": {
+       "type": "string",
+       "const": "reference"
+      },
+      "quotes": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "sourceKey": {
+          "type": "string"
+         },
+         "planKey": {
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "amount": {
+          "type": "string"
+         },
+         "interval": {
+          "type": "string",
+          "enum": [
+           "month",
+           "year"
+          ]
+         },
+         "amountBasis": {
+          "type": "string",
+          "enum": [
+           "monthly",
+           "annual",
+           "unknown"
+          ]
+         },
+         "tax": {
+          "type": "string",
+          "enum": [
+           "inclusive",
+           "exclusive",
+           "unknown"
+          ]
+         },
+         "observedAt": {
+          "type": "string"
+         },
+         "publishedAt": {
+          "type": "string"
+         },
+         "officialUrl": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "sourceKey",
+         "planKey",
+         "currency",
+         "amount",
+         "interval",
+         "amountBasis",
+         "tax",
+         "observedAt",
+         "publishedAt",
+         "officialUrl"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "quoteScope",
+      "quotes"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ }
+}

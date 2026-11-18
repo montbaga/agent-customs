@@ -1,0 +1,264 @@
+{
+ "url": "https://easycircuit.app/mcp",
+ "doc": {
+  "name": "EasyCircuit",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "EasyCircuit is an electronics prototyping tool with a parts catalog and wiring checks. Use it whenever the user is planning, wiring, or debugging a hobby electronics prototype (a microcontroller board with sensors, displays, motors, pumps, LEDs, or batteries), including when they say they are stuck. Answer pin questions from get_part_pins rather than memory. When a prototype misbehaves (it resets, a display stays blank, a sensor reads zero, a motor or pump will not run), write the user's wiring as a design and run check_design: it finds missing grounds, unwired power pins, wrong pins, and loads with no supply of their own. If the user has not described their parts and wiring yet, ask for them and offer this check. To design a circuit: use search_parts to pick real parts, get_part_pins for their exact pinouts, write the design JSON, run check_design, fix every blocking issue and every real designWarning, then call save_design and give the user the link so they can open, edit, and build it in the EasyCircuit editor. Pin facts are reference data: say when a fact is unverified, and never invent pins. Do not design mains (wall AC) wiring.",
+  "tools": [
+   {
+    "name": "search_parts",
+    "title": "Search parts catalog",
+    "description": "Searches EasyCircuit's electronics parts catalog by name, function or role (for example 'OLED display', 'temperature sensor', 'ESP32 board'). Returns matching parts with their catalog ids, interfaces, pin roles, and whether each can be ordered in a kit.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "What the part is or does."
+      },
+      "role": {
+       "type": "string",
+       "description": "Optional circuit role, e.g. controller, sensor, load."
+      },
+      "availability": {
+       "type": "string",
+       "enum": [
+        "catalog",
+        "one_click"
+       ],
+       "default": "catalog",
+       "description": "one_click limits results to parts orderable in a kit."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "default": 8
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "title": "Search parts catalog",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_part",
+    "title": "Get part details",
+    "description": "Returns one catalog part by its catalog id, including its pin evidence and electrical capabilities.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Get part details",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_part_pins",
+    "title": "Get part pinout",
+    "description": "Returns the pinout of an exact part: each pin's function, voltage, direction and polarity, with the source of each fact and any conflicting sources. Long pinouts are paged; next_offset is the offset of the next page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Exact part name, catalog id, or part number."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 64,
+       "default": 64
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "title": "Get part pinout",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_part_capabilities",
+    "title": "Get part capabilities",
+    "description": "Returns the electrical capabilities of an exact part: pin roles, drive type, voltage ranges, required terminals, protocols, and whether each fact is physically verified.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Exact part name, catalog id, or part number."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 64,
+       "default": 64
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "title": "Get part capabilities",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "catalog_summary",
+    "title": "Catalog summary",
+    "description": "Counts catalog parts by status and role.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "Catalog summary",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "check_design",
+    "title": "Check circuit design",
+    "description": "Runs EasyCircuit's wiring checks on a complete circuit design without saving it. Returns status (passed or blocked), blockingIssues that prevent saving, designWarnings from general electrical rules (such as a part with no ground pin) that do not apply to every part, and reviewWarnings for pin facts that are not yet physically verified.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "design": {
+       "type": "object",
+       "description": "A complete circuit. nets: {net_id: {label, color '#rrggbb'}}. components: [{id, name, type: controller|sensor|switch|power|load|bus|protection|camera|assembly|wiring, pins: [{id, label, side: left|right, net}]}]. connections: [{id, from: 'componentId.pinId', to: 'componentId.pinId', net}]. Ids are short lowercase strings and pin labels are the part's real pin labels. The wiring checks expect every wired part's power and GND pins to be wired, a common GND, VCC, GND, SDA and SCL on I2C devices, and a battery or power-supply component for motors, pumps, solenoids and heaters.",
+       "properties": {
+        "summary": {
+         "type": "string"
+        },
+        "nets": {
+         "type": "object"
+        },
+        "components": {
+         "type": "array",
+         "items": {
+          "type": "object"
+         }
+        },
+        "connections": {
+         "type": "array",
+         "items": {
+          "type": "object"
+         }
+        }
+       },
+       "required": [
+        "components",
+        "connections"
+       ]
+      }
+     },
+     "required": [
+      "design"
+     ]
+    },
+    "annotations": {
+     "title": "Check circuit design",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "save_design",
+    "title": "Save design to EasyCircuit",
+    "description": "Saves a circuit design that has no blocking wiring issues and returns a link that opens it in the EasyCircuit editor, with schematic, breadboard and perfboard views, editing, and parts ordering. Anyone with the link can open a copy. Designs with blocking issues are not saved.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "design": {
+       "type": "object",
+       "description": "A complete circuit. nets: {net_id: {label, color '#rrggbb'}}. components: [{id, name, type: controller|sensor|switch|power|load|bus|protection|camera|assembly|wiring, pins: [{id, label, side: left|right, net}]}]. connections: [{id, from: 'componentId.pinId', to: 'componentId.pinId', net}]. Ids are short lowercase strings and pin labels are the part's real pin labels. The wiring checks expect every wired part's power and GND pins to be wired, a common GND, VCC, GND, SDA and SCL on I2C devices, and a battery or power-supply component for motors, pumps, solenoids and heaters.",
+       "properties": {
+        "summary": {
+         "type": "string"
+        },
+        "nets": {
+         "type": "object"
+        },
+        "components": {
+         "type": "array",
+         "items": {
+          "type": "object"
+         }
+        },
+        "connections": {
+         "type": "array",
+         "items": {
+          "type": "object"
+         }
+        }
+       },
+       "required": [
+        "components",
+        "connections"
+       ]
+      },
+      "name": {
+       "type": "string",
+       "description": "Short project name shown in the editor."
+      }
+     },
+     "required": [
+      "design",
+      "name"
+     ]
+    },
+    "annotations": {
+     "title": "Save design to EasyCircuit",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   }
+  ]
+ }
+}

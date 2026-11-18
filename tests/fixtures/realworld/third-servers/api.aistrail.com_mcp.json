@@ -1,0 +1,524 @@
+{
+ "url": "https://api.aistrail.com/mcp",
+ "doc": {
+  "name": "AIS Trail",
+  "version": "1.7.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "AIS Trail: ship positions from AIS. Live tools (no key) cover ships heard in the last hour in Finnish waters and the northern Baltic (Fintraffic / Digitraffic, Class A only), in Norwegian waters (BarentsWatch, shore stations and Norwegian satellites) and around AIS Trail's volunteer receiving stations, plus last known positions up to 7 days for ships out of receiver range. vessel_track returns history (since October 2026 for Finnish waters and the northern Baltic, up to 12 months for Danish waters, the Kattegat, the Skagerrak, Norwegian waters and U.S. waters, up to 24 months there on the Business plan) and needs an AIS Trail account: the user signs in when the MCP client asks, or the client sends an API key as the HTTP header 'Authorization: Bearer ap_live_…'. vessel_port_calls and port_calls return port calls (arrival, departure, draught, previous and next port) from the same archive, plus port calls from the port's own records at Taiwan's international ports (no draught) and at Finnish ports (with the berth and the reported arrival and departure), and need the same account. expected_arrivals lists ships expected at a Finnish port from the port's records (estimated arrival and departure, berth; Pro and Business plans). vessel_events returns a ship's events (port and anchorage arrivals and departures, stops, identity changes and, when asked, AIS gaps, encounters, flag changes and position jumps); lookup_vessels returns archive records of up to 20 ships with sanctions flags (OFAC, UK, EU) by IMO number. These six tools need the same account and use the plan's credits as the REST API does. find_port finds port ids without one. Positions are what ships broadcast; times are UTC. Always credit the sources listed in each result's attribution. Private vessels (pleasure craft, sailing vessels and Class B transponders without a valid IMO number) are never listed or looked up individually; area and nearby results report how many were left out (private_vessels). Not for navigation. AIS data can be missing, delayed or wrong; do not use it for navigation, collision avoidance, search and rescue or any other safety-of-life purpose.",
+  "tools": [
+   {
+    "name": "search_vessels",
+    "title": "Search ships",
+    "description": "Find ships by name (or part of it), MMSI (9 digits) or IMO number (7 digits). Returns live ships first, then ships out of range with their last known position (up to 7 days). List results are compact rows (mmsi, name, category, flag (ISO code from the MMSI), lat, lon, speed_kn, course_deg, length_m, destination, age_s, status, source); call get_vessel for full details of one ship. Private vessels (pleasure craft, sailing vessels and Class B transponders without a valid IMO number) are never listed or looked up individually; area and nearby results report how many were left out (private_vessels).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 100,
+       "description": "Ship name, MMSI (9 digits) or IMO (7 digits)"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "default": 10,
+       "description": "Maximum number of ships to return"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Search ships"
+    }
+   },
+   {
+    "name": "get_vessel",
+    "title": "Ship details and position",
+    "description": "Everything known about one ship now: identity (name, IMO, call sign, flag, type, size), last position, speed, course, heading, navigational status, destination (port codes decoded) and ETA as given by the crew, how long ago it was heard, its track over the last 40 minutes, and the data sources to credit. flag (ISO code) and flag_country come from the MMSI: the flag of the radio licence, usually but not always the registry flag. dwt_estimate is an estimate from the AIS dimensions (tonnes, size class such as Panamax or VLCC, hull, draught used), not a registry value; null for tugs, pleasure craft and other types where deadweight does not apply. For archive records and sanctions flags, use lookup_vessels (account).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "mmsi": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 999999999,
+       "description": "9-digit MMSI"
+      }
+     },
+     "required": [
+      "mmsi"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Ship details and position"
+    }
+   },
+   {
+    "name": "vessels_in_area",
+    "title": "Ships in an area",
+    "description": "Ships heard in the last hour inside a box (at most 5° on each side), largest first. List results are compact rows (mmsi, name, category, flag (ISO code from the MMSI), lat, lon, speed_kn, course_deg, length_m, destination, age_s, status, source); call get_vessel for full details of one ship. Private vessels (pleasure craft, sailing vessels and Class B transponders without a valid IMO number) are never listed or looked up individually; area and nearby results report how many were left out (private_vessels).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "min_lat": {
+       "type": "number",
+       "minimum": -90,
+       "maximum": 90,
+       "description": "Southern edge of the box, decimal degrees"
+      },
+      "min_lon": {
+       "type": "number",
+       "minimum": -180,
+       "maximum": 180,
+       "description": "Western edge of the box, decimal degrees"
+      },
+      "max_lat": {
+       "type": "number",
+       "minimum": -90,
+       "maximum": 90,
+       "description": "Northern edge of the box, decimal degrees"
+      },
+      "max_lon": {
+       "type": "number",
+       "minimum": -180,
+       "maximum": 180,
+       "description": "Eastern edge of the box, decimal degrees"
+      },
+      "ship_type": {
+       "type": "string",
+       "enum": [
+        "cargo",
+        "tanker",
+        "passenger",
+        "hsc",
+        "fishing",
+        "service",
+        "pleasure",
+        "other"
+       ],
+       "description": "Optional type filter"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "default": 30,
+       "description": "Maximum number of ships to return"
+      }
+     },
+     "required": [
+      "min_lat",
+      "min_lon",
+      "max_lat",
+      "max_lon"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Ships in an area"
+    }
+   },
+   {
+    "name": "vessels_near",
+    "title": "Ships near a point or ship",
+    "description": "Ships heard in the last hour within a radius (at most 50 nautical miles) of a point or of another ship, nearest first. List results are compact rows (mmsi, name, category, flag (ISO code from the MMSI), lat, lon, speed_kn, course_deg, length_m, destination, age_s, status, source); call get_vessel for full details of one ship. Private vessels (pleasure craft, sailing vessels and Class B transponders without a valid IMO number) are never listed or looked up individually; area and nearby results report how many were left out (private_vessels).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "lat": {
+       "type": "number",
+       "minimum": -90,
+       "maximum": 90,
+       "description": "Latitude of the centre, decimal degrees (with lon, or give mmsi)"
+      },
+      "lon": {
+       "type": "number",
+       "minimum": -180,
+       "maximum": 180,
+       "description": "Longitude of the centre, decimal degrees (with lat, or give mmsi)"
+      },
+      "mmsi": {
+       "type": "integer",
+       "description": "Use this ship's position as the centre instead of lat/lon"
+      },
+      "radius_nm": {
+       "type": "number",
+       "minimum": 0.1,
+       "maximum": 50,
+       "default": 5,
+       "description": "Search radius in nautical miles"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Maximum number of ships to return"
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Ships near a point or ship"
+    }
+   },
+   {
+    "name": "vessel_track",
+    "title": "Ship history (account)",
+    "description": "Where a ship has been between two times (UTC, ISO 8601), from the AIS Trail archive. Needs an AIS Trail account: sign in when the MCP client asks, or send an API key as the HTTP header 'Authorization: Bearer ap_live_…' (keys at https://aistrail.com). Resolution: raw (up to 24 h per call), 1m (up to 7 days) or 1h (up to 366 days); at most 200 points per call, as rows of [time, lat, lon, speed_kn, course_deg]. The plan's history depth, credits (as on the track endpoint: 1 per vessel-day) and rate limit apply, and the 24-hour delay on recent data on plans without live data. sources_through gives, per source, the time up to which the archive holds its data; pending_days lists days in the range a source has not delivered yet, so no points on those days does not mean the ship was absent.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "mmsi": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 999999999,
+       "description": "9-digit MMSI of the ship"
+      },
+      "from": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Start, e.g. 2026-10-01T00:00:00Z"
+      },
+      "to": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "End, e.g. 2026-10-02T00:00:00Z"
+      },
+      "resolution": {
+       "type": "string",
+       "enum": [
+        "raw",
+        "1m",
+        "1h"
+       ],
+       "default": "1m",
+       "description": "raw: every position (up to 24 h per call); 1m: one point per minute (up to 7 days); 1h: one point per hour (up to 366 days)"
+      }
+     },
+     "required": [
+      "mmsi",
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "title": "Ship history (account)"
+    }
+   },
+   {
+    "name": "data_status",
+    "title": "Coverage and freshness",
+    "description": "How many ships are live now (live_ships_private: how many of them are private vessels, counted only), how many are known from the last 7 days, the date range of the history archive per source with available_until (the latest time vessel_track can return for that source on plans without live data), and the service status: ok or degraded, with reason codes in reasons.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Coverage and freshness"
+    }
+   },
+   {
+    "name": "find_port",
+    "title": "Find ports",
+    "description": "Find ports by name (or part of it), UN/LOCODE (e.g. FIHEL) or two-letter country code (e.g. FI) in the port reference (World Port Index and UN/LOCODE ports): id (for port_calls), name, country, UN/LOCODE, position, harbor size (World Port Index ports only) and the radius of the port area used to detect port calls. At most 20 ports, larger harbors first. No API key needed.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 64,
+       "description": "Port name"
+      },
+      "country": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 2,
+       "description": "ISO 3166-1 alpha-2 country code"
+      },
+      "locode": {
+       "type": "string",
+       "minLength": 5,
+       "maxLength": 6,
+       "description": "UN/LOCODE"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "default": 10,
+       "description": "Maximum number of ports to return"
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Find ports"
+    }
+   },
+   {
+    "name": "vessel_port_calls",
+    "title": "Ship port calls (account)",
+    "description": "Port calls of a ship between two times (UTC, ISO 8601), from the AIS Trail archive: port, arrival, departure, draught on arrival and departure, cargo estimate (loaded, ballast or unchanged, from the draught change), previous and next port. Give mmsi or imo. A port call starts when the ship stops inside a port area and ends when it leaves; departure is null while it is still in port. The sanctions column gives the codes of the sanctions lists (OFAC, UK, EU) that name the ship's IMO number; informational only, not a compliance determination. Needs an AIS Trail account: sign in when the MCP client asks, or send an API key as the HTTP header 'Authorization: Bearer ap_live_…'. At most 100 port calls per call and at most 366 days; the plan's history depth, credits (1 per port call returned), rate limit and 24-hour delay (on plans without live data) apply.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "mmsi": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 999999999,
+       "description": "9-digit MMSI of the ship; give mmsi or imo"
+      },
+      "imo": {
+       "type": "integer",
+       "minimum": 1000000,
+       "maximum": 9999999,
+       "description": "7-digit IMO number of the ship; give mmsi or imo"
+      },
+      "from": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Start, e.g. 2026-09-01T00:00:00Z"
+      },
+      "to": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "End, e.g. 2026-10-01T00:00:00Z"
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "title": "Ship port calls (account)"
+    }
+   },
+   {
+    "name": "port_calls",
+    "title": "Port arrivals and departures (account)",
+    "description": "Ships that called at one port between two times (UTC, ISO 8601), from the AIS Trail archive: ship (with its flag from the MMSI), arrival, departure, draught on arrival and departure, cargo estimate, previous and next port. Get the port_id from find_port. event: any (in port at any time in the range, default), arrival or departure. The sanctions column gives the codes of the sanctions lists (OFAC, UK, EU) that name the ship's IMO number; informational only, not a compliance determination. Needs an AIS Trail account: sign in when the MCP client asks, or send an API key as the HTTP header 'Authorization: Bearer ap_live_…'. At most 100 port calls per call and at most 366 days; the plan's rules and credits (1 per port call returned) apply as for vessel_port_calls.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "port_id": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 99999999,
+       "description": "Port id from find_port"
+      },
+      "from": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Start, e.g. 2026-09-01T00:00:00Z"
+      },
+      "to": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "End, e.g. 2026-09-02T00:00:00Z"
+      },
+      "event": {
+       "type": "string",
+       "enum": [
+        "any",
+        "arrival",
+        "departure"
+       ],
+       "default": "any",
+       "description": "any: in port at any time in the range; arrival: arrived in the range; departure: departed in the range"
+      }
+     },
+     "required": [
+      "port_id",
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "title": "Port arrivals and departures (account)"
+    }
+   },
+   {
+    "name": "expected_arrivals",
+    "title": "Ships expected at a port (account)",
+    "description": "Ships that have not arrived yet at one port, from the port's own records: estimated arrival and departure (UTC), berth and declared previous port, from 6 hours ago to 14 days ahead, in arrival order. Available for Finnish ports; elsewhere the list is empty. Get the port_id from find_port. Needs an AIS Trail account (sign in when the MCP client asks, or send an API key as the HTTP header 'Authorization: Bearer ap_live_…') and a plan with live data (Pro or Business); at most 200 ships per call, 1 credit per ship returned.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "port_id": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 99999999,
+       "description": "Port id from find_port"
+      }
+     },
+     "required": [
+      "port_id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "title": "Ships expected at a port (account)"
+    }
+   },
+   {
+    "name": "vessel_events",
+    "title": "Ship events (account)",
+    "description": "Events of a ship between two times (UTC, ISO 8601), computed from the AIS Trail archive. from and to are optional: without to, now (24 hours ago on plans without live data); without from, 7 days before to (on Free, no earlier than the oldest day the plan includes), as on the REST endpoint. Give mmsi or imo (with imo, every MMSI that reported that IMO number in the range). Types: ENTER_ZONE and EXIT_ZONE (arrival at and departure from a port or anchorage; port_id for port_calls, zone port or anchorage), STATE_CHANGED (MOVING, NOT_MOVING, LONG_STOP), NAME_CHANGED, IMO_CHANGED, CALLSIGN_CHANGED, DESTINATION_CHANGED and DRAUGHT_CHANGED (old and new value); only when asked by name or with types ['all']: AIS_GAP (long AIS silence while under way; old_value hours, new_value nautical miles), ENCOUNTER (slow close approach to another ship outside port areas, a candidate ship-to-ship transfer; new_value the other ship's MMSI), FLAG_CHANGED (the IMO number reappears under an MMSI with another flag) and POSITION_JUMP (a physically impossible position jump). Rows: [time, event, old_value, new_value, lat, lon, mmsi, port_id, zone, sanctions, detail]; detail says more about behaviour events. The sanctions column gives the codes of the sanctions lists (OFAC, UK, EU) that name the ship's IMO number; informational only, not a compliance determination. Needs an AIS Trail account: sign in when the MCP client asks, or send an API key as the HTTP header 'Authorization: Bearer ap_live_…'. At most 200 events per call and at most 31 days; the plan's history depth, credits (1 per event returned), rate limit and 24-hour delay (on plans without live data) apply.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "mmsi": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 999999999,
+       "description": "9-digit MMSI of the ship; give mmsi or imo"
+      },
+      "imo": {
+       "type": "integer",
+       "minimum": 1000000,
+       "maximum": 9999999,
+       "description": "7-digit IMO number; covers every MMSI that reported it in the range. Give mmsi or imo"
+      },
+      "from": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Start, e.g. 2026-10-01T00:00:00Z; default: 7 days before to (on Free, no earlier than the oldest day the plan includes)"
+      },
+      "to": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "End, e.g. 2026-10-08T00:00:00Z; default: now (24 hours ago on plans without live data)"
+      },
+      "types": {
+       "type": "array",
+       "maxItems": 12,
+       "items": {
+        "type": "string",
+        "enum": [
+         "ENTER_ZONE",
+         "EXIT_ZONE",
+         "STATE_CHANGED",
+         "NAME_CHANGED",
+         "IMO_CHANGED",
+         "CALLSIGN_CHANGED",
+         "DESTINATION_CHANGED",
+         "DRAUGHT_CHANGED",
+         "AIS_GAP",
+         "ENCOUNTER",
+         "FLAG_CHANGED",
+         "POSITION_JUMP",
+         "all"
+        ]
+       },
+       "description": "Event types; default: every type except AIS_GAP, ENCOUNTER, FLAG_CHANGED, POSITION_JUMP. ['all'] for every type."
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "title": "Ship events (account)"
+    }
+   },
+   {
+    "name": "lookup_vessels",
+    "title": "Ship records and sanctions (account)",
+    "description": "Records of up to 20 ships at once from the AIS Trail archive, by mmsi and/or imo (lists): identity and particulars (name, IMO, call sign, type, flag from the MMSI, length, beam, estimated deadweight, first and last seen) and sanctions flags by IMO number from three official lists: OFAC SDN, UK Sanctions List and EU Regulation 833/2014 Annex XLII (list, programmes, date listed). An IMO number resolves to the MMSI that reported it last; ships not in the plan's sources come back with found false. Sanctions flags are informational, not a compliance determination: only ships a list names by IMO number are matched, ownership-based sanctions are not covered. Needs an AIS Trail account: sign in when the MCP client asks, or send an API key as the HTTP header 'Authorization: Bearer ap_live_…'. Credits: 1 per ship returned (none for ships not found); the plan's sources and 24-hour delay (on plans without live data) apply.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "mmsi": {
+       "type": "array",
+       "maxItems": 20,
+       "items": {
+        "type": "integer",
+        "minimum": 100000000,
+        "maximum": 999999999
+       },
+       "description": "9-digit MMSIs"
+      },
+      "imo": {
+       "type": "array",
+       "maxItems": 20,
+       "items": {
+        "type": "integer",
+        "minimum": 1000000,
+        "maximum": 9999999
+       },
+       "description": "7-digit IMO numbers; mmsi and imo together at most 20"
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "title": "Ship records and sanctions (account)"
+    }
+   }
+  ]
+ }
+}

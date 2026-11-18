@@ -1,0 +1,3037 @@
+{
+ "url": "https://swisslivingindex.ch/mcp",
+ "doc": {
+  "name": "Swiss Living Index",
+  "version": "1.52.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Swiss Living Index: official Swiss data for the 26 cantons and about 2,100 communes (taxes, rents, health insurance premiums, salaries, permits, naturalisation, pensions, votes and parliament, holidays, fuel, electricity, EV charging). Every figure comes from an official Swiss source (FSO/BFS, ESTV, FOPH, SEM, SNB, ElCom, SFOE, MeteoSwiss, Parliamentary Services, cantons and communes) and carries its source and year.\n\nChoosing tools: one canton → get_canton; 2 to 4 cantons → compare_cantons; all cantons by one figure → rank_by_metric (keys from list_metrics); one commune → get_commune. Tax for one household → commune_tax; tax on CHF 100,000 across communes → tax_by_commune; a move between communes → plan_move (estimate_net_move for the money only). Health insurance: compare_health_insurers, cheapest_health_insurer, health_deductible_advice. Permits: which_permit first. Anything else: list_datasets then get_dataset.\n\nPersonal questions («how much will I get / pay», «can I …»): call the matching tool FIRST, with no arguments if you know none, BEFORE asking the user anything (never ask for details first); it returns the official figures and, where your answer depends on the person, questions_to_ask. Give the official figures, then ask those questions in the user's language; when the user answers, call the tool again with the answers. Pass only parameters the user actually gave.\n\nFor any figure about Switzerland (pensions, taxes, premiums, salaries, rents, holidays, votes, weather hazards, shop hours, fees) call a tool instead of answering from memory: the values change every year and the tools carry the official current ones.\n\nPlaces: communes by name, BFS number or postcode («8001 Zürich» and «Basel (BS)» work); cantons by 2-letter code (ZH, GE, TI). Amounts are CHF unless stated.\n\nWhen answering, cite the source and year given in the result, link the page field when present, and credit «Swiss Living Index» (CC BY 4.0). The data is information, not tax, legal or immigration advice. Pages exist in German, French, Italian and English.\n\nTechnology: CBI Software · advisory: Mirabello Consultancy.\n\nToday is 2026-11-18.",
+  "tools": [
+   {
+    "name": "list_metrics",
+    "title": "List canton metrics",
+    "description": "List every metric available for the 26 Swiss cantons: key, label, unit, official source and whether higher or lower is better. Call this first to find the metric key for rank_by_metric, get_canton or get_trend.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "rent_index",
+    "title": "Rent index by canton",
+    "description": "Rent index per Swiss canton: BFS average rent of occupied rented flats (structural survey, existing rents, not asking rents) by canton and number of rooms with the 95% confidence interval, 2010 onwards, plus a size-standardised rent (DERIVED by Swiss Living Index: each canton weighted with one fixed Swiss mix of dwellings by rooms) as a level index (Switzerland = 100) and change index (first year = 100), growth over 5 years and since 2010, vacancy rate and the national CPI rent index. With canton: its full yearly series; without: all cantons ranked. Also the rent statistics Basel-Stadt (quarterly rent index, year-on-year), Geneva (rent index since 1995 and average rent by rooms; Geneva counts the kitchen as a room) and the city of Zurich (median and mean net rent for 2, 3 and 4 rooms, non-profit vs other, every two years) publish themselves, each with its own definition and licence.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "ahv_pension",
+    "title": "AHV old-age pension",
+    "description": "Swiss AHV/AVS old-age pension (1st pillar, AHV-Rente, rente AVS, rendita AVS). ALWAYS call this for any question about the state pension, including «how much AHV pension will I get?»: never answer a personal amount from memory. Returns the official minimum and maximum (2026, 2027), the 13th pension, reference age, early withdrawal and deferral rates, and a PERSONAL ESTIMATE computed with the law (AHVG Art. 34 formula, partial-pension scale, income splitting for married couples, child-rearing credits, couple cap, AHV 21 supplements). Pass ONLY values the user stated (never guess income, birth year, sex or retirement age). Without average_income it returns questions_to_ask: ask the user those, then call again with the answers. For pillar 3a or pension-fund figures use pension_figures; for tax on a lump-sum withdrawal capital_withdrawal_tax.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "monthly_pension": {
+       "type": "number",
+       "description": "monthly old-age pension in CHF, optional"
+      },
+      "months": {
+       "type": "number",
+       "description": "months with an old-age pension in the year, 1 to 12, default 12"
+      },
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional: that canton's pension statistics"
+      },
+      "average_income": {
+       "type": "number",
+       "description": "This person’s OWN average gross yearly income in Switzerland over the working life (AHV-liable, today’s CHF), e.g. 85000. A combined household income must be split between the spouses."
+      },
+      "age": {
+       "type": "integer",
+       "description": "Current age in years, e.g. 55 (use when the user gives an age, not a birth year)."
+      },
+      "birth_year": {
+       "type": "integer",
+       "description": "Year of birth, e.g. 1968 (only if the user gave it)."
+      },
+      "sex": {
+       "type": "string",
+       "enum": [
+        "female",
+        "male"
+       ],
+       "description": "female or male (reference age, AHV 21 supplement)."
+      },
+      "contribution_years": {
+       "type": "number",
+       "description": "TOTAL AHV contribution years at retirement, including the years still to come (age 21 to retirement; 44 = complete, no gaps). A 55-year-old with no gaps who works to 65 has 44, not 34. Omit if unknown."
+      },
+      "married": {
+       "type": "boolean",
+       "description": "true if married or in a registered partnership."
+      },
+      "spouse_average_income": {
+       "type": "number",
+       "description": "Spouse’s average gross yearly income, today’s CHF, e.g. 40000."
+      },
+      "years_married": {
+       "type": "number",
+       "description": "Contribution years spent married, e.g. 25; omit if not stated."
+      },
+      "spouse_contribution_years": {
+       "type": "number",
+       "description": "Spouse’s full contribution years, e.g. 44."
+      },
+      "children_years": {
+       "type": "number",
+       "description": "Years with a child under 16 (child-rearing credits), e.g. 16."
+      },
+      "retirement_age": {
+       "type": "number",
+       "description": "Planned pension start age, e.g. 64 (early) or 67 (deferred).",
+       "minimum": 62,
+       "maximum": 70
+      },
+      "statistics": {
+       "type": "boolean",
+       "description": "true to add the average pension of every canton."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "school_holidays",
+    "title": "School holidays by canton",
+    "description": "School holidays of the compulsory schools (Volksschule) in the 26 Swiss cantons for the current and next school year, read from each canton's own sources (not the EDK list): autumn, Christmas, sports/carnival, spring/Easter as first and last weekday off, summer start, who sets the dates (whole canton, region of the capital, canton and communes, or communes), source links, a calendar file (.ics) per canton, and which cantons are on holiday this week. With canton: that canton; without: all.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "tax_deadlines",
+    "title": "Tax return deadlines",
+    "description": "Tax return filing rules for natural persons in the 26 Swiss cantons, read from each cantonal tax administration: ordinary filing deadline (or that the date printed on the return applies), deadline for the self-employed, free extension until, latest extension, extension fee, the online extension link, and the cantonal wording with source links. Rules of the current tax year; the cantons publish the next year in January/February. The date on the tax return is binding.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "pollen",
+    "title": "Pollen levels",
+    "description": "Pollen in Switzerland from the MeteoSwiss pollen network (open data, CC BY 4.0; credit «Source: MeteoSwiss»): daily mean concentration (grains per m³, 6 to 6 UTC) of hazel, alder, birch, ash, beech, oak and grasses at the 15 stations for the last 14 days, and a pollen calendar derived from the last ten complete years (weekly means, main season, peak week). With canton (2-letter code): its nearest station; without: every station plus the national calendar by month.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "federal_votes",
+    "title": "Federal vote results",
+    "description": "Results of every Swiss federal vote since 1981 (FSO open data; official titles in DE FR IT RM EN): without arguments the list of vote days with every proposal and its national result (yes %, turnout, cantons for and against, accepted); with date (YYYY-MM-DD) that day with the result of every canton; with date and commune (name or BFS number) or canton the result there; with commune alone that commune's results of the latest votes. Communes in today's boundaries (mapped by the FSO).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "date": {
+       "type": "string",
+       "description": "vote day YYYY-MM-DD, optional"
+      },
+      "commune": {
+       "type": "string",
+       "description": "commune name or BFS number, optional"
+      },
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "parliament_member",
+    "title": "Federal Parliament members",
+    "description": "Members of the Swiss Federal Parliament (National Council 200, Council of States 46) from the Parliamentary Services' open data web service ws.parlament.ch, refreshed daily: council, canton, party, parliamentary group and function, seat number, career in both chambers since joining, year and place of birth as published (never the full date), occupations with employer, mandates, committees and delegations with function, declared interests (Art. 11 Parliament Act: organisation, legal form, body, function, paid or unpaid), the official e-mail address and own website shown on the parlament.ch profile, and social media accounts the member links from their own website (only accounts whose handle carries the member's name). With name (or part of it) or id: matching members in full; with canton, council (NR or SR) or party (abbreviation) only: the matching list. Neutral facts only: no ratings.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "name or part of it, optional"
+      },
+      "id": {
+       "type": "integer",
+       "description": "parlament.ch person number, optional"
+      },
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      },
+      "council": {
+       "type": "string",
+       "description": "NR or SR, optional"
+      },
+      "party": {
+       "type": "string",
+       "description": "party abbreviation (e.g. SP, SVP, FDP-Liberale, M-E, GRÜNE, glp), optional"
+      },
+      "lang": {
+       "type": "string",
+       "description": "de, fr or it for committee and interest labels (default de)"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "parliament_vote",
+    "title": "National Council votes",
+    "description": "Votes of the Swiss National Council since 2007 (legislatures 48–52; Parliamentary Services, ws.parlament.ch; current legislature daily): every electronic vote with business number and title, bill, subject, what yes and no meant, time, totals (yes, no, abstain, excused, did not vote, presiding) and totals per parliamentary group. Without arguments: the final votes (Schlussabstimmungen) with result. With query (words of the title) or business (e.g. 26.033): matching votes. With id: that vote in full incl. how every member voted and the totals per canton. With member (name): add that member's decision to each listed vote. The Council of States' individual votes are not in the data service. For a popular initiative the final vote is on the federal decree carrying the recommendation, not on the initiative itself.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "integer",
+       "description": "vote id, optional"
+      },
+      "query": {
+       "type": "string",
+       "description": "words of the title, optional"
+      },
+      "business": {
+       "type": "string",
+       "description": "business number like 26.033, optional"
+      },
+      "member": {
+       "type": "string",
+       "description": "member name, optional"
+      },
+      "final_only": {
+       "type": "boolean",
+       "description": "only final votes (default true without id/query/business)"
+      },
+      "legislature": {
+       "type": "integer",
+       "description": "limit a search to one legislature (52 = 2023–2027, 51 = 2019–2023, 50, 49, 48 = 2007–2011); default: all downloaded"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "parliament_and_people",
+    "title": "Parliament vs popular vote",
+    "description": "Parliament next to the people: for every National Council final vote of the current legislature whose bill later went to a popular vote, the chamber's result (yes, no, abstain, by group) next to the national popular result (yes %, accepted). Matched only on the exact title (the initiative title in «…», or the act title without «vom <date>»); unmatched items are left out rather than guessed. For an initiative a yes in the chamber is a yes to the federal decree with its recommendation, not to the initiative. Commune and canton results: federal_votes with the date.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "parliament_session",
+    "title": "Parliament sessions",
+    "description": "Sessions of the Swiss Parliament in the current legislature (Parliamentary Services, ws.parlament.ch): dates, sittings of each chamber, number of speeches, speaking time in total and by parliamentary group per chamber (Federal Council separately), the items debated longest, and the final votes of the session. Without session: the list of sessions. Speaking time = end minus start of each speech in the Official Bulletin, without remarks from the chair.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "session": {
+       "type": "integer",
+       "description": "session id (e.g. 5215), optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "parliament_business",
+    "title": "Parliamentary item history",
+    "description": "The path of a Swiss parliamentary item (Geschäft) that reached a National Council final vote in the current legislature: title, type, responsible department, submission date, topics, the dated status history (submitted, in committee, planned, final vote, done), the debate days in each chamber with number of speeches and speaking time and the link to the Official Bulletin, the final vote result and, where it went to the people, the popular vote. Find it by business number (e.g. 26.033) or by words of the title.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "business": {
+       "type": "string",
+       "description": "business number like 26.033, optional"
+      },
+      "query": {
+       "type": "string",
+       "description": "words of the title, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "search_speeches",
+    "title": "Search parliament speeches",
+    "description": "Search speeches in the Swiss Parliament (both chambers, current legislature, Official Bulletin index): who spoke, in which council, when, for how long, on which item, with a link to the bulletin. Filter by speaker, business number, session or date. For what a whole session dealt with (dates, sittings, longest debates, final votes) use parliament_session.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "speaker": {
+       "type": "string",
+       "description": "Name of the member of parliament who spoke, e.g. \"Pfister\" or \"Gerhard Pfister\"."
+      },
+      "business": {
+       "type": "string",
+       "description": "Business number of the item, e.g. \"26.033\"."
+      },
+      "session": {
+       "type": "integer",
+       "description": "Session id from parliament_session, e.g. 5206; omit for all sessions."
+      },
+      "date": {
+       "type": "string",
+       "description": "Day of the sitting as YYYY-MM-DD, e.g. \"2026-09-15\".",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "election_results",
+    "title": "National Council elections",
+    "description": "Swiss National Council elections from the Federal Statistical Office (open data): for the latest election (2023) party strength in per cent of the vote with the change since the previous election, seats, women elected and turnout for Switzerland, every canton and every commune (communes in the boundaries SLI uses; merged communes add up the votes of their former communes, recomputed exactly); plus party strength and seats since 1991 for Switzerland and the cantons. With commune (name or BFS number), canton (2-letter code) or neither (Switzerland). history=true adds the series since 1991. Parties are shown as published (CVP and BDP until 2019, Die Mitte from 2023).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "commune name or BFS number, optional"
+      },
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      },
+      "history": {
+       "type": "boolean",
+       "description": "include the series since 1991 (Switzerland or canton)"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cantonal_parliament",
+    "title": "Cantonal parliaments",
+    "description": "Cantonal parliaments that publish members and every individual vote as open data: Basel-Stadt (data.bs.ch, CC BY 4.0, 100 seats, votes since 2012), Bern (ogd.parl.apps.be.ch, 160 seats, votes since Nov 2022) and Thurgau (data.tg.ch, CC0, 130 seats, votes since Oct 2022), daily: the members with parliamentary group, party, constituency, seat, year of birth, occupation, employer, own homepage, committees, declared interests and voting record in the current legislature (participation, agreement with the own group); plus the latest 200 votes with totals per group. With name: matching members in full; without: the list and the statistics. No addresses.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "BS (Basel-Stadt), BE (Bern) or TG (Thurgau): the cantonal parliaments that publish every vote as open data.",
+       "enum": [
+        "BS",
+        "BE",
+        "TG"
+       ]
+      },
+      "name": {
+       "type": "string",
+       "description": "member name or part of it, optional"
+      },
+      "votes": {
+       "type": "boolean",
+       "description": "include the latest votes"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "canton_delegation",
+    "title": "Canton delegation in Bern",
+    "description": "The members a Swiss canton sends to the Federal Parliament (its National Council seats and its one or two Council of States members), each with party, parliamentary group, seat number, year of birth and profile links; plus the delegation's count by group and by gender. Official source: Parliamentary Services, ws.parlament.ch (daily).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation"
+      }
+     },
+     "required": [
+      "canton"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "sunday_shopping",
+    "title": "Sunday shopping rules",
+    "description": "Sunday shopping and shop opening hours in the 26 Swiss cantons from the official law texts (re-checked weekly): how many Sundays all shops may open per year (federal Labour Act: at most four without a permit, each canton decides), who decides (canton or commune), weekday and Saturday closing times, Advent rules, tourist-place exceptions, the law with its URL and a verbatim quote. Shops in large stations, airports and motorway service areas may open every Sunday (federal law). With canton (2-letter code): that canton.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "immigration_reasons",
+    "title": "Reasons for immigration",
+    "description": "Why foreign nationals move to Switzerland: immigration into the permanent foreign resident population (permits B, C and L of 12 months or more) by reason (employment within / outside quotas, family reunification, education and training, residence without employment, recognised refugees, hardship case and residence status after an asylum procedure, other), per year since 2008, for Switzerland, EU/EFTA vs third countries, the 26 cantons (canton of residence) and about 180 nationalities. Official source: State Secretariat for Migration SEM, foreigner statistics table 3-30 (ZEMIS). SEM totals differ slightly from the FSO (STATPOP) migration figures by design. Asylum seekers are not included (see asylum_statistics).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "year": {
+       "type": "integer",
+       "description": "year 2008 onwards (default: latest)"
+      },
+      "canton": {
+       "type": "string",
+       "description": "2-letter canton code, e.g. ZH"
+      },
+      "nationality": {
+       "type": "string",
+       "description": "country name in German as published by SEM, or its English, French or Italian name, e.g. Germany / Deutschland"
+      },
+      "history": {
+       "type": "boolean",
+       "description": "include the Swiss totals for every year (default false)"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "mortgage_rates",
+    "title": "Mortgage and SNB rates",
+    "description": "Swiss National Bank policy rate (current, since when, every change since June 2019), SARON, and the average interest rates Swiss banks publish for new mortgages at month end (SNB data portal): variable, fixed 2 / 5 / 10 years, SARON 3 years, with 0.25 quantile, median and 0.75 quantile across banks, monthly series since 2007; plus savings and pillar 3a rates. For rents the BWO reference rate applies (get_reference_rate). Information only, not financial advice.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "history": {
+       "type": "boolean",
+       "description": "include the monthly mean series (default false)"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "dog_tax",
+    "title": "Dog tax by commune",
+    "description": "Yearly dog tax per Swiss commune from official sources where a canton has a uniform rate or publishes every commune: Vaud (cantonal CHF 100 plus each commune's tax), Lucerne and Aargau (CHF 120 everywhere), Basel-Stadt (CHF 160 / 150 / 120, each further dog double), Basel-Landschaft (each commune), Geneva (cantonal CHF 50 plus the commune's surcharge plus CHF 5 fees). With commune (name or BFS number): that commune; without: all covered communes. Other cantons are not covered.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "commune name or BFS number, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "waste_fees",
+    "title": "Waste fees by commune",
+    "description": "Waste, water and wastewater fees of Swiss communes. Official open data where the canton publishes every commune: canton of Zurich (all communes, since 2000: yearly basic fee converted to a 4-room flat and price per 35-litre bag) and Basel-Landschaft (bag price, basic fee per household, water and wastewater per m³). Plus, for about 380 larger communes in every canton, the federal Price Supervisor's yearly water, wastewater and waste fees for three model households (1, 3 and 4 persons), shown with its consent and its source note. CHF incl. VAT. With commune (name, BFS number or postcode): that commune; without: every ZH/BL commune's latest values.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "commune name or BFS number, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "how_many",
+    "title": "How many in Switzerland",
+    "description": "Official answers to «How many … are there in Switzerland?» (the questions that reach Google Switzerland's top 10 every year): cantons, communes and districts (BFS commune register, per canton), permanent residents and foreign nationals (BFS STATPOP), Swiss abroad, cows, dairy cows and cattle (BFS farm structure survey), museums and visits, hydropower plants of at least 300 kW (BFE), hospitals and beds, main languages, taxpayers with net wealth over CHF 1 million (ESTV), foreign enclaves, the geographic centre, and protected AOP cheeses (no official count of cheese varieties exists). Each answer has its date and federal source. With topic: only that answer.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "topic": {
+       "type": "string",
+       "description": "optional: register, population, swiss_abroad, cattle, museums, hydropower, hospitals, languages, millionaires, enclaves, centre, cheese"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "imputed_rental_value",
+    "title": "Imputed rental value abolition",
+    "description": "Abolition of the imputed rental value (Eigenmietwert, valeur locative) on owner-occupied homes in Switzerland: in force 1 January 2029 (Federal Council decision of 1 April 2026); timeline from the 2017 parliamentary initiative to entry into force, the changes for owners as the federal administration states them (maintenance and debt interest deductions, first-time buyer deduction, cantonal tax on second homes), and the official result of the linked vote of 28 September 2025 (FSO VoteInfo: Switzerland, every canton; with commune: that commune), the status of each canton on the optional tax on second homes and on implementing the reform (official cantonal sources, re-checked weekly), and how each canton sets the imputed rental value until the end of 2028 (ESTV). Information only, not tax advice.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      },
+      "commune": {
+       "type": "string",
+       "description": "commune name or BFS number, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "fire_danger",
+    "title": "Forest fire danger",
+    "description": "Forest fire danger and fire bans in Switzerland from FOEN open data (waldbrandgefahr.ch; credit «Source: FOEN»): for each of the 143 warning regions the danger level 1–5 and the canton's prevention measure 1–5 (no measures, warning, conditional ban, ban in and near the forest, absolute ban outdoors) with texts in DE FR IT EN and the date in force. With canton (2-letter code): that canton's regions and its highest danger and strictest measure; without: every canton summary. Bans issued by communes and fireworks rules (e.g. 1 August) are decided by cantons and communes and are not in this data.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "water_temperature",
+    "title": "Water temperatures",
+    "description": "Water temperature in Switzerland: every FOEN river station measuring water temperature (raw data, latest reading, and where FOEN publishes it usual_c = median for this calendar day over the station's measuring years with usual_p25_c/usual_p75_c; credit «Surface waters data: Hydrology Division, FOEN»), the three river stations at the outflows of Lake Thun, Lake Geneva and Lake Lucerne (labelled as outflows, FOEN measures no lakes), Lake Zurich from the two City of Zurich water police stations with the last 14 daily means and the typical value for this calendar week (mean over all full years since 2007, calculated by the Swiss Living Index), and Zurich city bath temperatures reported in the last 7 days. Also bathing water quality: the FOEN classification of every reported bathing site (EU Bathing Water Directive, 1 excellent, 2 good, 3 sufficient, 4 poor, 0 not classifiable; credit «Source: FOEN») and the latest Zurich cantonal laboratory sample per site. With canton (2-letter code): river stations in that canton (nearest locality).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "births_deaths",
+    "title": "Births and deaths",
+    "description": "Births and deaths in Switzerland or one canton (geo = CH or a 2-letter canton code): yearly births and deaths since 1969, the last 36 months, deaths per week for the last 104 weeks with the BFS expected value and 99% band (mortality monitoring; latest weeks provisional), the month with most deaths over the last ten years, and the page. Aggregate official statistics only (BFS BEVNAT, mortality monitoring); births and deaths per commune per year are in get_commune pages and the canton page table.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "geo": {
+       "type": "string",
+       "description": "CH or canton abbreviation, e.g. ZH"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_switzerland",
+    "title": "Switzerland overview",
+    "description": "The country level of the hierarchy Switzerland → 26 cantons → communes: population and foreign share (BFS STATPOP), naturalisations per year 2011 onwards with ordinary vs facilitated and the most common former nationalities (official BFS country names in DE FR IT EN), every canton with population, foreign share, tax rank, naturalisations per 1,000 foreign residents and its page and data file, and the index of all commune pages. Use get_canton and get_commune to go down a level. Also the Federal Council (members, departments, President of the Confederation, Federal Chancellor; verified on admin.ch, dated) and the key national figures of the Switzerland page: vital statistics, permits, unemployment, jobs, wages, rents, vacancy, reference rate, health premiums, hospitals, AHV 2027, pillar 3a 2027, public finances of all levels, mobility and energy, crime, sunshine; each with year and source.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_canton",
+    "title": "Canton profile",
+    "description": "Get all metric values for one canton. canton = 2-letter abbreviation (e.g. ZH, GE, TI). rank 1 = lowest value for cost metrics (dir 'low', e.g. taxes/rent) and highest value for capacity/benefit metrics (dir 'high', e.g. sunshine/jobs). Ranks describe order under the stated scenario, not universal suitability. Also returns the canton pages (DE FR IT EN), its flag, the cantonal government (members, departments, president) and chancellery contacts checked weekly against the official canton website, immigration and emigration by nationality (arrivals, departures, balance, trend), naturalisations by former nationality and world region with the rate per 1,000 foreign residents, and every commune of the canton with population, tax at CHF 100,000, Swiss rank and page. Includes highlights: protected AOP/IGP specialities of the area, UNESCO World Heritage, parks, cultural property of national importance and «Home of» brands (registered seat from the commercial register), plus traditional specialities of the canton. Also its official social media accounts (as linked from the canton's website; if none, the Federal Council's, see social_media.level).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\"."
+      },
+      "communes": {
+       "type": "boolean",
+       "description": "true to list every commune of the canton (population, tax on CHF 100,000, page); default the 10 largest."
+      }
+     },
+     "required": [
+      "canton"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "rank_by_metric",
+    "title": "Rank cantons by metric",
+    "description": "Rank all 26 Swiss cantons by one metric (lowest taxes, highest rents, most sunshine, lowest unemployment …), with the value, unit, year and official source of each canton. metric = a key from list_metrics; order = \"high\" or \"low\". For a full profile of one canton use get_canton; for 2 to 4 cantons side by side use compare_cantons.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "metric": {
+       "type": "string",
+       "description": "Metric key from list_metrics, e.g. \"tax_single\", \"rent_mean\", \"unemployment_pct\".",
+       "enum": [
+        "foreigner_pct",
+        "net_migration_per_1000",
+        "sunshine_hours",
+        "heat_days",
+        "tropical_nights",
+        "frost_days",
+        "balance_per_capita",
+        "beds_per_1000",
+        "jobs",
+        "tax_single",
+        "rent_mean",
+        "premium_adult",
+        "premium_adult_lowest",
+        "premium_adult_avg",
+        "premium_saving_adult",
+        "premium_subsidy_rate_pct",
+        "premium_subsidy_per_beneficiary_chf",
+        "premium_subsidy_pct_of_premium",
+        "vacancy_pct",
+        "new_dwellings_per_1000",
+        "crime_per_1000",
+        "violent_crime_per_1000",
+        "population",
+        "population_growth_pct",
+        "net_debt_per_capita",
+        "birth_rate_per_1000",
+        "ev_share_new_cars_pct",
+        "cars_per_1000",
+        "ev_share_stock_pct",
+        "motorbikes_per_1000",
+        "goods_vehicles_per_1000",
+        "cross_border_share_of_jobs_pct",
+        "median_net_income_chf",
+        "broadband_gbit_pct",
+        "pt_accessibility_index",
+        "pv_w_per_capita",
+        "energiestadt_population_share_pct",
+        "organic_area_share_pct",
+        "waste_kg_per_capita",
+        "separate_collection_pct",
+        "naturalisations_total",
+        "naturalisation_rate",
+        "unemployment_pct",
+        "electricity_rp_kwh"
+       ]
+      },
+      "order": {
+       "type": "string",
+       "description": "\"high\" = largest value first, \"low\" = smallest first (default high).",
+       "enum": [
+        "high",
+        "low"
+       ]
+      }
+     },
+     "required": [
+      "metric"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "compare_cantons",
+    "title": "Compare cantons",
+    "description": "Compare 2 to 4 Swiss cantons side by side across every metric of the index (income tax, rent, health premiums, unemployment, sunshine, safety, population and more), each with its value, unit, year and official source, and which canton does better. Use for «Zurich or Zug?» or «compare Geneva, Vaud and Basel». For one canton use get_canton; to rank all 26 use rank_by_metric; for rents alone rent_index.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "cantons": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "2 to 4 canton abbreviations, e.g. [\"ZH\",\"ZG\",\"GE\"].",
+       "minItems": 2,
+       "maxItems": 4
+      }
+     },
+     "required": [
+      "cantons"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "commune_tax",
+    "title": "Tax for a household in a commune",
+    "description": "Live income and wealth tax (federal, cantonal and communal, without church tax) for ONE household in ONE Swiss commune, from the official ESTV tax calculator (tax year 2026): any income, wealth, married or single, number of children. For the tax on a CHF 100,000 salary in every commune at once (ranking, cheapest communes) use tax_by_commune.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      },
+      "income": {
+       "type": "number",
+       "description": "Taxable gross yearly income in CHF, e.g. 100000."
+      },
+      "married": {
+       "type": "boolean",
+       "description": "true for a married couple (joint taxation), false or omitted for a single person."
+      },
+      "children": {
+       "type": "number",
+       "description": "Number of children in the household, e.g. 2 (default 0)."
+      },
+      "wealth": {
+       "type": "number",
+       "description": "Net wealth in CHF for the wealth tax, e.g. 250000 (default 0)."
+      }
+     },
+     "required": [
+      "commune",
+      "income"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "search_commune",
+    "title": "Find a commune",
+    "description": "Find Swiss communes by name or postcode (official ESTV location register). Returns commune name, canton and postcode — use before commune_tax or estimate_net_move when the spelling is uncertain.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Commune name (or part of it) or postcode, e.g. \"Küsnacht\" or \"8700\"."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "estimate_net_move",
+    "title": "Net cost of a move",
+    "description": "Net yearly CHF effect of moving between two Swiss communes for one household: live commune-level tax (official ESTV 2026) plus canton-average rent and health-premium differences; positive savings = the move saves money. For the full move checklist (insurer, school holidays, electricity, permits, deadlines) use plan_move.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from_commune": {
+       "type": "string",
+       "description": "current commune name or postcode"
+      },
+      "to_commune": {
+       "type": "string",
+       "description": "candidate commune name or postcode"
+      },
+      "income": {
+       "type": "number",
+       "description": "gross household income, CHF/year"
+      },
+      "married": {
+       "type": "boolean",
+       "description": "true for a married couple (joint taxation), false or omitted for a single person."
+      },
+      "children": {
+       "type": "number",
+       "description": "Number of children in the household, e.g. 2 (default 0)."
+      },
+      "wealth": {
+       "type": "number",
+       "description": "taxable wealth, CHF"
+      }
+     },
+     "required": [
+      "from_commune",
+      "to_commune",
+      "income"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_trend",
+    "title": "Canton metric history",
+    "description": "Historical year-series for a metric in one canton (e.g. sunshine back to 1884, migration to 1981, rent to 2010). metric = key from list_metrics with history: rent_mean, net_migration_per_1000, foreigner_pct, sunshine_hours, balance_per_capita, beds_per_1000, jobs, unemployment_pct (SECO yearly averages to 1993). Optional from_year.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\"."
+      },
+      "metric": {
+       "type": "string",
+       "description": "Metric key with a year series, e.g. \"rent_mean\", \"sunshine_hours\", \"unemployment_pct\".",
+       "enum": [
+        "rent_mean",
+        "net_migration_per_1000",
+        "foreigner_pct",
+        "sunshine_hours",
+        "population",
+        "heat_days",
+        "tropical_nights",
+        "frost_days",
+        "balance_per_capita",
+        "beds_per_1000",
+        "crime_per_1000",
+        "electricity_rp_kwh",
+        "jobs",
+        "unemployment_pct",
+        "violent_crime_per_1000",
+        "population_growth_pct",
+        "net_debt_per_capita",
+        "birth_rate_per_1000",
+        "ev_share_new_cars_pct",
+        "cars_per_1000",
+        "ev_share_stock_pct",
+        "motorbikes_per_1000",
+        "goods_vehicles_per_1000",
+        "cross_border_share_of_jobs_pct",
+        "median_net_income_chf",
+        "pv_w_per_capita",
+        "organic_area_share_pct",
+        "naturalisations_total",
+        "naturalisation_rate"
+       ]
+      },
+      "from_year": {
+       "type": "number",
+       "description": "First year to return, e.g. 2000; omit for the whole series."
+      }
+     },
+     "required": [
+      "canton",
+      "metric"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "upcoming_votes",
+    "title": "Upcoming federal votes",
+    "description": "The next Swiss federal vote dates and, once the Federal Council has set them, the proposals on the ballot, in German, French, Italian and English (official Federal Chancellery / VoteInfo data). For results of past votes use federal_votes.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "recommend_canton",
+    "title": "Recommend a canton",
+    "description": "Personal canton recommendation (\"Where should I live in Switzerland?\"): weight 5 categories 0–3 (cost = rent/premiums/electricity; tax = income tax/fiscal balance; work = jobs/unemployment/migration; env = sunshine/crime/vacancy; health = hospital capacity) and get all 26 cantons scored by the transparent percentile method of the Swiss Living Quality Index. Every evidence figure carries value, unit, rank, source and year. Scores describe order under the stated weights, not universal suitability.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "cost": {
+       "type": "number",
+       "description": "Weight 0 to 3 for low living costs (rent, health premiums, electricity); default 2.",
+       "minimum": 0,
+       "maximum": 3
+      },
+      "tax": {
+       "type": "number",
+       "description": "Weight 0 to 3 for low taxes (income tax, fiscal balance); default 2.",
+       "minimum": 0,
+       "maximum": 3
+      },
+      "work": {
+       "type": "number",
+       "description": "Weight 0 to 3 for the job market (jobs, unemployment, migration); default 2.",
+       "minimum": 0,
+       "maximum": 3
+      },
+      "env": {
+       "type": "number",
+       "description": "Weight 0 to 3 for environment and climate (sunshine, heat, frost); default 2.",
+       "minimum": 0,
+       "maximum": 3
+      },
+      "health": {
+       "type": "number",
+       "description": "Weight 0 to 3 for health care (hospital beds, premiums); default 2.",
+       "minimum": 0,
+       "maximum": 3
+      },
+      "infra": {
+       "type": "number",
+       "description": "0-3, connectivity & infrastructure (active once infra metrics ship)"
+      },
+      "international_community": {
+       "type": "boolean",
+       "description": "include foreigner share, higher preferred"
+      },
+      "limit": {
+       "type": "number",
+       "description": "top N with evidence, default 5"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_salary",
+    "title": "Salaries by sector",
+    "description": "Official gross monthly salaries in Switzerland by ECONOMIC SECTOR (BFS Swiss Earnings Structure Survey LSE): median and P10/P25/P75/P90 for all employees, women and men, by major region. canton (2-letter) is mapped to its major region; sector = NOGA code or words («banking», «software»). For salaries by OCCUPATION and age (nurse, developer, teacher) use salary_by_occupation.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Mapped to its BFS major region."
+      },
+      "region": {
+       "type": "string",
+       "description": "major region code 1–7 or -1 for Switzerland"
+      },
+      "sector": {
+       "type": "string",
+       "description": "Economic sector as NOGA code or words, e.g. \"64\", \"banking\", \"software\", \"construction\"; omit for all sectors."
+      },
+      "year": {
+       "type": "number",
+       "description": "Year of the earnings survey (every two years: 2012 to 2024), e.g. 2026; omit for the latest. An unavailable year returns the list of available years."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_minimum_wage",
+    "title": "Cantonal minimum wages",
+    "description": "Statutory cantonal minimum wages in Switzerland (official cantonal pages): hourly amount, valid from, history and the monthly equivalent at 40 hours. Only five cantons have one (BS, GE, JU, NE, TI); without canton the list of all five is returned. Elsewhere minimums apply only through collective or standard employment contracts.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Only BS, GE, JU, NE and TI have one; omit for all five."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_payroll_rates",
+    "title": "Payroll deduction rates",
+    "description": "Official Swiss social-security payroll deductions for the current year (AHV/IV/EO, unemployment insurance ALV with ceiling, occupational pension BVG coordinated salary and age credits), as used for a gross-to-net salary estimate.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_premium_subsidy",
+    "title": "Health premium subsidies",
+    "description": "Health-insurance premium subsidies (Prämienverbilligung / réduction des primes) per canton (FOPH KVSTAT): share of insured receiving a subsidy, average CHF per beneficiary and per household, subsidy as % of the mean premium, federal vs cantonal funding, plus the responsible cantonal office (name, address, phone, website). canton = 2-letter abbreviation.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\"."
+      }
+     },
+     "required": [
+      "canton"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_family_tax_deductions",
+    "title": "Family tax deductions",
+    "description": "Swiss income-tax deductions for families (ESTV tax folder): maximum childcare (third-party care) deduction per child and the child deduction (Kinderabzug) rule for a canton, plus the federal values. canton = 2-letter abbreviation; omit for federal only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Omit for the federal values only."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_housing_costs",
+    "title": "Household housing costs",
+    "description": "Average monthly housing costs per household in Switzerland (BFS household budget survey HABE): net rent or mortgage interest, ancillary costs (Nebenkosten: flat-rate charges, water, waste water, waste, upkeep), energy (electricity, gas/fuels, heating), with BFS quality grades. Latest year for Switzerland; with canton also the values of its major region (pooled period). Means over all households incl. owners.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Mapped to its BFS major region; omit for Switzerland."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_reference_rate",
+    "title": "Mortgage reference rate",
+    "description": "Swiss mortgage reference interest rate for rents (BWO/FOH): current rate, valid since, next publication dates, every change since 2008, and the rule for rent adjustments (VMWG Art. 13). Optional lease_rate (the rate in the lease) returns the quarter-point steps since then. Also returns the latest BFS rent price index (quarterly change, annual change, share of rents up/down/unchanged).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "lease_rate": {
+       "type": "number",
+       "description": "reference rate stated in the lease, e.g. 1.75"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "data_freshness",
+    "title": "Data freshness",
+    "description": "How current the Swiss Living Index data is: every scheduled official data source with where it runs (cloud, a Mac on the Swiss network, or the A5000 language-model machine), its cadence in days, the last successful check, the next due date and a status (current, due, overdue = more than twice its cadence, new = not run yet), plus a summary. Use it to state how fresh a figure is before relying on it. Optional status filter.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "current",
+        "due",
+        "overdue",
+        "new"
+       ],
+       "description": "optional filter"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_datasets",
+    "title": "List datasets",
+    "description": "Catalogue of EVERY dataset published by the Swiss Living Index (about 125: migration, births and first names, crime, public finances, cross-border commuters, vehicles, broadband, sustainability, naturalisations, permits, health care, housing, income, education and more), each with source, geography (Switzerland / canton / commune), years and page. Without arguments it returns the topics; with topic or query it returns the matching datasets. Then read one with get_dataset.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "topic": {
+       "type": "string",
+       "description": "topic key from the topic list, e.g. migration"
+      },
+      "query": {
+       "type": "string",
+       "description": "words to match in title, source or id"
+      },
+      "geography": {
+       "type": "string",
+       "description": "switzerland, canton or commune"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_dataset",
+    "title": "Read a dataset",
+    "description": "Read one Swiss Living Index dataset (id from list_datasets), exactly as published on the site (official values, unchanged). Filter with canton (2-letter) and/or commune (name or BFS number), section (a top-level key), from_year / to_year. Large datasets return a size summary first so you can narrow the request. Every reply carries source, source URL and the page to cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Dataset id from list_datasets, e.g. \"migration/migration-switzerland\"."
+      },
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Filters the dataset to that canton."
+      },
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work. Filters the dataset to that commune."
+      },
+      "section": {
+       "type": "string",
+       "description": "One top-level section of the dataset (the too_large answer lists them)."
+      },
+      "from_year": {
+       "type": "number",
+       "description": "Keep year series from this year, e.g. 2015."
+      },
+      "to_year": {
+       "type": "number",
+       "description": "Keep year series up to this year, e.g. 2025."
+      },
+      "max_kb": {
+       "type": "number",
+       "description": "reply size limit in KB, default 150, max 600"
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_commune",
+    "title": "Commune fact sheet",
+    "description": "Fact sheet for one Swiss commune (by name, BFS number or postcode); for communes with a one-pager also the president, council, administration contacts, departments, upcoming meetings, news, tenders and projects read from the commune website (with source and date): population, foreign residents, migration, jobs, new dwellings, gigabit and fibre coverage, public-transport accessibility, solar power, EV share, cars, cross-border commuters, commune finances, its canton context (tax, rent, premium ranks), live income tax for a reference profile (official ESTV), and the national fuel reference; its official social media accounts (as linked from the commune website; if none, the canton's, then the Federal Council's, see social_media.level). Includes highlights: protected AOP/IGP specialities of the area, UNESCO World Heritage, parks, cultural property of national importance and «Home of» brands (registered seat from the commercial register).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      }
+     },
+     "required": [
+      "commune"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "compare_health_insurers",
+    "title": "Compare health insurers",
+    "description": "Every approved basic health-insurance premium (FOPH) for a commune or premium region: cheapest offers for an adult (26+), young adult (19–25) or child, by deductible, insurance model (standard, family doctor/HMO, telemedicine, other) and accident cover, with the insurer and product. year 2027 (next year) or 2026. Premiums depend on the commune of residence, so give commune (name or BFS number) or region (e.g. ZH-1).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      },
+      "region": {
+       "type": "string",
+       "description": "Premium region as canton plus number, e.g. \"ZH-1\", \"ZH-2\", \"BE-3\" (use instead of commune)."
+      },
+      "year": {
+       "type": "number",
+       "description": "Premium year: 2026 (current) or 2027 (next year, approved by FOPH in September); default the latest."
+      },
+      "age_group": {
+       "type": "string",
+       "description": "adult (default), young_adult or child"
+      },
+      "deductible": {
+       "type": "number",
+       "description": "CHF, e.g. 300 or 2500"
+      },
+      "model": {
+       "type": "string",
+       "description": "standard, family_doctor, telemedicine, other or any (default)"
+      },
+      "accident": {
+       "type": "boolean",
+       "description": "true = accident cover included (default false: covered by the employer)"
+      },
+      "limit": {
+       "type": "number",
+       "description": "number of offers, default 10"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_electricity_price",
+    "title": "Electricity tariff",
+    "description": "Official electricity tariff (ElCom) for a Swiss commune and its grid operator(s): total, energy, grid use, commune charges and federal levy in Rappen per kWh, for 2025–2027, and the yearly bill for a consumption profile (ElCom categories H1–H8, default H4 = 5-room flat, 4500 kWh) or your own kWh.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      },
+      "category": {
+       "type": "string",
+       "description": "H1–H8, default H4"
+      },
+      "kwh": {
+       "type": "number",
+       "description": "own yearly consumption (overrides the category volume)"
+      },
+      "year": {
+       "type": "number",
+       "description": "Year of the ElCom tariff (2025 to 2027), e.g. 2026; omit for the latest. An unavailable year returns the list of available years."
+      }
+     },
+     "required": [
+      "commune"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "fuel_prices_near",
+    "title": "Fuel prices across the border",
+    "description": "Is the drive across the border worth it? Official station prices in France, Austria and Italy (live / daily official sources) near a Swiss place, ranked by net saving vs the official Swiss average price (BFS) after the fuel used for the round trip. place = postcode or locality (or lat/lon). Location is used for this lookup only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "place": {
+       "type": "string",
+       "description": "Swiss place: postcode, locality or both, e.g. \"8001\", \"Basel\", \"8001 Zürich\" or \"Basel (BS)\". Alternatively give lat and lon."
+      },
+      "lat": {
+       "type": "number",
+       "description": "Latitude in decimal degrees, e.g. 47.56 (with lon)."
+      },
+      "lon": {
+       "type": "number",
+       "description": "Longitude in decimal degrees, e.g. 7.59 (with lat)."
+      },
+      "fuel": {
+       "type": "string",
+       "description": "unleaded95 (default) or diesel"
+      },
+      "km": {
+       "type": "number",
+       "description": "search radius, 2–40, default 10"
+      },
+      "tank": {
+       "type": "number",
+       "description": "litres, default 50"
+      },
+      "consumption": {
+       "type": "number",
+       "description": "l/100 km, default 7"
+      },
+      "postcode": {
+       "type": "string",
+       "description": "Swiss 4-digit postcode, e.g. \"4058\" (alternative to place)."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "ev_charging_near",
+    "title": "EV charging availability",
+    "description": "Live availability of public EV charging points in Switzerland (official SFOE feed, minutes old): national and per-canton availability and fast chargers; with place (postcode or locality) or lat/lon also the nearest points within km with their live status. No prices (no official register exists).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "place": {
+       "type": "string",
+       "description": "Swiss place: postcode, locality or both, e.g. \"8001\", \"Basel\", \"8001 Zürich\" or \"Basel (BS)\". Alternatively give lat and lon. Omit place and coordinates for the national and per-canton summary."
+      },
+      "lat": {
+       "type": "number",
+       "description": "Latitude in decimal degrees, e.g. 46.95 (with lon)."
+      },
+      "lon": {
+       "type": "number",
+       "description": "Longitude in decimal degrees, e.g. 7.44 (with lat)."
+      },
+      "km": {
+       "type": "number",
+       "description": "radius, default 5, max 25"
+      },
+      "postcode": {
+       "type": "string",
+       "description": "Swiss 4-digit postcode, e.g. \"3011\" (alternative to place)."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "commute_cost",
+    "title": "Commute cost",
+    "description": "Monthly commute cost between two Swiss places: by car at the official Swiss average fuel price (BFS) and by electric car at the home commune official electricity tariff (ElCom H4), plus the public-transport journey time (Swiss timetable). Distance defaults to straight line × 1.3 between the stations (labelled estimate) unless km_one_way is given. Public-transport fares are not open official data and are not included.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "description": "Home place: Swiss postcode or locality, e.g. \"Winterthur\" or \"8400\"."
+      },
+      "to": {
+       "type": "string",
+       "description": "Work place: Swiss postcode or locality, e.g. \"Zürich\" or \"8001\"."
+      },
+      "km_one_way": {
+       "type": "number",
+       "description": "Road distance one way in km, e.g. 25; omit to use the routed distance between from and to."
+      },
+      "days_per_month": {
+       "type": "number",
+       "description": "Commuting days per month, e.g. 20 (default 20)."
+      },
+      "consumption_l": {
+       "type": "number",
+       "description": "l/100 km, default 7"
+      },
+      "ev_kwh": {
+       "type": "number",
+       "description": "kWh/100 km, default 18"
+      },
+      "fuel": {
+       "type": "string",
+       "description": "unleaded95 or diesel"
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "household_budget",
+    "title": "Household budget",
+    "description": "What Swiss households spend per month (BFS household budget survey, official): income, social insurance, taxes, health premiums, food, restaurants, housing and energy, transport, leisure and more, for all households, singles, couples without children, families and retired couples.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "household": {
+       "type": "string",
+       "description": "all, single, couple_no_children, family or retiree_couple; omit for all types"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "salary_by_occupation",
+    "title": "Salaries by occupation",
+    "description": "Official gross monthly salaries by occupation group (ISCO-08) and age band (up to 29, 30–49, 50+), median and P10–P90, for all, women and men, by major region (BFS LSE). occupation = ISCO code or words (e.g. \"nurse\", \"engineer\", \"teacher\", \"IT\"); canton maps to its major region.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "occupation": {
+       "type": "string",
+       "description": "Occupation as ISCO-08 code or words, e.g. \"25\", \"nurse\", \"software developer\", \"teacher\"."
+      },
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Mapped to its BFS major region."
+      },
+      "region": {
+       "type": "string",
+       "description": "BFS major region (NUTS-2): 1 Lake Geneva, 2 Espace Mittelland, 3 Northwestern Switzerland, 4 Zurich, 5 Eastern Switzerland, 6 Central Switzerland, 7 Ticino, -1 Switzerland. Use canton instead to map automatically."
+      },
+      "age": {
+       "type": "string",
+       "description": "all (default), under30, 30to49, 50plus"
+      },
+      "year": {
+       "type": "number",
+       "description": "Year of the earnings survey (every two years: 2012 to 2024), e.g. 2026; omit for the latest. An unavailable year returns the list of available years."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cheapest_health_insurer",
+    "title": "Cheapest health insurer",
+    "description": "The cheapest basic health insurer (FOPH-approved premiums, next year) in every Swiss premium region, or for one canton, region (e.g. ZH-1) or commune: cheapest standard premium (adult 26+, free choice of doctor, CHF 300 deductible, with accident cover) and the lowest possible premium (any model, highest deductible), plus how often each insurer is the cheapest nationally.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      },
+      "region": {
+       "type": "string",
+       "description": "premium region code, e.g. ZH-1, optional"
+      },
+      "commune": {
+       "type": "string",
+       "description": "name, postcode or BFS number, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "permit_types",
+    "title": "Swiss permit types",
+    "description": "Swiss residence permits L, B, C, Ci, G, F, N, S (incl. the asylum statuses): what each permit is, the official rules (validity, renewal, C permit after 10 or 5 years, language levels, EU/EFTA 5-year list, moving within Switzerland) each with its law article (AIG, VZAE, BüG) or SEM page, and the number of people per permit (BFS, 2010 to latest year) for Switzerland or a canton. Information, not legal advice: the cantonal migration office decides.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "optional canton, e.g. ZH"
+      },
+      "history": {
+       "type": "boolean",
+       "description": "include all years, default false"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "leaving_switzerland",
+    "title": "Leaving Switzerland",
+    "description": "Leaving Switzerland: the official steps with their law articles: deregister with the commune at the latest 14 days before departure (VZAE 15), what happens to an L, B or C permit (AIG 61), keeping a C permit for up to 4 years on request (VZAE 79), residence for naturalisation counted as given up (BüG 33), early pillar 3a withdrawal on leaving for good (BVV 3 Art. 3), pension fund cash payout and its EU/EFTA limit (FZG 5, 25f), vested benefits (FZG 4), AHV pensions abroad, refund of AHV contributions and voluntary AHV (AHVG 2, 18, RV-AHV), withholding tax on payouts abroad (DBG 96), plus the number of people who moved abroad (BFS).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "permit": {
+       "type": "string",
+       "enum": [
+        "L",
+        "B",
+        "C",
+        "swiss"
+       ],
+       "description": "current permit, or swiss for Swiss citizens"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "naturalisation_timing",
+    "title": "Naturalisation eligibility",
+    "description": "Checks the federal residence conditions for ordinary Swiss naturalisation (BüG Art. 9, 33) or facilitated naturalisation of a Swiss citizen's spouse (BüG Art. 21) from the years someone has lived in Switzerland: years between ages 8 and 18 count double (at least 6 actual years), temporary admission (F) counts half, C permit required. Returns which conditions are met with the law articles, and what is missing. Cantons add 2 to 5 years of residence in the canton (BüG 18). Orientation only, not legal advice.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "years_total": {
+       "type": "number",
+       "description": "actual years lived in Switzerland with B, C or Ci permit"
+      },
+      "years_in_last_5": {
+       "type": "number",
+       "description": "of those, years within the last 5 years"
+      },
+      "years_age_8_to_18": {
+       "type": "number",
+       "description": "of those, years between the 8th and 18th birthday"
+      },
+      "years_temporary_admission_f": {
+       "type": "number",
+       "description": "years with temporary admission F (count half)"
+      },
+      "has_c_permit": {
+       "type": "boolean",
+       "description": "true if the person holds a C permit (settlement permit), required for ordinary naturalisation."
+      },
+      "years_in_canton": {
+       "type": "number",
+       "description": "Years lived in the current canton, e.g. 3 (cantons ask 2 to 5)."
+      },
+      "spouse_of_swiss": {
+       "type": "boolean",
+       "description": "true for the spouse of a Swiss citizen (facilitated naturalisation, BüG Art. 21)."
+      },
+      "years_married_living_together": {
+       "type": "number",
+       "description": "Years married and living together with the Swiss spouse, e.g. 3 (facilitated naturalisation needs 3)."
+      }
+     },
+     "required": [
+      "years_total"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "which_permit",
+    "title": "Which permit fits",
+    "description": "Which Swiss permit fits a person (the Swiss Living Index permit route finder as a tool): from nationality and plan (visit, work, commute from abroad, join family, study, retire, live without working, or already living here on a B permit) returns the permit (L, B, C, G or none), whether it is an entitlement or at the canton's discretion, the 2026 quota for non-EU work, every rule with its law article (AIG, VZAE, BüG) or SEM page, and for people already here the years until a C permit and naturalisation. Same logic as the page, checked by 45 test cases. Asylum statuses are out of scope. Information, not legal advice: the cantonal migration office decides.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "nationality": {
+       "type": "string",
+       "description": "ISO 3166 alpha-2 code (e.g. DE, PL, GB, US, IN) or a group: eu5, eu, uk, other"
+      },
+      "plan": {
+       "type": "string",
+       "enum": [
+        "visit",
+        "work",
+        "commute",
+        "family",
+        "study",
+        "retire",
+        "nonactive",
+        "here"
+       ],
+       "description": "What the person wants to do in Switzerland: visit, work, commute (live abroad, work here), family (join family), study, retire, nonactive (live without working) or here (already living here)."
+      },
+      "job_length": {
+       "type": "string",
+       "enum": [
+        "lt3",
+        "3to12",
+        "ge12"
+       ],
+       "description": "work: under 3 months, 3 to 12 months, a year or longer / open-ended (default ge12)"
+      },
+      "qualified": {
+       "type": "boolean",
+       "description": "work, non-EU: manager, specialist or other qualified worker (default true)"
+      },
+      "family_member_in_switzerland": {
+       "type": "string",
+       "enum": [
+        "swiss",
+        "C",
+        "B",
+        "L"
+       ],
+       "description": "family: status of the person in Switzerland"
+      },
+      "family_member_is_eu_efta": {
+       "type": "boolean",
+       "description": "family: that person is an EU/EFTA national (free movement rules, not covered)"
+      },
+      "age": {
+       "type": "number",
+       "description": "Age in years, used for plan retire (e.g. 62)."
+      },
+      "ties_to_switzerland": {
+       "type": "boolean",
+       "description": "retire: earlier long stays or close relatives in Switzerland"
+      },
+      "years_on_b_permit": {
+       "type": "number",
+       "description": "here: years on a B permit without interruption"
+      }
+     },
+     "required": [
+      "nationality",
+      "plan"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "work_permit_quotas",
+    "title": "Work permit quotas",
+    "description": "Swiss work permit quotas for people from outside the EU/EFTA, set every year by the Federal Council (VZAE annexes 1 and 2): B and L permits per canton plus the federal reserve, and the separate quotas for EU/EFTA service providers over 90 days, UK nationals without acquired rights and US interns, with the admission rules (economic interest, priority of the domestic workforce, qualified workers only) and their law articles. canton optional.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      },
+      "year": {
+       "type": "number",
+       "description": "Quota year, e.g. 2026; omit for the latest Federal Council decision."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "family_reunification",
+    "title": "Family reunification",
+    "description": "Family reunification in Switzerland (AIG Art. 42 to 47, VZAE 73 to 73b): who can bring a spouse and children under 18, entitlement (Swiss citizens, C permit) or discretion (B, L), the conditions (living together, housing, no social assistance, language), the 5-year deadline (12 months for children over 12) and the language levels, each with its law article. sponsor = status of the person in Switzerland.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "sponsor": {
+       "type": "string",
+       "enum": [
+        "swiss",
+        "C",
+        "B",
+        "L"
+       ],
+       "description": "optional; omit for all four"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "naturalisation_canton_rules",
+    "title": "Cantonal naturalisation rules",
+    "description": "Cantonal conditions for ordinary Swiss naturalisation in each of the 26 cantons, on top of the federal rules (C permit, 10 years): minimum residence in the canton and the commune (2 to 5 years), language level spoken / written (federal minimum B1 / A2; 8 cantons require more), knowledge test (cantonal written test, commune test or interview), cantonal fee for one adult, the responsible office and the cantonal law with its version in force. Every value carries a verbatim quote from the official cantonal law collection or office page. canton optional (omit for all 26). Information, not legal advice.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "asylum_statistics",
+    "title": "Asylum statistics",
+    "description": "Official Swiss asylum statistics of the State Secretariat for Migration (SEM, monthly, archived month by month): new asylum applications, completed cases, asylum grants, rejections, Dublin decisions, recognition and protection rates, applications and grants of protection status S, departures and removals, and the numbers of people in the asylum process (N, F, S), with the official SEM labels in German and French. month = YYYY-MM (default latest), indicator = key or words to filter, nationality = German country name as published by SEM for new applications by nationality (default: top 15 of the last 12 months), years = true for yearly figures since 2014.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "month": {
+       "type": "string",
+       "description": "Month as YYYY-MM, e.g. \"2026-09\"; omit for the latest.",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "indicator": {
+       "type": "string",
+       "description": "Filter indicators by key or label (German or French), e.g. \"asylgesuche\", \"schutzquote\", \"dublin\"; \"all\" for all ~200; omit for the 12 headline indicators."
+      },
+      "nationality": {
+       "type": "string",
+       "description": "Nationality as SEM writes it in German (or French), e.g. \"Afghanistan\", \"Türkei\", \"Eritrea\"; omit for the top 15 of the last 12 months."
+      },
+      "years": {
+       "type": "boolean",
+       "description": "true to add the yearly series of each indicator."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "public_holidays",
+    "title": "Public holidays",
+    "description": "Public holidays per Swiss canton (official SECO list of cantonal holidays equated with Sundays, Art. 20a ArG; 1 August federal): for a canton and year the dates with weekday, which fall on working days and the bridge days (Monday before a Tuesday holiday, Friday after a Thursday holiday). Cantons that set holidays by area (AG, AI, AR, FR, NE, SO) return one list per area with conditions. Without canton: the number of holidays and bridge days of every canton. Names in DE/FR/IT/EN.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "2-letter abbreviation, optional"
+      },
+      "year": {
+       "type": "number",
+       "description": "default: current year"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "capital_withdrawal_tax",
+    "title": "Pension withdrawal tax",
+    "description": "Tax on a lump-sum withdrawal from the pension fund (2nd pillar) or pillar 3a in every Swiss commune, from the official ESTV tax calculator: CHF 100,000, 250,000, 500,000 or 1,000,000, single or married, payment at 65, federal + cantonal + communal tax without church tax. Give a commune (name, postcode or BFS number) for its tax, rate and rank, a canton for its lowest and highest communes, or nothing for the national lowest and highest. Lump sums in the same year are added together; pillar3a_tax calculates other amounts for one commune.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      },
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Lists every commune of the canton."
+      },
+      "amount": {
+       "type": "number",
+       "enum": [
+        100000,
+        250000,
+        500000,
+        1000000
+       ],
+       "description": "Withdrawn capital in CHF: 100000, 250000, 500000 or 1000000 (default 500000)."
+      },
+      "household": {
+       "type": "string",
+       "enum": [
+        "single",
+        "married"
+       ],
+       "description": "single (one person) or married (married couple)."
+      },
+      "limit": {
+       "type": "number",
+       "description": "How many communes to list when ranking a canton or Switzerland, e.g. 10 (default 10)."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "pension_figures",
+    "title": "Pension figures",
+    "description": "Official Swiss retirement-provision figures for the current year and, once decided, the next year: pillar 3a maximum deduction (with / without pension fund), AHV/IV old-age pension minimum and maximum per month and the married couple cap, BVG entry threshold and coordination deduction, minimum AHV contributions, supplementary-benefit amounts, withdrawal rules and retroactive 3a buy-ins. Each figure with its official source (Federal Council, BSV, ESTV).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "pillar3a_tax",
+    "title": "Pillar 3a tax saving",
+    "description": "Pillar 3a in a specific Swiss commune, from the official ESTV tax calculator: how much income tax a 3a payment saves (federal, cantonal and communal, without church tax) and how much tax a later capital withdrawal costs in the same commune. Defaults: the maximum 3a payment for the profile, no withdrawal unless capital is given.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "commune name or postcode"
+      },
+      "income": {
+       "type": "number",
+       "description": "gross salary CHF per year"
+      },
+      "married": {
+       "type": "boolean",
+       "description": "true for a married couple (joint taxation), false or omitted for a single person."
+      },
+      "children": {
+       "type": "number",
+       "description": "Number of children in the household, e.g. 2 (default 0)."
+      },
+      "pension_fund": {
+       "type": "boolean",
+       "description": "member of a pension fund (default true)"
+      },
+      "amount": {
+       "type": "number",
+       "description": "3a payment CHF (default: the maximum for the profile)"
+      },
+      "capital": {
+       "type": "number",
+       "description": "capital of a later withdrawal CHF (optional)"
+      },
+      "age_at_withdrawal": {
+       "type": "number",
+       "description": "Age when the 3a capital is withdrawn, e.g. 64 (default 65)."
+      }
+     },
+     "required": [
+      "commune",
+      "income"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "plan_move",
+    "title": "Plan a move",
+    "description": "Workflow for \"I am moving from A to B in Switzerland: what changes for me?\" in one call. Combines: income tax at both places (live ESTV, if income given), the health premium region and cheapest insurer at both places (FOPH), the electricity bill at both places (ElCom), the commute to work from both places (optional work_place), a side-by-side of both communes (official figures), and the official to-do list for a move within Switzerland (ch.ch) with the rules on taxes (StHG Art. 68) and premiums (KVG Art. 61). Each part fails independently, so one unavailable source never blocks the answer.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from_commune": {
+       "type": "string",
+       "description": "current commune, name or postcode"
+      },
+      "to_commune": {
+       "type": "string",
+       "description": "new commune, name or postcode"
+      },
+      "income": {
+       "type": "number",
+       "description": "gross household income CHF/year (optional, enables the tax comparison)"
+      },
+      "married": {
+       "type": "boolean",
+       "description": "true for a married couple (joint taxation), false or omitted for a single person."
+      },
+      "children": {
+       "type": "number",
+       "description": "Number of children in the household, e.g. 2 (default 0)."
+      },
+      "work_place": {
+       "type": "string",
+       "description": "workplace or station (optional, enables the commute comparison)"
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "de",
+        "fr",
+        "it",
+        "en"
+       ],
+       "description": "language of the to-do list, default en"
+      }
+     },
+     "required": [
+      "from_commune",
+      "to_commune"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "tax_by_commune",
+    "title": "Tax on CHF 100,000 by commune",
+    "description": "Income tax on a CHF 100,000 gross salary in every Swiss commune (federal + cantonal + communal, no church tax, no wealth), from the official ESTV tax calculator, for two households: single (35) and married couple with two children. Ranks the communes of a canton or Switzerland. For a specific income, wealth or household in one commune use commune_tax.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      },
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Lists every commune of the canton."
+      },
+      "household": {
+       "type": "string",
+       "enum": [
+        "single",
+        "family"
+       ],
+       "description": "single (35, no children) or family (married couple with two children)."
+      },
+      "limit": {
+       "type": "number",
+       "description": "how many lowest/highest communes, default 10"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "health_premium_increase",
+    "title": "Health premium increase",
+    "description": "How much Swiss health insurance premiums rise next year: the FOPH official mean premium (all models and deductibles, as people chose them) for Switzerland and per canton, for adults, young adults (19–25) and children, previous year vs next year in CHF and %; plus the median change of each insurer's standard premium on the same tariff. canton and insurer are optional filters.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "description": "Canton as 2-letter abbreviation, e.g. \"ZH\", \"GE\", \"TI\". Omit for Switzerland and every canton."
+      },
+      "insurer": {
+       "type": "string",
+       "description": "insurer name, e.g. CSS, optional"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "health_deductible_advice",
+    "title": "Best health deductible",
+    "description": "Which health insurance deductible (franchise) pays off: for a commune or premium region, age group, model and expected yearly health costs, the yearly premiums plus cost sharing (deductible + 10 % up to CHF 700, children CHF 350, KVG) for every deductible, the cheapest choice and the break-even between the lowest and highest deductible. Hospital contribution and the 40 % share on some medicines are not included.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "commune": {
+       "type": "string",
+       "description": "Swiss commune: official name, BFS number or 4-digit postcode, e.g. \"Winterthur\", \"230\" or \"8400\". «8001 Zürich» and «Basel (BS)» also work."
+      },
+      "region": {
+       "type": "string",
+       "description": "Premium region as canton plus number, e.g. \"ZH-1\", \"ZH-2\", \"BE-3\" (use instead of commune)."
+      },
+      "expected_costs": {
+       "type": "number",
+       "description": "expected health costs per year in CHF (doctor, medicines, hospital, therapy), default 1000"
+      },
+      "age_group": {
+       "type": "string",
+       "description": "adult (default), young_adult or child"
+      },
+      "model": {
+       "type": "string",
+       "description": "standard (default), family_doctor, telemedicine or any"
+      },
+      "accident": {
+       "type": "boolean",
+       "description": "accident cover included (default true; employees 8+ h a week are covered by the employer)"
+      },
+      "insurer": {
+       "type": "string",
+       "description": "one insurer by name, optional (default: the cheapest offer per deductible)"
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "switch_health_insurer",
+    "title": "Switch health insurer",
+    "description": "How to switch basic health insurance in Switzerland: the deadline for next year (receipt by 30 November, the Friday before on a weekend) with the days left, the five steps, when a switch is blocked (debts reminded by 30 November and unpaid by 31 December), the 30 June option (standard model with ordinary deductible only), deductible and model changes, and the free cancellation-letter page in DE/FR/IT/EN. Official sources: FOPH, priminfo, KVG Art. 7.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "sli://dataset/school/holidays",
+    "name": "school/holidays",
+    "title": "Holidays",
+    "description": "School holidays of the compulsory schools in the 26 cantons, from cantonal sources · official Swiss source · switzerland, canton · 2026–2027",
+    "mimeType": "application/json",
+    "size": 49381
+   },
+   {
+    "uri": "sli://dataset/tax/filing-deadlines",
+    "name": "tax/filing-deadlines",
+    "title": "Filing deadlines",
+    "description": "Tax return deadlines and extensions in the 26 cantons; imputed rental value: how each canton sets it until 2028 and the status of the second-home tax (official sources) · official Swiss source · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 26137
+   },
+   {
+    "uri": "sli://dataset/tax/imputed-rent-cantons",
+    "name": "tax/imputed-rent-cantons",
+    "title": "Imputed rent — cantons",
+    "description": "Tax return deadlines and extensions in the 26 cantons; imputed rental value: how each canton sets it until 2028 and the status of the second-home tax (official sources) · ESTV, Steuerdokumentation «Steuerliche Herausforderungen: Eigenmietwert», February 2026, section 5.4.1 «Ermässigung des Mietwerts» · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 2972
+   },
+   {
+    "uri": "sli://dataset/tax/imputed-rent-docs",
+    "name": "tax/imputed-rent-docs",
+    "title": "Imputed rent docs",
+    "description": "Tax return deadlines and extensions in the 26 cantons; imputed rental value: how each canton sets it until 2028 and the status of the second-home tax (official sources) · official Swiss source · switzerland",
+    "mimeType": "application/json",
+    "size": 827
+   },
+   {
+    "uri": "sli://dataset/tax/second-home-tax-cantons",
+    "name": "tax/second-home-tax-cantons",
+    "title": "Second home tax — cantons",
+    "description": "Tax return deadlines and extensions in the 26 cantons; imputed rental value: how each canton sets it until 2028 and the status of the second-home tax (official sources) · official Swiss source · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 13117
+   },
+   {
+    "uri": "sli://dataset/pollen/pollen",
+    "name": "pollen/pollen",
+    "title": "Pollen",
+    "description": "Pollen: MeteoSwiss network, 15 stations, daily values and pollen calendar · MeteoSwiss, pollen measuring network (open data, CC BY 4.0) · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 76962
+   },
+   {
+    "uri": "sli://dataset/votes/announced",
+    "name": "votes/announced",
+    "title": "Announced",
+    "description": "Federal votes: subjects of the next vote as announced by the Federal Council (until VoteInfo publishes); official results of every federal vote since 1981 by canton and commune (FSO open data) · Federal vote subjects as announced by the Federal Council / Federal Chancellery, used until the VoteInfo OGD file for the date exists (BFS publishes it shortly before the vote). Titles verbatim from the official press release in each language; no official English release exists, so the English site shows the German title marked as official title. · switzerland",
+    "mimeType": "application/json",
+    "size": 2161
+   },
+   {
+    "uri": "sli://dataset/shops/sunday-shopping-cantons",
+    "name": "shops/sunday-shopping-cantons",
+    "title": "Sunday shopping — cantons",
+    "description": "Sunday shopping and shop opening hours: rules of the 26 cantons from the official law texts, re-checked weekly · official Swiss source · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 23344
+   },
+   {
+    "uri": "sli://dataset/fire/fire-danger",
+    "name": "fire/fire-danger",
+    "title": "Fire danger",
+    "description": "Forest fire danger and cantonal fire bans per FOEN warning region, with own daily history · FOEN (Federal Office for the Environment), forest fire danger and cantonal prevention measures, data.geo.admin.ch · switzerland, canton · 1800–1901",
+    "mimeType": "application/json",
+    "size": 137841
+   },
+   {
+    "uri": "sli://dataset/fire/history",
+    "name": "fire/history",
+    "title": "History",
+    "description": "Forest fire danger and cantonal fire bans per FOEN warning region, with own daily history · Daily snapshot of FOEN forest fire danger and cantonal measures per region, kept by the Swiss Living Index because FOEN publishes only the current state. days[date][region_id] = [danger level, measure level]. · switzerland · 1800–1901",
+    "mimeType": "application/json",
+    "size": 58165
+   },
+   {
+    "uri": "sli://dataset/water/bathing-quality",
+    "name": "water/bathing-quality",
+    "title": "Bathing quality",
+    "description": "Water temperature: FOEN river stations, Lake Zurich (water police) with typical value for the week, Zurich baths · {\"foen\":{\"url\":\"https://data.geo.admin.ch/ch.bafu.gewaesserschutz-badewasserqualitaet/gewaesserschutz-badewasserqualitaet/gewaesserschutz-badewasserqualitaet_2056.shp.zip\",\"page\":\"https://map.geo.admi · switzerland",
+    "mimeType": "application/json",
+    "size": 58138
+   },
+   {
+    "uri": "sli://dataset/water/history",
+    "name": "water/history",
+    "title": "History",
+    "description": "Water temperature: FOEN river stations, Lake Zurich (water police) with typical value for the week, Zurich baths · One water temperature per station and day (°C, the value current at the time of the daily run), kept by the Swiss Living Index because FOEN publishes only the current value on LINDAS. rivers: FOEN station id; lake_zurich: daily mean of the water police station. · switzerland · 2009–2019",
+    "mimeType": "application/json",
+    "size": 32197
+   },
+   {
+    "uri": "sli://dataset/water/usual-cache",
+    "name": "water/usual-cache",
+    "title": "Usual cache",
+    "description": "Water temperature: FOEN river stations, Lake Zurich (water police) with typical value for the week, Zurich baths · official Swiss source · switzerland · 2009–2019",
+    "mimeType": "application/json",
+    "size": 851076
+   },
+   {
+    "uri": "sli://dataset/water/water-temperature",
+    "name": "water/water-temperature",
+    "title": "Water temperature",
+    "description": "Water temperature: FOEN river stations, Lake Zurich (water police) with typical value for the week, Zurich baths · {\"rivers\":{\"url\":\"https://lindas.admin.ch/query\",\"cube\":\"https://environment.ld.admin.ch/foen/hydro/river\",\"credit\":\"Surface waters data: Hydrology Division, Federal Office for the Environment FOEN\",\" · switzerland · 2009–2019",
+    "mimeType": "application/json",
+    "size": 25387
+   },
+   {
+    "uri": "sli://dataset/places/brand-seats",
+    "name": "places/brand-seats",
+    "title": "Brand seats",
+    "description": "Typically …: protected specialities (AOP/IGP), traditional specialities, «Home of» brands with registered seat, UNESCO World Heritage, parks, cultural property of national importance · Commercial register (Zefix), linked data https://lindas.admin.ch · switzerland",
+    "mimeType": "application/json",
+    "size": 6104
+   },
+   {
+    "uri": "sli://dataset/places/brands",
+    "name": "places/brands",
+    "title": "Brands",
+    "description": "Typically …: protected specialities (AOP/IGP), traditional specialities, «Home of» brands with registered seat, UNESCO World Heritage, parks, cultural property of national importance · «Home of»: well-known Swiss brands and the commune of the company's registered seat (Vito 2026-10-10). Editorial selection; the seat comes only from the commercial register (Zefix, via LINDAS linked data) and is re-checked weekly by scripts/verify-brands.mjs. Brands of companies that belong to a group are listed only with Vito's approval (group_approved). Brand names are used as plain words, no logos, no affiliation. · switzerland",
+    "mimeType": "application/json",
+    "size": 5202
+   },
+   {
+    "uri": "sli://dataset/places/highlights",
+    "name": "places/highlights",
+    "title": "Highlights",
+    "description": "Typically …: protected specialities (AOP/IGP), traditional specialities, «Home of» brands with registered seat, UNESCO World Heritage, parks, cultural property of national importance · {\"aop\":\"BLW, Register der Ursprungsbezeichnungen und geografischen Angaben (GUB/GGA)\",\"unesco_cultural\":\"BAK, UNESCO-Welterbe Kulturstätten\",\"unesco_natural\":\"BAFU, UNESCO-Welterbe Naturstätten\",\"park · switzerland, canton, commune",
+    "mimeType": "application/json",
+    "size": 920315
+   },
+   {
+    "uri": "sli://dataset/places/specialities",
+    "name": "places/specialities",
+    "title": "Specialities",
+    "description": "Typically …: protected specialities (AOP/IGP), traditional specialities, «Home of» brands with registered seat, UNESCO World Heritage, parks, cultural property of national importance · https://www.patrimoineculinaire.ch/ · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 5708
+   },
+   {
+    "uri": "sli://dataset/switzerland/federal-council",
+    "name": "switzerland/federal-council",
+    "title": "Federal council",
+    "description": "Switzerland (Bund): the Federal Council and Federal Chancellery, verified on admin.ch; «how many» answers (cantons, communes, districts, inhabitants, cows, museums, hydropower plants, hospitals, languages, millionaires, enclaves) from the federal sources · Swiss Federal Chancellery, admin.ch: «Die sieben Mitglieder des Bundesrates» and the Federal Council portal · switzerland",
+    "mimeType": "application/json",
+    "size": 11673
+   },
+   {
+    "uri": "sli://dataset/switzerland/how-many",
+    "name": "switzerland/how-many",
+    "title": "How many",
+    "description": "Switzerland (Bund): the Federal Council and Federal Chancellery, verified on admin.ch; «how many» answers (cantons, communes, districts, inhabitants, cows, museums, hydropower plants, hospitals, languages, millionaires, enclaves) from the federal sources · official Swiss source · switzerland",
+    "mimeType": "application/json",
+    "size": 5277
+   },
+   {
+    "uri": "sli://dataset/calendar/public-holidays-cantons",
+    "name": "calendar/public-holidays-cantons",
+    "title": "Public holidays — cantons",
+    "description": "Swiss year calendar (premium announcements, moving days, tax season, votes, releases) · SECO, Anhang «Feiertage Schweiz» (Auszug ArG, ArGV 1 bis 5) · switzerland, canton",
+    "mimeType": "application/json",
+    "size": 10266
+   },
+   {
+    "uri": "sli://dataset/calendar/swiss-year",
+    "name": "calendar/swiss-year",
+    "title": "Swiss year",
+    "description": "Swiss year calendar (premium announcements, moving days, tax season, votes, releases) · official Swiss source · switzerland",
+    "mimeType": "application/json",
+    "size": 5652
+   },
+   {
+    "uri": "sli://dataset/calendar/upcoming",
+    "name": "calendar/upcoming",
+    "title": "Upcoming",
+    "description": "Swiss year calendar (premium announcements, moving days, tax season, votes, releases) · official Swiss source · switzerland",
+    "mimeType": "application/json",
+    "size": 718
+   },
+   {
+    "uri": "sli://dataset/climate/climate-days-cantons",
+    "name": "climate/climate-days-cantons",
+    "title": "Climate days — cantons",
+    "description": "Climate (sunshine) · MeteoSwiss OGD SwissMetNet (data.geo.admin.ch), yearly station values tnd30xy0 / tnd20ny0 / tnd00ny0 · switzerland, canton · 1864–2025",
+    "mimeType": "application/json",
+    "size": 261150
+   },
+   {
+    "uri": "sli://dataset/climate/sunshine-cantons",
+    "name": "climate/sunshine-cantons",
+    "title": "Sunshine — cantons",
+    "description": "Climate (sunshine) · MeteoSwiss OGD SMN (data.geo.admin.ch), sre000y0 yearly sunshine duration · switzerland, canton · 1885–2025",
+    "mimeType": "application/json",
+    "size": 91900
+   },
+   {
+    "uri": "sli://dataset/climate/sunshine-switzerland",
+    "name": "climate/sunshine-switzerland",
+    "title": "Sunshine — switzerland",
+    "description": "Climate (sunshine) · MeteoSwiss OGD SMN (data.geo.admin.ch), sre000y0 yearly sunshine duration · switzerland · 1884–2025",
+    "mimeType": "application/json",
+    "size": 7154
+   },
+   {
+    "uri": "sli://dataset/composition/population-composition-cantons",
+    "name": "composition/population-composition-cantons",
+    "title": "Population composition — cantons",
+    "description": "Population composition · BFS px-x-0102020000_201 (Demografische Bilanz) — Bestand am 31. Dezember by Staatsangehörigkeit · switzerland, canton · 1981–2025",
+    "mimeType": "application/json",
+    "size": 144721
+   },
+   {
+    "uri": "sli://dataset/composition/population-composition-communes",
+    "name": "composition/population-composition-communes",
+    "title": "Population composition — communes",
+    "description": "Population composition · BFS px-x-0102020000_201 (Demografische Bilanz) — Bestand am 31. Dezember by Staatsangehörigkeit · switzerland, commune · 1981–2025",
+    "mimeType": "application/json",
+    "size": 11126879
+   },
+   {
+    "uri": "sli://dataset/composition/population-composition-switzerland",
+    "name": "composition/population-composition-switzerland",
+    "title": "Population composition — switzerland",
+    "description": "Population composition · BFS px-x-0102020000_201 (Demografische Bilanz) — Bestand am 31. Dezember by Staatsangehörigkeit · switzerland · 1981–2025",
+    "mimeType": "application/json",
+    "size": 6512
+   },
+   {
+    "uri": "sli://dataset/cost/capital-tax-communes",
+    "name": "cost/capital-tax-communes",
+    "title": "Capital tax — communes",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ESTV tax calculator (swisstaxcalculator.estv.admin.ch), API_calculateManyCapitalTaxes · switzerland, commune · 2026–2026",
+    "mimeType": "application/json",
+    "size": 1296783
+   },
+   {
+    "uri": "sli://dataset/cost/cost-reference",
+    "name": "cost/cost-reference",
+    "title": "Cost reference",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · official Swiss source · switzerland",
+    "mimeType": "application/json",
+    "size": 3548
+   },
+   {
+    "uri": "sli://dataset/cost/dog-tax-communes",
+    "name": "cost/dog-tax-communes",
+    "title": "Dog tax — communes",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · {\"VD\":{\"table\":\"https://www.vd.ch/fileadmin/user_upload/themes/territoire/communes/finances_communales/fichiers_xls/Arr%C3%AAt%C3%A9s_d_imposition_2026.xls\",\"rule\":\"https://www.vd.ch/etat-droit-financ · switzerland, commune",
+    "mimeType": "application/json",
+    "size": 92242
+   },
+   {
+    "uri": "sli://dataset/cost/electricity-cantons",
+    "name": "cost/electricity-cantons",
+    "title": "Electricity — cantons",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ElCom (Eidg. Elektrizitätskommission) — cube electricityprice-canton via LINDAS SPARQL · switzerland, canton · 2011–2027",
+    "mimeType": "application/json",
+    "size": 16723
+   },
+   {
+    "uri": "sli://dataset/cost/electricity-communes",
+    "name": "cost/electricity-communes",
+    "title": "Electricity — communes",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ElCom — Federal Electricity Commission, electricity tariffs per commune and grid operator (LINDAS cube elcom/electricityprice) · switzerland, commune · 2025–2027",
+    "mimeType": "application/json",
+    "size": 2357124
+   },
+   {
+    "uri": "sli://dataset/cost/health-premiums-cantons",
+    "name": "cost/health-premiums-cantons",
+    "title": "Health premiums — cantons",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · BAG / FOPH via opendata.swiss (health-insurance-premiums: Prämien_CH.csv + yearly archives) and priminfo.admin.ch (praemienregionen_<year>.xlsx, sheet D_PRIM) · switzerland, canton · 2010–2027",
+    "mimeType": "application/json",
+    "size": 64366
+   },
+   {
+    "uri": "sli://dataset/cost/health-premiums-regions",
+    "name": "cost/health-premiums-regions",
+    "title": "Health premiums regions",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · BAG / FOPH via opendata.swiss (health-insurance-premiums: Prämien_CH.csv + yearly archives) and priminfo.admin.ch (praemienregionen_<year>.xlsx, sheet D_PRIM) · switzerland · 2026–2027",
+    "mimeType": "application/json",
+    "size": 38791
+   },
+   {
+    "uri": "sli://dataset/cost/household-budget",
+    "name": "cost/household-budget",
+    "title": "Household budget",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · BFS Haushaltsbudgeterhebung (HABE) — T20.02.01.00.13 Einnahmen und Ausgaben nach Haushaltstyp (je-f-20.02.01.00.13, damId 32666967, released 2024-11-12) · switzerland",
+    "mimeType": "application/json",
+    "size": 5709
+   },
+   {
+    "uri": "sli://dataset/cost/rent-cantons",
+    "name": "cost/rent-cantons",
+    "title": "Rent — cantons",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · BFS Strukturerhebung — je-d-09.03.03.01 (avg rent by rooms & canton) · switzerland, canton · 2010–2024",
+    "mimeType": "application/json",
+    "size": 54558
+   },
+   {
+    "uri": "sli://dataset/cost/tax-burden-cantons",
+    "name": "cost/tax-burden-cantons",
+    "title": "Tax burden — cantons",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ESTV tax calculator (API_calculateDetailedTaxes, lg-proxy) · switzerland, canton · 2026–2026",
+    "mimeType": "application/json",
+    "size": 12496
+   },
+   {
+    "uri": "sli://dataset/cost/tax-communes",
+    "name": "cost/tax-communes",
+    "title": "Tax — communes",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ESTV tax calculator (swisstaxcalculator.estv.admin.ch), API_calculateDetailedTaxes · switzerland, commune · 2026–2026",
+    "mimeType": "application/json",
+    "size": 507199
+   },
+   {
+    "uri": "sli://dataset/cost/tax-locations-2026",
+    "name": "cost/tax-locations-2026",
+    "title": "Tax locations 2026",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ESTV tax calculator API_searchLocation, every postcode of the swisstopo register · switzerland, commune",
+    "mimeType": "application/json",
+    "size": 216777
+   },
+   {
+    "uri": "sli://dataset/cost/tax-multipliers-communes",
+    "name": "cost/tax-multipliers-communes",
+    "title": "Tax multipliers — communes",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · ESTV Steuerrechner, API_exportManySimpleRates (TaxGroupID 77), Steuerfüsse aller Gemeinden · switzerland, canton, commune · 2004–2027",
+    "mimeType": "application/json",
+    "size": 8016103
+   },
+   {
+    "uri": "sli://dataset/cost/utility-fees-pue",
+    "name": "cost/utility-fees-pue",
+    "title": "Utility fees pue",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · Preisüberwacher (PUE), Gebührenvergleich Wasser, Abwasser, Abfall · switzerland, commune",
+    "mimeType": "application/json",
+    "size": 231072
+   },
+   {
+    "uri": "sli://dataset/cost/waste-fees-communes",
+    "name": "cost/waste-fees-communes",
+    "title": "Waste fees — communes",
+    "description": "Cost of living (rent, premiums, electricity, tax burden, household budget) · {\"zh\":{\"url\":\"https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00001803_00003461.csv\",\"page\":\"https://opendata.swiss/de/dataset/abfallmengen-und-abfallgebuhren-in-den-gemeinden-im-kanton-zurich · switzerland, commune · 2000–2026",
+    "mimeType": "application/json",
+    "size": 224251
+   },
+   {
+    "uri": "sli://dataset/demographics/births-cantons",
+    "name": "demographics/births-cantons",
+    "title": "Births — cantons",
+    "description": "Births, deaths, civil status, first names · BFS BEVNAT via stats.swiss SDMX (DF_BEVNAT_NAISSANCES_1, DF_BEVNAT_NAISSANCES_2) + BFS DAM tables su-d-01.04.01.01.08, su-d-01.04.01.01.17 + PX-Web px-x-0102020000_101, px-x-0102020204_111 · switzerland, canton · 1803–2025",
+    "mimeType": "application/json",
+    "size": 1491730
+   },
+   {
+    "uri": "sli://dataset/demographics/births-communes",
+    "name": "demographics/births-communes",
+    "title": "Births — communes",
+    "description": "Births, deaths, civil status, first names · BFS px-x-0102020000_201 (Demografische Bilanz nach institutionellen Gliederungen, Komponente Lebendgeburt) · switzerland, commune · 2000–2025",
+    "mimeType": "application/json",
+    "size": 1282609
+   },
+   {
+    "uri": "sli://dataset/demographics/births-switzerland",
+    "name": "demographics/births-switzerland",
+    "title": "Births — switzerland",
+    "description": "Births, deaths, civil status, first names · BFS px-x-0102020000_201 (Demografische Bilanz nach institutionellen Gliederungen, Komponente Lebendgeburt) · switzerland · 2000–2025",
+    "mimeType": "application/json",
+    "size": 1183
+   },
+   {
+    "uri": "sli://dataset/demographics/civil-status-cantons",
+    "name": "demographics/civil-status-cantons",
+    "title": "Civil status — cantons",
+    "description": "Births, deaths, civil status, first names · BFS px-x-0102010000_103 (Wohnbevölkerung nach Zivilstand) · switzerland, canton · 2010–2025",
+    "mimeType": "application/json",
+    "size": 70388
+   },
+   {
+    "uri": "sli://dataset/demographics/civil-status-communes",
+    "name": "demographics/civil-status-communes",
+    "title": "Civil status — communes",
+    "description": "Births, deaths, civil status, first names · BFS px-x-0102010000_103 (Wohnbevölkerung nach Zivilstand) · switzerland, commune · 2010–2025",
+    "mimeType": "application/json",
+    "size": 5414173
+   },
+   {
+    "uri": "sli://dataset/demographics/civil-status-switzerland",
+    "name": "demographics/civil-status-switzerland",
+    "title": "Civil status — switzerland",
+    "description": "Births, deaths, civil status, first names · BFS px-x-0102010000_103 (Wohnbevölkerung nach Zivilstand) · switzerland · 2010–2025",
+    "mimeType": "application/json",
+    "size": 3232
+   }
+  ]
+ }
+}

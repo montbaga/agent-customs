@@ -287,7 +287,7 @@ export async function analyzeNetwork(input) {
         }];
       }
     } else {
-      fieldHits = scanText(field.text, { skipLanguage: Boolean(field.skipLanguage), targetHost: target.host });
+      fieldHits = scanText(field.text, { skipLanguage: Boolean(field.skipLanguage), targetHost: target.host, fieldName: field.field });
     }
     for (const hit of fieldHits) {
       if (!hit) continue;
@@ -320,14 +320,16 @@ export async function analyzeNetwork(input) {
       severity = "low";
       detail += " It asks on its own site; its peer rule stops this when another site runs it.";
     } else if (hit.rule.id === "C-EXEC" && !isInstructionField) {
-      const directsVisitor = /\b(?:ask|tell|have|get|instruct|direct|urge)\s+(?:the\s+)?(?:visitor|user|guest|customer|client|them)\b|\b(?:visitor|user|guest|customer)\s+(?:should|must|needs?\s+to|has\s+to)\b/i.test(hit.excerpt || "");
+      const directsVisitor = Boolean(hit.language)
+        || /\b(?:ask|tell|have|get|instruct|direct|urge)\s+(?:the\s+)?(?:visitor|user|guest|customer|client|them)\b|\b(?:visitor|user|guest|customer)\s+(?:should|must|needs?\s+to|has\s+to)\b/i.test(hit.excerpt || "");
       if (!directsVisitor) {
         severity = "medium";
         detail += " Found in tool/schema documentation rather than assistant instructions; verify it is reference docs rather than user coercion.";
       }
     } else if (hit.rule.id === "C-EXFIL" && !isInstructionField) {
       const ex = hit.excerpt || "";
-      const hardLeak = /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex);
+      const hardLeak = Boolean(hit.language)
+        || /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex);
       if (!hardLeak) {
         severity = "medium";
         detail += " Found in a tool description referencing a configured deployment server without an embedded external URL.";
@@ -857,17 +859,18 @@ function splitIdentifier(key) {
 }
 
 const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|credit ?cards?|debit ?cards?|cvv2?|cvc|csc|passwords?(?!\s+(?:setup|reset|change|recovery|policy)(?:\s+(?:link|url|page|token))?\b)|passcodes?|passphrases?|otp(?:\s*code)?|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
-const PASSWORD_GATE_PARAM_RE = /\b(?:password[- ]?gat(?:e|ing)|pass\s+(?:an?\s+)?empty\s+string\s+to\s+remove|optional\s+password\s+to\s+(?:protect|lock|gate)|(?:set|add|apply|enable|remove|clear)\s+(?:a|an|the|optional)?\s*password\b[^.]{0,40}\b(?:site|page|link|url|share|room|file|doc|document|pdf))\b/i;
+const PASSWORD_GATE_PARAM_RE = /\boptional\s+password\s+to\b|\b(?:set|add|remove|clear|protect|lock|gate)\s+(?:a|an|this|the|optional)?\s*password\b[^.]{0,30}\b(?:page|site|link|url|file|room|document|pdf)\b|\bpassword[- ]?(?:gate|protect(?:ed)?)\s+(?:a|an|this|the)?\s*(?:page|site|link|url|file|room|document|pdf)\b/i;
+const PASSWORD_REUSE_RE = /\b(?:same\s+password|reuse|online\s+bank|banking|e-?mail|account\s+password|existing\s+password)\b/i;
 const LOGIN_TOOL_NAME_RE = /^(?:login|sign_?in|auth(?:enticate)?|verify_password)/i;
 const SIGNUP_FLOW_RE = /\b(?:signup|sign[- ]?up|register|onboarding|invite|verify[-_ ]?email)\b/i;
-const SENSITIVE_ACCOUNT_CONTEXT_RE = /\b(?:bank|card|atm|login|account\s+takeover|transfer|wallet|seed)\b/i;
+const SENSITIVE_ACCOUNT_CONTEXT_RE = /\b(?:bank|card|atm|login|account\s+takeover|transfer|wallet|seed|(?:link|connect)\b[^.]{0,30}\baccount|\baccount\s+at)\b/i;
 
 function schemaSecretMode(key, description = "", pathStr = "", contextText = "", toolName = "") {
   const splitKey = splitIdentifier(key);
   if (!VISITOR_SECRET_PARAM.test(splitKey)) return null;
   if (/\breturns\b/i.test(pathStr) && /\bpasswords?\s*(?:setup|reset)?\s*(?:link|url|page)\b/i.test(splitKey)) return null;
   const combinedDesc = `${description || ""} ${contextText || ""}`;
-  if (/\bpasswords?\b/i.test(splitKey) && PASSWORD_GATE_PARAM_RE.test(combinedDesc) && !LOGIN_TOOL_NAME_RE.test(toolName || "")) {
+  if (/\bpasswords?\b/i.test(splitKey) && PASSWORD_GATE_PARAM_RE.test(combinedDesc) && !LOGIN_TOOL_NAME_RE.test(toolName || "") && !PASSWORD_REUSE_RE.test(combinedDesc)) {
     return { lowNote: true };
   }
   if (/\botp(?:\s*code)?\b/i.test(splitKey) && (SIGNUP_FLOW_RE.test(pathStr) || SIGNUP_FLOW_RE.test(combinedDesc)) && !SENSITIVE_ACCOUNT_CONTEXT_RE.test(combinedDesc)) {

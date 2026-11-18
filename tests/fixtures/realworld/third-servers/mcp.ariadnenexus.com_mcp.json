@@ -1,0 +1,863 @@
+{
+ "url": "https://mcp.ariadnenexus.com/mcp",
+ "doc": {
+  "name": "com.ariadnenexus/mcp-server",
+  "version": "0.1.2",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Ariadne Nexus Zero-PII Collateral Provenance & Underwriting MCP (ANX-RFC-001 / ZK_PROV_V1). 1. Run free discovery tools (`inspect_manifest_schema`, `verify_asset_hash`, `verify_zk_provenance_proof`, or `verify_underwriting_compliance`) first to validate 32-byte SHA-256 manifest digests and certificates with zero billing. 2. Never transmit natural-person names, street addresses, or raw bills of sale; submit only pre-hashed SHA-256 transfer digests (`custody_event_hashes`) and `optical_scan_sha256`. 3. Gated SLA tools (`generate_zk_provenance_proof`, `batch_underwrite_portfolio`) require an unlocked `X-API-Key` or inline `x402` (`X-Payment`) USDC settlement.",
+  "tools": [
+   {
+    "name": "inspect_manifest_schema",
+    "title": "Collateral Manifest Schema & Field Validator",
+    "description": "Returns required ANX-RFC-001 (ZK_PROV_V1) manifest fields for a collateral class and validates an optional candidate manifest object, listing missing keys and attestation readiness. Use when: checking required manifest keys or pre-validating a candidate JSON payload before SHA-256 hashing. Do not use when: validating an existing 64-hex SHA-256 digest (use verify_asset_hash instead), signing a provenance certificate (use generate_zk_provenance_proof instead), or auditing portfolio LTV caps (use verify_underwriting_compliance instead). Behavior: Read-only, stateless, deterministic schema check (p99=28ms; free discovery tier at 60 RPM without billing).",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "collateral_class": {
+       "type": "string",
+       "enum": [
+        "fine_art",
+        "rwa_bullion",
+        "rare_manuscript",
+        "collectible"
+       ],
+       "default": "fine_art",
+       "description": "Specialty collateral category whose ANX-RFC-001 manifest schema is inspected (default: \"fine_art\")."
+      },
+      "manifest_payload": {
+       "type": "object",
+       "description": "Optional candidate collateral manifest JSON object validated for required ANX-RFC-001 keys (asset_id, collateral_class, optical_scan_sha256, custody_event_hashes, appraised_value_cents). Omit to list required fields only."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Collateral Manifest Schema & Field Validator",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "tool",
+      "tier",
+      "collateral_class",
+      "required_manifest_fields",
+      "payload_checked",
+      "missing_fields",
+      "ready_for_zk_attestation",
+      "execution_latency_ms"
+     ],
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Executed tool identifier (\"inspect_manifest_schema\")."
+      },
+      "tier": {
+       "type": "string",
+       "description": "Commercial execution tier (\"free_discovery\")."
+      },
+      "collateral_class": {
+       "type": "string",
+       "enum": [
+        "fine_art",
+        "rwa_bullion",
+        "rare_manuscript",
+        "collectible"
+       ],
+       "description": "Evaluated specialty collateral classification."
+      },
+      "required_manifest_fields": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Required ANX-RFC-001 top-level manifest keys."
+      },
+      "payload_checked": {
+       "type": "boolean",
+       "description": "True when a candidate manifest_payload object was supplied."
+      },
+      "missing_fields": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Required manifest keys absent from manifest_payload."
+      },
+      "ready_for_zk_attestation": {
+       "type": "boolean",
+       "description": "True when manifest_payload was supplied and missing_fields is empty."
+      },
+      "execution_latency_ms": {
+       "type": "number",
+       "description": "Server-side execution duration in milliseconds."
+      }
+     }
+    }
+   },
+   {
+    "name": "verify_asset_hash",
+    "title": "Collateral SHA-256 Digest & Commitment Verifier",
+    "description": "Validates and normalizes a 64-character hexadecimal SHA-256 collateral manifest digest and derives its deterministic specialty-title registry commitment ID (cmt_*) for fine art, bullion, manuscripts, or collectibles. Use when: confirming manifest SHA-256 digest conformance and commitment binding prior to paid underwriting. Do not use when: checking unhashed JSON manifest fields (use inspect_manifest_schema instead) or verifying a signed ZK_PROV_V1 certificate (use verify_zk_provenance_proof instead). Behavior: Read-only, stateless, deterministic computation (p99=42ms; free discovery tier at 30 RPM without billing).",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "asset_sha256"
+     ],
+     "properties": {
+      "asset_sha256": {
+       "type": "string",
+       "pattern": "^(?:0x)?[a-fA-F0-9]{64}$",
+       "description": "64-character hexadecimal SHA-256 digest of the canonical collateral manifest JSON, with optional 0x prefix (e.g., \"0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\")."
+      },
+      "collateral_class": {
+       "type": "string",
+       "enum": [
+        "fine_art",
+        "rwa_bullion",
+        "rare_manuscript",
+        "collectible"
+       ],
+       "default": "fine_art",
+       "description": "Specialty collateral classification bound into the cmt_* registry commitment ID (default: \"fine_art\")."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Collateral SHA-256 Digest & Commitment Verifier",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "tool",
+      "tier",
+      "manifest_sha256",
+      "collateral_class",
+      "schema_conformance_valid",
+      "registry_commitment_id",
+      "locked_production_fields",
+      "execution_latency_ms"
+     ],
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Executed tool identifier (\"verify_asset_hash\")."
+      },
+      "tier": {
+       "type": "string",
+       "description": "Commercial execution tier (\"free_discovery\")."
+      },
+      "manifest_sha256": {
+       "type": "string",
+       "description": "Normalized lowercase 0x-prefixed 64-hex SHA-256 digest."
+      },
+      "collateral_class": {
+       "type": "string",
+       "enum": [
+        "fine_art",
+        "rwa_bullion",
+        "rare_manuscript",
+        "collectible"
+       ],
+       "description": "Bound specialty collateral classification."
+      },
+      "schema_conformance_valid": {
+       "type": "boolean",
+       "description": "True when the digest conforms to ANX-RFC-001 32-byte SHA-256 rules."
+      },
+      "registry_commitment_id": {
+       "type": "string",
+       "description": "Deterministic specialty-title commitment identifier prefixed with cmt_."
+      },
+      "locked_production_fields": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Gated attestation fields unlocked via generate_zk_provenance_proof."
+      },
+      "execution_latency_ms": {
+       "type": "number",
+       "description": "Server-side execution duration in milliseconds."
+      }
+     }
+    }
+   },
+   {
+    "name": "generate_zk_provenance_proof",
+    "title": "Ed25519 Zero-PII Provenance Proof & Optical Score Generator",
+    "description": "Computes a 0x01-prefixed SHA-256 custodial Merkle root, optical microtopography score (7200-9985 bps), underwriting recommendation, and Ed25519-signed ZK_PROV_V1 zero-PII provenance certificate. Use when: generating a pre-bind title attestation for an asset_id and policy_ref from custodial SHA-256 digests. Do not use when: verifying an existing certificate (use verify_zk_provenance_proof instead) or sizing multi-asset portfolio loans (use batch_underwrite_portfolio instead). Behavior: Read-only attestation (p99=380ms; $2.50 USD / 250 cents via X-API-Key or X-Payment; returns an unbilled 402 quote if unentitled).",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "asset_id",
+      "policy_ref"
+     ],
+     "properties": {
+      "asset_id": {
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+       "minLength": 3,
+       "maxLength": 64,
+       "description": "Unique alphanumeric collateral or vault asset identifier, 3-64 chars allowing underscores, colons, or hyphens (e.g., \"art_vault_basquiat_09\")."
+      },
+      "policy_ref": {
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+       "minLength": 3,
+       "maxLength": 64,
+       "description": "Underwriting binder or specialty title policy reference ID, 3-64 chars (e.g., \"POL-CHUBB-2026-441\")."
+      },
+      "custody_event_hashes": {
+       "type": "array",
+       "maxItems": 128,
+       "default": [],
+       "items": {
+        "type": "string",
+        "pattern": "^(?:0x)?[a-fA-F0-9]{64}$",
+        "description": "64-character hex SHA-256 digest of a chronological custodial transfer event (zero seller PII)."
+       },
+       "description": "Ordered list of up to 128 SHA-256 hex digests of prior custodial transfers folded into the 0x01 Merkle root; defaults to a genesis leaf if empty."
+      },
+      "optical_scan_sha256": {
+       "type": "string",
+       "pattern": "^(?:0x)?[a-fA-F0-9]{64}$",
+       "description": "Optional 64-character hex SHA-256 digest of the raking-light or XRF optical microtopography scan; derived from asset_id when omitted."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Ed25519 Zero-PII Provenance Proof & Optical Score Generator",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "tool",
+      "tier",
+      "asset_id",
+      "policy_ref",
+      "title_lien_clearance_merkle_root",
+      "custody_chain_depth",
+      "optical_forensic_score_bps",
+      "underwriting_recommendation",
+      "zk_attestation_certificate",
+      "execution_latency_ms"
+     ],
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Executed tool identifier (\"generate_zk_provenance_proof\")."
+      },
+      "tier": {
+       "type": "string",
+       "description": "Commercial execution tier (\"gated_production\")."
+      },
+      "asset_id": {
+       "type": "string",
+       "description": "Attested collateral identifier."
+      },
+      "policy_ref": {
+       "type": "string",
+       "description": "Bound underwriting policy or binder reference."
+      },
+      "title_lien_clearance_merkle_root": {
+       "type": "string",
+       "description": "0x-prefixed 64-hex SHA-256 Merkle root with 0x01 internal node separation."
+      },
+      "custody_chain_depth": {
+       "type": "integer",
+       "description": "Number of custodial transfer leaves folded into the Merkle tree."
+      },
+      "optical_forensic_score_bps": {
+       "type": "integer",
+       "description": "Surface microtopography concordance score in basis points (7200-9985)."
+      },
+      "underwriting_recommendation": {
+       "type": "string",
+       "enum": [
+        "BIND_ELIGIBLE_STANDARD",
+        "BIND_WITH_ENHANCED_DEDUCTIBLE"
+       ],
+       "description": "Deterministic specialty-title bind recommendation."
+      },
+      "zk_attestation_certificate": {
+       "type": "object",
+       "description": "Ed25519-signed ZK_PROV_V1 zero-PII attestation envelope.",
+       "required": [
+        "scheme",
+        "public_statement",
+        "oracle_pubkey_ed25519_b64",
+        "signature_b64",
+        "issued_at_utc",
+        "seller_pii_exposed"
+       ],
+       "properties": {
+        "scheme": {
+         "type": "string",
+         "description": "Attestation signature scheme (\"ariadne-zk-ed25519-v1\")."
+        },
+        "public_statement": {
+         "type": "string",
+         "description": "Pipe-delimited ZK_PROV_V1 signed public claims."
+        },
+        "oracle_pubkey_ed25519_b64": {
+         "type": "string",
+         "description": "Base64-encoded 32-byte Ed25519 oracle public key."
+        },
+        "signature_b64": {
+         "type": "string",
+         "description": "Base64-encoded 64-byte Ed25519 signature over public_statement."
+        },
+        "issued_at_utc": {
+         "type": "string",
+         "description": "ISO-8601 UTC attestation issuance timestamp."
+        },
+        "seller_pii_exposed": {
+         "type": "boolean",
+         "description": "Always false; confirms zero seller PII in public claims."
+        }
+       }
+      },
+      "execution_latency_ms": {
+       "type": "number",
+       "description": "Server-side execution duration in milliseconds."
+      }
+     }
+    }
+   },
+   {
+    "name": "verify_zk_provenance_proof",
+    "title": "Ed25519 Zero-PII Provenance Certificate & Merkle Verifier",
+    "description": "Verifies an ariadne-zk-ed25519-v1 (ZK_PROV_V1) provenance certificate across Ed25519 signature validity, zero-PII enforcement, signed claim parity, optional pinned oracle key, and optional 0x01 SHA-256 custodial Merkle recomputation. Use when: auditing a certificate from generate_zk_provenance_proof before policy bind or loan closing. Do not use when: generating a new proof (use generate_zk_provenance_proof instead), checking a manifest digest (use verify_asset_hash instead), or auditing portfolio LTV cap compliance (use verify_underwriting_compliance instead). Behavior: Read-only, stateless cryptographic check (p99=18ms; free discovery tier at 60 RPM without billing).",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "zk_attestation_certificate"
+     ],
+     "properties": {
+      "zk_attestation_certificate": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "scheme",
+        "public_statement",
+        "oracle_pubkey_ed25519_b64",
+        "signature_b64",
+        "seller_pii_exposed"
+       ],
+       "description": "Signed ZK_PROV_V1 certificate object emitted by generate_zk_provenance_proof.",
+       "properties": {
+        "scheme": {
+         "type": "string",
+         "description": "Cryptographic scheme identifier (expected \"ariadne-zk-ed25519-v1\")."
+        },
+        "public_statement": {
+         "type": "string",
+         "description": "Pipe-delimited ZK_PROV_V1 signed statement string."
+        },
+        "oracle_pubkey_ed25519_b64": {
+         "type": "string",
+         "description": "Base64-encoded 32-byte raw Ed25519 public key of the issuing oracle."
+        },
+        "signature_b64": {
+         "type": "string",
+         "description": "Base64-encoded 64-byte Ed25519 signature over UTF-8 public_statement."
+        },
+        "issued_at_utc": {
+         "type": "string",
+         "description": "Optional ISO-8601 UTC issuance timestamp on the certificate envelope."
+        },
+        "seller_pii_exposed": {
+         "type": "boolean",
+         "description": "Zero-PII compliance flag asserted on the certificate (must be false)."
+        }
+       }
+      },
+      "asset_id": {
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+       "description": "Optional outer asset_id cross-checked against the signed asset claim."
+      },
+      "policy_ref": {
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+       "description": "Optional outer policy_ref cross-checked against the signed policy claim."
+      },
+      "optical_forensic_score_bps": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000,
+       "description": "Optional outer optical score (0-10000 bps) cross-checked against signed optical_bps."
+      },
+      "title_lien_clearance_merkle_root": {
+       "type": "string",
+       "pattern": "^(?:0x)?[a-fA-F0-9]{64}$",
+       "description": "Optional outer 64-hex Merkle root cross-checked against signed merkle_root."
+      },
+      "pinned_oracle_pubkey_b64": {
+       "type": "string",
+       "description": "Optional out-of-band pinned base64 Ed25519 oracle public key enforced during verification."
+      },
+      "custody_event_hashes": {
+       "type": "array",
+       "maxItems": 128,
+       "items": {
+        "type": "string",
+        "pattern": "^(?:0x)?[a-fA-F0-9]{64}$",
+        "description": "64-character hex SHA-256 custodial transfer digest."
+       },
+       "description": "Optional ordered custodial SHA-256 digests used to independently recompute and verify the 0x01-prefixed Merkle root."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Ed25519 Zero-PII Provenance Certificate & Merkle Verifier",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "tool",
+      "tier",
+      "verified",
+      "scheme",
+      "signature_valid",
+      "zero_pii_confirmed",
+      "pinned_key_enforced",
+      "merkle_chain_independently_recomputed",
+      "oracle_pubkey_ed25519_b64",
+      "oracle_pubkey_sha256_hex",
+      "signed_claims",
+      "failure_code",
+      "execution_latency_ms"
+     ],
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Executed tool identifier (\"verify_zk_provenance_proof\")."
+      },
+      "tier": {
+       "type": "string",
+       "description": "Commercial execution tier (\"free_discovery\")."
+      },
+      "verified": {
+       "type": "boolean",
+       "description": "True only when signature, zero-PII, claims, pinned key, and Merkle checks all pass."
+      },
+      "scheme": {
+       "type": "string",
+       "description": "Evaluated certificate scheme identifier."
+      },
+      "signature_valid": {
+       "type": "boolean",
+       "description": "True when the Ed25519 signature over public_statement verified cleanly."
+      },
+      "zero_pii_confirmed": {
+       "type": "boolean",
+       "description": "True when seller_pii_exposed is strictly false."
+      },
+      "pinned_key_enforced": {
+       "type": "boolean",
+       "description": "True when pinned_oracle_pubkey_b64 was supplied and matched."
+      },
+      "merkle_chain_independently_recomputed": {
+       "type": "boolean",
+       "description": "True when custody_event_hashes were supplied and matched signed merkle_root."
+      },
+      "oracle_pubkey_ed25519_b64": {
+       "type": "string",
+       "description": "Base64 Ed25519 public key extracted from the certificate."
+      },
+      "oracle_pubkey_sha256_hex": {
+       "type": "string",
+       "description": "Lowercase 64-hex SHA-256 fingerprint of the raw 32-byte Ed25519 public key."
+      },
+      "signed_claims": {
+       "type": "object",
+       "description": "Parsed key-value claims from the signed ZK_PROV_V1 statement."
+      },
+      "failure_code": {
+       "type": "string",
+       "enum": [
+        "NONE",
+        "UNSUPPORTED_SCHEME",
+        "PII_FLAG_VIOLATION",
+        "ORACLE_PUBKEY_MISMATCH",
+        "MALFORMED_KEY_OR_SIGNATURE",
+        "INVALID_SIGNATURE",
+        "MALFORMED_STATEMENT",
+        "CLAIM_MISMATCH",
+        "MERKLE_ROOT_MISMATCH"
+       ],
+       "description": "Verification disposition code (\"NONE\" when verified is true)."
+      },
+      "failure_detail": {
+       "type": "string",
+       "description": "Diagnostic explanation populated when verified is false."
+      },
+      "execution_latency_ms": {
+       "type": "number",
+       "description": "Server-side execution duration in milliseconds."
+      }
+     }
+    }
+   },
+   {
+    "name": "batch_underwrite_portfolio",
+    "title": "Batch Merton Jump-Diffusion Portfolio Underwriting Engine",
+    "description": "Computes per-asset optical scores (bps), Merton jump-diffusion 99% stressed values, approved advances in integer USD cents, and effective LTV (bps) across 1-100 collateral items. Use when: sizing a fine-art or RWA credit facility from appraised cent values, optical scan digests, custody depth, and horizon days. Do not use when: signing a single-asset proof (use generate_zk_provenance_proof instead) or auditing an underwriting summary against LTV caps (use verify_underwriting_compliance instead). Behavior: Read-only actuarial solver (p99=910ms; $2.50 USD / 250 cents via X-API-Key or X-Payment; unbilled 402 quote if unentitled).",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "portfolio_id",
+      "assets"
+     ],
+     "properties": {
+      "portfolio_id": {
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+       "minLength": 3,
+       "maxLength": 64,
+       "description": "Institutional credit facility or collateral schedule identifier, 3-64 chars (e.g., \"port_fine_art_2026_q4\")."
+      },
+      "target_advance_rate_bps": {
+       "type": "integer",
+       "minimum": 1000,
+       "maximum": 8500,
+       "default": 5000,
+       "description": "Requested gross loan-to-value (LTV) advance rate in integer basis points from 1000 (10.00%) to 8500 (85.00%); defaults to 5000 (50.00%)."
+      },
+      "horizon_days": {
+       "type": "integer",
+       "minimum": 30,
+       "maximum": 1825,
+       "default": 365,
+       "description": "Credit facility tenor and liquidation stress horizon in calendar days from 30 to 1825 (default: 365)."
+      },
+      "assets": {
+       "type": "array",
+       "minItems": 1,
+       "maxItems": 100,
+       "description": "List of 1 to 100 specialty collateral items to underwrite under Merton jump-diffusion 99% tail stress.",
+       "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "asset_id",
+         "appraised_value_cents",
+         "optical_scan_sha256"
+        ],
+        "description": "Single collateral item with integer-cent appraisal and optical scan digest.",
+        "properties": {
+         "asset_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+          "description": "Unique collateral item identifier, 3-64 chars (e.g., \"col_item_01\")."
+         },
+         "appraised_value_cents": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000000000,
+          "description": "Independent appraised value in exact integer USD cents from 1 to 100000000000 ($1B max; e.g., 500000000 for $5M)."
+         },
+         "optical_scan_sha256": {
+          "type": "string",
+          "pattern": "^(?:0x)?[a-fA-F0-9]{64}$",
+          "description": "64-character hex SHA-256 digest of the item's optical microtopography scan."
+         },
+         "custody_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 3,
+          "description": "Verified custodial transfer chain depth (1-100); depth >= 4 lowers title-defect jump intensity lambda from 0.19 to 0.08 (default: 3)."
+         }
+        }
+       }
+      }
+     }
+    },
+    "annotations": {
+     "title": "Batch Merton Jump-Diffusion Portfolio Underwriting Engine",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "tool",
+      "tier",
+      "portfolio_id",
+      "asset_count",
+      "horizon_days",
+      "total_appraised_value_cents",
+      "total_merton_stressed_value_cents",
+      "total_approved_advance_cents",
+      "effective_portfolio_ltv_bps",
+      "assets",
+      "execution_latency_ms"
+     ],
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Executed tool identifier (\"batch_underwrite_portfolio\")."
+      },
+      "tier": {
+       "type": "string",
+       "description": "Commercial execution tier (\"gated_production\")."
+      },
+      "portfolio_id": {
+       "type": "string",
+       "description": "Evaluated portfolio or credit facility identifier."
+      },
+      "asset_count": {
+       "type": "integer",
+       "description": "Number of collateral items underwritten."
+      },
+      "horizon_days": {
+       "type": "integer",
+       "description": "Liquidation stress horizon in calendar days."
+      },
+      "total_appraised_value_cents": {
+       "type": "integer",
+       "description": "Aggregate appraised portfolio value in integer USD cents."
+      },
+      "total_merton_stressed_value_cents": {
+       "type": "integer",
+       "description": "Aggregate Merton 99% tail-stressed value in integer USD cents."
+      },
+      "total_approved_advance_cents": {
+       "type": "integer",
+       "description": "Aggregate approved loan advance in integer USD cents."
+      },
+      "effective_portfolio_ltv_bps": {
+       "type": "integer",
+       "description": "Portfolio-level approved advance divided by appraised value in bps."
+      },
+      "assets": {
+       "type": "array",
+       "description": "Per-asset optical scores, stressed values, and approved cent advances.",
+       "items": {
+        "type": "object",
+        "required": [
+         "asset_id",
+         "appraised_value_cents",
+         "optical_forensic_score_bps",
+         "merton_99_stressed_value_cents",
+         "approved_advance_cents",
+         "status"
+        ],
+        "properties": {
+         "asset_id": {
+          "type": "string",
+          "description": "Collateral item ID."
+         },
+         "appraised_value_cents": {
+          "type": "integer",
+          "description": "Item appraised value in integer USD cents."
+         },
+         "optical_forensic_score_bps": {
+          "type": "integer",
+          "description": "Item optical concordance score in basis points."
+         },
+         "merton_99_stressed_value_cents": {
+          "type": "integer",
+          "description": "Item Merton 99% stressed value in integer USD cents."
+         },
+         "approved_advance_cents": {
+          "type": "integer",
+          "description": "Item approved advance in integer USD cents (capped at 55% of stressed value)."
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "APPROVED",
+           "MANUAL_FORENSIC_REVIEW"
+          ],
+          "description": "Item underwriting disposition."
+         }
+        }
+       }
+      },
+      "execution_latency_ms": {
+       "type": "number",
+       "description": "Server-side execution duration in milliseconds."
+      }
+     }
+    }
+   },
+   {
+    "name": "verify_underwriting_compliance",
+    "title": "Underwriting LTV Cap & Oracle Root-of-Trust Verifier",
+    "description": "Audits a portfolio underwriting summary against the ANX-RFC-001 55% (5500 bps) Merton stressed advance cap, classifies optical forensic score thresholds, and returns the active ZK_PROV_V1 Ed25519 oracle public key and SHA-256 fingerprint. Use when: validating credit-committee LTV compliance on a batch_underwrite_portfolio quote or retrieving the oracle public key for pinning in verify_zk_provenance_proof. Do not use when: computing stressed collateral values from raw asset schedules (use batch_underwrite_portfolio instead), verifying an Ed25519 certificate signature (use verify_zk_provenance_proof instead), or checking JSON manifest fields (use inspect_manifest_schema instead). Behavior: Read-only, stateless compliance check (p99=15ms; free discovery tier at 60 RPM without billing).",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "portfolio_id",
+      "total_appraised_value_cents",
+      "total_merton_stressed_value_cents",
+      "proposed_advance_cents"
+     ],
+     "properties": {
+      "portfolio_id": {
+       "type": "string",
+       "pattern": "^[a-zA-Z0-9_:-]{3,64}$",
+       "minLength": 3,
+       "maxLength": 64,
+       "description": "Portfolio or credit facility identifier audited for statutory LTV compliance (e.g., \"port_fine_art_2026_q4\")."
+      },
+      "total_appraised_value_cents": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000000000000,
+       "description": "Aggregate appraised portfolio value in exact integer USD cents (>= 1)."
+      },
+      "total_merton_stressed_value_cents": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000000000000,
+       "description": "Aggregate Merton 99% tail-stressed liquidation value in integer USD cents returned by batch_underwrite_portfolio."
+      },
+      "proposed_advance_cents": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000000000000,
+       "description": "Proposed loan advance in exact integer USD cents tested against the ANX-RFC-001 55% (5500 bps) Merton stressed advance ceiling."
+      },
+      "min_optical_forensic_score_bps": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000,
+       "default": 8500,
+       "description": "Minimum item-level optical forensic score across the portfolio in basis points (0-10000; default: 8500)."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Underwriting LTV Cap & Oracle Root-of-Trust Verifier",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "tool",
+      "tier",
+      "portfolio_id",
+      "compliant",
+      "max_compliant_advance_cents",
+      "headroom_cents",
+      "gross_ltv_bps",
+      "stressed_ltv_bps",
+      "optical_policy_tier",
+      "oracle_trust_anchor",
+      "execution_latency_ms"
+     ],
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Executed tool identifier (\"verify_underwriting_compliance\")."
+      },
+      "tier": {
+       "type": "string",
+       "description": "Commercial execution tier (\"free_discovery\")."
+      },
+      "portfolio_id": {
+       "type": "string",
+       "description": "Audited portfolio or credit facility identifier."
+      },
+      "compliant": {
+       "type": "boolean",
+       "description": "True when proposed_advance_cents <= 55% of stressed value, stressed value <= appraised value, and min_optical_forensic_score_bps >= 8000."
+      },
+      "max_compliant_advance_cents": {
+       "type": "integer",
+       "description": "Maximum ANX-RFC-001 compliant loan advance in integer USD cents (5500 bps of stressed value)."
+      },
+      "headroom_cents": {
+       "type": "integer",
+       "description": "Signed integer USD cents remaining under ceiling (negative indicates cap breach)."
+      },
+      "gross_ltv_bps": {
+       "type": "integer",
+       "description": "Proposed advance divided by total appraised value in basis points."
+      },
+      "stressed_ltv_bps": {
+       "type": "integer",
+       "description": "Proposed advance divided by Merton 99% stressed value in basis points."
+      },
+      "optical_policy_tier": {
+       "type": "string",
+       "enum": [
+        "BIND_ELIGIBLE_STANDARD",
+        "APPROVED_ENHANCED_DEDUCTIBLE",
+        "MANUAL_FORENSIC_REVIEW"
+       ],
+       "description": "Underwriting policy tier determined by min_optical_forensic_score_bps."
+      },
+      "oracle_trust_anchor": {
+       "type": "object",
+       "description": "Active ANX-RFC-001 Ed25519 oracle root-of-trust metadata for key pinning.",
+       "required": [
+        "scheme",
+        "protocol_version",
+        "oracle_pubkey_ed25519_b64",
+        "oracle_pubkey_sha256_hex",
+        "rfc_spec_url"
+       ],
+       "properties": {
+        "scheme": {
+         "type": "string",
+         "description": "Signature scheme (\"ariadne-zk-ed25519-v1\")."
+        },
+        "protocol_version": {
+         "type": "string",
+         "description": "Specification version (\"ZK_PROV_V1\")."
+        },
+        "oracle_pubkey_ed25519_b64": {
+         "type": "string",
+         "description": "Active base64-encoded 32-byte Ed25519 oracle public key."
+        },
+        "oracle_pubkey_sha256_hex": {
+         "type": "string",
+         "description": "SHA-256 hex fingerprint of the raw 32-byte Ed25519 oracle public key."
+        },
+        "rfc_spec_url": {
+         "type": "string",
+         "description": "Canonical ANX-RFC-001 specification URI."
+        }
+       }
+      },
+      "execution_latency_ms": {
+       "type": "number",
+       "description": "Server-side execution duration in milliseconds."
+      }
+     }
+    }
+   }
+  ]
+ }
+}
