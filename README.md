@@ -20,7 +20,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#5--agent-customs-bench-npm-run-bench--papermd"><img alt="Bench: 87.8% blocked · 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Checks: 152 passing" src="https://img.shields.io/badge/tests-152_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Checks: 154 passing" src="https://img.shields.io/badge/tests-154_passing-ece4d3?labelColor=0c1d18"></a>
 <img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18">
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -151,7 +151,7 @@ Three ways to explore Agent Customs, fastest first:
   <strong>1 · Automatic Test Suite</strong><br><br>
   No browser or API key needed:<br><br>
   <code>npm test</code><br><br>
-  Runs 152 checks across attacks, frozen Rounds 2–3 &amp; re-check controls, Unicode obfuscation, A2A/MCP schemas, capability flow, canary tripwires, certificates, benchmarks, CLI, extension, and the practice site.
+  Runs 154 checks across attacks, frozen Rounds 2–3 &amp; re-check controls, Unicode obfuscation, A2A/MCP schemas, capability flow, canary tripwires, certificates, benchmarks, CLI, extension, and the practice site.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · Inspection Desk (No Key)</strong><br><br>
@@ -247,7 +247,7 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
     <td width="50%" valign="top"><img src="docs/images/phase2-verify.jpg" alt="Phase 2 ES256 Customs Certificate signature verification"><br><sub><b>Phase 2 — Signed Receipt Verification:</b> Verifies ES256 signatures on exported Customs Certificates locally and compares against the live endpoint fingerprint.</sub></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Phase 2 and 3 Attack Lab simulation paired with the Agent Customs Bench scorecard"><br><sub><b>Phase 2 &amp; 3 — Attack Lab &amp; Benchmark:</b> Side-by-side without/with Agent Customs simulation paired with the 173-case benchmark scorecard.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Phase 2 and 3 Attack Lab simulation paired with the Agent Customs Bench scorecard"><br><sub><b>Phase 2 &amp; 3 — Attack Lab &amp; Benchmark:</b> Side-by-side without/with Agent Customs simulation paired with the 184-case benchmark scorecard.</sub></td>
     <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Phase 3 Builders panel showing CLI, Action, and Extension tabs"><br><sub><b>Phase 3 — For Builders (CLI, Action &amp; Extension):</b> Copy-ready integration tabs covering <code>site.js</code>, Node CLI, SARIF GitHub Action, and the browser extension.</sub></td>
   </tr>
 </table>
@@ -279,7 +279,7 @@ Static rules catch known obfuscations and phrasing, **while runtime locks limit 
 
 | Lock | What it blocks | Mechanism |
 | :--- | :--- | :--- |
-| **Lock 1 · Secrets stay home** | Sending card numbers, IBANs, keys, or explicit creds out | Format-based matching with `\p{Nd}` Unicode digit folding (full-width, Arabic-Indic), bounded 1–4 char separators (`" -- "`), Luhn/IBAN check digits (skipping labeled `IMEI`/serial numbers), Base64 chunk decoding, and explicit credential redaction (`"bank login is ..."`) across turns, partner calls, MCP/sandbox args, actions, forms, and clicked links. |
+| **Lock 1 · Secrets stay home** | Sending card numbers, IBANs, keys, or explicit creds out | Format-based matching with `\p{Nd}` Unicode digit folding (full-width, Arabic-Indic), bounded 1–4 char separators (`" -- "`), Luhn/IBAN check digits (bounded inbound-only `IMEI`/`IMSI`/`ICCID` exemptions, zero outbound exemptions), Base64 chunk decoding, and explicit credential redaction (`"bank login is ..."`) across turns, partner calls, MCP/sandbox args, actions, forms, and clicked links. |
 | **Lock 2 · Actions &amp; replies** | *"Quietly place an order"* &amp; side-channel payloads | Quarantines unsafe replies (incl. inline `System:` overrides &amp; email-login phishing while allowing benign few-shot dialogues), allow-lists output keys (`{ cruse, text, source, presentation }`), drops remote images (backed by page CSP `img-src 'self' data: blob:`) and external bare/full domains (with or without `/path`), persists MCP `listTools()` digests in `PinStore`, and gates state-changing actions on a human click. |
 | **Lock 3 · Armed canary trap** | Hidden prompt dumps &amp; encoded leaks | Appends a synthetic session canary (`ac_cnr_...`) to the top front agent's instructions at install/turn (restored cleanly on `uninstall()`). Outbound sinks walk string leaves inside objects and scan full tokens + random suffixes across raw, URL, ROT13, spaced, hex/spaced-hex, comma char codes, reversed, and 3-offset / wrapped Base64 (`80/80` at width 64 &amp; 76), halting execution and revoking partner approvals on trip. |
 
@@ -323,20 +323,20 @@ Public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json)
 
 ### 5 · Agent Customs Bench (`npm run bench` — [PAPER.md](PAPER.md))
 
-Reproducible desktop benchmark (Node.js v24.18.0, win32, **`$0` model tokens**) cleanly separating **Static Detection (`98` hostile across Rounds 1–3, internal un-tuned Held-out, and quoted external probes + `52` benign controls)** from **Runtime Lock &amp; Integrity Self-Tests (`23` checks)**, compared against a **Normalized Regex Baseline** run *after* identical NFKC, tag-character decoding, and invisible-character stripping:
+Reproducible desktop benchmark (Node.js v24.18.0, win32, **`$0` model tokens**) cleanly separating **Static Detection (`98` hostile across Rounds 1–3, internal un-tuned Held-out, and quoted external probes + `61` benign controls)** from **Runtime Lock &amp; Integrity Self-Tests (`25` checks)**, compared against a **Normalized Regex Baseline** run *after* identical NFKC, tag-character decoding, and invisible-character stripping:
 
 | Suite / Category | Cases | Agent Customs | Normalized Regex Baseline | Avg Latency |
 | :--- | ---: | :--- | ---: | ---: |
-| **Round 1 · `unicode_obfuscation`** | 12 | **100.0%** blocked/held | 58.3% | 10.61 ms |
-| **Round 1 · `prompt_and_phishing`** | 24 | **100.0%** blocked/held | 16.7% | 4.40 ms |
-| **Round 1 · `a2a_mcp_supply_chain`** | 6 | **66.7%** blocked/held *(**100%** flagged)* | 33.3% | 5.94 ms |
-| **Round 2 · `round2_adversarial`** *(red team, pre-fix 3/24)* | 24 | **95.8%** blocked/held *(**100%** flagged)* | 20.8% | 3.85 ms |
-| **Round 3 · `round3_generalization`** *(pre-fix 0/15)* | 15 | **100.0%** blocked/held | 0.0% | 2.07 ms |
+| **Round 1 · `unicode_obfuscation`** | 12 | **100.0%** blocked/held | 58.3% | 12.40 ms |
+| **Round 1 · `prompt_and_phishing`** | 24 | **100.0%** blocked/held | 16.7% | 4.74 ms |
+| **Round 1 · `a2a_mcp_supply_chain`** | 6 | **66.7%** blocked/held *(**100%** flagged)* | 33.3% | 6.74 ms |
+| **Round 2 · `round2_adversarial`** *(red team, pre-fix 3/24)* | 24 | **95.8%** blocked/held *(**100%** flagged)* | 20.8% | 4.21 ms |
+| **Round 3 · `round3_generalization`** *(pre-fix 0/15)* | 15 | **100.0%** blocked/held | 0.0% | 2.46 ms |
 | **Held-out · `heldout_unseen`** *(internal, post-fix)* | 10 | **50.0%** blocked/held | 0.0% | 2.11 ms |
-| **External · `external_heldout_quoted`** *(7 quoted from 20-case third-party set; `1/20` pre-format)* | 7 | **42.9%** blocked/held *(via format rules)* | 14.3% | 1.96 ms |
-| **Benign controls** *(3 official demos, 14 MCP/A2A, Round 3, held-out &amp; re-check)* | 52 | **100.0%** unblocked (**0% false blocks**) | 94.2% *(5.8% false blocks)* | 5.92 ms |
-| **Static Detection Total** | **150** | **86/98 (`87.8%`) blocked/held · 89/98 (`90.8%`) flagged** | **19/98 (`19.4%`) · 5.8% FP** | **~2.36 ms detection median** |
-| Lock &amp; integrity self-tests (`locks` + `tampering`) | 23 | **23/23 (`100%`) passing** | *N/A* | 1.75–2.60 ms avg |
+| **External · `external_heldout_quoted`** *(7 quoted from 20-case third-party set; `1/20` → `4/20` on full set)* | 7 | **42.9%** blocked/held *(via format rules)* | 14.3% | 1.91 ms |
+| **Benign controls** *(3 official demos, 14 MCP/A2A, Round 3, held-out &amp; re-check)* | 61 | **100.0%** unblocked (**0% false blocks**; 57 `CLEARED`, 4 `CONDITIONS`) | 91.8% *(8.2% false blocks)* | 4.89 ms |
+| **Static Detection Total** | **159** | **86/98 (`87.8%`) blocked/held · 89/98 (`90.8%`) flagged** | **19/98 (`19.4%`) · 8.2% FP** | **~2.64 ms detection median** |
+| Lock &amp; integrity self-tests (`locks` + `tampering`) | 25 | **25/25 (`100%`) passing** | *N/A* | 1.64–1.95 ms avg |
 
 See [**PAPER.md**](PAPER.md) for the full threat model, 5-layer diagram, commit provenance for frozen Round 2/3/external sets, and honest unseen-phrasing ceilings (`node tools/bench.mjs --verbose`).
 
@@ -388,7 +388,7 @@ Requires Node 22+ and zero npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 152 checks (attacks, Rounds 2–3, re-check controls, locks, CLI, bench & extension)
+npm test                                # 154 checks (attacks, Rounds 2–3, re-check controls, locks, CLI, bench & extension)
 npm run bench -- --verbose              # Print separated benchmark scorecard + flagged breakdown
 npm run check && npm run check:practice # Validate Agent Customs & practice networks with Cognizant's kit
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -490,7 +490,7 @@ The site and the test range must sit on **two separate origins** so partner call
 | [`bin/`](bin/) &amp; [`action.yml`](action.yml) | Zero-dependency CLI (`check`, `verify`, `bench`) with SARIF output and GitHub Composite Action |
 | [`PAPER.md`](PAPER.md) | 5-layer architecture note, formal threat model, benchmark scorecard &amp; honest limits |
 | [`tools/`](tools/) | CLI inspector, benchmark suite (`bench.mjs`, `round2-corpus.mjs`, `round3-corpus.mjs`, `heldout-corpus.mjs`, `external-heldout.mjs`), local server, range/practice/extension builders, smoke checks, receipt signer |
-| [`tests/`](tests/) | Node native test runner suite (`152` tests) + official spec fixtures |
+| [`tests/`](tests/) | Node native test runner suite (`154` tests) + official spec fixtures |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Upstream kit scripts &amp; templates (unmodified) |
 
 </details>
@@ -500,7 +500,7 @@ The site and the test range must sit on **two separate origins** so partner call
 
 - **Agent manifests, not general HTML:** Built for AI agent manifests and catalogs — Open Agentic Web (`agent-manifest.json`, `.network.json`), Google A2A Agent Cards (`.well-known/agent.json`, `agent-card.json`), and MCP (`mcp.json`, `server.json`, `mcpServers`, `tools/list`), not regular HTML websites.
 - **`Cleared` ≠ certified safe:** It means known attack vectors were not found — which is why version pinning + Luhn/IBAN/action/canary locks remain armed at runtime. Manifests naming third-party brands on generic hosts (such as `raw.githubusercontent.com`) surface an `I-AUTHORITY` hygiene notice (`Cleared with conditions`) because the host itself does not verify publisher identity.
-- **Static vs. runtime boundaries:** Open Agentic Web and MCP tool executions run with Lock 1–3 runtime guards and persisted `PinStore` MCP `listTools()` pins (forgettable from Desk Approvals after intentional updates); Google A2A is inspected statically because Cognizant's runtime does not execute remote A2A transports directly. Category rules caught Round 1–3 phrasing, but on 20 independent unseen wordings static rules held `1/20` pre-format (`50%` on internal held-out, `3/7` quoted externals after adding crypto/`javascript:`/IBAN format rules), confirming rules act as a first filter backed by runtime Locks 1–3 and opt-in `semanticJudge: true`. Written-out card words, `IMEI`/serial-labeled Luhn digits, 5+ char digit separators, and split-field secrets stay out of band.
+- **Static vs. runtime boundaries:** Open Agentic Web and MCP tool executions run with Lock 1–3 runtime guards and persisted `PinStore` MCP `listTools()` pins (forgettable from Desk Approvals after intentional updates); Google A2A is inspected statically because Cognizant's runtime does not execute remote A2A transports directly. Category rules caught Round 1–3 phrasing, but on 20 independent unseen wordings static rules held `1/20` pre-format and `4/20` after format additions (`50%` on internal held-out, `3/7` quoted externals after adding crypto/`javascript:`/IBAN format rules), confirming rules act as a first filter backed by runtime Locks 1–3 and opt-in `semanticJudge: true`. Written-out card words, bounded inbound-only visitor-chat `IMEI`/`IMSI`/`ICCID` exemptions (15 / 14–15 / 19–20 digits within 3 words; never exempted outbound), 5+ char digit separators, and split-field secrets stay out of band.
 - **Language scope:** English is checked in full; 10 additional languages check secret/card/password phishing; unfamiliar scripts/languages (including multi-token Turkish, Indonesian, Swedish, Norwegian, Danish, Zulu, and Somali requests, while leaving 3-word accented dishes and greetings clear) are held for human review.
 - **CORS requirement:** Sites that omit `Access-Control-Allow-Origin` cannot be fetched directly from the static web desk — inspect those origins via [`bin/agent-customs.mjs`](bin/agent-customs.mjs), CI [`action.yml`](action.yml), or the MV3 browser [`extension/`](extension/) (`optional_host_permissions` over `https://*/*`).
 - **Similar tools:** Unlike CLI-only MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan), Agent Customs runs 100% inside the browser (plus optional CLI, SARIF GitHub Action, and browser extension) across Open Agentic Web, A2A, and MCP catalogs with no external backend, guards partner calls at runtime with armed canaries and MCP tool pinning, and pins SHA-256 versions against rug pulls.

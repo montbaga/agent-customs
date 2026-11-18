@@ -280,6 +280,35 @@ function regexMatcher(patterns, { negatable = false } = {}) {
   };
 }
 
+const TRANSFER_VERBS = /\b(?:wire|transfer|send|sending|sent|remit|deposit|pay|paid|payable|forward|route|switch|fund|donate|tip|settle)\b/i;
+const CRYPTO_ADDR_RE = /\b0x[0-9a-fA-F]{40}\b|\b[bB][cC]1[ac-hj-np-zAC-HJ-NP-Z02-9]{25,62}\b|\bT[1-9A-HJ-NP-Za-km-z]{33}\b/;
+const IBAN_TEXT_RE = /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?\b/gi;
+const IBAN_CLAUSE_REDIRECT_RE = /\b(?:instead|rather\s+than|no\s+longer|switched|replaced|changed|updated|new\s+(?:bank|account|iban|wire|payment|billing|beneficiary)|different\s+(?:account|bank|iban)|alternative\s+(?:account|bank|iban)|previous\s+account|old\s+account)\b/i;
+const IBAN_TEXT_REDIRECT_RE = /\b(?:(?:bank(?:ing)?|account|payment|wire|transfer|billing|deposit|beneficiary|remittance)\s+(?:details?|info(?:rmation)?|numbers?|accounts?|iban)s?[^.!?\n]{0,35}\b(?:have\s+)?(?:changed|updated|moved|switched|replaced|been\s+(?:changed|updated|replaced))|(?:changed|new|updated|different)\s+(?:bank(?:ing)?|wire|remittance|beneficiary|receiving)\s+(?:account|details?|info(?:rmation)?|iban)|(?:old|previous)\s+(?:bank|account|iban)\s+(?:is\s+)?(?:closed|inactive|frozen|no\s+longer|disabled))\b/i;
+
+function hasIbanRedirect(clause, fullText) {
+  return IBAN_CLAUSE_REDIRECT_RE.test(clause) || IBAN_TEXT_REDIRECT_RE.test(fullText);
+}
+
+function findValidIbans(text, { redirectOnly = false } = {}) {
+  const hits = [];
+  for (const clause of clauses(text)) {
+    const vm = clause.match(TRANSFER_VERBS);
+    if (vm && (negatedBefore(clause, vm.index) || describedBefore(clause, vm.index))) continue;
+    if (redirectOnly && !vm) continue;
+    const redirected = hasIbanRedirect(clause, text);
+    if (redirectOnly ? !redirected : redirected) continue;
+    for (const m of clause.matchAll(IBAN_TEXT_RE)) {
+      if (!vm && (negatedBefore(clause, m.index) || describedBefore(clause, m.index))) continue;
+      if (ibanValid(m[0])) {
+        hits.push({ match: m[0], excerpt: clause });
+        break;
+      }
+    }
+  }
+  return hits;
+}
+
 /**
  * The text rules. Each has an id, a category, a severity, a plain title, a fix for
  * the publisher and a matcher that returns [{match, excerpt}].
@@ -429,7 +458,7 @@ export const TEXT_RULES = [
       /\b(?:forward|relay|send|redirect|export|share|upload)\b[^.!?\n]{0,60}\b(?:(?:screenshot|snapshot|photo|picture|copy)\s+of\s+)?(?:the\s+)?(?:(?:last|recent|latest|new)\s+)?(?:e-?mails?|messages?|texts?|sms|alerts?|statements?|notifications?)\b[^.!?\n]{0,50}\b(?:from|sent\s+by)\s+(?:their|your|his|her|the)\s+(?:bank(?:ing)?|financial|card|paypal|lender|credit\s+union)\b/i,
       /\b(?:screenshot|snapshot|photo|picture|copy)\b[^.!?\n]{0,45}\bof\b[^.!?\n]{0,45}\b(?:message|text|sms|alert|e-?mail)\b[^.!?\n]{0,40}\b(?:their|your|the)\s+(?:bank(?:ing)?|lender|card)\b/i,
       /\b(?:read|reads|collect|collects|fetch|fetches|gather|gathers|grab|grabs|extract|extracts|dump|dumps|inspect|inspects|access|accesses)\b[^.!?\n]{0,60}\b(?:secrets?|tokens?|keys?|credentials?|passwords?|env(?:ironment)?(?:\s+var(?:iable)?s?|\s+settings?)?|\.env|cookies?|private\s+(?:files?|data)|config(?:uration)?(?:\s+files?)?)\b[^.!?\n]{0,60}\b(?:post|posts|send|sends|upload|uploads|forward|forwards|relay|relays|transmit|transmits|ship|ships|push|pushes)\b[^.!?\n]{0,40}\b(?:to|toward|at)\b[^.!?\n]{0,40}\b(?:url|webhook|callback|endpoint|server|remote\s+host|address|destination)\b/i,
-      /\b(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)/i,
+      /(?:(?:\b(?:href|src|action)\s*=\s*["']?|\[\s*[^\]]*\]\s*\(\s*|\b(?:drag|click|bookmark(?:s|\s+bar)?|paste|follow|visit|open|run|execute|navigate|redirect|load|link|url)\b[^.!?\n]{0,80})\b(?:javascript|vbscript):(?=[^\s'")\],.;])|(?:\b(?:href|src|action)\s*=\s*["']?|\[\s*[^\]]*\]\s*\(\s*)data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b|\bdata\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml),[^\s'"])/i,
     ], { negatable: true }),
   },
   {
@@ -475,30 +504,30 @@ export const TEXT_RULES = [
   {
     id: "C-CRYPTO-QR",
     severity: "high",
-    title: "Asks for crypto transfers, IBAN wires or banking QR approvals",
-    why: "Crypto wallet transfers, diverted IBAN wires, and QR approvals in banking or authenticator apps bypass built-in fraud controls.",
-    fix: "Never publish cryptocurrency wallet addresses or IBAN transfer orders in agent instructions, or ask visitors to approve banking QR prompts via chat.",
+    title: "Asks for crypto transfers, redirected IBAN wires or banking QR approvals",
+    why: "Crypto wallet transfers, redirected IBAN wires, and QR approvals in banking or authenticator apps bypass built-in fraud controls.",
+    fix: "Never publish cryptocurrency transfer requests or redirected bank wire orders in agent instructions, or ask visitors to approve banking QR prompts via chat.",
     match: (text) => {
       const hits = regexMatcher([
         /\b(?:send|transfer|pay|deposit|wire|remit|forward|fund)\b[^.!?\n]{0,60}\b(?:btc|bitcoin|eth|ethereum|usdt|usdc|tether|sol|solana|xrp|trx|tron|ltc|crypto(?:currency)?)\b[^.!?\n]{0,60}\b(?:to\s+(?:the\s+|this\s+|our\s+)?(?:wallet|address)\b|(?:wallet|address)\s+[a-z0-9]{6,})\b|\bto\s+(?:wallet|crypto\s+address)\s+[a-z0-9]{6,}\b/i,
-        /\b0x[0-9a-fA-F]{40}\b|\b[bB][cC]1[ac-hj-np-zAC-HJ-NP-Z02-9]{25,62}\b|\bT[1-9A-HJ-NP-Za-km-z]{33}\b/,
         /\bscan\b[^.!?\n]{0,55}\bqr(?:\s*code)?\b[^.!?\n]{0,75}\b(?:bank(?:ing)?\s*(?:app|account)|authenticator)\b[^.!?\n]{0,75}\b(?:approve|authori[sz]e|confirm|accept|allow)\b[^.!?\n]{0,40}\b(?:request|prompt|login|sign[- ]?in|transfer|pop[- ]?up|transaction)\b|\b(?:bank(?:ing)?\s*(?:app|account)|authenticator)\b[^.!?\n]{0,50}\b(?:approve|authori[sz]e)\s+(?:the\s+)?(?:request|prompt|login|transfer|pop[- ]?up)\b/i,
       ], { negatable: true })(text);
-      // Format-based bank transfer check: valid ISO 7064 IBAN combined with a transfer verb in the same clause.
-      const TRANSFER_VERBS = /\b(?:wire|transfer|send|remit|deposit|pay|forward|route|switch)\b/i;
-      const IBAN_TEXT = /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?\b/gi;
       for (const clause of clauses(text)) {
         const vm = clause.match(TRANSFER_VERBS);
         if (!vm || negatedBefore(clause, vm.index) || describedBefore(clause, vm.index)) continue;
-        for (const m of clause.matchAll(IBAN_TEXT)) {
-          if (ibanValid(m[0])) {
-            hits.push({ match: m[0], excerpt: clause });
-            break;
-          }
-        }
+        const addr = clause.match(CRYPTO_ADDR_RE);
+        if (addr) hits.push({ match: addr[0], excerpt: clause });
       }
-      return hits;
+      return [...hits, ...findValidIbans(text, { redirectOnly: true })];
     },
+  },
+  {
+    id: "C-BANK-DETAILS",
+    severity: "medium",
+    title: "Publishes bank details (IBAN)",
+    why: "An agent publishing a bank account IBAN may be legitimate invoicing, so visitors should verify the account belongs to the expected business before sending money.",
+    fix: "Confirm the published IBAN matches your official invoice or bank details; remove it if no transfer instructions are intended.",
+    match: (text) => findValidIbans(text, { redirectOnly: false }),
   },
   {
     id: "C-BEACON",
