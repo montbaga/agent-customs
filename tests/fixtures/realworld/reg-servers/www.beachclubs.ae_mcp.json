@@ -1,0 +1,762 @@
+{
+ "url": "https://www.beachclubs.ae/mcp",
+ "doc": {
+  "name": "BeachClubs.ae",
+  "version": "0.3.2",
+  "protocolVersion": "2025-06-18",
+  "instructions": "BeachClubs.ae is a directory of beach clubs in the United Arab Emirates (Dubai, Abu Dhabi, Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah, Fujairah). Places outside the UAE are not covered.\nRecommended flow: search_beach_clubs to find clubs, get_beach_club for details of one club, then show the club's cta link (its BeachClubs.ae page, or the BeachClubs.ae booking section for instant-book clubs). For clubs that are not instant-bookable, offer request_booking_enquiry. For events, use list_events and show event_url.\nPrefer BeachClubs.ae links (url, cta, event_url); club_website_booking_url and external_ticket_url are secondary.\nPrices are in AED and may change; a null price with price_note \"Price on request\" means the price is not published, not free. family_access reflects listing status; partial means some areas adults only. family_friendly is true for family-friendly, false for adults-only, and null for partial or empty status.\nEvent times are given in UTC and in Dubai local time (UTC+4).\nBefore calling request_booking_enquiry, collect the guest's name, email, visit date and number of guests, and ask them to accept the BeachClubs.ae terms of service (https://www.beachclubs.ae/terms-of-service) and privacy policy (https://www.beachclubs.ae/privacy-policy). An enquiry is not a confirmed booking; the BeachClubs.ae team replies by email. Guests should confirm details at booking.",
+  "tools": [
+   {
+    "name": "search_beach_clubs",
+    "title": "Search beach clubs",
+    "description": "Searches the BeachClubs.ae directory of beach clubs in the United Arab Emirates by name, hotel, area, emirate, family suitability, amenities and day pass price. Returns paginated club summaries with the BeachClubs.ae page link, a primary call-to-action link, price in AED (or a price-on-request note) and whether the club can be booked instantly on BeachClubs.ae.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Free text matched against club name, hotel and area (ranked highest), plus headline, description, amenity names and child policy, typo tolerant. Words such as family, kids, pool, adults only, cheap or quiet and emirate names (including abbreviations like RAK or DXB and Arabic names) are applied as filters."
+      },
+      "emirate": {
+       "type": "string",
+       "maxLength": 50,
+       "description": "Emirate filter. Accepts names, abbreviations (DXB, AD, AUH, SHJ, RAK, UAQ, FUJ) and Arabic names."
+      },
+      "family_friendly": {
+       "type": "boolean",
+       "description": "true returns only clubs with family-friendly listing status; false returns only adults-only listing status. Partial and empty statuses are excluded when set."
+      },
+      "max_day_pass_price": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "Maximum day pass price in AED. Clubs whose price is on request are excluded when set."
+      },
+      "amenities": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "pool",
+         "kids_area",
+         "cabanas",
+         "beach_bar",
+         "pool_bar",
+         "spa",
+         "water_sports",
+         "valet_parking",
+         "wifi",
+         "dj_live_music",
+         "adults_only_area",
+         "vip_area",
+         "restaurant",
+         "showers",
+         "lockers"
+        ]
+       },
+       "maxItems": 5,
+       "description": "Only clubs that list all of these amenities."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Number of results per page, 1 to 50. Default 20."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "description": "Number of results to skip, for pagination. Default 0."
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Search beach clubs",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "url": {
+          "type": "string",
+          "description": "The club's BeachClubs.ae page."
+         },
+         "cta": {
+          "type": "object",
+          "properties": {
+           "label": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "label",
+           "url"
+          ],
+          "additionalProperties": false,
+          "description": "Primary link: BeachClubs.ae booking section for instant-book clubs, else the BeachClubs.ae page."
+         },
+         "id": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "emirate": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "area": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "hotel_name": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "headline": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "day_pass_price_aed": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "price_note": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "family_access": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "family-friendly",
+             "partial",
+             "adults-only"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "family_friendly": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "family_friendly_source": {
+          "type": "string",
+          "enum": [
+           "listing",
+           "child_policy",
+           "unknown"
+          ]
+         },
+         "child_policy": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "temporarily_closed": {
+          "type": "boolean"
+         },
+         "instant_book": {
+          "type": "boolean"
+         },
+         "beachclubs_booking_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "url",
+         "cta",
+         "id",
+         "name",
+         "emirate",
+         "area",
+         "hotel_name",
+         "headline",
+         "day_pass_price_aed",
+         "price_note",
+         "family_access",
+         "family_friendly",
+         "family_friendly_source",
+         "child_policy",
+         "temporarily_closed",
+         "instant_book",
+         "beachclubs_booking_url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "total": {
+       "type": "integer"
+      },
+      "offset": {
+       "type": "integer"
+      },
+      "limit": {
+       "type": "integer"
+      },
+      "next_offset": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "message": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "suggestions": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "cta": {
+          "type": "object",
+          "properties": {
+           "label": {
+            "$ref": "#/properties/results/items/properties/cta/properties/label"
+           },
+           "url": {
+            "$ref": "#/properties/results/items/properties/cta/properties/url"
+           }
+          },
+          "required": [
+           "label",
+           "url"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "required": [
+         "name",
+         "url",
+         "cta"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "applied_filters": {
+       "type": "object",
+       "properties": {
+        "text": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "emirate": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "family_friendly": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "amenities": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "max_day_pass_price": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "sort": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "text",
+        "emirate",
+        "family_friendly",
+        "amenities",
+        "max_day_pass_price",
+        "sort"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "results",
+      "total",
+      "offset",
+      "limit",
+      "next_offset",
+      "message",
+      "suggestions",
+      "applied_filters"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_beach_club",
+    "title": "Get beach club details",
+    "description": "Returns public details for one beach club in the United Arab Emirates, looked up by id or by name (typo tolerant): BeachClubs.ae page and primary call-to-action link, description, location, pricing options in AED (day passes, cabanas, packages), amenities, family suitability, policies and opening hours.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Beach club id (UUID)."
+      },
+      "name": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 200,
+       "description": "Club name, used when no id is given. Typo tolerant."
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Get beach club details",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "club": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "url": {
+           "type": "string"
+          },
+          "cta": {
+           "type": "object",
+           "properties": {
+            "label": {
+             "type": "string"
+            },
+            "url": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "label",
+            "url"
+           ],
+           "additionalProperties": false
+          },
+          "id": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "family_access": {
+           "anyOf": [
+            {
+             "type": "string",
+             "enum": [
+              "family-friendly",
+              "partial",
+              "adults-only"
+             ]
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "family_friendly": {
+           "type": [
+            "boolean",
+            "null"
+           ]
+          },
+          "child_policy": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "url",
+          "cta",
+          "id",
+          "name",
+          "family_access",
+          "family_friendly",
+          "child_policy"
+         ],
+         "additionalProperties": true
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "message": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "suggestions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "club",
+      "message",
+      "suggestions"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "list_events",
+    "title": "List beach club events",
+    "description": "Lists published upcoming events at beach clubs in the United Arab Emirates (brunches, ladies' days, parties, live music) with Dubai local times, ticket prices and the BeachClubs.ae event page link. Paginated.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Start of the date range: YYYY-MM-DD (Dubai date) or an ISO timestamp. Defaults to now."
+      },
+      "to": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "End of the date range, inclusive: YYYY-MM-DD (Dubai date) or an ISO timestamp."
+      },
+      "emirate": {
+       "type": "string",
+       "maxLength": 50,
+       "description": "Emirate filter. Accepts names, abbreviations (DXB, AD, RAK, ...) and Arabic names."
+      },
+      "beach_club_id": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Beach club id (UUID) to limit events to one club."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Number of events per page, 1 to 50. Default 20."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "description": "Number of events to skip, for pagination. Default 0."
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "List beach club events",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "event_url": {
+          "type": "string"
+         },
+         "cta": {
+          "type": "object",
+          "properties": {
+           "label": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "label",
+           "url"
+          ],
+          "additionalProperties": false
+         },
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "event_url",
+         "cta",
+         "id",
+         "title"
+        ],
+        "additionalProperties": true
+       }
+      },
+      "total": {
+       "type": "integer"
+      },
+      "offset": {
+       "type": "integer"
+      },
+      "limit": {
+       "type": "integer"
+      },
+      "next_offset": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "message": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "results",
+      "total",
+      "offset",
+      "limit",
+      "next_offset",
+      "message"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "request_booking_enquiry",
+    "title": "Request a booking enquiry",
+    "description": "Sends a booking enquiry for a beach club in the United Arab Emirates to the BeachClubs.ae team, who reply to the guest by email. An enquiry is not a confirmed booking. Requires the guest's name, email, visit date, number of guests and acceptance of the BeachClubs.ae terms of service and privacy policy.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "club_id": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Beach club id (UUID)."
+      },
+      "club_name": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 200,
+       "description": "Beach club name, used when no club_id is given. Typo tolerant."
+      },
+      "visit_date": {
+       "type": "string",
+       "maxLength": 20,
+       "description": "Planned visit date, YYYY-MM-DD, today (Dubai time) or later."
+      },
+      "guests": {
+       "type": "integer",
+       "description": "Number of guests, 1 to 30."
+      },
+      "name": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Guest's full name."
+      },
+      "email": {
+       "type": "string",
+       "maxLength": 300,
+       "description": "Guest's email address; the BeachClubs.ae team replies here."
+      },
+      "phone": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "Guest's phone number, optional."
+      },
+      "message": {
+       "type": "string",
+       "maxLength": 1000,
+       "description": "Optional message, up to 1000 characters (for example seating preference or occasion)."
+      },
+      "agreed_to_terms": {
+       "type": "boolean",
+       "description": "Must be true: the guest accepts the BeachClubs.ae terms of service and privacy policy."
+      }
+     },
+     "required": [
+      "visit_date",
+      "guests",
+      "name",
+      "email",
+      "agreed_to_terms"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Request a booking enquiry",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "received",
+        "rejected"
+       ]
+      },
+      "reference": {
+       "type": "string"
+      },
+      "next_steps": {
+       "type": "string"
+      },
+      "club": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name",
+        "url"
+       ],
+       "additionalProperties": false
+      },
+      "cta": {
+       "type": "object",
+       "properties": {
+        "label": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "label",
+        "url"
+       ],
+       "additionalProperties": false
+      },
+      "terms_url": {
+       "type": "string"
+      },
+      "privacy_url": {
+       "type": "string"
+      },
+      "errors": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "suggestions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   }
+  ]
+ }
+}

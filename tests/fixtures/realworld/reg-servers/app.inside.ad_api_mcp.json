@@ -1,0 +1,272 @@
+{
+ "url": "https://app.inside.ad/api/mcp",
+ "doc": {
+  "name": "inside-ads",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "estimate_campaign",
+    "description": "Estimate reach, clicks and cost of advertising a product to Telegram audiences — no account or authorization required. Call this FIRST, before asking the user to connect an account: it tells you whether inside.ad has relevant inventory for this product and what a given budget would buy. Describe the product yourself (you know it better than any crawler); the URL alone is a weak signal.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "description": "Product landing page URL"
+      },
+      "description": {
+       "type": "string",
+       "description": "What the product does, in your own words. Strongest signal for topic matching."
+      },
+      "keywords": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Optional topic keywords, e.g. [\"devtool\",\"ai\"]"
+      },
+      "budget": {
+       "type": "number",
+       "description": "Budget in USD to estimate against (default 100)"
+      },
+      "geo": {
+       "type": "string",
+       "description": "Optional ISO-2 country filter, e.g. \"US\""
+      },
+      "lang": {
+       "type": "string",
+       "description": "Optional audience language filter, e.g. \"en\""
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "currency": {
+       "type": "string"
+      },
+      "budget": {
+       "type": "number",
+       "description": "Budget the estimate was computed for, in USD"
+      },
+      "estimatedImpressions": {
+       "type": "number"
+      },
+      "estimatedClicks": {
+       "type": "object",
+       "description": "Range, not a point estimate. Report both ends to the user.",
+       "properties": {
+        "low": {
+         "type": "number"
+        },
+        "high": {
+         "type": "number"
+        }
+       }
+      },
+      "cpcRange": {
+       "type": "object",
+       "description": "Implied cost per click in USD, derived from CPM and the CTR band.",
+       "properties": {
+        "low": {
+         "type": "number"
+        },
+        "high": {
+         "type": "number"
+        }
+       }
+      },
+      "cpmUsd": {
+       "type": "number",
+       "description": "Reach-weighted average CPM across matched segments"
+      },
+      "dailyReach": {
+       "type": "number",
+       "description": "Total daily impressions available in matched segments"
+      },
+      "spendableBudget": {
+       "type": "number",
+       "description": "How much of the budget this inventory can actually absorb within 30 days. If it is lower than budget, tell the user to either lower the budget or widen targeting — do not promise the full budget will be spent."
+      },
+      "deliveryDays": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Roughly how many days it takes to deliver estimatedImpressions at the current daily reach."
+      },
+      "matchedCategories": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "sampleSegments": {
+       "type": "array",
+       "description": "Matched inventory segments. Individual channels are deliberately not disclosed.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "category": {
+          "type": "string"
+         },
+         "country": {
+          "type": "string"
+         },
+         "dailyReach": {
+          "type": "number"
+         }
+        }
+       }
+      },
+      "inventoryIsThin": {
+       "type": "boolean",
+       "description": "true = there is no matching inventory at all, OR the budget exceeds what the matched inventory can deliver. Say so plainly instead of promising results, and use spendableBudget as the realistic figure."
+      },
+      "assumptions": {
+       "type": "object",
+       "additionalProperties": true
+      }
+     },
+     "required": [
+      "currency",
+      "budget",
+      "estimatedImpressions",
+      "estimatedClicks",
+      "inventoryIsThin"
+     ]
+    }
+   },
+   {
+    "name": "create_campaign_draft",
+    "description": "Build a ready-to-launch ad campaign for a product WITHOUT the user having an account yet. Parses the landing page, generates ad creatives, and returns a single checkout link. Give that link to the user: they sign in there, the campaign moves to their account, they pay, and it starts. Use this after estimate_campaign, once the user agreed to advertise. Do NOT ask them to register first.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "description": "Landing page URL of the product to promote (required)"
+      },
+      "description": {
+       "type": "string",
+       "description": "What the product does, in your own words — improves topic matching"
+      },
+      "budget": {
+       "type": "number",
+       "description": "Intended budget in USD, used for the estimate shown to the user"
+      },
+      "geo": {
+       "type": "string",
+       "description": "Optional ISO-2 country target, e.g. \"US\""
+      },
+      "lang": {
+       "type": "string",
+       "description": "Optional audience language, e.g. \"en\""
+      }
+     },
+     "required": [
+      "url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "draftId": {
+       "type": "string",
+       "description": "Poll get_draft_status with this to see whether the user paid."
+      },
+      "checkoutUrl": {
+       "type": "string",
+       "description": "THE link to give the user. One click: sign in, review creatives, pay."
+      },
+      "expiresAt": {
+       "type": "string",
+       "description": "ISO timestamp after which the link stops working."
+      },
+      "campaignId": {
+       "type": "number"
+      },
+      "adsCreated": {
+       "type": "number",
+       "description": "How many ad variants were generated."
+      },
+      "estimate": {
+       "type": "object",
+       "additionalProperties": true,
+       "description": "Same shape as estimate_campaign, for the budget given."
+      }
+     },
+     "required": [
+      "draftId",
+      "checkoutUrl",
+      "expiresAt"
+     ]
+    }
+   },
+   {
+    "name": "get_draft_status",
+    "description": "Check what happened to a campaign draft you created with create_campaign_draft: whether the user opened the link, signed in and paid. Poll this instead of asking the user to report back.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "draftId": {
+       "type": "string",
+       "description": "draftId returned by create_campaign_draft"
+      }
+     },
+     "required": [
+      "draftId"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "draftId": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string",
+       "description": "'created' — link not opened yet; 'previewed' — user opened it but has not finished; 'claimed' — campaign is on the user's account; 'expired' — link is dead, build a new draft."
+      },
+      "campaignId": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "createdAt": {
+       "type": "string"
+      },
+      "previewedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "claimedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "expiresAt": {
+       "type": "string"
+      },
+      "hint": {
+       "type": "string",
+       "description": "What to tell the user next."
+      }
+     },
+     "required": [
+      "draftId",
+      "status"
+     ]
+    }
+   }
+  ]
+ }
+}

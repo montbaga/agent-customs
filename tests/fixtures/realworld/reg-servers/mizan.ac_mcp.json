@@ -1,0 +1,1207 @@
+{
+ "url": "https://mizan.ac/mcp",
+ "doc": {
+  "name": "Mizan",
+  "version": "1.2.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Mizan reads the public ban lists of game communities and files each ban under the account it names. A ban is the claim of the list that made it: quote a record's `verdict.text` as it stands, credit each ban to its list, and never call a player a cheater or clean. No bans found means none on the lists Mizan reads, nothing more. `verdict.mizanBan` is true only for a ban by Mizan's own anti-cheat. Ban reasons are each community's own text. Checking several Steam accounts? Use one check_players call, not a loop of lookup_player.",
+  "tools": [
+   {
+    "name": "lookup_player",
+    "title": "Look up a player",
+    "description": "Look up a player's Mizan record: their bans across every list Mizan reads, whether any list banned them for cheating, and Steam's own VAC and game bans for a Steam account. Pass a SteamID in any form, a Steam profile link, a Discord id or a Minecraft name.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "A player id, profile link or name, as typed into mizan.ac/lookup."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "found": {
+       "type": "boolean",
+       "const": true
+      },
+      "schema": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "The record format's version; it changes only when a field changes meaning or goes away."
+      },
+      "player": {
+       "type": "object",
+       "properties": {
+        "provider": {
+         "type": "string",
+         "description": "steam, discord, minecraft, fivem, epic, xbox or eos"
+        },
+        "id": {
+         "type": "string"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "ids": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "label": {
+            "type": "string"
+           },
+           "value": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "label",
+           "value"
+          ],
+          "additionalProperties": false
+         },
+         "description": "The same account in every id form, such as SteamID and SteamID3."
+        }
+       },
+       "required": [
+        "provider",
+        "id",
+        "name",
+        "ids"
+       ],
+       "additionalProperties": false
+      },
+      "verdict": {
+       "type": "object",
+       "properties": {
+        "text": {
+         "type": "string",
+         "description": "The verdict in words. Quote it as it stands."
+        },
+        "mizanBan": {
+         "type": "boolean",
+         "description": "True only when Mizan's own anti-cheat banned the player; every other ban is its list's claim."
+        },
+        "lists": {
+         "type": "object",
+         "properties": {
+          "total": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "inForce": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "ended": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "total",
+          "inForce",
+          "ended"
+         ],
+         "additionalProperties": false
+        },
+        "bans": {
+         "type": "object",
+         "properties": {
+          "total": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "inForce": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "ended": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "total",
+          "inForce",
+          "ended"
+         ],
+         "additionalProperties": false
+        },
+        "cheating": {
+         "type": "object",
+         "properties": {
+          "bans": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "inForce": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "lists": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "bans",
+          "inForce",
+          "lists"
+         ],
+         "additionalProperties": false
+        },
+        "listsRead": {
+         "anyOf": [
+          {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "How many lists Mizan reads."
+        }
+       },
+       "required": [
+        "text",
+        "mizanBan",
+        "lists",
+        "bans",
+        "cheating",
+        "listsRead"
+       ],
+       "additionalProperties": false
+      },
+      "steam": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "vacBanned": {
+           "type": "boolean"
+          },
+          "vacBans": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "gameBans": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "daysSinceLastBan": {
+           "anyOf": [
+            {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "communityBanned": {
+           "type": [
+            "boolean",
+            "null"
+           ]
+          },
+          "economyBan": {
+           "anyOf": [
+            {
+             "type": "string",
+             "const": "none"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "tradeBanned": {
+           "type": [
+            "boolean",
+            "null"
+           ]
+          },
+          "checkedAt": {
+           "type": "string",
+           "description": "ISO 8601 time"
+          }
+         },
+         "required": [
+          "vacBanned",
+          "vacBans",
+          "gameBans",
+          "daysSinceLastBan",
+          "communityBanned",
+          "economyBan",
+          "tradeBanned",
+          "checkedAt"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Steam's own VAC and game bans; null for another platform or when Steam did not answer."
+      },
+      "steamState": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "unavailable",
+        "not_steam"
+       ]
+      },
+      "profile": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "avatar": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "visibility": {
+         "anyOf": [
+          {
+           "type": "string",
+           "enum": [
+            "public",
+            "friends",
+            "private"
+           ]
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "createdAt": {
+         "anyOf": [
+          {
+           "type": "string",
+           "description": "ISO 8601 time"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "level": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "presence": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "game": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "recentNames": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "name": {
+            "type": "string"
+           },
+           "at": {
+            "anyOf": [
+             {
+              "type": "string",
+              "description": "ISO 8601 time"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "current": {
+            "type": "boolean"
+           },
+           "source": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "name",
+           "at",
+           "source"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "name",
+        "avatar",
+        "visibility",
+        "createdAt",
+        "level",
+        "presence",
+        "game",
+        "recentNames"
+       ],
+       "additionalProperties": false
+      },
+      "bans": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "source": {
+          "type": "object",
+          "properties": {
+           "key": {
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           },
+           "kind": {
+            "anyOf": [
+             {
+              "type": "string",
+              "enum": [
+               "anti_cheat",
+               "staff",
+               "platform",
+               "community"
+              ]
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "kindLabel": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "key",
+           "name",
+           "kind",
+           "kindLabel"
+          ],
+          "additionalProperties": false
+         },
+         "categories": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "label"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "reason": {
+          "description": "The list's own words; null when Mizan withholds them.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "reasonWithheld": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "key": {
+              "type": "string"
+             },
+             "label": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "key",
+             "label"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Set when Mizan withholds the reason because it accuses the player of a crime or reveals sensitive details: the category it reads as instead."
+         },
+         "issuer": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "antiCheat": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "game": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "mode": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "server": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "createdAt": {
+          "anyOf": [
+           {
+            "type": "string",
+            "description": "ISO 8601 time"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "expiresAt": {
+          "anyOf": [
+           {
+            "type": "string",
+            "description": "ISO 8601 time"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "endedAt": {
+          "anyOf": [
+           {
+            "type": "string",
+            "description": "ISO 8601 time"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "inForce": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "source",
+         "categories",
+         "reason",
+         "reasonWithheld",
+         "issuer",
+         "antiCheat",
+         "game",
+         "mode",
+         "server",
+         "createdAt",
+         "expiresAt",
+         "endedAt",
+         "inForce"
+        ],
+        "additionalProperties": false
+       },
+       "description": "At most 200 bans, newest first; verdict.bans counts every one."
+      },
+      "checkedAt": {
+       "type": "string",
+       "description": "ISO 8601 time"
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "page": {
+         "type": "string"
+        },
+        "json": {
+         "type": "string"
+        },
+        "markdown": {
+         "type": "string"
+        },
+        "dispute": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "page",
+        "json",
+        "markdown",
+        "dispute"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "found",
+      "schema",
+      "player",
+      "verdict",
+      "steam",
+      "steamState",
+      "profile",
+      "bans",
+      "checkedAt",
+      "links"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "check_players",
+    "title": "Check up to 100 Steam accounts",
+    "description": "Check up to 100 Steam accounts in one call, such as everyone on a game server: each account's bans across every list Mizan reads, whether a list banned it for cheating, and Steam's own VAC and game bans. Pass SteamIDs in any form or steamcommunity.com profile links; lines of a server's `status` output work too.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "players": {
+       "minItems": 1,
+       "maxItems": 100,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+       },
+       "description": "SteamIDs in any form (SteamID64, STEAM_0:0:11101, [U:1:22202]), steamcommunity.com profile links, or lines of `status` output."
+      }
+     },
+     "required": [
+      "players"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "ok": {
+       "type": "boolean",
+       "const": true
+      },
+      "checked": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "counts": {
+       "type": "object",
+       "properties": {
+        "players": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 9007199254740991
+        },
+        "listedForCheating": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 9007199254740991
+        },
+        "listed": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 9007199254740991
+        },
+        "steamBanned": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 9007199254740991
+        }
+       },
+       "required": [
+        "players",
+        "listedForCheating",
+        "listed",
+        "steamBanned"
+       ],
+       "additionalProperties": false
+      },
+      "leftOut": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991,
+       "description": "Accounts past the first 100, not checked."
+      },
+      "unresolved": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "customUrl": {
+          "type": "string"
+         },
+         "reason": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "customUrl",
+         "reason"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "players": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "SteamID64"
+         },
+         "name": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "customUrl": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "page": {
+          "type": "string"
+         },
+         "verdict": {
+          "type": "string"
+         },
+         "bans": {
+          "type": "object",
+          "properties": {
+           "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+           },
+           "inForce": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+           },
+           "lists": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+           }
+          },
+          "required": [
+           "total",
+           "inForce",
+           "lists"
+          ],
+          "additionalProperties": false
+         },
+         "lists": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "name": {
+             "type": "string"
+            },
+            "cheating": {
+             "type": "boolean"
+            },
+            "conduct": {
+             "type": "boolean"
+            },
+            "antiCheat": {
+             "type": [
+              "string",
+              "null"
+             ]
+            }
+           },
+           "required": [
+            "name",
+            "cheating",
+            "conduct",
+            "antiCheat"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "steam": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "vacBans": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+             },
+             "gameBans": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+             },
+             "daysSinceLastBan": {
+              "anyOf": [
+               {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "communityBanned": {
+              "type": "boolean"
+             },
+             "tradeBanned": {
+              "type": [
+               "boolean",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "vacBans",
+             "gameBans",
+             "daysSinceLastBan",
+             "communityBanned",
+             "tradeBanned"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "name",
+         "customUrl",
+         "page",
+         "verdict",
+         "bans",
+         "lists",
+         "steam"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "ok",
+      "checked",
+      "counts",
+      "leftOut",
+      "unresolved",
+      "players"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_sources",
+    "title": "List the ban lists Mizan reads",
+    "description": "List the ban lists Mizan reads, largest first: each list's name, who issues its bans, the games it covers, its bans and how many are in force, and whether Mizan is still reading it. Filter by game key or by part of the name.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "game": {
+       "description": "A game key, such as rust, garrysmod, cs2, csgo, tf2 or squad; registry_stats lists every one.",
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+      },
+      "name": {
+       "description": "Part of a list's name, such as \"sourcebans\".",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 64
+      },
+      "limit": {
+       "description": "Lists to return, largest first. Defaults to 25.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "ok": {
+       "type": "boolean",
+       "const": true
+      },
+      "lists": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991,
+       "description": "Every list Mizan reads."
+      },
+      "matched": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991,
+       "description": "Lists matching the filters, before the limit."
+      },
+      "readAt": {
+       "type": "string",
+       "description": "ISO 8601 time"
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "key": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "kind": {
+          "description": "Who issues the list's bans: anti_cheat, staff, platform, community",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "games": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "bans": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+         },
+         "inForce": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+         },
+         "state": {
+          "type": "string",
+          "enum": [
+           "reading",
+           "retrying",
+           "stopped"
+          ]
+         },
+         "site": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "page": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "key",
+         "name",
+         "kind",
+         "games",
+         "bans",
+         "inForce",
+         "state",
+         "site",
+         "page"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "ok",
+      "lists",
+      "matched",
+      "readAt",
+      "sources"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "registry_stats",
+    "title": "The registry's size",
+    "description": "The size of Mizan's registry: how many ban lists it reads, the bans on them, how many are in force, and the same counts for each game.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "ok": {
+       "type": "boolean",
+       "const": true
+      },
+      "lists": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "bans": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "inForce": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "games": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "readAt": {
+       "type": "string",
+       "description": "ISO 8601 time"
+      },
+      "byGame": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "game": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "lists": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+         },
+         "bans": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+         },
+         "inForce": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+         },
+         "page": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "game",
+         "name",
+         "lists",
+         "bans",
+         "inForce",
+         "page"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "ok",
+      "lists",
+      "bans",
+      "inForce",
+      "games",
+      "readAt",
+      "byGame"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_my_communities",
+    "title": "List your communities",
+    "description": "List the communities you belong to on Mizan, your role in each, their registry status and their game servers. Needs you to sign in to Mizan.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "communities": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "role": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "servers": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            },
+            "game": {
+             "type": "string"
+            },
+            "mode": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "address": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "name",
+            "game",
+            "mode",
+            "address"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "role",
+         "status",
+         "servers"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "communities"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ }
+}

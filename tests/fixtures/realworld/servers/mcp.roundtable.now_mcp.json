@@ -1,0 +1,1300 @@
+{
+ "url": "https://mcp.roundtable.now/mcp",
+ "doc": {
+  "name": "Roundtable MCP",
+  "version": "1.5.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Roundtable runs multi-model AI debates — multiple LLMs discuss a topic, then a moderator synthesizes their perspectives into actionable insight.\n\nUse these tools whenever the user wants to brainstorm, debate, get a second opinion, explore tradeoffs, consult experts, review code, or get diverse perspectives on any question.\n\nTool selection guide:\n- consult-council: General questions, brainstorming, open-ended exploration\n- design-architecture: System design, architecture decisions, tech stack selection\n- review-code: Code review, security audit, performance analysis\n- debug-issue: Bug investigation, root cause analysis\n- plan-implementation: Feature planning, task breakdown, implementation strategy\n- assess-tradeoffs: Compare options, evaluate trade-offs, decision making\n\nTips:\n- Omit models for auto-mode (recommended) — AI picks optimal models and roles\n- Use session_context to chain debates — reference prior session IDs for continuity\n- Use thinking_level: \"high\" for complex problems, \"low\" for quick opinions\n- check-usage shows remaining credits and rate limits",
+  "tools": [
+   {
+    "name": "list-models",
+    "title": "List Models",
+    "description": "List available AI models grouped by thinking level (low/medium/high). Shows default models, credit costs, capabilities for each tier. Use this before consult to understand model options.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "thinking_level": {
+       "description": "Filter to a specific thinking level",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "levels": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string",
+          "description": "Human-readable tier name"
+         },
+         "level": {
+          "type": "string",
+          "description": "Thinking level identifier"
+         },
+         "models": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "capabilities": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             },
+             "description": "Model capabilities"
+            },
+            "id": {
+             "type": "string",
+             "description": "Model identifier"
+            },
+            "multiplier": {
+             "type": "number",
+             "description": "Credit cost multiplier"
+            }
+           },
+           "required": [
+            "capabilities",
+            "id",
+            "multiplier"
+           ],
+           "additionalProperties": false,
+           "description": "Available model"
+          },
+          "description": "Models in this tier"
+         },
+         "moderator": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string",
+            "description": "Moderator model identifier"
+           },
+           "multiplier": {
+            "type": "number",
+            "description": "Credit cost multiplier"
+           }
+          },
+          "required": [
+           "id",
+           "multiplier"
+          ],
+          "additionalProperties": false,
+          "description": "Moderator model for this tier"
+         }
+        },
+        "required": [
+         "label",
+         "level",
+         "models",
+         "moderator"
+        ],
+        "additionalProperties": false,
+        "description": "Thinking level tier"
+       },
+       "description": "Available thinking level tiers"
+      }
+     },
+     "required": [
+      "levels"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list-sessions",
+    "title": "List Sessions",
+    "description": "List your previous MCP tool sessions. Returns session metadata including prompt, tool used, quality score, and credits consumed. Useful for reviewing past council discussions.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "limit": {
+       "default": 20,
+       "description": "Max results to return",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100
+      },
+      "offset": {
+       "default": 0,
+       "description": "Pagination offset",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "tool_name": {
+       "description": "Filter by tool name (e.g., \"consult\", \"architect\")",
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "hasMore": {
+       "type": "boolean",
+       "description": "Whether more results are available"
+      },
+      "sessions": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "credits": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Credits consumed"
+         },
+         "durationMs": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Duration in milliseconds"
+         },
+         "id": {
+          "type": "string",
+          "description": "Session identifier"
+         },
+         "prompt": {
+          "type": "string",
+          "description": "Original prompt text"
+         },
+         "thinkingLevel": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Thinking level used"
+         },
+         "toolName": {
+          "type": "string",
+          "description": "Tool that was invoked"
+         }
+        },
+        "required": [
+         "credits",
+         "durationMs",
+         "id",
+         "prompt",
+         "thinkingLevel",
+         "toolName"
+        ],
+        "additionalProperties": false,
+        "description": "Session entry"
+       },
+       "description": "List of sessions"
+      }
+     },
+     "required": [
+      "hasMore",
+      "sessions"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get-session",
+    "title": "Get Session",
+    "description": "Get full details of a previous MCP session by ID. Returns the complete result including participant responses and moderator synthesis. Use list-sessions first to find session IDs.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "session_id": {
+       "type": "string",
+       "minLength": 1,
+       "description": "The session ID to retrieve"
+      }
+     },
+     "required": [
+      "session_id"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "createdAt": {
+       "type": "string",
+       "description": "Session creation timestamp"
+      },
+      "durationMs": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Duration in milliseconds"
+      },
+      "id": {
+       "type": "string",
+       "description": "Session identifier"
+      },
+      "prompt": {
+       "type": "string",
+       "description": "Original prompt text"
+      },
+      "qualityScore": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "AI-rated quality score"
+      },
+      "toolName": {
+       "type": "string",
+       "description": "Tool that was invoked"
+      },
+      "totalCredits": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Total credits consumed"
+      }
+     },
+     "required": [
+      "createdAt",
+      "durationMs",
+      "id",
+      "prompt",
+      "qualityScore",
+      "toolName",
+      "totalCredits"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get-logs",
+    "title": "Get Logs",
+    "description": "Query structured logs from your MCP tool executions. Filter by session, severity level, event type, and time range. Useful for debugging and monitoring tool usage.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "end_time": {
+       "description": "End timestamp (ms) for time range filter",
+       "type": "number"
+      },
+      "event": {
+       "description": "Filter by event name (e.g., \"debate_completed\")",
+       "type": "string"
+      },
+      "level": {
+       "description": "Filter by log level",
+       "type": "string",
+       "enum": [
+        "info",
+        "warn",
+        "error"
+       ]
+      },
+      "limit": {
+       "default": 50,
+       "description": "Max results",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200
+      },
+      "offset": {
+       "default": 0,
+       "description": "Pagination offset",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      },
+      "session_id": {
+       "description": "Filter logs for a specific session",
+       "type": "string"
+      },
+      "start_time": {
+       "description": "Start timestamp (ms) for time range filter",
+       "type": "number"
+      }
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "logs": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "data": {
+          "anyOf": [
+           {
+            "type": "object",
+            "propertyNames": {
+             "type": "string"
+            },
+            "additionalProperties": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "number"
+              },
+              {
+               "type": "boolean"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Structured log data payload"
+         },
+         "event": {
+          "type": "string",
+          "description": "Event name"
+         },
+         "level": {
+          "type": "string",
+          "description": "Log severity level"
+         },
+         "sessionId": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Associated session identifier"
+         },
+         "time": {
+          "type": "string",
+          "description": "Log timestamp"
+         }
+        },
+        "required": [
+         "data",
+         "event",
+         "level",
+         "sessionId",
+         "time"
+        ],
+        "additionalProperties": false,
+        "description": "Log entry"
+       },
+       "description": "Matching log entries"
+      }
+     },
+     "required": [
+      "logs"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "check-usage",
+    "title": "Check Usage",
+    "description": "Check your remaining credits, usage limits, and plan info",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "verbose": {
+       "description": "Include detailed per-window rate limit breakdown",
+       "default": false,
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "credits": {
+       "type": "number",
+       "description": "Remaining credit balance"
+      },
+      "plan": {
+       "type": "string",
+       "description": "Current plan tier"
+      },
+      "rateLimits": {
+       "type": "object",
+       "properties": {
+        "daily": {
+         "type": "object",
+         "properties": {
+          "count": {
+           "type": "number",
+           "description": "Requests used"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Request cap"
+          },
+          "resetAt": {
+           "type": "string",
+           "description": "Reset timestamp"
+          }
+         },
+         "required": [
+          "count",
+          "limit",
+          "resetAt"
+         ],
+         "additionalProperties": false,
+         "description": "Daily rate limit window"
+        },
+        "fiveHour": {
+         "type": "object",
+         "properties": {
+          "count": {
+           "type": "number",
+           "description": "Requests used"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Request cap"
+          },
+          "resetAt": {
+           "type": "string",
+           "description": "Reset timestamp"
+          }
+         },
+         "required": [
+          "count",
+          "limit",
+          "resetAt"
+         ],
+         "additionalProperties": false,
+         "description": "5-hour rate limit window"
+        },
+        "weekly": {
+         "type": "object",
+         "properties": {
+          "count": {
+           "type": "number",
+           "description": "Requests used"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Request cap"
+          },
+          "resetAt": {
+           "type": "string",
+           "description": "Reset timestamp"
+          }
+         },
+         "required": [
+          "count",
+          "limit",
+          "resetAt"
+         ],
+         "additionalProperties": false,
+         "description": "Weekly rate limit window"
+        }
+       },
+       "required": [
+        "daily",
+        "fiveHour",
+        "weekly"
+       ],
+       "additionalProperties": false,
+       "description": "Rate limit status across all windows"
+      },
+      "status": {
+       "type": "string",
+       "description": "Overall usage status"
+      }
+     },
+     "required": [
+      "credits",
+      "plan",
+      "rateLimits",
+      "status"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get-thread-link",
+    "title": "Get Thread Link",
+    "description": "Get the dashboard URL for a previous debate session. Returns the thread link and public URL if the thread is public.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "session_id": {
+       "type": "string",
+       "minLength": 1,
+       "description": "The session ID to get the thread link for"
+      }
+     },
+     "required": [
+      "session_id"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "dashboardUrl": {
+       "type": "string",
+       "description": "Dashboard URL to view the thread"
+      },
+      "isPublic": {
+       "type": "boolean",
+       "description": "Whether the thread is publicly accessible"
+      },
+      "publicUrl": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Public share URL if thread is public"
+      }
+     },
+     "required": [
+      "dashboardUrl",
+      "isPublic",
+      "publicUrl"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "set-thread-visibility",
+    "title": "Set Thread Visibility",
+    "description": "Set a thread as public or private. Public threads can be shared via URL. Use session_id from a previous debate session.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "is_public": {
+       "type": "boolean",
+       "description": "Set to true to make the thread publicly accessible, false to make it private"
+      },
+      "session_id": {
+       "type": "string",
+       "minLength": 1,
+       "description": "The session ID from a previous debate"
+      }
+     },
+     "required": [
+      "is_public",
+      "session_id"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "isPublic": {
+       "type": "boolean",
+       "description": "Current visibility state"
+      },
+      "publicUrl": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Public share URL if thread is public"
+      }
+     },
+     "required": [
+      "isPublic",
+      "publicUrl"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "consult-council",
+    "title": "Consult Council",
+    "description": "Consult the AI coding council — multiple models discuss your engineering question sequentially (each sees prior responses), then a moderator synthesizes. Auto-mode by default — AI picks optimal models, roles, and conversation mode from your prompt. Provide explicit models to override (manual mode). Fully configurable: mode, format, roles, models, thinking level.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "context": {
+       "description": "Additional background context for the debate (code, docs, requirements)",
+       "type": "string",
+       "maxLength": 50000
+      },
+      "format": {
+       "default": "discussion",
+       "description": "Moderator output format: discussion (narrative), adr (architecture decision), comparison (table), pros-cons",
+       "type": "string",
+       "enum": [
+        "discussion",
+        "adr",
+        "comparison",
+        "pros-cons"
+       ]
+      },
+      "mode": {
+       "default": "debating",
+       "description": "Conversation mode: analyzing (research), brainstorming (ideas), debating (tradeoffs), solving (action plans)",
+       "type": "string",
+       "enum": [
+        "analyzing",
+        "brainstorming",
+        "debating",
+        "solving"
+       ]
+      },
+      "models": {
+       "description": "Override specific model IDs. Min 3 models. Use list-models to see available options",
+       "minItems": 3,
+       "maxItems": 6,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "prompt": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 10000,
+       "description": "The question, topic, or problem to debate"
+      },
+      "roles": {
+       "description": "Inline role names for participants (e.g., [\"Security Architect\", \"Backend Engineer\"])",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "thinking_level": {
+       "default": "medium",
+       "description": "Controls model quality and cost: low (fast/cheap), medium (balanced), high (maximum reasoning)",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "webhook_url": {
+       "description": "Webhook URL to POST results to after completion",
+       "type": "string",
+       "format": "uri"
+      },
+      "session_context": {
+       "description": "Session IDs to use as context (max 3). Prior moderator summaries will be prepended.",
+       "maxItems": 3,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "knowledge": {
+       "description": "Reference knowledge to inject as context",
+       "maxItems": 5,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "content": {
+          "type": "string",
+          "description": "Text content or URL to fetch"
+         },
+         "label": {
+          "description": "Label for this knowledge item",
+          "type": "string"
+         },
+         "type": {
+          "type": "string",
+          "enum": [
+           "text",
+           "url"
+          ],
+          "description": "Content type: text (pass-through) or url (fetch and extract)"
+         }
+        },
+        "required": [
+         "content",
+         "type"
+        ]
+       }
+      },
+      "auto_route": {
+       "default": false,
+       "description": "Auto-select optimal models based on prompt analysis and historical performance",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "prompt"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "design-architecture",
+    "title": "Design Architecture",
+    "description": "Architecture design council. Systems Architect, Infrastructure Engineer, and DX Advocate evaluate your system design. Always uses high thinking for maximum depth. Output as ADR.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "description": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 10000,
+       "description": "What the system should do"
+      },
+      "focus_areas": {
+       "description": "Priority areas (e.g., [\"security\", \"performance\"])",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "scale": {
+       "default": "startup",
+       "description": "Target scale: startup (small team), growth (scaling), enterprise (large org)",
+       "type": "string",
+       "enum": [
+        "startup",
+        "growth",
+        "enterprise"
+       ]
+      },
+      "tech_stack": {
+       "description": "Preferred technologies",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "webhook_url": {
+       "description": "Webhook URL to POST results to after completion",
+       "type": "string",
+       "format": "uri"
+      }
+     },
+     "required": [
+      "description"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "review-code",
+    "title": "Review Code",
+    "description": "Code review council. Senior Engineer, Security Reviewer, and Performance Analyst analyze your code and a moderator synthesizes their findings.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "code": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100000,
+       "description": "The code to review"
+      },
+      "focus": {
+       "description": "Review focus areas (e.g., [\"security\", \"performance\"])",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "language": {
+       "description": "Programming language (auto-detected if not specified)",
+       "type": "string"
+      },
+      "thinking_level": {
+       "default": "medium",
+       "description": "Review depth: low (quick scan), medium (balanced), high (thorough)",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "webhook_url": {
+       "description": "Webhook URL to POST results to after completion",
+       "type": "string",
+       "format": "uri"
+      }
+     },
+     "required": [
+      "code"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "plan-implementation",
+    "title": "Plan Implementation",
+    "description": "Implementation planning council. Tech Lead, Senior Engineer, and QA Strategist break down a feature into actionable steps, identify risks, and define acceptance criteria. Output as ADR.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "codebase_context": {
+       "description": "Relevant existing code, file structure, or architecture notes",
+       "type": "string",
+       "maxLength": 50000
+      },
+      "constraints": {
+       "description": "Constraints (e.g., [\"no breaking changes\", \"must support offline\"])",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "feature": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 10000,
+       "description": "The feature or change to plan"
+      },
+      "tech_stack": {
+       "description": "Current tech stack",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "thinking_level": {
+       "default": "medium",
+       "description": "Planning depth",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "webhook_url": {
+       "description": "Webhook URL to POST results to after completion",
+       "type": "string",
+       "format": "uri"
+      },
+      "session_context": {
+       "description": "Session IDs to use as context (max 3). Prior moderator summaries will be prepended.",
+       "maxItems": 3,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "knowledge": {
+       "description": "Reference knowledge to inject as context",
+       "maxItems": 5,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "content": {
+          "type": "string",
+          "description": "Text content or URL to fetch"
+         },
+         "label": {
+          "description": "Label for this knowledge item",
+          "type": "string"
+         },
+         "type": {
+          "type": "string",
+          "enum": [
+           "text",
+           "url"
+          ],
+          "description": "Content type: text (pass-through) or url (fetch and extract)"
+         }
+        },
+        "required": [
+         "content",
+         "type"
+        ]
+       }
+      }
+     },
+     "required": [
+      "feature"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "debug-issue",
+    "title": "Debug Issue",
+    "description": "Debugging council. Root Cause Analyst, Systems Engineer, and Edge Case Investigator collaboratively diagnose bugs, analyze errors, and propose fixes.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "code": {
+       "description": "The relevant code where the bug occurs",
+       "type": "string",
+       "maxLength": 100000
+      },
+      "error": {
+       "description": "Error message, stack trace, or unexpected output",
+       "type": "string",
+       "maxLength": 10000
+      },
+      "expected_behavior": {
+       "description": "What should happen vs what actually happens",
+       "type": "string",
+       "maxLength": 5000
+      },
+      "problem": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 10000,
+       "description": "Describe the bug, failure, or unexpected behavior"
+      },
+      "thinking_level": {
+       "default": "medium",
+       "description": "Analysis depth",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "webhook_url": {
+       "description": "Webhook URL to POST results to after completion",
+       "type": "string",
+       "format": "uri"
+      },
+      "session_context": {
+       "description": "Session IDs to use as context (max 3). Prior moderator summaries will be prepended.",
+       "maxItems": 3,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "knowledge": {
+       "description": "Reference knowledge to inject as context",
+       "maxItems": 5,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "content": {
+          "type": "string",
+          "description": "Text content or URL to fetch"
+         },
+         "label": {
+          "description": "Label for this knowledge item",
+          "type": "string"
+         },
+         "type": {
+          "type": "string",
+          "enum": [
+           "text",
+           "url"
+          ],
+          "description": "Content type: text (pass-through) or url (fetch and extract)"
+         }
+        },
+        "required": [
+         "content",
+         "type"
+        ]
+       }
+      }
+     },
+     "required": [
+      "problem"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "assess-tradeoffs",
+    "title": "Assess Tradeoffs",
+    "description": "Tradeoff assessment council. Pragmatist, Skeptic, and Futurist evaluate options from different angles — short-term vs long-term, risk vs reward, simplicity vs flexibility. Output as pros-cons.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "context": {
+       "description": "Background context — codebase, team, timeline, constraints",
+       "type": "string",
+       "maxLength": 50000
+      },
+      "decision": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 10000,
+       "description": "The decision or question to evaluate"
+      },
+      "options": {
+       "description": "Specific options to compare",
+       "minItems": 2,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "priorities": {
+       "description": "What matters most (e.g., [\"performance\", \"dx\", \"cost\"])",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "thinking_level": {
+       "default": "medium",
+       "description": "Analysis depth",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "webhook_url": {
+       "description": "Webhook URL to POST results to after completion",
+       "type": "string",
+       "format": "uri"
+      },
+      "session_context": {
+       "description": "Session IDs to use as context (max 3). Prior moderator summaries will be prepended.",
+       "maxItems": 3,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "decision"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "quick-consult",
+    "title": "Quick Consult",
+    "description": "Fast, cheap AI council opinion on a question",
+    "arguments": [
+     {
+      "name": "question",
+      "description": "The question to discuss",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "deep-review",
+    "title": "Deep Code Review",
+    "description": "High-thinking code review with security + performance focus",
+    "arguments": [
+     {
+      "name": "code",
+      "description": "The code to review",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "architecture-decision",
+    "title": "Architecture Decision",
+    "description": "Full architecture council for design decisions",
+    "arguments": [
+     {
+      "name": "description",
+      "description": "What the system should do",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "roundtable://usage",
+    "name": "usage",
+    "description": "Current credit balance, plan type, and rate limit status",
+    "mimeType": "application/json",
+    "title": "Usage & Credits"
+   },
+   {
+    "uri": "roundtable://models",
+    "name": "models",
+    "description": "Available AI models grouped by thinking level with credit multipliers",
+    "mimeType": "application/json",
+    "title": "Available Models"
+   },
+   {
+    "uri": "ui://roundtable/debate-results.html",
+    "name": "Roundtable Widget",
+    "mimeType": "text/html;profile=mcp-app",
+    "description": "Roundtable debate results viewer"
+   }
+  ]
+ }
+}

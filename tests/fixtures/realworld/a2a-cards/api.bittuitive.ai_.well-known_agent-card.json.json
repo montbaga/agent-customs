@@ -1,0 +1,728 @@
+{
+ "url": "https://api.bittuitive.ai/.well-known/agent-card.json",
+ "doc": {
+  "name": "BitTuitive",
+  "description": "BitTuitive™: One Payment, BTC or USDC, Any Verified Data Point, routed to the highest-rated source with automatic fallback. Reliable data for AI agents, paid per call over Lightning (L402) or in USDC on Base (x402): the router buys any scoreboard-verified L402 data API (and owner-approved x402 APIs) for you (crypto, stocks, weather, traffic and more) with one payment, ranked by quality score and latency; plus BitTuitive's own data feeds (Bitcoin: price, on-chain, fees, Lightning, mining and market signals) and a free quality scoreboard of paid agent APIs. Pay per call (one payment = one fresh response) or buy a 30-day subscription. No API keys, no accounts, no KYC. Free status checks before paying. US stock fundamentals and filings from SEC EDGAR (stock_fundamentals 30 sats, stock_filings 10 sats; cite the SEC, no endorsement). Stock prices are routed only through vetted L402 APIs with a disclosed redistributable source; first-party FMP quotes stay off until licensed. NOTE: this is a plain HTTPS REST API (see the OpenAPI spec), not an A2A message endpoint; the agent card describes its skills for discovery.",
+  "supportedInterfaces": [
+   {
+    "url": "https://api.bittuitive.ai/api/v1",
+    "protocolBinding": "https://github.com/lightninglabs/L402",
+    "protocolVersion": "1.0"
+   }
+  ],
+  "provider": {
+   "organization": "BitTuitive",
+   "url": "https://api.bittuitive.ai/",
+   "contact": {
+    "url": "https://contact.bittuitive.ai/",
+    "email": "hello@bittuitive.ai",
+    "purpose": "acquisitions, partnerships, API providers"
+   }
+  },
+  "version": "0.2.9",
+  "documentationUrl": "https://api.bittuitive.ai/llms.txt",
+  "capabilities": {
+   "streaming": false,
+   "pushNotifications": false,
+   "extendedAgentCard": false
+  },
+  "securitySchemes": {
+   "L402": {
+    "apiKeySecurityScheme": {
+     "location": "header",
+     "name": "Authorization",
+     "description": "L402 (Lightning): 'Authorization: L402 <base64 macaroon>:<hex preimage>' from the HTTP 402 challenge 'WWW-Authenticate: L402 macaroon=\"...\", invoice=\"...\"'. LSAT also accepted."
+    }
+   },
+   "x402": {
+    "apiKeySecurityScheme": {
+     "location": "header",
+     "name": "PAYMENT-SIGNATURE",
+     "description": "x402 (USDC on Base, scheme exact): base64 PaymentPayload for the requirement in the 402's PAYMENT-REQUIRED header (v2) or JSON `accepts` (v1, header X-PAYMENT)."
+    }
+   }
+  },
+  "defaultInputModes": [
+   "application/json"
+  ],
+  "defaultOutputModes": [
+   "application/json"
+  ],
+  "skills": [
+   {
+    "id": "router",
+    "name": "One payment (sats or USDC), any verified data API",
+    "description": "One Payment, BTC or USDC, Any Verified Data Point, routed to the highest-rated source with automatic fallback. Pay BitTuitive once, in sats over Lightning or USDC on Base; it pays the highest-rated scoreboard-verified L402 data API (ranked by score and latency) for you, calls it and returns the data with routing metadata. Price = upstream + max(20%, 3 sats), the routing fee. Best-pick mode falls back to the next-best API; total failure returns a 24 h credit.",
+    "tags": [
+     "router",
+     "aggregator",
+     "l402",
+     "x402",
+     "lightning",
+     "usdc",
+     "weather",
+     "traffic",
+     "crypto",
+     "bitcoin"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/route/endpoints",
+     "GET https://api.bittuitive.ai/api/v1/route?data_type=weather&q=air+quality",
+     "MCP: POST https://api.bittuitive.ai/mcp tools/call route_call {\"data_type\": \"weather\", \"q\": \"air quality\"}"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ]
+   },
+   {
+    "id": "btc_price",
+    "name": "btc_price (10 sats/call)",
+    "description": "Bitcoin price only (USD/EUR). Lightweight, fast. Cached up to 60 seconds. GET https://api.bittuitive.ai/api/v1/data/btc_price returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "btc_price"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/btc_price",
+     "GET https://api.bittuitive.ai/api/v1/status/btc_price (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "btc_price_fresh",
+    "name": "btc_price_fresh (30 sats/call)",
+    "description": "Fresh Bitcoin spot (USD/EUR) with 24h change, cached at most 10 seconds. Use this when 60-second btc_price is too slow. Upstream gold-api.com typically prints about every 30 seconds; this tier returns the latest print within 10 seconds of it landing. Stale fallback at most 30 seconds, flagged stale. GET https://api.bittuitive.ai/api/v1/data/btc_price_fresh returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "btc_price_fresh"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/btc_price_fresh",
+     "GET https://api.bittuitive.ai/api/v1/status/btc_price_fresh (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "btc_oracle",
+    "name": "btc_oracle (50 sats/call)",
+    "description": "Full BTC Oracle: Price, Hash Rate, Mempool, Difficulty, Fees, Block Height. GET https://api.bittuitive.ai/api/v1/data/btc_oracle returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "btc_oracle"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/btc_oracle",
+     "GET https://api.bittuitive.ai/api/v1/status/btc_oracle (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "btc_pro",
+    "name": "btc_pro (100 sats/call)",
+    "description": "Pro Tier: All Oracle data + Lightning Network + Mining Revenue. GET https://api.bittuitive.ai/api/v1/data/btc_pro returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "btc_pro"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/btc_pro",
+     "GET https://api.bittuitive.ai/api/v1/status/btc_pro (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "btc_signals",
+    "name": "btc_signals (200 sats/call)",
+    "description": "Signals tier: Fear & Greed, BTC/gold ratio, % from ATH, momentum score, volatility regime, 24 h transaction count. BTC dominance, NVT and active addresses return null (no source with a commercial license). GET https://api.bittuitive.ai/api/v1/data/btc_signals returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "btc_signals"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/btc_signals",
+     "GET https://api.bittuitive.ai/api/v1/status/btc_signals (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "stock_fundamentals",
+    "name": "stock_fundamentals (30 sats/call)",
+    "description": "SEC EDGAR company facts for one ticker (?symbol=NVDA): revenue, net income, EPS, shares outstanding, cash and debt as reported, plus the ticker-to-CIK map. Any ticker in the SEC company_tickers.json file is accepted. Cached 12-24 hours. Source: U.S. Securities and Exchange Commission (EDGAR). GET https://api.bittuitive.ai/api/v1/data/stock_fundamentals returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "stocks",
+     "equities",
+     "l402",
+     "lightning",
+     "market-data",
+     "stock_fundamentals"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/stock_fundamentals?symbol=AAPL",
+     "GET https://api.bittuitive.ai/api/v1/status/stock_fundamentals (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "stock_filings",
+    "name": "stock_filings (10 sats/call)",
+    "description": "Latest SEC EDGAR filings (10-K, 10-Q, 8-K, with amendments and document links) for one ticker (?symbol=NVDA). Any ticker in the SEC company_tickers.json file is accepted. Cached 15-60 minutes. Source: U.S. Securities and Exchange Commission (EDGAR). GET https://api.bittuitive.ai/api/v1/data/stock_filings returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "stocks",
+     "equities",
+     "l402",
+     "lightning",
+     "market-data",
+     "stock_filings"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/stock_filings?symbol=AAPL",
+     "GET https://api.bittuitive.ai/api/v1/status/stock_filings (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "market_insights",
+    "name": "market_insights (500 sats/call)",
+    "description": "Proprietary agent-demand and routing insights: ranked requested data types with counts and 7/30-day trends, stated willingness-to-pay, unmet searches, routed-call volume by category, provider reliability, the payment conversion funnel, and supply–demand gaps. Aggregates only (k-anonymized terms). A free teaser (rank and volume band only) is at /api/v1/insights/requests. GET https://api.bittuitive.ai/api/v1/data/market_insights returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "market_insights"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/market_insights",
+     "GET https://api.bittuitive.ai/api/v1/status/market_insights (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "weather_current",
+    "name": "weather_current (10 sats/call)",
+    "description": "Current conditions for a point (lat & lon) or a US city or ZIP. US observations from the NOAA National Weather Service (public domain). City/ZIP lookup uses U.S. Census Bureau Gazetteer files (public domain). Outside NWS coverage, a MET Norway model forecast is used (CC BY 4.0, with attribution). Source: NOAA National Weather Service. Not endorsed by NOAA or NWS. GET https://api.bittuitive.ai/api/v1/data/weather_current returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "weather",
+     "forecast",
+     "l402",
+     "lightning",
+     "weather_current"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/weather_current?location=Austin%2C+TX",
+     "GET https://api.bittuitive.ai/api/v1/status/weather_current (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "weather_forecast",
+    "name": "weather_forecast (30 sats/call)",
+    "description": "Hourly (up to 7 days) plus 7-day forecast for a point or a US city or ZIP. US forecasts from the NOAA National Weather Service. Outside NWS coverage, MET Norway Locationforecast is used (CC BY 4.0, with attribution). Source: NOAA National Weather Service. Not endorsed by NOAA or NWS. GET https://api.bittuitive.ai/api/v1/data/weather_forecast returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "weather",
+     "forecast",
+     "l402",
+     "lightning",
+     "weather_forecast"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/weather_forecast?location=Austin%2C+TX",
+     "GET https://api.bittuitive.ai/api/v1/status/weather_forecast (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "weather_alerts",
+    "name": "weather_alerts (10 sats/call)",
+    "description": "Active NWS weather alerts for a US point, city, ZIP, or state (state=TX). US and territories only; no non-US fallback. Source: NOAA National Weather Service. Not endorsed by NOAA or NWS. GET https://api.bittuitive.ai/api/v1/data/weather_alerts returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "weather",
+     "forecast",
+     "l402",
+     "lightning",
+     "weather_alerts"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/weather_alerts?state=TX",
+     "GET https://api.bittuitive.ai/api/v1/status/weather_alerts (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "btc_price_lite",
+    "name": "btc_price_lite (3 sats/call)",
+    "description": "Bitcoin price in whole US dollars (USD only), refreshed at most every 5 minutes. A coarser, cheaper alternative to btc_price: no EUR, no 24h change, no cross-check. Use btc_price when you need a 60-second quote. GET https://api.bittuitive.ai/api/v1/data/btc_price_lite returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "bitcoin",
+     "l402",
+     "lightning",
+     "market-data",
+     "btc_price_lite"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/btc_price_lite",
+     "GET https://api.bittuitive.ai/api/v1/status/btc_price_lite (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "weather_now",
+    "name": "weather_now (5 sats/call)",
+    "description": "Current temperature (F), wind speed (mph) and a text summary for a US city or ZIP or a lat/lon point (coordinates rounded to about 1 km, cached up to 15 minutes). A coarser, cheaper alternative to weather_current: no humidity, no Celsius, no station. US data from the NOAA National Weather Service (public domain), MET Norway elsewhere (CC BY 4.0). Not endorsed by NOAA or NWS. GET https://api.bittuitive.ai/api/v1/data/weather_now returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "weather",
+     "forecast",
+     "l402",
+     "lightning",
+     "weather_now"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/weather_now?location=Austin%2C+TX",
+     "GET https://api.bittuitive.ai/api/v1/status/weather_now (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "airport_delays",
+    "name": "airport_delays (10 sats/call)",
+    "description": "Current US airport ground stops, ground delay programs, arrival and departure delays, and closures from the FAA National Airspace System Status snapshot (public domain). Omit airport for the full snapshot, or pass airport=SFO (IATA) or airport=KSFO (ICAO). Not for navigation. Source: Federal Aviation Administration (NAS Status). Not endorsed by the FAA. GET https://api.bittuitive.ai/api/v1/data/airport_delays returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "travel",
+     "aviation",
+     "airports",
+     "l402",
+     "lightning",
+     "airport_delays"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/airport_delays?airport=SFO",
+     "GET https://api.bittuitive.ai/api/v1/status/airport_delays (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "travel_airport",
+    "name": "travel_airport (30 sats/call)",
+    "description": "One US airport (airport=SFO required): FAA delay/closure events plus current weather and active NWS alerts at that airport (NOAA). Airport coordinates from the NOAA Aviation Weather Center. Not for navigation. Source: Federal Aviation Administration (NAS Status) and NOAA National Weather Service. Not endorsed by the FAA or NOAA. GET https://api.bittuitive.ai/api/v1/data/travel_airport returns HTTP 402 with an L402 challenge; pay the invoice and retry with 'Authorization: L402 <macaroon>:<preimage>'. One payment = one response. Also included in subscriptions.",
+    "tags": [
+     "travel",
+     "aviation",
+     "airports",
+     "l402",
+     "lightning",
+     "travel_airport"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/travel_airport?airport=SFO",
+     "GET https://api.bittuitive.ai/api/v1/status/travel_airport (free pre-flight)"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ],
+    "securityRequirements": [
+     {
+      "schemes": {
+       "L402": {
+        "list": []
+       }
+      }
+     }
+    ]
+   },
+   {
+    "id": "subscriptions",
+    "name": "30-day subscriptions (L402)",
+    "description": "One L402 payment unlocks a plan for 30 days with a daily call quota (resets 00:00 UTC). basic: 5000 sats, 100/day, btc_price, btc_oracle; pro: 25000 sats, 250/day, btc_price, btc_price_fresh, btc_oracle, btc_pro, btc_signals, stock_fundamentals, stock_filings, market_insights, weather_current, weather_forecast, weather_alerts, airport_delays, travel_airport",
+    "tags": [
+     "subscription",
+     "l402",
+     "bitcoin"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/subscriptions",
+     "GET https://api.bittuitive.ai/api/v1/subscribe/basic"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ]
+   },
+   {
+    "id": "scoreboard",
+    "name": "Paid-API scoreboard (free)",
+    "description": "Independent, probe-based quality scores (0-100) for paid agent APIs (L402 and x402), grouped by data type: bitcoin, crypto, stocks, weather, traffic, other. Free, no payment needed.",
+    "tags": [
+     "scoreboard",
+     "api-quality",
+     "discovery",
+     "l402",
+     "x402"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/scoreboard/categories",
+     "GET https://api.bittuitive.ai/api/v1/scoreboard?data_type=weather&min_score=70",
+     "MCP: POST https://api.bittuitive.ai/mcp tools/call best_endpoint {\"need\": \"weather forecast\"}"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json",
+     "text/html"
+    ]
+   },
+   {
+    "id": "request-data",
+    "name": "Request data BitTuitive does not have yet",
+    "description": "Free. Agents can record a data-demand signal (data_type, description, example query, max sats). This does not auto-add a source. Public insights pages are teasers (rank and volume band). Full ranked counts and trends are the paid market_insights tier (500 sats, also in pro).",
+    "tags": [
+     "demand",
+     "requests",
+     "discovery"
+    ],
+    "examples": [
+     "POST https://api.bittuitive.ai/api/v1/request-data",
+     "GET https://api.bittuitive.ai/api/v1/insights/requests",
+     "MCP: POST https://api.bittuitive.ai/mcp tools/call request_data",
+     "GET https://api.bittuitive.ai/api/v1/data/market_insights"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ]
+   },
+   {
+    "id": "market-insights",
+    "name": "Paid market insights (agent demand)",
+    "description": "Paid L402 (500 sats, included in the pro subscription). Full ranked requested data types with counts and 7/30-day trends, willingness-to-pay, unmet searches, routed-call volume, provider reliability and supply–demand gaps. Aggregates only. Public /api/v1/insights/* pages are teasers.",
+    "tags": [
+     "insights",
+     "demand",
+     "l402"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/market_insights",
+     "MCP: POST https://api.bittuitive.ai/mcp tools/call get_market_insights"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ]
+   },
+   {
+    "id": "weather",
+    "name": "US weather (NOAA NWS)",
+    "description": "Paid L402. weather_current ({payment_help.price_sats('weather_current')} sats), weather_forecast ({payment_help.price_sats('weather_forecast')} sats) and the coarser, cheaper weather_now ({payment_help.price_sats('weather_now')} sats) for lat/lon or a US city/ZIP; weather_alerts (10 sats) for a US point or state. Source: NOAA National Weather Service (not endorsed by NOAA). US city/ZIP from Census Gazetteer files. Non-US current/forecast: MET Norway (CC BY 4.0). Included in the pro subscription.",
+    "tags": [
+     "weather",
+     "forecast",
+     "alerts",
+     "l402",
+     "noaa"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/weather_current?location=Austin,+TX",
+     "GET https://api.bittuitive.ai/api/v1/data/weather_forecast?lat=38.8977&lon=-77.0365",
+     "GET https://api.bittuitive.ai/api/v1/data/weather_alerts?state=TX",
+     "GET https://api.bittuitive.ai/api/v1/data/weather_now?location=Austin,+TX",
+     "MCP: POST https://api.bittuitive.ai/mcp tools/call get_weather_current"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ]
+   },
+   {
+    "id": "travel",
+    "name": "US airport delays (FAA NAS Status)",
+    "description": "Paid L402. airport_delays ({payment_help.price_sats('airport_delays')} sats) is the current FAA NAS Status snapshot of US ground stops, ground delay programs, arrival/departure delays and closures (optional airport=SFO). travel_airport (30 sats) is one airport: those events plus current NOAA weather and NWS alerts. Not for navigation. Source: Federal Aviation Administration (NAS Status). Not endorsed by the FAA. Included in the pro subscription.",
+    "tags": [
+     "travel",
+     "aviation",
+     "airports",
+     "delays",
+     "l402",
+     "faa"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/api/v1/data/airport_delays",
+     "GET https://api.bittuitive.ai/api/v1/data/airport_delays?airport=SFO",
+     "GET https://api.bittuitive.ai/api/v1/data/travel_airport?airport=SFO",
+     "MCP: POST https://api.bittuitive.ai/mcp tools/call get_airport_delays"
+    ],
+    "inputModes": [
+     "application/json"
+    ],
+    "outputModes": [
+     "application/json"
+    ]
+   },
+   {
+    "id": "provider-registration",
+    "name": "List your API on the BitTuitive router",
+    "description": "API providers can register an HTTPS L402 data API. Listings stay pending until review; nothing is routed automatically. Providers must disclose their data source and license and attest they have the right to sell the data. Approved providers appear at https://api.bittuitive.ai/api/v1/providers (no contact emails) and may be routed as registered providers.",
+    "tags": [
+     "providers",
+     "marketplace",
+     "l402",
+     "router"
+    ],
+    "examples": [
+     "GET https://api.bittuitive.ai/providers",
+     "GET https://api.bittuitive.ai/providers/terms",
+     "GET https://api.bittuitive.ai/api/v1/providers",
+     "POST https://api.bittuitive.ai/api/v1/providers/register"
+    ],
+    "inputModes": [
+     "application/json",
+     "text/html"
+    ],
+    "outputModes": [
+     "application/json",
+     "text/html"
+    ]
+   }
+  ],
+  "iconUrl": "https://api.bittuitive.ai/icon-512.png",
+  "x-bittuitive": {
+   "openapi": "https://api.bittuitive.ai/openapi.json",
+   "l402_manifest": "https://api.bittuitive.ai/.well-known/l402.json",
+   "llms_txt": "https://api.bittuitive.ai/llms.txt",
+   "a2a_spec": "https://a2a-protocol.org/latest/specification/",
+   "payment_protocols": [
+    "L402",
+    "x402"
+   ],
+   "x402": "https://api.bittuitive.ai/.well-known/x402",
+   "mcp": "https://api.bittuitive.ai/mcp",
+   "mcp_server_card": "https://api.bittuitive.ai/mcp/server-card",
+   "providers": "https://api.bittuitive.ai/providers",
+   "provider_terms": "https://api.bittuitive.ai/providers/terms"
+  }
+ }
+}
