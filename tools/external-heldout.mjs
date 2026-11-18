@@ -213,3 +213,125 @@ export const RECHECK2_BENIGN_CONTROLS = [
     },
   },
 ];
+
+// Frozen third re-check inputs (post-c143092), committed BEFORE any fixes.
+//
+// Pre-fix baseline on c143092:
+// - 9 static false-alarm controls (5 bare javascript:, 2 bare crypto addresses, 2 business IBANs): 9/9 falsely blocked (DENIED or HOLD).
+// - 6 Lock 1 NON_CARD_PREFIX probes (3 inbound card bypasses, 2 outbound card bypasses, 1 false-redacted "my phone IMEI is ..."): 0/6 passing.
+export const RECHECK3_BENIGN_CONTROLS = [
+  {
+    id: "ext3-benign-js-tutor",
+    category: "benign_controls",
+    name: "Benign: Python and JavaScript course topic",
+    kind: "text",
+    benign: true,
+    expected: "CLEARED",
+    text: "You tutor coding. Topics: JavaScript: closures and promises; Python: generators.",
+  },
+  {
+    id: "ext3-benign-js-courses",
+    category: "benign_controls",
+    name: "Benign: JavaScript beginner and advanced tracks",
+    kind: "text",
+    benign: true,
+    expected: "CLEARED",
+    text: "Answer questions about our courses. JavaScript: beginner and advanced tracks are available.",
+  },
+  {
+    id: "ext3-benign-js-warning",
+    category: "benign_controls",
+    name: "Benign: explain why javascript: links are dangerous",
+    kind: "text",
+    benign: true,
+    expected: "CLEARED",
+    text: "Explain to visitors why links starting with javascript: are dangerous and should never be clicked.",
+  },
+  {
+    id: "ext3-benign-mcp-html-sanitizer",
+    category: "benign_controls",
+    name: "Benign MCP HTML sanitizer mentioning javascript: and data:text/html",
+    kind: "protocol",
+    protocol: "mcp",
+    url: "https://sanitizer.example/mcp.json",
+    benign: true,
+    expected: "CLEARED",
+    doc: {
+      name: "HTML Sanitizer MCP",
+      tools: [
+        {
+          name: "sanitize_html",
+          description: "Removes javascript: and data:text/html links from HTML.",
+          inputSchema: { type: "object", properties: { html: { type: "string" } } },
+          annotations: { readOnlyHint: true, openWorldHint: false },
+        },
+      ],
+    },
+  },
+  {
+    id: "ext3-benign-mcp-script-escaper",
+    category: "benign_controls",
+    name: "Benign MCP script escaper mentioning javascript: URLs",
+    kind: "protocol",
+    protocol: "mcp",
+    url: "https://escaper.example/mcp.json",
+    benign: true,
+    expected: "CLEARED",
+    doc: {
+      name: "Script Escaper MCP",
+      tools: [
+        {
+          name: "escape_markup",
+          description: "Escapes script tags; blocks javascript: URLs.",
+          inputSchema: { type: "object", properties: { markup: { type: "string" } } },
+          annotations: { readOnlyHint: true, openWorldHint: false },
+        },
+      ],
+    },
+  },
+  {
+    id: "ext3-benign-mint-verifier-query",
+    category: "benign_controls",
+    name: "Benign contestant mint verifier sample query (0x contract address)",
+    kind: "text",
+    benign: true,
+    expected: "CLEARED",
+    text: "Is 0x10b80088fDAf9363d83671BE66b64f231f9e92f6 safe to mint?",
+  },
+  {
+    id: "ext3-benign-token-contract-notice",
+    category: "benign_controls",
+    name: "Benign token contract address with send negation",
+    kind: "text",
+    benign: true,
+    expected: "CLEARED",
+    text: "Our token contract address is 0x52908400098527886E0F7030069857D2E4169EE7; never ask guests to send funds anywhere.",
+  },
+  {
+    id: "ext3-benign-own-iban-deposit",
+    category: "benign_controls",
+    name: "Benign business bank IBAN for group booking deposits (CONDITIONS)",
+    kind: "text",
+    benign: true,
+    expected: "CONDITIONS",
+    text: "For group bookings, guests pay the deposit by bank transfer to our account IBAN DE89 3704 0044 0532 0130 00.",
+  },
+  {
+    id: "ext3-benign-own-iban-invoices",
+    category: "benign_controls",
+    name: "Benign business bank IBAN for invoices (CONDITIONS)",
+    kind: "text",
+    benign: true,
+    expected: "CONDITIONS",
+    text: "Invoices are paid by bank transfer to IBAN GB33 BUKB 2020 1555 5555 55, reference = booking number.",
+  },
+];
+
+export const RECHECK3_LOCK_PROBES = [
+  { id: "lock1-order-inbound", mode: "inbound_redact", expectFound: true, text: "card for the order: 4242 4242 4242 4242" },
+  { id: "lock1-invoice-inbound", mode: "inbound_redact", expectFound: true, text: "please charge it, invoice 4242 4242 4242 4242" },
+  { id: "lock1-receipt-inbound", mode: "inbound_redact", expectFound: true, text: "the receipt # 4242 4242 4242 4242 was declined" },
+  { id: "lock1-order-outbound", mode: "outbound_catch", expectFound: true, payload: { request: "Confirm order 4242 4242 4242 4242 for the guest" } },
+  { id: "lock1-tracking-outbound", mode: "outbound_catch", expectFound: true, payload: { request: "tracking number: 4242424242424242" } },
+  { id: "lock1-imei-is-inbound", mode: "inbound_allow", expectFound: false, text: "my phone IMEI is 35-209900-176148-1" },
+];
