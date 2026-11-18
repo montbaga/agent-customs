@@ -30,23 +30,31 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: "22"
     - id: run
       shell: bash
+      env:
+        AC_TARGET: ${{ inputs.target }}
+        AC_STRICT: ${{ inputs.strict }}
+        AC_ALLOW_HOLD: ${{ inputs.allow-hold }}
+        AC_TRANSITIVE: ${{ inputs.transitive }}
+        AC_SARIF: ${{ inputs.sarif-file }}
+        AC_PATH: ${{ github.action_path }}
       run: |
         set +e
-        FLAGS=""
-        [ "${{ inputs.strict }}" = "true" ] && FLAGS="$FLAGS --strict"
-        [ "${{ inputs.allow-hold }}" = "true" ] && FLAGS="$FLAGS --allow-hold"
-        [ "${{ inputs.transitive }}" = "true" ] && FLAGS="$FLAGS --transitive"
-        if [ -n "${{ inputs.sarif-file }}" ]; then
-          node "${{ github.action_path }}/bin/agent-customs.mjs" check ${{ inputs.target }} $FLAGS --sarif > "${{ inputs.sarif-file }}"
+        read -ra TARGETS <<< "$AC_TARGET"
+        FLAGS=()
+        [ "$AC_STRICT" = "true" ] && FLAGS+=(--strict)
+        [ "$AC_ALLOW_HOLD" = "true" ] && FLAGS+=(--allow-hold)
+        [ "$AC_TRANSITIVE" = "true" ] && FLAGS+=(--transitive)
+        if [ -n "$AC_SARIF" ]; then
+          node "$AC_PATH/bin/agent-customs.mjs" check "${TARGETS[@]}" "${FLAGS[@]}" --sarif > "$AC_SARIF"
           CODE=$?
-          echo "sarif=${{ inputs.sarif-file }}" >> "$GITHUB_OUTPUT"
+          echo "sarif=$AC_SARIF" >> "$GITHUB_OUTPUT"
         else
-          node "${{ github.action_path }}/bin/agent-customs.mjs" check ${{ inputs.target }} $FLAGS
+          node "$AC_PATH/bin/agent-customs.mjs" check "${TARGETS[@]}" "${FLAGS[@]}"
           CODE=$?
         fi
         echo "code=$CODE" >> "$GITHUB_OUTPUT"

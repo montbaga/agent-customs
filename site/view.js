@@ -1031,10 +1031,10 @@ async function wireBenchStrip() {
     const ac = bench.agentCustoms;
     const baseline = bench.naiveRegexBaseline;
     const items = [
-      [`${bench.totalCases} benchmark cases`, `${bench.hostileTotal} adversarial · ${bench.benignTotal} benign controls`],
-      [`${ac.catchRate}% attacks stopped`, `${ac.flaggedRate}% flagged · vs. ${baseline.catchRate}% naive regex`],
-      [`${ac.falsePositiveRate}% benign false blocks`, `${ac.benignCleared}/${bench.benignTotal} clean cleared · vs. ${baseline.falsePositiveRate}% naive regex`],
-      [`${ac.medianMs} ms median check`, `${ac.llmTokenCost} model cost · reproducible via npm run bench`],
+      [`${bench.hostileTotal} attack vectors + ${bench.benignTotal} benign`, `Round 1 ${ac.round1Caught}/${ac.round1Total} · Round 2 ${ac.round2Caught}/${ac.round2Total} · ${bench.selfTestPassed}/${bench.selfTestTotal} lock/cert checks`],
+      [`${ac.catchRate}% attacks blocked/held`, `${ac.flaggedRate}% flagged incl. conditions · vs. ${baseline.catchRate}% normalized regex`],
+      [`${ac.falsePositiveRate}% benign false blocks`, `${ac.benignCleared}/${bench.benignTotal} clean cleared · vs. ${baseline.falsePositiveRate}% normalized regex`],
+      [`~${ac.medianDetectionMs} ms median check`, `${ac.llmTokenCost} · reproducible via npm run bench`],
     ];
     list.replaceChildren(...items.map(([stat, note]) => h("li", null, h("strong", null, stat), h("span", null, note))));
   } catch {
@@ -1053,7 +1053,7 @@ function wireBuilderCodeTabs() {
       "node bin/agent-customs.mjs check site/agent_customs --strict",
       "node bin/agent-customs.mjs check site/samples/mcp-poisoned",
       "",
-      "# Run the 68-case benchmark",
+      "# Run the reproducible benchmark",
       "npm run bench",
     ].join("\n"),
     action: [

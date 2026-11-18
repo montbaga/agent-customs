@@ -4,12 +4,10 @@
 // and snapshot diffing with no API key required.
 
 import { analyzeNetwork } from "./customs/analyze.js";
-import { canaryEncodings, generateCanaryToken } from "./customs/canary.js";
 import { diffSnapshots } from "./customs/diff.js";
-import { installLocks } from "./customs/locks.js";
+import { checkPartnerReply, installLocks, redactSensitiveText } from "./customs/locks.js";
 import { MemoryStorage, PinStore, pinFromReport } from "./customs/pins.js";
 import { normalizeForeignSpec } from "./customs/protocols.js";
-import { checkPartnerReply, redactSensitiveText } from "./customs/locks.js";
 
 const hide = (text) => Array.from(text, (c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join("");
 
@@ -158,8 +156,6 @@ export async function runArenaScenario(id) {
   }
 
   if (id === "canary-exfil") {
-    const token = generateCanaryToken();
-    const b64Payload = canaryEncodings(token).base64;
     const partnerUrl = "https://analytics-helper.invalid/mcp";
     const store = new PinStore(new MemoryStorage());
     const events = [];
@@ -173,8 +169,16 @@ export async function runArenaScenario(id) {
     };
     store.set(partnerUrl, pinFromReport(mockReport, "first-use"));
 
+    const frontAgent = { name: "host_agent", instructions: "Summarize dashboard metrics politely." };
     const fakeEngine = {
-      top: { base: "https://host-app.invalid" },
+      top: {
+        base: "https://host-app.invalid",
+        network: {
+          findFrontMan: () => "host_agent",
+          getAgentSpec: (n) => (n === "host_agent" ? frontAgent : null),
+          config: { tools: [frontAgent] },
+        },
+      },
       actions: { execute: async () => "ok" },
       async runTurn(_text, fn) { return fn(); },
       resetHistory() {},
@@ -190,12 +194,17 @@ export async function runArenaScenario(id) {
 
     const locks = installLocks(fakeEngine, {
       canary: true,
-      canaryToken: token,
+      store,
       onCanaryTrip(ev) {
         for (const u of ev.partners) if (store.delete(u)) unpinnedRevoked.push(u);
         events.push(ev);
       },
     });
+
+    const token = locks.canary.token;
+    const match = frontAgent.instructions.match(/ac_cnr_[a-f0-9]+/);
+    const leaked = match ? match[0] : token;
+    const b64Payload = btoa(`ctx:${leaked}`);
 
     const mcpClient = await fakeEngine.resolveMcp(partnerUrl);
     let caughtError = "";
@@ -215,15 +224,15 @@ export async function runArenaScenario(id) {
       unprotected: {
         outcome: "Base64 secret leaked",
         steps: [
-          { stage: "1 · Protected host secret", detail: `A session token ("${token}") sits inside the host conversation.` },
-          { stage: "2 · Encoded to evade filters", detail: `Attack encodes the secret as Base64 ("${b64Payload}") so simple pattern blockers miss it.` },
+          { stage: "1 · Protected host secret", detail: `Lock 3 injected the session canary ("${leaked}") into host instructions.` },
+          { stage: "2 · Offset-encoded to evade filters", detail: `Attack encodes surrounding prompt text as Base64 ("${b64Payload}") so simple matchers miss it.` },
           { stage: "3 · Exfiltrated off-site", detail: `analytics-helper.invalid receives { blob: "${b64Payload}" } without alert.` },
         ],
       },
       protected: {
         outcome: `Canary tripped (${events[0]?.encoding || "base64"}) & pin revoked`,
         steps: [
-          { stage: "1 · Outbound call scanned", detail: `Lock 3 checks encoded variants across tool arguments and catches the ${events[0]?.encoding || "base64"} copy in ${elapsedMs} ms.` },
+          { stage: "1 · Outbound call scanned", detail: `Lock 3 checks multi-offset encodings across tool arguments and catches the ${events[0]?.encoding || "base64"} leak in ${elapsedMs} ms.` },
           { stage: "2 · Turn stopped cold", detail: caughtError || "Blocked before the network call left the browser." },
           { stage: "3 · Trust revoked automatically", detail: `Partner approval for analytics-helper.invalid is removed immediately (still pinned: ${store.get(partnerUrl) ? "yes" : "no"}).` },
         ],
