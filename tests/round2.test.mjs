@@ -1,4 +1,5 @@
-// Regression tests for every frozen Round-2 red-team probe (F5, F6, F7, F15, ROT13)
+// Regression tests for every frozen Round-2 red-team probe (capability splits,
+// social engineering, secondary schema fields, short non-English text, and ROT13)
 // and benign counter-examples, verifying detection without false blocks.
 // Run from the project folder: node --test tests/round2.test.mjs
 import assert from "node:assert/strict";
