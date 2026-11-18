@@ -1,0 +1,53 @@
+name: "Agent Customs Check"
+description: "Inspect agent networks, A2A Agent Cards, and MCP manifests in pull requests without external dependencies."
+inputs:
+  target:
+    description: "Space-separated URLs, local folders, or JSON manifests to inspect"
+    required: true
+  strict:
+    description: "Fail on HELD or CONDITIONS verdicts"
+    required: false
+    default: "false"
+  allow-hold:
+    description: "Exit 0 when verdict is HOLD"
+    required: false
+    default: "false"
+  transitive:
+    description: "Follow cross-origin downstream partners"
+    required: false
+    default: "false"
+  sarif-file:
+    description: "Optional path to write a SARIF v2.1.0 report"
+    required: false
+    default: ""
+outputs:
+  exit-code:
+    description: "CLI exit code (0 passed, 1 hold, 2 denied/error)"
+    value: ${{ steps.run.outputs.code }}
+  sarif-file:
+    description: "Written SARIF file path when requested"
+    value: ${{ steps.run.outputs.sarif }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+    - id: run
+      shell: bash
+      run: |
+        set +e
+        FLAGS=""
+        [ "${{ inputs.strict }}" = "true" ] && FLAGS="$FLAGS --strict"
+        [ "${{ inputs.allow-hold }}" = "true" ] && FLAGS="$FLAGS --allow-hold"
+        [ "${{ inputs.transitive }}" = "true" ] && FLAGS="$FLAGS --transitive"
+        if [ -n "${{ inputs.sarif-file }}" ]; then
+          node "${{ github.action_path }}/bin/agent-customs.mjs" check ${{ inputs.target }} $FLAGS --sarif > "${{ inputs.sarif-file }}"
+          CODE=$?
+          echo "sarif=${{ inputs.sarif-file }}" >> "$GITHUB_OUTPUT"
+        else
+          node "${{ github.action_path }}/bin/agent-customs.mjs" check ${{ inputs.target }} $FLAGS
+          CODE=$?
+        fi
+        echo "code=$CODE" >> "$GITHUB_OUTPUT"
+        exit $CODE

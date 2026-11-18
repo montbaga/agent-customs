@@ -11,13 +11,16 @@
 [**Live Inspection Desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
 [**Practice Site**](https://montbaga.github.io/agent-customs/practice/) &nbsp;·&nbsp;
 [**Test Range**](https://agent-customs-range.github.io/) &nbsp;·&nbsp;
-[**Add Guard (2 Lines)**](#add-the-guard-to-your-site) &nbsp;·&nbsp;
-[**Try It**](#try-it-yourself) &nbsp;·&nbsp;
-[**Contact Monty**](#lets-talk)
+[**Threat Model (`PAPER.md`)**](PAPER.md) &nbsp;·&nbsp;
+[**Benchmark**](#5--agent-customs-bench-npm-run-bench--papermd) &nbsp;·&nbsp;
+[**Add Guard**](#add-the-guard-to-your-site) &nbsp;·&nbsp;
+[**Contact**](#lets-talk)
 
 <br>
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
+<a href="#5--agent-customs-bench-npm-run-bench--papermd"><img alt="Bench: 94.5% blocked · 0% false blocks" src="https://img.shields.io/badge/bench-94.5%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Checks: 141 passing" src="https://img.shields.io/badge/tests-141_passing-ece4d3?labelColor=0c1d18"></a>
 <img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18">
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -145,7 +148,7 @@ Three ways to explore Agent Customs, fastest first:
   <strong>1 · Automatic Test Suite</strong><br><br>
   No browser or API key needed:<br><br>
   <code>npm test</code><br><br>
-  Runs 136 checks across attacks, Unicode obfuscation, A2A/MCP schemas, capability flow, canary tripwires, certificates, locks, receipts, and the practice site.
+  Runs 141 checks across attacks, Unicode obfuscation, A2A/MCP schemas, capability flow, canary tripwires, certificates, benchmarks, CLI, extension, and the practice site.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · Inspection Desk (No Key)</strong><br><br>
@@ -233,6 +236,24 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
   </tr>
 </table>
 
+### Phase 1–3 Showcase
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/images/phase1-mcp-trifecta.jpg" alt="Phase 1 MCP Lethal Trifecta held for review report"><br><sub><b>Phase 1 — MCP &amp; Lethal Trifecta:</b> Inspects <code>mcp.json</code> manifests, traces capability paths across private data + untrusted inputs + external sinks, and grades <code>Papers 3/7 pass</code>.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase2-verify.jpg" alt="Phase 2 ES256 Customs Certificate signature verification"><br><sub><b>Phase 2 — Signed Receipt Verification:</b> Verifies ES256 signatures on exported Customs Certificates locally and compares against the live endpoint fingerprint.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Phase 2 and 3 Attack Lab simulation paired with the 68-case benchmark scorecard"><br><sub><b>Phase 2 &amp; 3 — Attack Lab &amp; Benchmark:</b> Side-by-side without/with Agent Customs simulation paired with the 68-case benchmark scorecard.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Phase 3 Builders panel showing CLI, Action, and Extension tabs"><br><sub><b>Phase 3 — For Builders (CLI, Action &amp; Extension):</b> Copy-ready integration tabs covering <code>site.js</code>, Node CLI, SARIF GitHub Action, and the browser extension.</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/images/phase3-extension.jpg" alt="Phase 3 Chrome/Edge browser extension inspecting io.github.microsoft/playwright-mcp" width="72%">
+  <br><sub><b>Phase 3 — Browser Extension:</b> One-click MV3 popup inspection on live registry manifests (shown inspecting <code>io.github.microsoft/playwright-mcp</code>).</sub>
+</p>
+
 <details>
 <summary><b>Mobile views (Inspection Desk & Practice Site)</b></summary>
 
@@ -293,6 +314,22 @@ Public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json)
 - **Clearance Certificates & Verify dropzone (`certificate.js`):** Export standalone SVG, printable HTML, or 2× PNG cards with embedded ES256 metadata, or drop `.svg`, `.json`, `.html`, or `.pdf` files on the **Verify** tab to check their signature and live SHA-256 fingerprint.
 - **Side-by-side Attack lab (`arena.js`):** Replay hidden Unicode theft, Lethal Trifecta MCP leaks, Base64 canary traps, and rug pulls without an API key (`#lab` section).
 
+### 5 · Agent Customs Bench (`npm run bench` — [PAPER.md](PAPER.md))
+
+Evaluated live against **68 reproducible cases** (`55` adversarial across 5 categories + `13` benign controls) using [`tools/bench.mjs`](tools/bench.mjs) (`1.88 ms` median latency, **`$0` model tokens**):
+
+| Category | Cases | Agent Customs | Naive Regex Baseline | Avg Latency |
+| :--- | ---: | ---: | ---: | ---: |
+| **Unicode & invisible obfuscation** | 12 | **100.0%** blocked/held | 8.3% | 7.80 ms |
+| **Prompt & multilingual phishing** | 24 | **95.8%** blocked/held | 16.7% | 2.75 ms |
+| **A2A & MCP supply-chain chains** | 6 | **66.7%** blocked/held *(100% flagged)* | 0.0% | 3.72 ms |
+| **Runtime Locks 1–3 (`canary`, Luhn, beacon)** | 9 | **100.0%** caught | 0.0% | 0.47 ms |
+| **Rug pulls & certificate tampering** | 4 | **100.0%** caught | 0.0% | 2.12 ms |
+| **Benign honest controls** | 13 | **100.0%** clear (**0% false blocks**) | 76.9% *(23.1% false blocks)* | 1.79 ms |
+| **Total Corpus** | **68** | **52/55 (`94.5%`) blocked/held · 54/55 (`98.2%`) flagged** | **5/55 (`9.1%`) caught · 23.1% false blocks** | **1.88 ms median** |
+
+See [**PAPER.md**](PAPER.md) for the full threat model, 5-layer diagram, and honest edge-case breakdown (`node tools/bench.mjs --verbose`).
+
 ---
 
 ## The test range
@@ -309,16 +346,43 @@ The dedicated second-origin test site at https://agent-customs-range.github.io/ 
 
 ---
 
-## Run it on your computer
+## Run it everywhere (CLI, GitHub Action, Chrome / Edge Extension)
 
 Requires Node 22+ and zero npm packages.
+
+<table width="100%">
+<tr>
+<td width="33.3%" valign="top">
+  <strong>1 · CLI &amp; Benchmark</strong><br><br>
+  Scan URLs, local folders, MCP/A2A manifests, or verify ES256 receipts:<br><br>
+  <code>npm test</code><br>
+  <code>npm run bench</code><br>
+  <code>node bin/agent-customs.mjs check https://raw.githubusercontent.com/microsoft/playwright-mcp/main/server.json</code>
+</td>
+<td width="33.3%" valign="top">
+  <strong>2 · GitHub Action (<code>action.yml</code>)</strong><br><br>
+  Block PRs introducing hidden prompts, leaked keys, or toxic MCP configs with native SARIF uploads:<br><br>
+  <code>uses: montbaga/agent-customs@main</code><br>
+  Supports <code>strict</code>, <code>allow-hold</code>, <code>transitive</code>, and <code>sarif-file</code>.
+</td>
+<td width="33.3%" valign="top">
+  <strong>3 · Chrome / Edge Extension</strong><br><br>
+  Inspect live external websites past browser CORS restrictions:<br><br>
+  1. Run <code>npm run extension</code><br>
+  2. Open <code>chrome://extensions</code> (Developer mode)<br>
+  3. <strong>Load unpacked</strong> → select <a href="extension/"><code>extension/</code></a>
+</td>
+</tr>
+</table>
 
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # Run all unit, attack, lock, receipt & practice tests
+npm test                                # Run all 141 checks (attacks, protocols, locks, CLI, bench & extension)
+npm run bench -- --verbose              # Print benchmark scorecard + individual non-held cases
 npm run check                           # Validate site network with Cognizant's build_network.mjs
-npm run inspect -- site/agent_customs   # Inspect any local folder or https:// URL
+node bin/agent-customs.mjs check site/samples/mcp-poisoned/mcp.json --sarif
+node bin/agent-customs.mjs verify site/receipts/agent-customs-range.github.io/sunny_bakery/sunny_bakery.json --live
 ```
 
 ### Watch the live server & rug-pull simulation
@@ -398,8 +462,11 @@ The site and the test range must sit on **two separate origins** so partner call
 | [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`certificate.js`](site/certificate.js), [`arena.js`](site/arena.js), [`site.js`](site/site.js) | Inspection desk UI, certificates, Attack lab, actions, and guard wiring |
 | [`site/runtime/`](site/runtime/) | Upstream Cognizant Open Agentic Web runtime (unmodified, Apache 2.0) |
 | [`practice/`](practice/) | Main Street Guide demo app generated by `tools/make-practice.mjs` |
-| [`tools/`](tools/) | CLI inspector, server with `_headers`, range/practice builders, CDP smoke/screenshot scripts, receipt signer |
-| [`tests/`](tests/) | Node native test runner suite (`136` tests) + official spec fixtures |
+| [`extension/`](extension/) | Manifest V3 Chrome/Edge popup inspector generated by `tools/make-extension.mjs` |
+| [`bin/`](bin/) & [`action.yml`](action.yml) | Zero-dependency CLI (`check`, `verify`, `bench`) with SARIF output and GitHub Composite Action |
+| [`PAPER.md`](PAPER.md) | 5-layer architecture note, formal threat model, benchmark scorecard & honest limits |
+| [`tools/`](tools/) | CLI inspector, benchmark suite (`bench.mjs`), local server, range/practice/extension builders, smoke checks, receipt signer |
+| [`tests/`](tests/) | Node native test runner suite (`141` tests) + official spec fixtures |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Upstream kit scripts & templates (unmodified) |
 
 </details>
@@ -410,8 +477,8 @@ The site and the test range must sit on **two separate origins** so partner call
 - **Agent manifests, not general HTML:** Built for AI agent manifests and catalogs — Open Agentic Web (`agent-manifest.json`, `.network.json`), Google A2A Agent Cards (`.well-known/agent.json`, `agent-card.json`), and MCP (`mcp.json`, `server.json`, `mcpServers`, `tools/list`), not regular HTML websites.
 - **`Cleared` ≠ certified safe:** It means known attack vectors were not found — which is why version pinning + Luhn/IBAN/action locks remain armed at runtime. Manifests naming third-party brands on generic hosts (such as `raw.githubusercontent.com`) surface an `I-AUTHORITY` hygiene notice (`Cleared with conditions`) because the host itself does not verify publisher identity.
 - **Language scope:** English is checked in full; 10 additional languages check secret/card/password phishing; unfamiliar scripts/languages are held for human review.
-- **CORS requirement:** Sites that omit `Access-Control-Allow-Origin` cannot be fetched by browsers or inspected from the web desk (`npm run inspect -- https://...` checks CORS from CLI and reports this explicitly).
-- **Similar tools:** Unlike CLI-only MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan), Agent Customs runs 100% inside the browser (plus optional local CLI) across Open Agentic Web, A2A, and MCP catalogs with no external backend, guards partner calls at runtime, and pins SHA-256 versions against rug pulls.
+- **CORS requirement:** Sites that omit `Access-Control-Allow-Origin` cannot be fetched directly from the static web desk — inspect those origins via [`bin/agent-customs.mjs`](bin/agent-customs.mjs) / `npm run inspect -- https://...` or the MV3 browser [`extension/`](extension/).
+- **Similar tools:** Unlike CLI-only MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan), Agent Customs runs 100% inside the browser (plus optional CLI, SARIF GitHub Action, and browser extension) across Open Agentic Web, A2A, and MCP catalogs with no external backend, guards partner calls at runtime with synthetic canaries, and pins SHA-256 versions against rug pulls.
 
 </details>
 
