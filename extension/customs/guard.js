@@ -64,6 +64,8 @@ export const STRICT_POLICY = Object.freeze({
  * :param options.canary: false disables the synthetic Lock 3 canary tripwire (on by default).
  * :param options.canaryToken: Optional fixed canary token for tests or interactive demos.
  * :param options.onCanaryTrip: Called with {encoding, where, partners, revoked} when tripped.
+ * :param options.semanticJudge: Opt-in Layer 2 AI semantic judge (default false so checks
+ *   stay deterministic and zero-token; set true to escalate unseen risks via caller's model).
  * :param options.trustedActions: Names of website actions that only change harmless things
  *   on the page, or ask the visitor themselves, so the action lock lets them run.
  * :param options.onLock: Called with {lock, kind, where, reason} whenever a lock blocks
@@ -83,11 +85,17 @@ export function installCustomsGuard(engine, options = {}) {
   const original = engine._compile;
   const aiJudge = typeof options.aiJudge === "function"
     ? options.aiJudge
-    : (options.semanticJudge === false ? null : createEngineJudge(engine));
+    : (options.semanticJudge === true ? createEngineJudge(engine) : null);
+
+  let locks = null;
 
   engine._compile = async function customsCompile(base, manifest, entry, opts = {}) {
     const compiled = await original.call(this, base, manifest, entry, opts);
-    if (opts && opts.isTop) return compiled; // the site trusts its own network
+    if (opts && opts.isTop) {
+      if (compiled?.network) engine.top = { ...(engine.top || {}), network: compiled.network, base, manifest };
+      locks?.syncTopCanary?.();
+      return compiled; // the site trusts its own network
+    }
     const name = entry?.name || compiled?.network?.name || "";
     const networkUrl = `${String(base).replace(/\/$/, "")}/${name}`;
     const network = compiled.network;
@@ -158,10 +166,11 @@ export function installCustomsGuard(engine, options = {}) {
     return compiled;
   };
 
-  const locks = options.locks === false ? null : installLocks(engine, {
+  locks = options.locks === false ? null : installLocks(engine, {
     trustedActions: options.trustedActions || [],
     strict,
     aiJudge,
+    store,
     canary: options.canary,
     canaryToken: options.canaryToken,
     onCanaryTrip: (event) => {

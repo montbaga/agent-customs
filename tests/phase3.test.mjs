@@ -93,21 +93,26 @@ test("CLI verify validates authentic ES256 artifacts and rejects tampered copies
   }
 });
 
-test("root action.yml exposes composite inputs and invokes CLI check", async () => {
+test("root action.yml exposes composite inputs safely via env vars and pins setup-node SHA", async () => {
   const yml = await readFile(path.join(ROOT, "action.yml"), "utf8");
   assert.match(yml, /using:\s*["']composite["']/);
   assert.match(yml, /bin\/agent-customs\.mjs/);
   assert.match(yml, /target:/);
   assert.match(yml, /sarif-file:/);
+  assert.match(yml, /actions\/setup-node@[0-9a-f]{40}\b/);
+  const runPart = yml.split(/\n\s*run:\s*\|\r?\n/)[1] || "";
+  assert.ok(runPart.length > 0, "expected run: | block in action.yml");
+  assert.doesNotMatch(runPart, /\$\{\{/, "run script must read inputs via env vars, never inline ${{ }} expansion");
 });
 
 // ---- Agent Customs Bench ---------------------------------------------------------------
 
-test("Agent Customs Bench runs reproducibly, catches attacks with zero benign false blocks, and matches bench.json", async () => {
+test("Agent Customs Bench runs reproducibly, separates detection from self-tests, and matches bench.json", async () => {
   const res = await runBenchmark();
-  assert.ok(res.totalCases >= 60);
-  assert.ok(res.hostileTotal >= 50);
-  assert.ok(res.benignTotal >= 10);
+  assert.ok(res.totalCases >= 100);
+  assert.ok(res.hostileTotal >= 60);
+  assert.ok(res.benignTotal >= 25);
+  assert.equal(res.selfTestPassed, res.selfTestTotal);
   assert.ok(res.agentCustoms.catchRate > res.naiveRegexBaseline.catchRate);
   assert.equal(res.agentCustoms.falseBlocks, 0);
   assert.equal(res.agentCustoms.falsePositiveRate, 0);
@@ -117,7 +122,10 @@ test("Agent Customs Bench runs reproducibly, catches attacks with zero benign fa
   assert.equal(saved.totalCases, res.totalCases);
   assert.equal(saved.hostileTotal, res.hostileTotal);
   assert.equal(saved.benignTotal, res.benignTotal);
+  assert.equal(saved.selfTestTotal, res.selfTestTotal);
+  assert.equal(saved.selfTestPassed, res.selfTestPassed);
   assert.equal(saved.agentCustoms.caught, res.agentCustoms.caught);
+  assert.equal(saved.agentCustoms.round2Caught, res.agentCustoms.round2Caught);
   assert.equal(saved.agentCustoms.falseBlocks, res.agentCustoms.falseBlocks);
 });
 
@@ -137,6 +145,9 @@ test("extension/customs matches site/customs, manifest is valid MV3, and origin 
 
   const manifest = JSON.parse(await readFile(path.join(ROOT, "extension/manifest.json"), "utf8"));
   assert.equal(manifest.manifest_version, 3);
+  assert.deepEqual(manifest.permissions, ["activeTab"]);
+  assert.equal(manifest.host_permissions, undefined, "must not claim blanket up-front host_permissions");
+  assert.deepEqual(manifest.optional_host_permissions, ["https://*/*"], "uses scoped optional HTTPS host permission");
   for (const iconRel of Object.values(manifest.icons)) {
     const png = await readFile(path.join(ROOT, "extension", iconRel));
     assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);

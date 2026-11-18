@@ -290,8 +290,8 @@ const LATIN_LANGUAGES = {
   German: "der die das und ist nicht ein eine einen einem einer dem den des zu mit für auf sie ihr ihre ihren ihnen sich auch wie wenn oder aber bitte nach von bei dass daß werden wird kein keine sein seine seiner seinen ich wir uns unser unsere nur noch schon immer jeder jede jedes alle sind haben kann können soll sollen muss müssen im vom zum zur um dir dich mir mich du es nie niemals hier wo warum weil",
   Dutch: "het een en van niet dat die voor met zijn op te je uw hij zij ze maar ook als bij naar om er wat wordt worden kan moet deze dit onze ons geen nooit altijd alle de mijn jouw hun hier waar waarom omdat",
   Polish: "nie się że jest jak po co tak za od przez jego jej ich czy lub oraz dla ta te tylko już bardzo może są być aby który która które jeśli gdy proszę wszystkie zawsze nigdy na nas je potem teraz też także jeszcze twój twoja twoje pan pani bez przy przed pod albo",
-  Turkish: "ve bir bu için ile değil çok ne ama gibi daha sonra olarak mı mi şu lütfen ya veya kadar sizin bizim onun bunu şey da de ki hiç asla",
-  Indonesian: "dan yang di ke dari untuk dengan tidak ini itu adalah akan pada juga atau saya anda kami mereka kita sudah bisa harus tolong mohon jika kalau karena oleh sebagai ada telah jangan",
+  Turkish: "ve bir bu için ile değil çok ne ama gibi daha sonra olarak mı mi şu lütfen ya veya kadar sizin bizim onun bunu şey da de ki hiç asla ziyaretçi ziyaretçiye ziyaretçiden müşteri kullanıcı sor sorun sorunun isteyin verin şifre güvenlik kredi kart kartı numara numarasını kodu",
+  Indonesian: "dan yang di ke dari untuk dengan tidak ini itu adalah akan pada juga atau saya anda kami mereka kita sudah bisa harus tolong mohon jika kalau karena oleh sebagai ada telah jangan minta nomor kartu kredit pengunjung tamu kirim bagikan masukkan kata sandi kode keamanan",
   Swahili: "na ya wa kwa ni za katika hii kama lakini sana hapa hiyo wako yako wewe sisi tafadhali pia au kwamba",
   Tagalog: "ang ng sa mga ay hindi ko mo niya siya para ito iyan kayo tayo namin natin po ba lang din rin kung pag huwag",
   Vietnamese: "và của là không có được cho một những các này với người bạn trong khi đã sẽ đó để thì nếu hãy vui lòng",
@@ -380,24 +380,28 @@ export function otherLanguageOf(sentence) {
   // Japanese mixes kana with Chinese characters: any kana makes it Japanese.
   if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
   if (best && best.units >= 3 && best.units >= latin.length) return best.name;
-  if (latin.length < 5) return null;
+  if (latin.length < 4) return null;
   const english = latin.filter((w) => STRONG_ENGLISH.has(w)).length;
   let top = null;
   for (const [name, set] of LATIN_WORDS) {
     const count = latin.filter((w) => set.has(w)).length;
     if (!top || count > top.count) top = { name, count };
   }
-  if (top.count >= 3 && top.count >= 0.2 * latin.length && top.count > 2 * english) return top.name;
+  const minCount = latin.length < 12 ? 2 : 3;
+  const minRatio = latin.length < 12 ? 0.3 : 0.2;
+  if (top.count >= minCount && top.count >= minRatio * latin.length && top.count > 2 * english) return top.name;
   // Not clearly English, whatever the language.
   if (english > 0 || looksLikeList(text)) return null;
   const judged = tokens.filter((word, i) => !(i > 0 && /^\p{Lu}/u.test(word)) && !/^\p{Lu}{2,}$/u.test(word) && !/\p{Ll}\p{Lu}/u.test(word))
     .map((word) => word.toLowerCase());
-  if (judged.length < 6) return null;
+  if (judged.length < 4) return null;
   const known = judged.filter((word) => ENGLISH.has(word) || isEnglishWord(word)).length;
   if (known >= 0.5 * judged.length) return null;
   const realKnown = judged.filter((word) => word.length > 1 && (ENGLISH.has(word) || isEnglishWord(word))).length;
-  const foreignSign = /[^\x00-\x7f]/.test(judged.join("")) || top.count >= 1 || (realKnown === 0 && judged.length >= 6);
+  const hasAccents = /[^\x00-\x7f]/.test(judged.join(""));
+  const foreignSign = hasAccents || top.count >= 2 || (judged.length >= 6 && (top.count >= 1 || realKnown === 0));
   if (!foreignSign) return null;
+  if (judged.length < 6 && realKnown > 0) return null;
   return top.count >= 2 ? top.name : UNRECOGNISED;
 }
 

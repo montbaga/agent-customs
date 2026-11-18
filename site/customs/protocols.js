@@ -82,10 +82,17 @@ export function normalizeForeignSpec(doc, targetUrl, protocol = detectProtocol(d
   return null;
 }
 
+function a2aServiceUrls(card) {
+  const out = [];
+  if (typeof card?.url === "string" && card.url.trim()) out.push(card.url.trim());
+  for (const iface of [...(card?.supportedInterfaces || []), ...(card?.additionalInterfaces || [])]) {
+    if (typeof iface?.url === "string" && iface.url.trim()) out.push(iface.url.trim());
+  }
+  return [...new Set(out)];
+}
+
 function a2aServiceUrl(card) {
-  if (typeof card?.url === "string" && card.url.trim()) return card.url.trim();
-  const iface = [...(card?.supportedInterfaces || []), ...(card?.additionalInterfaces || [])].find((i) => typeof i?.url === "string" && i.url.trim());
-  return iface ? iface.url.trim() : "";
+  return a2aServiceUrls(card)[0] || "";
 }
 
 function normalizeA2aCard(doc, targetUrl) {
@@ -126,7 +133,7 @@ function normalizeA2aCard(doc, targetUrl) {
     tools.push({
       name: skillName,
       instructions: tags.length ? `Tags: ${tags.join(", ")}` : "",
-      command: examples.join("\n"),
+      command: [s.name, ...examples].filter(Boolean).join("\n"),
       function: {
         description: String(s.description || s.name || ""),
         parameters: schema,
@@ -279,6 +286,7 @@ function normalizeMcpCatalog(doc, targetUrl) {
         description: String(t.description || ""),
         parameters: t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : null,
       },
+      outputSchema: t.outputSchema && typeof t.outputSchema === "object" ? t.outputSchema : null,
       tools: refs,
       annotations: t.annotations && typeof t.annotations === "object" ? { ...t.annotations } : null,
       _rawProtocolItem: "mcp_tool",
@@ -291,10 +299,25 @@ function normalizeMcpCatalog(doc, targetUrl) {
     for (const arg of Array.isArray(p.arguments) ? p.arguments : []) {
       if (arg?.name) argsProps[arg.name] = { type: "string", description: String(arg.description || "") };
     }
+    const promptTexts = [];
+    for (const msg of Array.isArray(p.messages) ? p.messages : []) {
+      if (!msg) continue;
+      if (typeof msg === "string") { promptTexts.push(msg); continue; }
+      const content = msg.content;
+      if (typeof content === "string") promptTexts.push(content);
+      else if (Array.isArray(content)) {
+        for (const part of content) {
+          if (typeof part === "string") promptTexts.push(part);
+          else if (typeof part?.text === "string") promptTexts.push(part.text);
+        }
+      } else if (content && typeof content === "object" && typeof content.text === "string") {
+        promptTexts.push(content.text);
+      }
+    }
     normalizedTools.push({
       name: `prompt:${p.name || i + 1}`,
       instructions: String(p.description || ""),
-      command: "",
+      command: promptTexts.join("\n"),
       function: {
         description: String(p.description || ""),
         parameters: { type: "object", properties: argsProps },
@@ -408,26 +431,38 @@ export function evaluateForeignPapers({ protocol, target, rawDoc = {}, manifest 
     if (!cardOk) blocking.push("its A2A card lacks a required name or valid URL");
 
     if (urlValid && target.origin) {
-      const sameOrigin = parsedUrl.origin === target.origin;
-      const secure = parsedUrl.protocol === "https:" || target.loopback;
+      const parsedAll = [];
+      for (const ifaceUrl of a2aServiceUrls(rawDoc)) {
+        try {
+          const u = new URL(ifaceUrl, target.origin ? `${target.origin}/` : undefined);
+          if (/^https?:$/.test(u.protocol)) parsedAll.push(u);
+        } catch { /* ignore invalid secondary */ }
+      }
+      const insecure = parsedAll.filter((u) => u.protocol !== "https:" && !target.loopback);
+      const offOrigin = parsedAll.filter((u) => u.origin !== target.origin);
       addCheck({
         id: "P-A2A-ENDPOINT",
         section: "A2A §4, §7",
         title: "A2A endpoint uses HTTPS on the expected origin",
-        status: !secure ? "fail" : sameOrigin ? "pass" : "warn",
-        detail: !secure ? `Endpoint ${parsedUrl.href} uses plain HTTP.` : sameOrigin ? "Matches publishing origin over HTTPS." : `Points execution to another host (${parsedUrl.host}).`,
-        fix: "Host the A2A JSON-RPC endpoint on HTTPS on your own origin.",
+        status: insecure.length ? "fail" : offOrigin.length ? "warn" : "pass",
+        detail: insecure.length
+          ? `Endpoint ${insecure[0].href} uses plain HTTP.`
+          : offOrigin.length
+            ? `Points execution to another host (${[...new Set(offOrigin.map((u) => u.host))].join(", ")}).`
+            : "Matches publishing origin over HTTPS.",
+        fix: "Host all A2A JSON-RPC and interface endpoints on HTTPS on your own origin.",
       });
-      if (!sameOrigin) {
+      if (offOrigin.length) {
+        const offHosts = [...new Set(offOrigin.map((u) => u.host))];
         addFinding({
           rule: "R-CROSS-ORIGIN-ENDPOINT",
           category: "itinerary",
           severity: "medium",
-          title: `Delegates execution to another origin (${parsedUrl.host})`,
-          detail: `The card published at ${target.host} sets url to ${parsedUrl.href}.`,
-          where: { field: "url" },
+          title: `Delegates execution to another origin (${offHosts.join(", ")})`,
+          detail: `The card published at ${target.host} declares interface URL(s) on ${offOrigin.map((u) => u.href).join(", ")}.`,
+          where: { field: "url / interfaces" },
           why: "A card hosted on one domain can quietly route visitor requests to an unrelated server.",
-          fix: "Serve the Agent Card and its A2A RPC endpoint on the same origin.",
+          fix: "Serve the Agent Card and all its RPC interface endpoints on the same origin.",
         });
       }
     }

@@ -15,21 +15,24 @@ import { foreignSecretRequests, otherLanguageOf, otherLanguageSentences } from "
 import { foldConfusableTokens, normalizeForRules, revealHidden } from "./unicode.js";
 
 // "Password reset" or "password manager" is not the password itself.
-const SECRET = /\b(passwords?(?![- ]?(?:reset|recovery|manager|managers|policy|policies|requirements?|rules?|strength|tips?|hints?|change|changes|page|link|links|form|field|guide|help|expired?|expiry|protected)\b)|pass ?codes?|pass ?phrases?|one[- ]time (?:pass)?codes?|otps?|(?:2fa|two[- ]factor|mfa)(?:\s+backup)? codes?|(?:backup|recovery|verification) codes?|security (?:codes?|digits?|answers?)|secret (?:questions?|answers?|codes?|pins?|phrases?|words?)|mother'?s maiden name|maiden name|card ?numbers?|(?:credit|debit|payment|bank) ?card (?:numbers?|digits?|numerals?|details|info(?:rmation)?)|card (?:digits?|numerals?|details|info(?:rmation)?)|card\s*#|cc\s*#|card no\.?|payment (?:details|info(?:rmation)?)|billing (?:details|info(?:rmation)?)|cvv2?|cvc|csc|social security(?: numbers?)?|ssn|seed phrases?|recovery phrases?|mnemonic phrases?|private keys?|api keys?|(?:access|auth(?:entication)?|session|bearer|refresh|verification|security|secret) tokens?|secret keys?|login (?:details|credentials|secrets?|info(?:rmation)?)|sign-?in (?:details|credentials|secrets?|info(?:rmation)?)|(?:online|internet|mobile|web)?\s*bank(?:ing)? (?:login|log-?in|details|credentials|passphrases?|passcodes?|passwords?|secrets?|info(?:rmation)?|usernames?)|session cookies?)\b|\bcc#/i;
+const SECRET = /\b(passwords?(?![- ]?(?:reset|recovery|manager|managers|policy|policies|requirements?|rules?|strength|tips?|hints?|change|changes|page|link|links|form|field|guide|help|expired?|expiry|protected)\b)|pass ?codes?|pass ?phrases?|one[- ]time (?:pass)?codes?|otps?|(?:2fa|two[- ]factor|mfa)(?:\s+backup)? codes?|(?:backup|recovery|verification) codes?|security (?:codes?|digits?|answers?|questions?)|secret (?:questions?|answers?|codes?|pins?|phrases?|words?)|mother'?s maiden name|maiden name|first pet(?:'?s)? name|childhood street|first school|card ?numbers?|(?:credit|debit|payment|bank) ?card (?:numbers?|digits?|numerals?|details|info(?:rmation)?)|card (?:digits?|numerals?|details|info(?:rmation)?)|card\s*#|cc\s*#|card no\.?|payment (?:details|info(?:rmation)?)|billing (?:details|info(?:rmation)?)|cvv2?|cvc|csc|social security(?: numbers?)?|ssn|seed phrases?|recovery phrases?|mnemonic phrases?|(?:12|twelve|18|eighteen|24|twenty[- ]?four)[- ]+(?:secret\s+|recovery\s+|seed\s+|backup\s+)?words\b|(?:wallet|seed|mnemonic|recovery)\s+(?:backup|recovery)\s+(?:cards?|words?|phrases?|codes?)|private keys?|api keys?|(?:access|auth(?:entication)?|session|bearer|refresh|verification|security|secret) tokens?|secret keys?|login (?:details|credentials|secrets?|info(?:rmation)?)|sign-?in (?:details|credentials|secrets?|info(?:rmation)?)|(?:online|internet|mobile|web)?\s*bank(?:ing)? (?:login|log-?in|details|credentials|passphrases?|passcodes?|passwords?|secrets?|info(?:rmation)?|usernames?)|session cookies?)\b|\bcc#/i;
 // Card and bank details described rather than named: "the 16 digits on the front of
 // their card", "the login they use for online banking", "the long number embossed on their Visa".
 const CARD_TARGET = /(?:(?:credit|debit|bank|payment)\s+)?(?:card|visa|mastercard|amex|american\s+express|discover|maestro|unionpay|plastic)/.source;
+const ID_TARGET = /(?:passports?|driver'?s\s+licen[cs]es?|driving\s+licen[cs]es?|national\s+ids?|id\s+cards?|gov(?:ernment)?[- ]issued\s+ids?|photo\s+ids?|state\s+ids?|id\s+documents?)/.source;
 const SECRET_DESCRIBED = new RegExp([
   /\b(?:\d{1,2}|sixteen|fifteen|three|four|six|eight)[- ]?(?:digits?|numerals?)(?:\s+\w+){0,4}?\s+(?:on|from|near|across|behind|(?:printed|embossed|stamped|written|shown)\s+(?:on|near|across))\s+(?:the\s+)?(?:front|back|reverse|rear|signature\s+(?:strip|panel|line|box))\b/.source,
   `\\b(?:numbers?|digits?|numerals?|codes?)(?:\\s+\\w+){0,4}?\\s+(?:on|from|near|(?:printed|embossed|stamped|written|shown)\\s+(?:on|near))(?:\\s+(?:the\\s+)?(?:front|back|reverse|rear|signature\\s+(?:strip|panel|line|box))\\s+(?:of|on)){0,2}\\s+(?:their|your|his|her|the|a)\\s+${CARD_TARGET}\\b`,
   /\b(?:3|three|4|four)[- ]?(?:digits?|numerals?)(?:\s+(?:code|number))?\s+(?:on|near)\s+the\s+(?:back|reverse|rear)\b/.source,
   `\\b(?:all\\s+)?(?:numbers?|digits?|numerals?)(?:\\s+\\w+){0,10}?\\s+(?:on|from|near|(?:printed|embossed|stamped|written|shown)\\s+(?:on|near))(?:\\s+(?:the\\s+)?(?:front|back|reverse|rear|signature\\s+(?:strip|panel|line|box))\\s+(?:of|on)){0,2}\\s+(?:their|your|his|her|the)\\s+${CARD_TARGET}\\b`,
-  `\\b(?:photos?|pictures?|images?|snapshots?|scans?|cop(?:y|ies))\\s+of\\s+(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|rear|both\\s+sides)\\s+of\\s+)?(?:their|your|his|her|the|a)\\s+(?:${CARD_TARGET}|passports?|driver'?s\\s+licen[cs]es?|national\\s+ids?|id\\s+cards?)\\b`,
+  `\\b(?:photos?|pictures?|images?|snapshots?|scans?|cop(?:y|ies))\\s+of\\s+(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|rear|both\\s+sides)\\s+of\\s+)?(?:their|your|his|her|the|a)\\s+(?:${CARD_TARGET}|${ID_TARGET})\\b`,
+  `\\b(?:both\\s+sides\\s+of\\s+(?:their|your|his|her|the|a)\\s+(?:${CARD_TARGET}|${ID_TARGET}|ids?)|(?:upload|send|submit|share|email|take\\s+a\\s+photo\\s+of|photograph)\\b[^.!?\\n]{0,40}\\b(?:${ID_TARGET}))\\b`,
   `\\b${CARD_TARGET}(?:'s)?\\s+(?:expiry|expiration)(?:\\s+dates?)?\\b`,
   `\\b(?:expiry|expiration)\\s+dates?\\s+(?:of|on|from)\\s+(?:their|your|his|her|the)\\s+${CARD_TARGET}\\b`,
   /\b(?:login|log-?in|sign-?in|username|user ?name|credentials?|password|pin|passcode|passphrase)s?\b(?:\s+\w+){0,4}?\s+(?:for|to|of|into|on)\s+(?:(?:their|your|his|her|the)\s+)?(?:online|internet|mobile|web)\s+bank(?:ing)?\b/.source,
   /\b(?:(?:online|internet|mobile)\s+)?bank(?:ing)?\s+(?:login|log-?in|password|pin|passcode|passphrase|credentials|username|user ?name|sign-?in)s?\b/.source,
-  /\bhow\s+(?:they|the\s+(?:visitor|user|customer|guest)|you)\s+(?:log|sign)\s*-?\s*in\s+to\s+(?:their|your|his|her|the)\s+(?:online\s+)?bank\b/.source,
+  /\b(?:how|what)\s+(?:they|the\s+(?:visitor|user|customer|guest)|you)\s+(?:(?:types?|enters?|uses?|inputs?|puts?)\s+to\s+)?(?:log|sign)s?\s*-?\s*in\s+(?:to|into)\s+(?:their|your|his|her|the|any)\s+(?:(?:online|web|e-?mail|mail|work|personal)\s+){0,2}(?:bank(?:ing)?|e-?mail|mail|inbox|account|portal)\b/.source,
+  /\b(?:12|twelve|24|twenty[- ]?four)\s+words\s+(?:written|printed|stored|saved)\s+(?:on|in)\s+(?:their|your|the|a)\s+(?:wallet|backup|recovery|seed)\b/.source,
   /\b(?:card|bank|atm|debit|credit|upi)\s+pin\s*-?\s*codes?\b/.source,
   /\bpin\s*-?\s*codes?\s+(?:of|for|on)\s+(?:their|your|his|her|the)\s+(?:(?:credit|debit|bank|atm)\s+)?card\b/.source,
   // One-time codes described by how they arrive: "the code we just texted to their phone",
@@ -41,7 +44,7 @@ const SECRET_DESCRIBED = new RegExp([
 ].join("|"), "i");
 // A PIN or PAN in capitals. "PIN code" alone is left out: in India it is a postal code.
 const PIN = /\bPINs?\b(?!\s*-?\s*codes?\b)|\bPANs?\b/;
-const FINANCIAL_ID = /\b(bank account (?:numbers?|details)|account numbers?|routing numbers?|iban|sort codes?|passport numbers?|national id(?: numbers?)?|tax id(?: numbers?)?|driver'?s licen[cs]e(?: numbers?)?)\b/i;
+const FINANCIAL_ID = /\b(bank account (?:numbers?|details)|account numbers?|routing numbers?|iban|sort codes?|passport numbers?|national id(?: numbers?)?|tax id(?: numbers?)?|driver'?s licen[cs]e(?: numbers?)?|driving licen[cs]e(?: numbers?)?)\b/i;
 const PERSONAL = /\b(full names?|e-?mail(?: address(?:es)?)?|phone numbers?|mobile numbers?|telephone numbers?|(?:home|street|postal|mailing) address(?:es)?|dates? of birth|birth ?dates?|birthdays?)\b/i;
 // Asking verbs. "give/send/provide/share/enter" count only when aimed at the asker
 // ("give us your", "send me the", "enter their"), so "give the visitor our phone
@@ -53,11 +56,11 @@ const PERSONAL = /\b(full names?|e-?mail(?: address(?:es)?)?|phone numbers?|mobi
 // assistant is told to repeat.
 const VISITOR_NOUN = /(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|them|him|her)/.source;
 const ASK = new RegExp([
-  `\\b(?<!\\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\\s+)(ask(?:s|ing)?|(?<!\\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no)\\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|read (?:back|out|you|me|us)|tell (?:me|us)|what is (?:your|their)|find out (?:what|which|their|your|his|her)|(?:needs?|requires?)(?:ing)? (?:your|their|his|her|(?:the\\s+)?${VISITOR_NOUN}'?s?)|(?:give|send|provide|share|enter|type|submit|get|dictate|paste|whisper|spell(?: out)?)(?:\\s+\\w+){0,2}?\\s+(?:us|me|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+(?:to\\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell(?: out)?|provide|confirm|write|submit|key in|dictate|whisper|speak|state|mention|hand over|repeat))\\b`,
-  /\b(?:must|should|has\s+to|have\s+to|needs?\s+to|will)\s+(?:tell|give|send|read|type|share|provide|confirm|show|spell|let\s+(?:you|us|me)\s+know|hand\s+over)\b/.source,
-  /\bmake\s+sure\s+(?:to\s+(?:ask|get|obtain|collect|gather|request|verify|confirm|check|read|take|note)|you\s+(?:ask|get|obtain|collect|gather|have)|(?:the\s+)?(?:visitor|user|customer|guest|client|they)\s+(?:gives?|shares?|sends?|enters?|types?|provides?|tells?|reads?|submits?))\b/.source,
-  /\b(?:ask|request|require|insist|ensure)\s+that\s+(?:they|the\s+(?:visitor|user|customer|guest|client))\s+(?:type|enter|give|send|share|provide|tell|read|dictate|paste|submit|confirm|verify|reply)\b/.source,
-  /\b(?:invite|prompt|encourage|persuade|convince|instruct|direct|urge|advise|tell)\s+(?:the\s+)?(?:visitors?|users?|customers?|guests?|clients?|them|him|her)\s+to\s+(?:share|give|send|enter|type|provide|tell|read|dictate|paste|submit|whisper|reveal|confirm|check)\b/.source,
+  `\\b(?<!\\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\\s+)(ask(?:s|ing)?|(?<!\\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no)\\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|upload|forward|relay|read (?:back|out|you|me|us)|tell (?:me|us)|what (?:is|was) (?:your|their|the name of)|find out (?:what|which|their|your|his|her)|(?:needs?|requires?)(?:ing)? (?:your|their|his|her|(?:the\\s+)?${VISITOR_NOUN}'?s?)|(?:give|send|provide|share|enter|type|submit|get|dictate|paste|whisper|spell(?: out)?|upload|forward)(?:\\s+\\w+){0,2}?\\s+(?:us|me|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+(?:to\\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell(?: out)?|provide|confirm|write|submit|key in|dictate|whisper|speak|state|mention|hand over|repeat|upload|forward))\\b`,
+  /\b(?:must|should|has\s+to|have\s+to|needs?\s+to|will)\s+(?:tell|give|send|read|type|share|provide|confirm|show|spell|upload|forward|let\s+(?:you|us|me)\s+know|hand\s+over)\b/.source,
+  /\bmake\s+sure\s+(?:to\s+(?:ask|get|obtain|collect|gather|request|verify|confirm|check|read|take|note)|you\s+(?:ask|get|obtain|collect|gather|have)|(?:the\s+)?(?:visitor|user|customer|guest|client|they)\s+(?:gives?|shares?|sends?|enters?|types?|provides?|tells?|reads?|submits?|uploads?|forwards?))\b/.source,
+  /\b(?:ask|request|require|insist|ensure)\s+that\s+(?:they|the\s+(?:visitor|user|customer|guest|client))\s+(?:type|enter|give|send|share|provide|tell|read|dictate|paste|submit|confirm|verify|reply|upload|forward)\b/.source,
+  /\b(?:invite|prompt|encourage|persuade|convince|instruct|direct|urge|advise|tell)\s+(?:the\s+)?(?:visitors?|users?|customers?|guests?|clients?|them|him|her)\s+to\s+(?:share|give|send|enter|type|provide|tell|read|dictate|paste|submit|whisper|reveal|confirm|check|upload|forward|photograph)\b/.source,
   /\b(?:reply|respond|answer)\s+with\s+(?:your|their|his|her|the)\b/.source,
   /\b(?:re-?sync|sync|connect|verify|unlock|restore|recover|import|authenticate|confirm|secure|appeal)\b[^.!?\n]{0,50}?\busing\s+(?:your|their|his|her)\b/.source,
 ].join("|"), "i");
@@ -119,7 +122,12 @@ const HARMLESS_WITHOUT = /\bwithout\s+(?:telling|asking|informing|notifying|both
 // True when a negation comes before the asking verb in the same clause, and applies to that
 // verb: the last negation before it, with no verb like "skip" in between.
 function negatedBefore(clause, verbIndex) {
-  const before = clause.slice(0, verbIndex);
+  let before = clause.slice(0, verbIndex);
+  // A negation inside a leading "If/When ...," conditional clause negates that condition,
+  // not the main instruction after the comma ("If X does not load, download ...").
+  const condComma = /^\s*(?:if|when|whenever|where|once|since|because|although|though)\b[^,]+,\s*/i;
+  const cm = before.match(condComma);
+  if (cm) before = before.slice(cm[0].length);
   const all = [...before.matchAll(NEGATIONS)];
   if (!all.length) return false;
   return !UNDOES_NEGATION.test(before.slice(all[all.length - 1].index));
@@ -397,8 +405,35 @@ export const TEXT_RULES = [
       /\b(?:read|open|cat|fetch|load|inspect|extract|dump|access|pass|send|exfiltrate|include)\b[^.!?\n]{0,80}(?:~\/\.ssh|id_rsa|id_ed25519|authorized_keys|\.cursor\/mcp\.json|\bmcp\.json\b|credentials\.json|local\s+config(?:uration)?\s+file|ssh\s+(?:private\s+)?key|local\s+storage\s+credentials)/i,
       /\b(?:pass|put|hide|embed|include|stuff|place|send)\b[^.!?\n]{0,50}\b(?:contents?|secrets?|data|files?|tokens?|keys?)\b[^.!?\n]{0,40}\b(?:inside|into|in|via)\s+(?:the\s+)?['"]?(?:sidenote|metadata|notes?|extra|comment|hidden|aux(?:iliary)?|context)['"]?\s+(?:parameter|field|arg(?:ument)?)\b/i,
       /\b(?:override|modify|alter|change|rewrite|reroute|redirect|replace|intercept|hijack|inject)\b[^.!?\n]{0,60}\b(?:other\s+tools?|any\s+(?:\w+\s+)?tool|arguments?|parameters?|destinations?|recipients?|paths?|file\s+paths?|callbacks?|webhooks?)\b[^.!?\n]{0,60}\b(?:forward|send|copy|route|redirect|point|to\s+https?:\/\/|(?:https?:)?\/\/)/i,
+      /\b(?:forward|relay|send|redirect|export|share)\b[^.!?\n]{0,60}\b(?:e-?mails?|messages?|texts?|sms|alerts?|statements?|notifications?)\b[^.!?\n]{0,50}\bfrom\s+(?:their|your|his|her|the)\s+(?:bank(?:ing)?|financial|card|paypal|lender|credit\s+union)\b/i,
       /\[[^\]]*\]\(\s*(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)|\b(?:href|src|action)\s*=\s*["']?\s*(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)/i,
-    ]),
+    ], { negatable: true }),
+  },
+  {
+    id: "C-EXEC",
+    severity: "high",
+    title: "Tells the visitor to download, install or paste executable commands",
+    why: "Instructing a visitor to run downloaded installers or terminal commands executes attacker code on their computer.",
+    fix: "Remove executable downloads and shell commands. An assistant must never ask visitors to install binaries or run scripts.",
+    match: regexMatcher([
+      /\b(?:download|install|run|execute|launch|open)\b(?:\.(?=\S)|[^.!?\n]){0,90}\.(?:exe|msi|apk|dmg|pkg|bat|cmd|ps1|vbs|scr|appimage|sh)\b/i,
+      /\b(?:open|launch|start)\s+(?:a\s+|the\s+|your\s+)?(?:terminal|command\s+prompt|cmd|powershell|shell|bash|zsh)\b(?:\.(?=\S)|[^.!?\n]){0,80}\b(?:paste|run|type|enter|execute)\b/i,
+      /(?:curl|wget)(?:\.(?=\S)|[^.!?\n]){0,120}\|\s*(?:ba?sh|sh|zsh|pwsh|powershell|python)\b|\b(?:iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|\n]{0,100}\|\s*iex\b/i,
+    ], { negatable: true }),
+  },
+  {
+    id: "C-REMOTE-ACCESS",
+    severity: "high",
+    title: "Asks for remote screen control or gift-card codes",
+    why: "Remote-desktop tools, live screen sharing over banking apps, and gift-card code requests are classic social-engineering scams.",
+    fix: "Remove instructions asking visitors to install remote-access software, share banking screens, or read gift-card codes.",
+    match: regexMatcher([
+      /\b(?:download|install|open|run|use|launch)\b[^.!?\n]{0,50}\b(?:anydesk|teamviewer|rustdesk|splashtop|screenconnect|logmein|ultraviewer|supremo|quick\s*assist)\b/i,
+      /\b(?:share|stream|broadcast)\s+(?:their|your|his|her)\s+screen\b[^.!?\n]{0,70}\b(?:bank(?:ing)?|payment|card|wallet|transfer|login|password|code|pin|deposit)\b/i,
+      /\bscreen[- ]?shar(?:e|ing)\b[^.!?\n]{0,70}\b(?:bank(?:ing)?|payment|card|wallet|deposit)\b/i,
+      /\b(?:pay|paid|settle|cover|fund|deposit)\b[^.!?\n]{0,60}\b(?:in|with|using|via|by)\s+(?:a\s+)?(?:gift\s*cards?|prepaid\s*cards?|itunes\s*cards?|google\s+play\s*cards?|steam\s*cards?|amazon\s+gift\s*cards?)\b/i,
+      /\b(?:read(?:\s+out)?|tell|give|share|send|provide|type|enter)\b[^.!?\n]{0,60}\b(?:codes?|numbers?|pins?)\s+(?:on|from)\s+(?:the\s+)?back\b|\bgift\s*cards?\b[^.!?\n]{0,60}\b(?:read(?:\s+out)?|give|share|send|provide|type|enter)\b[^.!?\n]{0,40}\b(?:codes?|numbers?|pins?)\b/i,
+    ], { negatable: true }),
   },
   {
     id: "C-BEACON",
@@ -596,7 +631,7 @@ function rot13(s) {
 
 function decodeRot13Readable(text) {
   for (const rawLine of text.split(/\r?\n/)) {
-    const seg = rawLine.replace(/^[^.!?\n:]{0,40}:\s*/, "").trim();
+    const seg = rawLine.replace(/^[^.!?\n:]{0,120}:\s*/, "").trim();
     if (seg.length < 16) continue;
     const fwdWords = (seg.toLowerCase().match(/[a-z]{2,}/g) || []);
     if (fwdWords.length < 4) continue;

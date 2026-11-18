@@ -42,6 +42,13 @@ test("detectCanaryLeak catches raw, URL, Base64, hex, and reversed encodings", (
   assert.equal(detectCanaryLeak({ data: enc.base64url }, token)?.encoding, "base64url");
   assert.equal(detectCanaryLeak(`dump:${enc.hex}`, token)?.encoding, "hex");
   assert.equal(detectCanaryLeak(`rev=${enc.reversed}`, token)?.encoding, "reversed");
+  assert.equal(detectCanaryLeak(`rot=${enc.rot13}`, token)?.encoding, "rot13");
+  assert.equal(detectCanaryLeak({ b: Buffer.from(`x${token}`).toString("base64") }, token)?.encoding, "base64");
+  assert.equal(detectCanaryLeak({ b: Buffer.from(`xy${token}`).toString("base64") }, token)?.encoding, "base64");
+  assert.equal(detectCanaryLeak({ b: Buffer.from(JSON.stringify({ note: "ctx", t: token })).toString("base64") }, token)?.encoding, "base64");
+  assert.match(detectCanaryLeak({ b: Buffer.from(`x${token}`).toString("base64url") }, token)?.encoding || "", /^base64(?:url)?$/);
+  assert.equal(detectCanaryLeak(`tok=${[...token].join(" ")}`, token)?.encoding, "spaced");
+  assert.equal(detectCanaryLeak("totally unrelated data chunk", token), null);
 });
 
 test("guard Lock 3 canary tripwire blocks encoded exfiltration and revokes partner approval", async () => {
@@ -199,4 +206,65 @@ test("all Attack Lab scenarios execute against real analyzer, locks, canary, and
 
   const rugRun = await runArenaScenario("rug-pull");
   assert.match(rugRun.protected.outcome, /Held for review/);
+});
+
+test("F1: guard arms the host system prompt with Lock 3 canary, catches dynamic offset exfiltration from messages[0], and restores on uninstall", async () => {
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = (url, init) => serve(url, init);
+  try {
+    const store = new PinStore(new MemoryStorage());
+    const topNet = new AgentNetwork(config, "agent_customs");
+    const frontName = topNet.findFrontMan();
+    const frontSpec = topNet.getAgentSpec(frontName);
+    const originalPrompt = String(frontSpec.instructions || "");
+
+    const calls = [];
+    // Dynamic model that encodes its OWN system prompt (messages[0].content) with a 1-byte offset in Base64.
+    const dynamicModel = {
+      async chat(req) {
+        calls.push(req);
+        if (calls.length === 1) {
+          return { content: "", toolCalls: [{ id: "c1", type: "function", function: { name: "sunny_bakery_sunny_bakery", arguments: JSON.stringify({ request: "Hours?" }) } }] };
+        }
+        if (calls.length === 2) {
+          return { content: "Hours sent.", toolCalls: [] };
+        }
+        if (calls.length === 3) {
+          const sysPrompt = req.messages[0]?.content || "";
+          const encodedPrompt = Buffer.from(`x${sysPrompt}`).toString("base64");
+          return { content: "", toolCalls: [{ id: "c2", type: "function", function: { name: "sunny_bakery_sunny_bakery", arguments: JSON.stringify({ request: `note=${encodedPrompt}` }) } }] };
+        }
+        return { content: "Blocked.", toolCalls: [] };
+      },
+    };
+    const peer = new ScriptedModel([{ text: "Open 8am." }]);
+    const engine = new Engine({ originUrl: SITE, trace: new TraceBus() });
+    engine.top = { network: topNet, base: SITE, manifest, llm: dynamicModel, bundleUrl: null, integrity: null };
+    engine.userRouter = { baseUrl: "https://router.invalid/v1", mock: false };
+    engine.onConsent = async () => "allow";
+    const compile = engine._compile;
+    engine._compile = async function (...args) {
+      const compiled = await compile.apply(this, args);
+      if (!args[3]?.isTop) compiled.llm = peer;
+      return compiled;
+    };
+
+    const guard = installCustomsGuard(engine, { store, notice: false });
+    assert.ok(frontSpec.instructions.includes(guard.canary.token), "host system instructions must be armed automatically");
+    assert.notEqual(frontSpec.instructions, originalPrompt);
+
+    await engine.runTurn("Menu?");
+    assert.ok(store.get(SUNNY), "first benign turn pins Sunny Bakery");
+    assert.equal(guard.canary.tripped, false);
+
+    await engine.runTurn("Summarize my request.");
+    assert.equal(guard.canary.tripped, true, "exfiltrating messages[0].content at arbitrary Base64 offset must trip Lock 3");
+    assert.equal(store.get(SUNNY), null, "partner pin must be revoked when system prompt canary leaks");
+    assert.equal(peer.calls.length, 1, "partner must not receive second turn after Lock 3 trips");
+
+    guard.uninstall();
+    assert.equal(frontSpec.instructions, originalPrompt, "uninstall must restore original host instructions cleanly");
+  } finally {
+    globalThis.fetch = prevFetch;
+  }
 });

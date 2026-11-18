@@ -192,7 +192,7 @@ export async function analyzeNetwork(input) {
 
   // ---- Contraband: hidden characters ---------------------------------------
   const hiddenByPlace = new Map();
-  walkStrings({ manifest, network: config }, (text, path) => {
+  walkStrings({ manifest, network: config, ...(rawDoc ? { rawDoc } : {}) }, (text, path) => {
     // Shared text is expanded into each agent's instructions, which are scanned there.
     if (path[0] === "network" && path[1] === "commondefs") return;
     const h = scanHidden(text);
@@ -253,7 +253,7 @@ export async function analyzeNetwork(input) {
   }
 
   // ---- Contraband: text rules ------------------------------------------------
-  const textFields = collectTextFields(manifest, config);
+  const textFields = collectTextFields(manifest, config, rawDoc);
   const ruleHits = new Map();
   const agentRuleSeen = new Set();
   for (const field of textFields) {
@@ -794,13 +794,25 @@ function walkStrings(value, fn, path = []) {
   }
 }
 
+function splitIdentifier(key) {
+  return String(key || "")
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|credit ?cards?|debit ?cards?|cvv2?|cvc|csc|passwords?|passcodes?|passphrases?|otp|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
+
 function collectSchemaProperties(node, emit) {
   if (!node || typeof node !== "object") return;
   if (Array.isArray(node)) { node.forEach((item) => collectSchemaProperties(item, emit)); return; }
   if (node.properties && typeof node.properties === "object" && !Array.isArray(node.properties)) {
     for (const [k, spec] of Object.entries(node.properties)) {
+      const splitKey = splitIdentifier(k);
+      if (VISITOR_SECRET_PARAM.test(splitKey)) emit(`ask the visitor for ${splitKey}`);
       if (spec && typeof spec === "object") {
-        const parts = [k.replace(/[_-]+/g, " ")];
+        const parts = [splitKey];
         for (const key of ["title", "description", "default"]) {
           if (typeof spec[key] === "string" && spec[key].trim()) parts.push(spec[key].trim());
         }
@@ -808,6 +820,9 @@ function collectSchemaProperties(node, emit) {
           for (const v of spec.enum) if (typeof v === "string" && v.trim()) parts.push(v.trim());
         }
         if (parts.length > 1) emit(parts.join(" "));
+        else if (splitKey) emit(splitKey);
+      } else if (splitKey) {
+        emit(splitKey);
       }
       collectSchemaProperties(spec, emit);
     }
@@ -838,18 +853,29 @@ function sampleAroundHidden(text) {
 const MENTIONED = "mentioned in instructions";
 const onlyMentioned = (kinds) => [...kinds].every((k) => k === MENTIONED);
 
-function collectTextFields(manifest, config) {
+const RAW_SKIP_KEYS = new Set([
+  "$schema", "id", "url", "uri", "href", "endpoint", "version", "protocolVersion",
+  "protocol", "type", "format", "transport", "registryType", "identifier", "sha256",
+  "integrity", "role", "defaultInputModes", "defaultOutputModes", "mimeTypes",
+]);
+
+function collectTextFields(manifest, config, rawDoc = null) {
   const out = [];
+  const seenExact = new Set();
   const push = (text, field, agent = null, extra = {}) => {
-    if (typeof text === "string" && text.trim()) out.push({ text, field, agent, ...extra });
+    if (typeof text === "string" && text.trim()) {
+      out.push({ text, field, agent, ...extra });
+      if (!extra.crossField) seenExact.add(text.trim());
+    }
   };
   for (const agent of config.tools || []) {
     if (!agent || typeof agent !== "object") continue;
     if (typeof agent.name === "string" && agent.name.trim()) {
-      push(agent.name.replace(/[_-]+/g, " "), "agent name", agent.name);
+      push(splitIdentifier(agent.name), "agent name", agent.name);
     }
     push(agent.instructions, "instructions", agent.name);
     push(agent.command, "command", agent.name);
+    push(agent.annotations?.title, "annotations.title", agent.name);
     // The runtime joins instructions + command into one system prompt, so scan both
     // joined with a space too, catching a phrase split across the two fields.
     if (typeof agent.instructions === "string" && agent.instructions.trim()
@@ -857,12 +883,19 @@ function collectTextFields(manifest, config) {
       push(`${agent.instructions.trim()} ${agent.command.trim()}`, "instructions + command", agent.name, { crossField: true });
     }
     push(agent.function?.description, "function.description", agent.name);
-    // A calling model reads the whole input schema: property names, enums and defaults
-    // as well as descriptions. walkStrings passes object keys too.
-    walkStrings(agent.function?.parameters || {}, (text) => push(text, "parameters", agent.name));
-    // Also join each schema property name with its own description/title/default/enum so
-    // splitting a request across key + description ("ask_for": "their card number") stays together.
+    // A calling model reads the whole input/output schema: property names, enums, titles and defaults.
+    walkStrings(agent.function?.parameters || {}, (text, p) => {
+      const last = p[p.length - 1];
+      push(typeof last === "string" && last.startsWith("key:") ? splitIdentifier(text) : text, "parameters", agent.name);
+    });
     collectSchemaProperties(agent.function?.parameters, (text) => push(text, "parameters", agent.name, { crossField: true }));
+    if (agent.outputSchema && typeof agent.outputSchema === "object") {
+      walkStrings(agent.outputSchema, (text, p) => {
+        const last = p[p.length - 1];
+        push(typeof last === "string" && last.startsWith("key:") ? splitIdentifier(text) : text, "outputSchema", agent.name);
+      });
+      collectSchemaProperties(agent.outputSchema, (text) => push(text, "outputSchema", agent.name, { crossField: true }));
+    }
   }
   push(config.metadata?.description, "metadata.description");
   for (const q of config.metadata?.sample_queries || []) push(q, "metadata.sample_queries");
@@ -871,6 +904,21 @@ function collectTextFields(manifest, config) {
   for (const n of manifest.networks || []) {
     push(n?.description, "manifest description");
     for (const q of n?.sample_queries || []) push(q, "manifest sample_queries");
+  }
+  if (rawDoc && typeof rawDoc === "object") {
+    walkStrings(rawDoc, (text, path) => {
+      const last = path[path.length - 1];
+      if (typeof last === "string" && last.startsWith("key:")) {
+        if (VISITOR_SECRET_PARAM.test(splitIdentifier(text))) {
+          push(`ask the visitor for ${splitIdentifier(text)}`, path.map((s) => String(s).replace(/^key:/, "")).join("."));
+        }
+        return;
+      }
+      if (RAW_SKIP_KEYS.has(String(last || ""))) return;
+      const trimmed = String(text || "").trim();
+      if (!trimmed || /^https?:\/\/\S+$/i.test(trimmed) || seenExact.has(trimmed)) return;
+      push(trimmed, `rawDoc.${path.map((s) => String(s).replace(/^key:/, "")).join(".")}`);
+    });
   }
   return out;
 }
