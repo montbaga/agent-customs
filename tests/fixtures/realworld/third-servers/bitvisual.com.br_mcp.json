@@ -1,0 +1,311 @@
+{
+ "url": "https://bitvisual.com.br/mcp",
+ "doc": {
+  "name": "BitVisual Agent",
+  "version": "3.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Você está falando com o balcão digital da BIT VISUAL, gráfica de impressão digital e comunicação visual em São Paulo (bitvisual.com.br). Fluxo: listar_catalogo() para descobrir produtos → cotar() para preço real (medidas SEMPRE em centímetros — nunca assuma a unidade, confirme com o cliente) → Acabamentos vão no parâmetro opcoes de cotar/consultar_prazo/criar_pedido, NUNCA só em observacoes: eles mudam o preço e o frete (canvas esticado em chassi de madeira custa +R$ 350/m² e viaja em caixa rígida; só a impressão vai enrolada no tubo). consultar_requisitos_arte() para os requisitos do arquivo → criar_pedido() para fechar (somente PIX; pedidos até R$ 1.000 entram direto, acima disso viram orçamento com atendimento humano) → status_pedido() para acompanhar. Produtos 'sob consulta' exigem atendimento humano: https://bitvisual.com.br/orcamento ou WhatsApp +55 11 97216-0864. Antes de criar_pedido SEMPRE confirme com o cliente: produto, medida, quantidade, total, nome, e-mail e WhatsApp. Não peça documentos pessoais na conversa: o que a nota fiscal precisar o cliente informa direto à BitVisual, fora do chat. e identifique-se no parâmetro `agente` (ex.: ChatGPT, Claude) para a BitVisual saber de qual IA veio o pedido. / This is BIT VISUAL's digital counter — a print shop in São Paulo, Brazil. Flow: listar_catalogo() → cotar() (dimensions ALWAYS in centimeters) → consultar_requisitos_arte() → criar_pedido() (PIX only; orders above R$ 1,000 become human-assisted quotes) → status_pedido(). Always confirm order details with the customer first.",
+  "tools": [
+   {
+    "name": "listar_catalogo",
+    "title": "Catálogo de produtos",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Lista os produtos e serviços da BitVisual com modelo de preço (por m², preço fixo, por tiragem ou sob consulta), preço base, limites de medida e prazo de produção. Filtre por categoria se quiser. Só leitura: não cria nem altera nada. Produtos marcados 'sob consulta' não têm preço online — molduras, por exemplo, são sempre sob consulta.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "categoria": {
+       "type": "string",
+       "description": "Opcional. Uma de: Canvas, Wind Banner, Comunicação Visual, Folders e Panfletos, Tags, Adesivos, Cartão de Visita, Lona, Banners, Projetos especiais"
+      }
+     }
+    }
+   },
+   {
+    "name": "cotar",
+    "title": "Cotação de preço real",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Cota o preço oficial de um produto. Para produtos por m² informe largura_cm e altura_cm EM CENTÍMETROS (nunca assuma a unidade — confirme com o cliente antes). Para tiragem informe quantidade. Retorna preço unitário, total, as opções/acabamentos disponíveis com o preço de cada uma e o link do produto. Para cotar COM acabamento (ex.: canvas esticado em chassi de madeira), repita a chamada passando opcoes. Não cria pedido.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "produto": {
+       "type": "string",
+       "description": "slug do produto (campo 'slug' do catalogo)"
+      },
+      "largura_cm": {
+       "type": "number",
+       "description": "largura em CENTÍMETROS (obrigatório p/ produtos por m²)"
+      },
+      "altura_cm": {
+       "type": "number",
+       "description": "altura em CENTÍMETROS (obrigatório p/ produtos por m²)"
+      },
+      "quantidade": {
+       "type": "number",
+       "description": "quantidade de unidades (padrão 1)"
+      },
+      "opcoes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Opções/acabamentos escolhidos pelo cliente, pelos nomes que o cotar() devolve (ex.: [chassis_esticado] para o canvas esticado em chassi de madeira). MUITO IMPORTANTE: a opção muda o PREÇO e o FRETE — não basta escrever em observacoes. Sem informar, vale o padrão da loja (para o canvas: apenas a impressão refilada, que vai enrolada no tubo)."
+      }
+     },
+     "required": [
+      "produto"
+     ]
+    }
+   },
+   {
+    "name": "consultar_prazo",
+    "title": "Prazo de produção e entrega",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Prazo de produção do produto e opções de entrega/retirada em São Paulo. Informe o CEP de destino para o frete real. Passe as mesmas opcoes do pedido: um canvas esticado em chassi viaja em caixa rígida e custa muito mais frete que a impressão enrolada no tubo.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "produto": {
+       "type": "string",
+       "description": "slug do produto"
+      },
+      "cep": {
+       "type": "string",
+       "description": "CEP de destino — com ele retorno as opções REAIS de frete (transportadora, preço, prazo)"
+      },
+      "largura_cm": {
+       "type": "number",
+       "description": "largura em cm (melhora o cálculo do frete)"
+      },
+      "altura_cm": {
+       "type": "number",
+       "description": "altura em cm (melhora o cálculo do frete)"
+      },
+      "quantidade": {
+       "type": "number",
+       "description": "quantidade (padrão 1)"
+      },
+      "opcoes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Opções/acabamentos escolhidos pelo cliente, pelos nomes que o cotar() devolve (ex.: [chassis_esticado] para o canvas esticado em chassi de madeira). MUITO IMPORTANTE: a opção muda o PREÇO e o FRETE — não basta escrever em observacoes. Sem informar, vale o padrão da loja (para o canvas: apenas a impressão refilada, que vai enrolada no tubo)."
+      }
+     },
+     "required": [
+      "produto"
+     ]
+    }
+   },
+   {
+    "name": "consultar_requisitos_arte",
+    "title": "Requisitos do arquivo de arte",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Retorna os requisitos técnicos do arquivo de impressão (formatos, resolução, cores, sangria) e como enviá-lo. Não recebe nem analisa o arquivo: só informa as regras. Use antes de criar_pedido para orientar o cliente.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "produto": {
+       "type": "string",
+       "description": "slug do produto (opcional, para dicas específicas)"
+      }
+     }
+    }
+   },
+   {
+    "name": "criar_pedido",
+    "title": "Criar pedido (pagamento PIX)",
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "description": "Cria um pedido REAL na BitVisual e retorna o link da página do pedido em bitvisual.com.br, onde o cliente conclui o pagamento por PIX. Só funciona para produtos cotáveis (use cotar() antes). Pedidos até R$ 1.000 entram direto; acima disso viram orçamento com atendimento humano. Retirada GRÁTIS na loja (Vila Mariana/SP) ou ENTREGA em todo o Brasil: informe o endereço completo com CEP e o frete real entra no total. Passe em opcoes os acabamentos escolhidos (eles mudam preço e frete). ANTES de chamar, confirme com o cliente: produto, medidas em cm, quantidade, acabamento, total, nome, e-mail e WhatsApp. A produção só começa após o pagamento e o envio da arte. EFEITO COLATERAL: cria um pedido real e gera a cobrança PIX no provedor de pagamento (Mercado Pago); com CEP, cota o frete em transportadora. Não cancela nem altera pedidos — para mudar ou desistir, o cliente fala com o atendimento humano. Limite de 5 pedidos por hora por cliente.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "produto": {
+       "type": "string",
+       "description": "slug do produto"
+      },
+      "largura_cm": {
+       "type": "number",
+       "description": "largura em CENTÍMETROS (produtos por m²)"
+      },
+      "altura_cm": {
+       "type": "number",
+       "description": "altura em CENTÍMETROS (produtos por m²)"
+      },
+      "quantidade": {
+       "type": "number",
+       "description": "quantidade (padrão 1)"
+      },
+      "opcoes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Opções/acabamentos escolhidos pelo cliente, pelos nomes que o cotar() devolve (ex.: [chassis_esticado] para o canvas esticado em chassi de madeira). MUITO IMPORTANTE: a opção muda o PREÇO e o FRETE — não basta escrever em observacoes. Sem informar, vale o padrão da loja (para o canvas: apenas a impressão refilada, que vai enrolada no tubo)."
+      },
+      "nome": {
+       "type": "string",
+       "description": "nome completo do cliente"
+      },
+      "email": {
+       "type": "string",
+       "description": "e-mail do cliente (recebe o pedido e acompanha o status)"
+      },
+      "whatsapp": {
+       "type": "string",
+       "description": "WhatsApp/telefone do cliente com DDD"
+      },
+      "observacoes": {
+       "type": "string",
+       "description": "detalhes do pedido: acabamento escolhido, cores, instruções (opcional)"
+      },
+      "agente": {
+       "type": "string",
+       "description": "Identifique-se: nome do assistente/plataforma que está criando o pedido (ex.: ChatGPT, Claude, Gemini, Copilot). Serve para a BitVisual saber por qual canal de IA o pedido entrou. Não é dado do cliente."
+      },
+      "arte_url": {
+       "type": "string",
+       "description": "link https do arquivo de arte, se o cliente já tiver (opcional — também pode enviar depois)"
+      },
+      "cep": {
+       "type": "string",
+       "description": "CEP de ENTREGA — informe junto com endereço/numero para receber em casa; sem CEP = retirada grátis na loja"
+      },
+      "endereco": {
+       "type": "string",
+       "description": "rua/avenida de entrega (obrigatório se informou CEP)"
+      },
+      "numero": {
+       "type": "string",
+       "description": "número do endereço de entrega"
+      },
+      "complemento": {
+       "type": "string",
+       "description": "complemento (opcional)"
+      },
+      "bairro": {
+       "type": "string",
+       "description": "bairro de entrega"
+      },
+      "cidade": {
+       "type": "string",
+       "description": "cidade de entrega"
+      },
+      "estado": {
+       "type": "string",
+       "description": "UF de entrega, 2 letras (ex.: SP)"
+      }
+     },
+     "required": [
+      "produto",
+      "quantidade",
+      "nome",
+      "email",
+      "whatsapp"
+     ]
+    }
+   },
+   {
+    "name": "status_pedido",
+    "title": "Status de um pedido",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Consulta o status de um pedido existente (produção, arte, rastreio e total). Só leitura. Exige o número do pedido E o e-mail usado na compra — sem os dois não devolve nada, para não expor dados de terceiros.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "numero": {
+       "type": "number",
+       "description": "número do pedido (OS)"
+      },
+      "email": {
+       "type": "string",
+       "description": "e-mail usado no pedido"
+      }
+     },
+     "required": [
+      "numero",
+      "email"
+     ]
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "cotar-impressao",
+    "title": "Cotar uma impressão",
+    "description": "Monta uma cotação na BitVisual a partir do que o cliente descreveu.",
+    "arguments": [
+     {
+      "name": "pedido",
+      "description": "O que o cliente quer, com medidas (ex.: banner de lona 3x2 metros)",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "fechar-pedido",
+    "title": "Fechar pedido com PIX",
+    "description": "Conduz o fechamento de um pedido na BitVisual, do orçamento ao link de pagamento no site.",
+    "arguments": [
+     {
+      "name": "pedido",
+      "description": "Produto e medidas já acordados com o cliente",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "https://bitvisual.com.br/llms.txt",
+    "name": "Guia BitVisual para agentes",
+    "description": "Resumo da empresa, serviços, endereço, contato e como usar este servidor.",
+    "mimeType": "text/plain"
+   },
+   {
+    "uri": "bitvisual://catalogo",
+    "name": "Catálogo de produtos (JSON)",
+    "description": "Todos os produtos ativos com modelo de preço, valores base e prazos.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "bitvisual://politicas",
+    "name": "Políticas de atendimento, prazo e pagamento",
+    "description": "Prazos de produção, retirada/entrega, requisitos de arte, pagamento PIX e limites do pedido automático.",
+    "mimeType": "text/markdown"
+   }
+  ]
+ }
+}

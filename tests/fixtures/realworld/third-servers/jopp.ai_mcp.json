@@ -1,0 +1,929 @@
+{
+ "url": "https://jopp.ai/mcp",
+ "doc": {
+  "name": "jopp – Jobs in der Schweiz",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "jopp (jopp.ai) is a job search for Switzerland and Liechtenstein. It lists open positions collected from employer career sites and public job boards; a job leaves the search when jopp finds its advert taken offline. Job content is mostly German, some French, Italian or English.\n\nUse search_jobs to find jobs and get_job for the full details of one. Filter by canton codes (map a city to its canton, e.g. Zürich → ZH, Lausanne → VD); list_categories returns the category and role keys for precise occupation filters.\n\nLehrstellen (Swiss vocational apprenticeships, Berufslehre) are a separate list: search_jobs returns regular jobs and internships by default and never a Lehrstelle. Pass segment \"apprenticeships\" to search the Lehrstellen instead; get_job reads either.\n\nDescriptions are jopp briefs: factual summaries of the advert written by jopp; a job is listed only once its brief exists, and a brief can lag a changed advert by a few minutes. The original advert at applyUrl is authoritative and is where people apply. Salaries with basis \"estimated\" are jopp estimates, not from the advert. Each job's url is its page on jopp.ai.",
+  "tools": [
+   {
+    "name": "search_jobs",
+    "title": "Search jobs in Switzerland",
+    "description": "Search open jobs in Switzerland and Liechtenstein by keywords and filters. Only jobs whose advert is still online are returned. Lehrstellen are listed only with segment apprenticeships. Returns up to 20 jobs per page, newest first for filter-only searches; keyword searches rank by relevance, favouring recent adverts and mixing companies. Use get_job for a job's full description.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "segment": {
+       "default": "jobs",
+       "description": "jobs (default): regular jobs and internships. apprenticeships: only Lehrstellen (Swiss vocational apprenticeships, Berufslehre). A search lists one of the two, never both.",
+       "type": "string",
+       "enum": [
+        "jobs",
+        "apprenticeships"
+       ]
+      },
+      "query": {
+       "description": "Keywords matched against job title, company and description, with German word forms (e.g. \"Pflegefachfrau\", \"Software Engineer Python\"). All words must match; use OR between alternatives, \"quotes\" for phrases and -word to exclude. Place names match only the text; use cantons to filter by location.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200
+      },
+      "cantons": {
+       "description": "Two-letter canton codes (ZH, BE, VD, GE, …) or LI for Liechtenstein.",
+       "maxItems": 27,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "AG",
+         "AI",
+         "AR",
+         "BE",
+         "BL",
+         "BS",
+         "FR",
+         "GE",
+         "GL",
+         "GR",
+         "JU",
+         "LU",
+         "NE",
+         "NW",
+         "OW",
+         "SG",
+         "SH",
+         "SO",
+         "SZ",
+         "TG",
+         "TI",
+         "UR",
+         "VD",
+         "VS",
+         "ZG",
+         "ZH",
+         "LI"
+        ]
+       }
+      },
+      "category": {
+       "description": "A category key from list_categories.",
+       "type": "string",
+       "maxLength": 60
+      },
+      "role": {
+       "description": "A role key from list_categories; requires its category.",
+       "type": "string",
+       "maxLength": 60
+      },
+      "workloadMin": {
+       "description": "Lowest workload in percent of full time (10–100).",
+       "type": "integer",
+       "minimum": 10,
+       "maximum": 100
+      },
+      "workloadMax": {
+       "description": "Highest workload in percent of full time (10–100).",
+       "type": "integer",
+       "minimum": 10,
+       "maximum": 100
+      },
+      "workModes": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "onsite",
+         "hybrid",
+         "remote"
+        ]
+       }
+      },
+      "contractTypes": {
+       "description": "Not for segment apprenticeships.",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "permanent",
+         "temporary",
+         "internship",
+         "freelance"
+        ]
+       }
+      },
+      "seniorities": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "entry",
+         "professional",
+         "senior",
+         "lead",
+         "management"
+        ]
+       }
+      },
+      "advertLanguages": {
+       "description": "Language the advert is written in.",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "de",
+         "fr",
+         "it",
+         "en",
+         "other"
+        ]
+       }
+      },
+      "requiredLanguages": {
+       "description": "Only jobs that require all of these languages.",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "de",
+         "fr",
+         "it",
+         "en"
+        ]
+       }
+      },
+      "salaryStated": {
+       "description": "Only jobs whose advert states a salary.",
+       "type": "boolean"
+      },
+      "excludeAgencies": {
+       "description": "Leave out recruitment agencies.",
+       "type": "boolean"
+      },
+      "publishedWithinDays": {
+       "anyOf": [
+        {
+         "type": "number",
+         "const": 1
+        },
+        {
+         "type": "number",
+         "const": 3
+        },
+        {
+         "type": "number",
+         "const": 7
+        },
+        {
+         "type": "number",
+         "const": 14
+        },
+        {
+         "type": "number",
+         "const": 30
+        }
+       ]
+      },
+      "limit": {
+       "default": 10,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20
+      },
+      "cursor": {
+       "description": "nextCursor of a previous search_jobs result; the other arguments are then ignored.",
+       "type": "string",
+       "maxLength": 4000
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search jobs in Switzerland",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "total": {
+       "type": "number",
+       "description": "How many open jobs match."
+      },
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "description": "The job on jopp.ai."
+         },
+         "title": {
+          "type": "string"
+         },
+         "company": {
+          "type": "string"
+         },
+         "isAgency": {
+          "type": "boolean",
+          "description": "True when a recruitment agency posted the job."
+         },
+         "locations": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "workload": {
+          "description": "Workload in percent of full time, e.g. \"80–100 %\".",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "workMode": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "onsite",
+             "hybrid",
+             "remote"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "contractType": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "permanent",
+             "temporary",
+             "internship",
+             "apprenticeship",
+             "freelance"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "seniority": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "entry",
+             "professional",
+             "senior",
+             "lead",
+             "management"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "salary": {
+          "description": "Salary as stated in the advert, if any.",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "summary": {
+          "type": "string",
+          "description": "A short excerpt of the job description."
+         },
+         "publishedAt": {
+          "description": "ISO date the job was published or first seen.",
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "url",
+         "title",
+         "company",
+         "isAgency",
+         "locations",
+         "workload",
+         "workMode",
+         "contractType",
+         "seniority",
+         "salary",
+         "summary",
+         "publishedAt"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "nextCursor": {
+       "description": "Pass as cursor for the next page; null at the end.",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "searchUrl": {
+       "type": "string",
+       "description": "The same search on jopp.ai."
+      }
+     },
+     "required": [
+      "total",
+      "results",
+      "nextCursor",
+      "searchUrl"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_job",
+    "title": "Get a job",
+    "description": "Full details of one job by its id from search_jobs: facts, salary, description (usually a jopp brief) and the link to the original advert.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 100,
+       "description": "The job id from search_jobs."
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Get a job",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string",
+       "description": "The job on jopp.ai."
+      },
+      "applyUrl": {
+       "type": "string",
+       "description": "The original advert: the employer's or source's page to read it in full and apply."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "open",
+        "closed"
+       ]
+      },
+      "title": {
+       "type": "string"
+      },
+      "company": {
+       "type": "string"
+      },
+      "isAgency": {
+       "type": "boolean"
+      },
+      "locations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "workload": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "workMode": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "onsite",
+          "hybrid",
+          "remote"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "contractType": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "permanent",
+          "temporary",
+          "internship",
+          "apprenticeship",
+          "freelance"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "seniority": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "entry",
+          "professional",
+          "senior",
+          "lead",
+          "management"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "offerKind": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "job",
+          "apprenticeship",
+          "internship",
+          "trainee",
+          "working_student",
+          "freelance",
+          "taster",
+          "not_a_job",
+          "unknown"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "category": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "key": {
+           "type": "string"
+          },
+          "label": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "key",
+          "label"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "role": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "key": {
+           "type": "string"
+          },
+          "label": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "key",
+          "label"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "industry": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "start": {
+       "description": "An ISO date, \"immediately\" or \"by_agreement\".",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "leadership": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "team_lead",
+          "people_manager"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "education": {
+       "description": "Lowest education the advert asks for.",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "experience": {
+       "description": "Years of experience the advert asks for.",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "requiredLanguages": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "advantageLanguages": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "salary": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "basis": {
+           "type": "string",
+           "enum": [
+            "stated",
+            "estimated"
+           ]
+          },
+          "text": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "currency": {
+           "type": "string"
+          },
+          "min": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "max": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "period": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "basis",
+          "text",
+          "currency",
+          "min",
+          "max",
+          "period"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "\"stated\" comes from the advert. \"estimated\" is a jopp estimate of the yearly salary at 100 % workload and is not from the advert."
+      },
+      "language": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "de",
+          "fr",
+          "it",
+          "en",
+          "other"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Language of title and description."
+      },
+      "description": {
+       "type": "string",
+       "description": "Markdown. Usually jopp's brief, a factual summary of the advert; the original advert at applyUrl is authoritative."
+      },
+      "publishedAt": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "withJoppAccount": {
+       "type": "object",
+       "properties": {
+        "text": {
+         "type": "string"
+        },
+        "signInUrl": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "text",
+        "signInUrl"
+       ],
+       "additionalProperties": false,
+       "description": "What a person can do with this job after signing in to jopp."
+      }
+     },
+     "required": [
+      "id",
+      "url",
+      "applyUrl",
+      "status",
+      "title",
+      "company",
+      "isAgency",
+      "locations",
+      "workload",
+      "workMode",
+      "contractType",
+      "seniority",
+      "offerKind",
+      "category",
+      "role",
+      "industry",
+      "start",
+      "leadership",
+      "education",
+      "experience",
+      "requiredLanguages",
+      "advantageLanguages",
+      "salary",
+      "language",
+      "description",
+      "publishedAt",
+      "withJoppAccount"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_categories",
+    "title": "List job categories",
+    "description": "jopp's occupation categories and their roles, for the category and role filters of search_jobs. Pass a category key to get its roles with typical job titles.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "category": {
+       "description": "A category key to list its roles in detail.",
+       "type": "string",
+       "maxLength": 60
+      }
+     }
+    },
+    "annotations": {
+     "title": "List job categories",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "categories": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "key": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "examples": {
+          "type": "string"
+         },
+         "roles": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "examples": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "label"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "key",
+         "label",
+         "examples",
+         "roles"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "categories"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "search",
+    "title": "Search jobs (simple)",
+    "description": "Keyword search over open jobs in Switzerland; returns ids, titles and links. search_jobs offers filters and more fields.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Keywords, e.g. \"Pflegefachfrau Bern\"."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "title": "Search jobs (simple)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "results"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "fetch",
+    "title": "Fetch a job",
+    "description": "The full text of one job by its id from search, as a readable document.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 100,
+       "description": "The job id from search."
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Fetch a job",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "text": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "metadata": {
+       "type": "object",
+       "propertyNames": {
+        "type": "string"
+       },
+       "additionalProperties": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "id",
+      "title",
+      "text",
+      "url",
+      "metadata"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ }
+}

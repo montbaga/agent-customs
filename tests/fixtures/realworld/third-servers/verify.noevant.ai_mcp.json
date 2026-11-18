@@ -1,0 +1,123 @@
+{
+ "url": "https://verify.noevant.ai/mcp",
+ "doc": {
+  "name": "fidenta-verify",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "verify_claims",
+    "description": "Fact-check text against live web evidence from two independent retrievers, then have a model from a different lab audit the verdict. Returns per-claim verdicts: SUPPORTED, CONTRADICTED, UNSUPPORTED (searched and found nothing — not the same as false), or UNVERIFIABLE (opinion or prediction). Use before relying on a factual claim, or to check your own draft answer before sending it.",
+    "annotations": {
+     "title": "Verify claims against live sources",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "text": {
+       "type": "string",
+       "description": "The text to verify. A single claim or a full answer containing several. May also be a bare link, e.g. 'verify https://example.com/article'."
+      },
+      "url": {
+       "type": "string",
+       "description": "A public http(s) link to an article or web page. We fetch it, extract the readable text and verify the claims in it. Use this when the user gives you a link instead of text — you do not need to fetch the page yourself. Pages behind a login or paywall cannot be read; ask for the text instead."
+      },
+      "force": {
+       "type": "boolean",
+       "description": "Re-check even if a recent saved result exists."
+      },
+      "max_claims": {
+       "type": "integer",
+       "description": "Hard cap on how many claims to verify, and therefore on how many credits this call can spend. Use it to bound cost on a long document."
+      },
+      "confirm": {
+       "type": "boolean",
+       "description": "Required to proceed when the text contains more than 3 checkable claims. Call estimate_claims first, tell the user the claim count and credit cost, then call again with confirm true once they agree."
+      }
+     }
+    }
+   },
+   {
+    "name": "estimate_claims",
+    "description": "FREE. Break text into checkable claims and report how many there are and how many credits verifying them would cost. Spends nothing and verifies nothing. Always call this before verify_claims on anything longer than a sentence or two — an article can contain 20 claims, and each claim costs one credit, so the user should see the price before agreeing to it.",
+    "annotations": {
+     "title": "Estimate claims and cost",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "text": {
+       "type": "string",
+       "description": "The text to break into claims. May also be a bare link."
+      },
+      "url": {
+       "type": "string",
+       "description": "A public http(s) link to an article or web page. We fetch it, extract the readable text and verify the claims in it. Use this when the user gives you a link instead of text — you do not need to fetch the page yourself. Pages behind a login or paywall cannot be read; ask for the text instead."
+      }
+     }
+    }
+   },
+   {
+    "name": "top_up",
+    "description": "Buy more verification credits without leaving the conversation. Call with confirm false (or omit it) to see the price, the card on file and the remaining monthly limit; call again with confirm true once the user has agreed. Charges the card the user already saved and authorised for in-chat top-ups — if no card is saved, or the bank requires the cardholder present, it returns a secure checkout link instead of charging.",
+    "annotations": {
+     "title": "Top up credits",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "confirm": {
+       "type": "boolean",
+       "description": "True only after the user has explicitly agreed to the charge. Never set this on your own initiative."
+      }
+     }
+    }
+   },
+   {
+    "name": "recall_claim",
+    "description": "Look up whether a claim has already been verified on this account, without spending a verification.",
+    "annotations": {
+     "title": "Recall a previous verification",
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "inputSchema": {
+     "type": "object",
+     "required": [
+      "claim"
+     ],
+     "properties": {
+      "claim": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   {
+    "name": "check_usage",
+    "description": "Report how many verifications remain on this account for the current period.",
+    "annotations": {
+     "title": "Check remaining verifications",
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    }
+   }
+  ]
+ }
+}

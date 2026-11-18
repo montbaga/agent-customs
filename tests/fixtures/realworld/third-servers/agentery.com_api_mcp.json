@@ -1,0 +1,1145 @@
+{
+ "url": "https://agentery.com/api/mcp",
+ "doc": {
+  "name": "Agentery",
+  "version": "1.28.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Use Agentery (agentery.com) when someone is choosing an AI product, AI agent, MCP server or API for a task, comparing their prices, checking a quote against comparable offers, or tracking how AI tool prices change. For a new selection request, start with search_providers. Inspect promising candidates with get_provider_profile, then compare the shortlist with compare_providers. Use the returned provider IDs (handles). Check task fit, delivery type (provider / MCP server / API / platform), available pricing and billing units before recommending a product. Missing prices are unknown, not zero; contact-sales pricing is not a numeric quote; a related search result is a candidate to assess, not proof it fulfils every requirement. Use market_report or price_benchmark when market context is needed (price_benchmark takes `query`). research_capability is an optional combined research route (market + pricing context + shortlist in one call). get_price_index / get_price_index_history return the Agent Economy Price Index — an index level, never a market price; pass provider_type=agent|mcp for one delivery type. Demand tools (demand_signals, market_gaps) describe limited evidence from Agentery's own traffic and are not prerequisites for product selection. suggest_alternatives finds substitutes for one known provider (cheaper_only only when a valid price comparison exists). Use report_outcome only after actually using a listed provider. Which tool when: a task and no product names, search_providers; one named product, get_provider_profile (get_provider is only the short directory card); two to six named products, compare_providers; substitutes for one product, suggest_alternatives; whether a price or quote is fair for a type of product, get_group_fair_price; a price range for a capability split by agent and MCP, price_benchmark; the market behind a task, find_market or market_report; a question the catalogue cannot answer yet, request_research, then get_research with its job_id. If a call fails, the error carries code, fix and retryable: apply the fix rather than guessing. Worked examples: https://agentery.com/connect#examples. Public tools are rate-limited to 30 calls/min per IP (60 for outcome contributors). rank_providers_for_workflow is partner-only (Bearer key). Integration guidance and worked examples: https://agentery.com/connect",
+  "tools": [
+   {
+    "name": "research_capability",
+    "description": "Gives a one-call first overview of a buying task: market prices, a short priced shortlist and alternatives together. Use this when you want a quick picture: the closest listings (matched on what they do, no fixed categories), price range and median for comparable products (with n), and a shortlist with observed prices, market_position (below / in line / above market) and handles in compare_ready, plus suggested_alternatives. It does not run the comparison. Use search_providers → get_provider_profile → compare_providers instead for careful selection; price_benchmark to judge one price. Accepts `task` (aliases: query, q).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "cohort_ref": {
+       "type": "string",
+       "description": "Optional (1.17.0): reuse the exact set of comparable providers selected by an earlier price_benchmark / market_report / research_capability call."
+      },
+      "task": {
+       "type": "string",
+       "description": "Required — the natural-language capability/task, e.g. 'reconcile supplier invoices' or 'litigation-analysis provider'. Aliases: query, q."
+      },
+      "buyer_tier": {
+       "type": "string",
+       "enum": [
+        "individual",
+        "pro",
+        "team",
+        "enterprise"
+       ],
+       "description": "Optional buyer tier to price against ('team' = Team/SME)."
+      },
+      "max_monthly_usd": {
+       "type": "number",
+       "description": "Optional budget ceiling in USD/month — filters the shortlist and drives suggested_alternatives."
+      },
+      "integrations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Optional required integrations, e.g. [\"zendesk\",\"slack\"] — soft preference; integration status is reported per provider."
+      },
+      "sort": {
+       "type": "string",
+       "enum": [
+        "match",
+        "price_asc"
+       ],
+       "description": "Shortlist ordering. Default 'match'."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Shortlist size (1-12, default 5)."
+      },
+      "provider_type": {
+       "type": "string",
+       "enum": [
+        "auto",
+        "agent",
+        "mcp",
+        "api",
+        "any"
+       ],
+       "description": "Preferred delivery type. 'auto' (default) infers from the task; note 'AI agent' phrasing is treated as generic (neutral), not an agent-only filter. When a type is explicit (mcp/api/agent) matching providers are SOFT-RANKED to the top and the rest are kept as clearly-labelled cross_type_alternative entries — never hard-filtered (no zero-result cliff), and the functional match is never changed. Every provider is labelled with provider_type (public values: agent | mcp | api | unknown) + type_match_score; provider_type{type_rank_boost_applied, boosted_provider_type, result_counts_by_type} is returned."
+      },
+      "response_mode": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "description": "'summary' (default) or 'full' (adds tier cohorts, coverage and raw results)."
+      },
+      "request_ref": {
+       "type": "string",
+       "description": "Optional task reference (rq_ + 12 hex) from an earlier answer. Continues that task: its remembered facts (quantities, budget, requirements, benchmark selection) apply to this call, and the answer keeps the same request_ref."
+      }
+     },
+     "required": [
+      "task"
+     ]
+    },
+    "title": "Research a capability",
+    "annotations": {
+     "title": "Research a capability",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "search_providers",
+    "description": "Finds products (AI products, AI agents, MCP servers or APIs) that do a task and returns a ranked shortlist; start here to choose a product. Use this when someone wants candidates, e.g. 'MCP server to reply to Zendesk tickets'. Each result has what it does, a fit label (match / partial / weak, naming any mismatch), delivery type, price status (known / free / contact_sales / unknown; unknown is never free) and links. Requirements in the wording are checked per result; unverified ones are marked unknown. Results are candidates: open strong ones with get_provider_profile, compare finalists with compare_providers. Thin coverage returns no_match, never padding. Use research_capability instead for a one-call overview with prices; price_benchmark, find_market or get_group_fair_price when the question is cost.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "REQUIRED. Free-text description of the product job you are buying, e.g. 'customer support provider with Zendesk integration' or 'supplier invoice reconciliation'. Not for questions about Agentery itself (upvotes, endpoints): those return status unsupported_request."
+      },
+      "filters": {
+       "type": "object",
+       "description": "Optional: industry_fit[], integrations_available[], entity_type[] (agent|tool|infrastructure|service|marketplace|content-community), autonomy_level[] (assistant|workflow automation|agentic|infrastructure), minimum_evidence_quality (low|medium|high)"
+      },
+      "max_monthly_usd": {
+       "type": "number",
+       "description": "Drop providers whose observed lowest paid tier exceeds this (USD/month). Providers with no observed public price still pass unless require_public_price is true."
+      },
+      "require_public_price": {
+       "type": "boolean",
+       "description": "Only return providers with an observed public price (default false)"
+      },
+      "billing": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only providers with one of these observed billing models, e.g. [\"free\",\"freemium\",\"subscription\",\"usage\"]"
+      },
+      "sort": {
+       "type": "string",
+       "enum": [
+        "match",
+        "price_asc"
+       ],
+       "description": "match (default) or price_asc (cheapest observed price first; unpriced providers last)"
+      },
+      "provider_type": {
+       "type": "string",
+       "enum": [
+        "agent",
+        "mcp",
+        "api",
+        "platform",
+        "infrastructure"
+       ],
+       "description": "Filter to one provider type — the audited classification dimension (same as the website type chips and AEPI facets); result labels always match this filter. Omit for all types."
+      },
+      "deployment": {
+       "type": "string",
+       "enum": [
+        "hosted",
+        "self_hosted",
+        "both",
+        "unknown"
+       ],
+       "description": "Optional (1.10.0). Keep only providers whose EVIDENCED deployment model matches: hosted = a vendor-published MCP endpoint exists (connect, nothing to install); self_hosted = a published install line (npx/uvx/docker/pip/git clone) and no vendor endpoint; both = both are documented; unknown = no evidence held. 'both' listings satisfy hosted and self_hosted. Evidence comes from the vendor's own pages and source directories (Glama/MCP registry attributes) — never guessed from a repository's existence."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results (1-50, default 20)"
+      },
+      "request_ref": {
+       "type": "string",
+       "description": "Optional task reference (rq_ + 12 hex) from an earlier answer. Continues that task: its remembered facts (quantities, budget, requirements, benchmark selection) apply to this call, and the answer keeps the same request_ref."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "title": "Search providers",
+    "annotations": {
+     "title": "Search providers",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "find_market",
+    "description": "Maps a task to its market: who competes there, how many are priced, and the price level per buyer tier. Use this when someone asks who competes in a space or what a kind of product costs, e.g. 'tools that monitor competitor pricing'. Returns the market label (nearest providers by meaning, no fixed categories), provider and priced counts, the nearest providers with observed prices, and pricing_by_tier (median, p25/p75, range and n per buyer tier). When nothing is close it returns no_match or thin_coverage and withholds pricing rather than invent a market. Use market_report instead for the full measured breakdown; research_capability for market plus shortlist in one call; price_benchmark to judge a specific price.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "description": "REQUIRED. A natural-language task, capability or service in plain words, e.g. 'reconcile supplier invoices'. Call as {\"task\": \"…\"}; an empty call returns status needs_input with an example and searches nothing."
+      },
+      "query": {
+       "type": "string",
+       "description": "Alias for task (back-compat only) — prefer task"
+      }
+     },
+     "required": [
+      "task"
+     ]
+    },
+    "title": "Find a market",
+    "annotations": {
+     "title": "Find a market",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "compare_providers",
+    "description": "Use to compare 2–6 shortlisted listings side by side — plan-level prices (e.g. the Pro tier), capabilities, deployment, licence and how to connect — or to check a quote against alternatives. Inputs resolve to real listings by exact handle, then exact name, never a silent fuzzy swap: unknown inputs come back in unresolved_inputs with suggested_matches and a corrected_call; if only one input is real it is compared with its nearest market peers (comparison_status says so); if none resolve, comparison_status is insufficient_valid_providers. Mixed delivery types are flagged: a hosted agent and an MCP server are not directly equivalent, so compare hosted prices with hosted prices. Over-budget or weak matches get suggested_alternatives. Returns a concise decision view by default (fit, observed plans and prices with source and date, job cost, requirement verdicts, unknowns); pass detail:\"full\" for every field. Accepts `provider_ids` (aliases: handles, ids, or a comma-separated string).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "requirements": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Optional. Mandatory requirements as plain phrases (e.g. \"sanctions screening\", \"documented MCP interface\"). Adds an ADDITIVE service_view: per-provider evidence matrix from stored first-party page text — supported / not_supported / unknown with the excerpt and observation date; unknown never means unsupported."
+      },
+      "service": {
+       "type": "string",
+       "enum": [
+        "supplier-verification",
+        "contract-review",
+        "developer-capabilities",
+        "cheaper-alternatives"
+       ],
+       "description": "Optional. A service recipe whose fixed requirements and evidence fields are applied (see service_view.requirements)."
+      },
+      "task": {
+       "type": "string",
+       "description": "Optional. The buyer's job in plain words; used as the service_view heading."
+      },
+      "optional": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Optional preferences: reported in service_view but never gating."
+      },
+      "detail": {
+       "type": "string",
+       "enum": [
+        "concise",
+        "full"
+       ],
+       "description": "Optional. concise (default): the decision view. full: the complete comparison (all plan lines, evidence checks, deployment, licence, how to connect, requirement evidence excerpts)."
+      },
+      "provider_ids": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "2-6 provider handles from search_providers/market_gaps, e.g. [\"openhands\",\"lexaclaw\"]"
+      },
+      "request_ref": {
+       "type": "string",
+       "description": "Optional task reference (rq_ + 12 hex) from an earlier answer. Continues that task: its remembered facts (quantities, budget, requirements, benchmark selection) apply to this call, and the answer keeps the same request_ref."
+      }
+     },
+     "required": [
+      "provider_ids"
+     ]
+    },
+    "title": "Compare providers",
+    "annotations": {
+     "title": "Compare providers",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_price_index",
+    "description": "Use when asked whether prices of AI agents, tools or MCP servers are rising or falling overall. Returns the current Agent Economy Price Index (AEPI), a chained quoted-price index of observed agent and MCP pricing in US dollars (changes in the publicly quoted price of the same product and offer; base 100 = 30 Jun 2026; an index level, not a price), with 1-, 7- and 30-day change, plus the same for the four buyer tiers (Individual, Pro, Team/SME, Enterprise). Every response names its release_id, reference_currency and methodology_revision; response_mode=full adds fx_attribution (exact native-price and exchange-rate contributions per window: log changes add, level factors multiply) and currency_evidence. provider_type=agent|mcp gives the standalone index for that delivery type; tier narrows to one tier. For the trend over time use get_price_index_history; for what a particular kind of product costs use get_group_fair_price or price_benchmark.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "benchmark_id": {
+       "type": "string",
+       "description": "Optional: a private custom benchmark token (cb_…) from create_custom_benchmark — returns that cohort's current index instead of the economy index. Cannot be combined with niche."
+      },
+      "provider_type": {
+       "type": "string",
+       "enum": [
+        "all",
+        "agent",
+        "mcp",
+        "subscription",
+        "hybrid",
+        "one_off",
+        "payg"
+       ],
+       "description": "'all' (default) = the combined whole-economy index; 'agent' or 'mcp' = the standalone index over just that delivery type (own base 100); 'payg' = the standalone pay-as-you-go sub-index (usage rates purchasable without a subscription, engine v2). Agents and MCPs price and move differently, so an MCP buyer should read the 'mcp' index and an agent buyer the 'agent' index."
+      },
+      "tier": {
+       "type": "string",
+       "enum": [
+        "all",
+        "individual",
+        "pro",
+        "team",
+        "enterprise"
+       ],
+       "description": "Filter to one buyer tier ('team' = Team/SME). Default 'all'."
+      },
+      "response_mode": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "description": "'summary' (default) or 'full' (adds exact native / FX / combined contributions for the 1d, 7d and 30d windows with their from/to days and units, the currency-evidence split of the index weight, and the full methodology revision note)."
+      }
+     }
+    },
+    "title": "Get price index",
+    "annotations": {
+     "title": "Get price index",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "price_benchmark",
+    "description": "Judges a specific price or quote against the closest comparable products by what they do (no fixed categories), in the buyer's tier and pricing unit. Use this when asked whether a price is fair or what a capability typically costs, e.g. 'Is $49/month reasonable for an AI SDR for a small team?'. Pass the capability as `query` (aliases: task, niche). Returns observed prices of comparable products — median, p25/p75, range, mean, stdev and n — split by delivery type (agent | mcp) and buyer tier (individual / pro / team_sme / enterprise), never blended across incompatible pricing units. A benchmark describes an observed sample; it is not a quote and not evidence of willingness to pay. Set provider_type and buyer_tier when known. If nothing priced is close it returns resolved:false with a note, never an invented figure. Use get_group_fair_price instead for a broad group-wide guide; find_market for who competes.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "The capability to benchmark, in natural language, e.g. 'AI code review' or 'supplier invoice reconciliation'. Preferred input."
+      },
+      "task": {
+       "type": "string",
+       "description": "Alias of `query` (same text)."
+      },
+      "niche": {
+       "type": "string",
+       "description": "Legacy alias of `query`, kept for older clients — prefer `query`."
+      },
+      "sector": {
+       "type": "string",
+       "description": "Sector name, e.g. 'legal' (ignored if a query is given)"
+      },
+      "provider_type": {
+       "type": "string",
+       "enum": [
+        "agent",
+        "mcp",
+        "api",
+        "all"
+       ],
+       "description": "Delivery type being priced. Set when the user says provider, MCP or API. Omit (or 'all') to get the per-type matrix instead of a blended figure. 'api' is recognised but not yet a separate commercial cohort (folded into provider)."
+      },
+      "buyer_tier": {
+       "type": "string",
+       "enum": [
+        "individual",
+        "pro",
+        "team_sme",
+        "enterprise",
+        "all"
+       ],
+       "description": "Buyer tier being priced. Set when the user describes who is buying (an individual, a professional, a team/SME, or an enterprise). An individual licence must never be represented by the SME or enterprise price."
+      },
+      "pricing_unit": {
+       "type": "string",
+       "enum": [
+        "flat",
+        "per_seat",
+        "per_agent",
+        "per_call",
+        "per_ticket",
+        "per_conversation",
+        "per_resolution",
+        "per_transaction",
+        "per_invoice",
+        "per_document",
+        "per_page",
+        "per_minute",
+        "per_message",
+        "per_email",
+        "per_credit",
+        "per_token",
+        "percent_of_spend"
+       ],
+       "description": "Billing unit the benchmark is FOR (1.17.0: honoured). Selects the comparable observations; units are never converted into one another, and a thin unit returns its observations and the gap — never a flat-monthly substitute. A query such as 'cost per support ticket' sets it when omitted."
+      },
+      "cohort_ref": {
+       "type": "string",
+       "description": "Optional (1.17.0): reuse the exact set of comparable providers selected by an earlier price_benchmark / market_report / research_capability call (its cohort_ref), instead of re-selecting the market from new wording."
+      },
+      "proposed_price": {
+       "type": "number",
+       "description": "Optional (sellers): a proposed price to position against the selected comparable offers (same unit; currency below). Returns where it sits in the observed range; a percentile only with ≥5 comparable providers. A market reference, not an optimal price."
+      },
+      "currency": {
+       "type": "string",
+       "description": "Currency of proposed_price (ISO code, default USD)."
+      },
+      "commitment": {
+       "type": "string",
+       "enum": [
+        "monthly",
+        "annual"
+       ],
+       "description": "Billing commitment of proposed_price (default monthly)."
+      },
+      "offset": {
+       "type": "number",
+       "description": "Paging offset over the selected observations in full mode."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Observations per page in full mode (1–100, default 50)."
+      },
+      "response_mode": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "description": "'summary' (default): the selected benchmark with its top observations. 'full': every included observation (paged), with plan, native price, unit, commitment, source and observed date."
+      },
+      "request_ref": {
+       "type": "string",
+       "description": "Optional task reference (rq_ + 12 hex) from an earlier answer. Continues that task: its remembered facts (quantities, budget, requirements, benchmark selection) apply to this call, and the answer keeps the same request_ref."
+      }
+     }
+    },
+    "title": "Benchmark a price",
+    "annotations": {
+     "title": "Benchmark a price",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "request_research",
+    "description": "Use when a buying decision hinges on one specific fact about one listing that its profile does not settle, e.g. {\"provider_id\":\"flux_operator\",\"requirement\":\"Is there a Helm chart for Kubernetes?\"} or 'Does the Business plan go to checkout or to contact sales?'. Agentery reads the vendor's own pages, its code repository (read, never run) and the pricing page's buttons, and answers yes / no / partly / unknown with quotes, URLs and observation dates. Usually answered in this response within about 15 s; otherwise call get_research with the job_id after poll_after_seconds. Identical questions share one job. A found statement is the vendor's own claim, not independent verification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "provider_id": {
+       "type": "string",
+       "description": "The listing (provider_id from search_providers)."
+      },
+      "requirement": {
+       "type": "string",
+       "description": "The requirement in plain words, e.g. 'EU data residency', 'integrates with Slack', 'SOC 2 Type II', 'commercial use permitted'."
+      },
+      "request_ref": {
+       "type": "string",
+       "description": "Optional: the request_ref of the answer that raised the question."
+      }
+     },
+     "required": [
+      "provider_id",
+      "requirement"
+     ]
+    },
+    "title": "Request product research",
+    "annotations": {
+     "title": "Request product research",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_research",
+    "description": "Status and result of a research job created by request_research. status: queued / running / answered / partly_answered / still_unknown / failed; phase: queued | running | retry_scheduled | completed_answer | completed_unknown | failed. Poll no more often than poll_after_seconds — polling is free and never repeats the work. result: answer (yes/no/partly/unknown), short_answer, evidence per claim (quote, URL, observed date; file path and revision for repositories; element for pricing-page buttons), facts assessed separately (e.g. Dockerfile vs published image vs Helm chart), conflicts and what remains unresolved.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "job_id": {
+       "type": "string",
+       "description": "The job_id from request_research (rj_ + 12 hex)."
+      }
+     },
+     "required": [
+      "job_id"
+     ]
+    },
+    "title": "Get research result",
+    "annotations": {
+     "title": "Get research result",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "stop_research_updates",
+    "description": "Stop watching a research job (the result stays retrievable with get_research).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "job_id": {
+       "type": "string",
+       "description": "The job_id from request_research (rj_ + 12 hex)."
+      }
+     },
+     "required": [
+      "job_id"
+     ]
+    },
+    "title": "Stop research updates",
+    "annotations": {
+     "title": "Stop research updates",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "refine_results",
+    "description": "Use when an earlier search_providers or research_capability answer missed what was meant: pass its request_ref and the correction in plain words (e.g. 'must integrate with Slack', 'budget is $20/month', 'data must stay in the EU'). Agentery re-runs the search with the changed constraints (the others are kept) and returns the new answer plus what changed. source: 'human' (the user's words), 'agent' (your assessment, default) or 'follow_up'. Agentery sees only the request and correction you send, never your wider conversation. Task answers (search_providers, compare_providers, research_capability, price_benchmark, market_report) carry ONE request_ref plus a 'conversation' block: the facts remembered for the task, any optional clarification questions (at most two, one round) and the exact refine_results call to continue. Answer with plain words, 'unknown' or 'skip'; source is one of human, agent, follow_up. Pass the same request_ref to another task tool to continue the task there. References expire 24 h after the last turn.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "request_ref": {
+       "type": "string",
+       "description": "The request_ref from the earlier answer (rq_ + 12 hex characters)."
+      },
+      "correction": {
+       "type": "string",
+       "description": "What was missing or wrong, in plain words."
+      },
+      "source": {
+       "type": "string",
+       "enum": [
+        "human",
+        "agent",
+        "follow_up"
+       ],
+       "description": "Where the correction came from. Default 'agent'."
+      }
+     },
+     "required": [
+      "request_ref",
+      "correction"
+     ]
+    },
+    "title": "Refine search results",
+    "annotations": {
+     "title": "Refine search results",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_group_fair_price",
+    "description": "Gives the broad group-wide fair price for a kind of product: the median entry monthly price per buyer tier across its whole product group. Use this when you want a general price guide: give a task or product type (or a group_id from the group price league) and get the fair price for each buyer tier (individual, pro, team / small business, enterprise) with its typical range, the group's typical payment models (free, subscription, usage, one-time, contact sales), usage and one-time medians where at least 3 listings publish them, and the group's 90-day price-index change. Groups are built from what products do, not from price. Medians of current published prices only; individual listings are not returned. Call with no arguments to list group IDs. Use price_benchmark instead to check a specific quote against the closest comparables; search_providers for candidates.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "The task or product type, e.g. 'AI meeting notes for sales teams'."
+      },
+      "group_id": {
+       "type": "number",
+       "description": "Optional: a group id from agentery.com/aepi/groups or from get_provider_profile's product_group."
+      }
+     }
+    },
+    "title": "Get group fair price",
+    "annotations": {
+     "title": "Get group fair price",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_price_index_history",
+    "description": "Use to show how AI agent and MCP prices have moved over time: the dated Agent Economy Price Index series, the same chained quoted-price series (US dollars, base 100 = 30 Jun 2026) agentery.com/aepi charts. Points are index levels, never prices; calendar days with no published observation are listed in gaps with their reason, never interpolated. Whole-economy series by default; `tier` for one buyer tier; provider_type agent|mcp for one delivery type (own base 100); `period` 30d (default) / 90d / all; response_mode summary (default) or full (adds per-day native / FX / combined components and the window's exact attribution). Thin data returns insufficient_history, never an invented series. For what one capability costs use price_benchmark or market_report. Also reads a private custom benchmark's history via benchmark_id.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "benchmark_id": {
+       "type": "string",
+       "description": "Optional: a private custom benchmark token (cb_…) — returns that cohort's dated series instead of the economy series. Cannot be combined with niche."
+      },
+      "provider_type": {
+       "type": "string",
+       "enum": [
+        "all",
+        "agent",
+        "mcp",
+        "subscription",
+        "hybrid",
+        "one_off",
+        "payg"
+       ],
+       "description": "'all' (default) = the combined whole-economy series, or the standalone 'agent' / 'mcp' / 'subscription' / 'hybrid' / 'one_off' / 'payg' = the billing-LENS series (they cut across provider/mcp; a rate sits in one delivery type AND one lens; own base 100) — 'payg' (pay-as-you-go, engine v2) series (own base 100)."
+      },
+      "tier": {
+       "type": "string",
+       "enum": [
+        "all",
+        "individual",
+        "pro",
+        "team",
+        "enterprise"
+       ],
+       "description": "Return one buyer tier's series ('team' = Team/SME). Default 'all' = the headline series."
+      },
+      "period": {
+       "type": "string",
+       "enum": [
+        "30d",
+        "90d",
+        "all"
+       ],
+       "description": "History window. Default '30d'."
+      },
+      "response_mode": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "description": "'summary' (default, compact) or 'full' (adds per-day native / FX / combined log changes and levels, the window's exact attribution and the currency-evidence split)."
+      },
+      "since": {
+       "type": "string",
+       "description": "Optional, for providers that poll: the `cursor` (or `next_cursor`) from your previous call, or an ISO timestamp of your last check. Returns only what changed since then: new_points (newly published days), corrected_points (earlier days whose published level changed, with previous_level) and withdrawn_points, plus next_cursor for the next call. status 'no_changes' when nothing changed. Omit for the full history."
+      }
+     }
+    },
+    "title": "Get price index history",
+    "annotations": {
+     "title": "Get price index history",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "market_gaps",
+    "description": "Finds jobs callers ask for that few paid products serve: requests seen on this MCP server, clustered by meaning, that sit far from any paid provider. Use this when a seller or investor asks where under-served opportunities are. Returns the request phrasing, distinct_callers, raw_requests, the nearest paid provider and its similarity (low = under-served). headline = jobs asked by two or more callers; weak_leads = one caller; information_requests = questions about a named product. These are research leads from limited traffic, not buyer counts or proof of a market-wide gap; few or none is normal while volume is low. Marked test traffic is excluded. No arguments needed. Use demand_signals instead when you want searches that returned no or only weak results.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "sector": {
+       "type": "string",
+       "description": "Optional sector filter, e.g. 'legal', 'healthcare'"
+      },
+      "rank": {
+       "type": "string",
+       "enum": [
+        "gaps",
+        "hot"
+       ],
+       "description": "gaps (default): whitespace with money, crowded excluded. hot: most active by market pulse, crowding ignored."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max gaps (1-50, default 15)"
+      },
+      "include_own": {
+       "type": "boolean",
+       "description": "Also list leads asked ONLY by you (default false: one caller's repeated searches are not independent demand; they are counted in your_own_only_excluded)"
+      }
+     }
+    },
+    "title": "Find market gaps",
+    "annotations": {
+     "title": "Find market gaps",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "suggest_alternatives",
+    "description": "Find related alternatives to a known provider, ranked by text-embedding nearness to that provider's OWN profile (NO category lookup), each with observed price, endpoint liveness, community upvotes and how_to_connect (website, docs, mcp endpoint). For cheaper_only, inspect whether the reference price and candidate prices support a valid comparison: an empty response may reflect a missing or incompatible reference price rather than the absence of alternatives (the response says which). Accepts `agent_id` (aliases: handle, id). These substitutes are also surfaced inside research_capability and compare_providers. Each alternative also carries `deployment` (evidenced model) and how_to_connect.install / repository (1.10.0).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "agent_id": {
+       "type": "string",
+       "description": "Handle of the provider to find substitutes for, e.g. 'openhands'"
+      },
+      "cheaper_only": {
+       "type": "boolean",
+       "description": "Only keep alternatives priced below the subject's lowest monthly price. Free/freemium providers always qualify; providers with no observed price are excluded. Default false."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max alternatives (1-10, default 5)"
+      }
+     },
+     "required": [
+      "agent_id"
+     ]
+    },
+    "title": "Find provider alternatives",
+    "annotations": {
+     "title": "Find provider alternatives",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "demand_signals",
+    "description": "Lists searches that found nothing good: queries by external callers in the last 90 days that returned no provider or only weak matches (best relevance below 0.62). Use this when you want searches Agentery could not answer well, as generalised job labels ranked by distinct callers. Most entries come from a single caller: treat those as leads. These are limited coverage signals from Agentery's own callers — not proof that a product does not exist, and not proof that a market has paying demand. Not a prerequisite for choosing a product. Empty args ({}) return the current list; an empty response means insufficient qualifying evidence (status insufficient_evidence + next_step) — it is never filled from search popularity, page views or trending queries. Use market_gaps instead for jobs that few paid products serve.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "number",
+       "description": "Max signals (1-50, default 20)"
+      },
+      "include_own": {
+       "type": "boolean",
+       "description": "Also list signals that come ONLY from your own searches (default false; counted in your_own_only_excluded)"
+      }
+     }
+    },
+    "title": "View demand signals",
+    "annotations": {
+     "title": "View demand signals",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "report_outcome",
+    "description": "Report the result of ACTUALLY USING a listed provider for a task. Testing Agentery's connection or retrieval does not establish that the listed provider worked — do not report those. Reports are self-reported evidence subject to eligibility checks: they are correlated with your recent retrievals, improve ranking accuracy, and unlock higher rate limits for contributors. Only reports we can match to one of YOUR retrievals (search_providers / get_provider_profile / compare_providers / suggest_alternatives naming that provider, last 48h) carry weight; unmatched reports are stored but unweighted. Aggregates surface as `reported_success` on profile/comparison cards once 5+ distinct reporters exist (90-day window). Callers with 5+ correlated reports in 30 days get a doubled per-minute rate limit. Send an x-agentery-key header to keep one reporter identity across IPs (it is stored only as a hash).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "agent_id": {
+       "type": "string",
+       "description": "Handle of the provider you used, as returned by search_providers/get_provider_profile/compare_providers"
+      },
+      "outcome": {
+       "type": "string",
+       "enum": [
+        "worked",
+        "failed",
+        "partial"
+       ],
+       "description": "Did the provider accomplish the task you hired it for?"
+      },
+      "task_type": {
+       "type": "string",
+       "description": "Optional short task label, e.g. 'code-review', 'lead-enrichment'"
+      },
+      "error_class": {
+       "type": "string",
+       "description": "Optional failure class, e.g. 'timeout', 'auth', 'wrong-output', 'endpoint-down'"
+      },
+      "latency_ms": {
+       "type": "number",
+       "description": "Optional end-to-end latency of the provider in milliseconds"
+      },
+      "note": {
+       "type": "string",
+       "description": "Optional free-text detail (capped at 300 chars)"
+      }
+     },
+     "required": [
+      "agent_id",
+      "outcome"
+     ]
+    },
+    "title": "Report provider outcome",
+    "annotations": {
+     "title": "Report provider outcome",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_provider_profile",
+    "description": "Use to check one specific listing before recommending or connecting it: plans and prices with billing units, what it does, integrations, deployment (hosted / self_hosted / both / unknown, with evidence), licence (named licence only), liveness and how to connect (website, docs, MCP endpoint with a copy-paste config_snippet, A2A agent card, API, install). Fields are null when the vendor publishes nothing; nothing is guessed. price_applies_to flags a stored price that belongs to the vendor's platform rather than this connector. product_group names the listing's product group with its fair price per buyer tier and 90-day price-index change. reported_success stays null until 5+ distinct reporters in 90 days; after actually using a listing, call report_outcome.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "provider_id": {
+       "type": "string",
+       "description": "The provider_id/handle returned by search_providers or compare_providers"
+      }
+     },
+     "required": [
+      "provider_id"
+     ]
+    },
+    "title": "Get provider profile",
+    "annotations": {
+     "title": "Get provider profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_provider",
+    "description": "For buying decisions prefer get_provider_profile (prices, deployment, evidence); use this only for the short public directory card of one provider by handle or registration number: bio, source URLs, X-verification status, entity type, community rating and structured profile when available.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "handle": {
+       "type": "string",
+       "description": "Provider handle, e.g. 'openhands'"
+      },
+      "regNum": {
+       "type": "number",
+       "description": "Registration number, e.g. 2432"
+      }
+     }
+    },
+    "title": "Get provider details",
+    "annotations": {
+     "title": "Get provider details",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "market_report",
+    "description": "Measures ONE market in depth before building or investing: the full observed price distribution by provider type and buyer tier, and the providers competing there. Use this when you need detailed market numbers, not a quick map. The market is the semantic neighbourhood of your query (nearest providers by text embedding, NO fixed category). Every field is MEASURED: the observed-pricing benchmark (median, mean, stdev, p25/p75, min–max range and n via the canonical pricing engine), how many providers are in the neighbourhood and how many are priced, and the top competing providers with observed price and relevance. Pass `query` (e.g. 'customer support chatbot'). Use find_market instead for a quick market map; research_capability for market + pricing + a ready shortlist in one call; search_providers to pick a product.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Natural-language capability or market, e.g. 'customer support chatbot' or 'ai phishing detection'."
+      },
+      "response_mode": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "description": "'summary' (DEFAULT): neighbourhood counts, per-type/per-tier price cohorts and the top 12 providers. 'full' (1.17.0): EVERY member of the neighbourhood, paged with offset / limit, each with its price reading (plan, unit, currency, source, observed date)."
+      },
+      "cohort_ref": {
+       "type": "string",
+       "description": "Optional (1.17.0): reuse the exact set of comparable providers selected by an earlier price_benchmark / market_report / research_capability call (its cohort_ref), instead of re-selecting the market from new wording."
+      },
+      "offset": {
+       "type": "number",
+       "description": "full mode: paging offset over members (default 0)."
+      },
+      "limit": {
+       "type": "number",
+       "description": "full mode: members per page (1–150, default 50)."
+      },
+      "request_ref": {
+       "type": "string",
+       "description": "Optional task reference (rq_ + 12 hex) from an earlier answer. Continues that task: its remembered facts (quantities, budget, requirements, benchmark selection) apply to this call, and the answer keeps the same request_ref."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "title": "Get market report",
+    "annotations": {
+     "title": "Get market report",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "create_custom_benchmark",
+    "description": "Use when someone wants to keep watching the prices of products they choose (e.g. five named writing tools). Creates a PRIVATE custom benchmark (a saved, calculated peer cohort) over Agentery's data — no account needed. Two modes: (A) explicit members: pass `members` (a list of exact handles; product names/domains resolve where unambiguous). (B) fork a market: pass `base_niche` (its slug) plus optional `remove`/`add`. Returns a one-time secret `benchmark_id` (cb_… token) — store it; it's your only key. Use it later in get/update/delete and in market_report/get_price_index/get_price_index_history. Ambiguous names are returned as candidates, never silently resolved; unresolved inputs block creation unless allow_partial:true. All prices/history are computed from Agentery's immutable observations; canonical market data is never changed.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "Optional private label"
+      },
+      "members": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Mode A: exact handles (preferred), product names or domains"
+      },
+      "base_niche": {
+       "type": "string",
+       "description": "Mode B: slug of the canonical market to fork"
+      },
+      "remove": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Mode B: members to drop from the forked market"
+      },
+      "add": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "members to add"
+      },
+      "allow_partial": {
+       "type": "boolean",
+       "description": "Create with only the resolved members when some inputs don't resolve (default false)"
+      }
+     }
+    },
+    "title": "Create custom benchmark",
+    "annotations": {
+     "title": "Create custom benchmark",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "get_custom_benchmark",
+    "description": "Get a private custom benchmark's current report: members, current stats (headline median/quartiles only when ≥3 comparable priced members — monthly, per-seat and per-call prices are never blended), buyer-tier / provider-type / pricing-unit cohorts, historical index, and data coverage. Pass `benchmark_id` (your cb_ token) as an ARGUMENT.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "benchmark_id": {
+       "type": "string",
+       "description": "Your cb_ token (bearer secret; passed as an argument, never a URL)"
+      },
+      "version": {
+       "type": "number",
+       "description": "Optional benchmark version (default latest)"
+      },
+      "as_of": {
+       "type": "string",
+       "description": "Optional YYYY-MM-DD — reproduce the exact stats + index as they were on that date, using this version's fixed membership"
+      },
+      "response_mode": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "description": "full includes the index series"
+      }
+     },
+     "required": [
+      "benchmark_id"
+     ]
+    },
+    "title": "Get custom benchmark",
+    "annotations": {
+     "title": "Get custom benchmark",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "update_custom_benchmark",
+    "description": "Add/remove members or rename a custom benchmark. Creates a NEW immutable version (the previous version stays fully reproducible) and returns the exact change-impact on the median/quartiles/index. Pass `benchmark_id`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "benchmark_id": {
+       "type": "string",
+       "description": "Your cb_ token"
+      },
+      "add": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Provider ids (handles) to add to the benchmark"
+      },
+      "remove": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Provider ids (handles) to remove from the benchmark"
+      },
+      "rename": {
+       "type": "string",
+       "description": "New name for the benchmark"
+      }
+     },
+     "required": [
+      "benchmark_id"
+     ]
+    },
+    "title": "Update custom benchmark",
+    "annotations": {
+     "title": "Update custom benchmark",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   },
+   {
+    "name": "delete_custom_benchmark",
+    "description": "Disable access to a custom benchmark. Keeps only a minimal audit record; no underlying Agentery data is touched. Pass `benchmark_id`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "benchmark_id": {
+       "type": "string",
+       "description": "Your cb_ token"
+      }
+     },
+     "required": [
+      "benchmark_id"
+     ]
+    },
+    "title": "Delete custom benchmark",
+    "annotations": {
+     "title": "Delete custom benchmark",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true,
+     "description": "JSON result; identical to the text content block."
+    }
+   }
+  ]
+ }
+}

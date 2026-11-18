@@ -1,0 +1,1079 @@
+{
+ "url": "https://mcp.entscheidsuche.ch/mcp",
+ "doc": {
+  "name": "entscheidsuche",
+  "version": "1.27.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "MCP-Server für entscheidsuche.ch — eine Suchmaschine für Schweizer Gerichtsentscheide, Gerichtsurteile, Rechtsprechung und Swiss case law. Die Tools helfen bei Entscheiden des Bundesgerichts (BGer, BGE) sowie kantonalen Gerichten, Obergerichten, Verwaltungsgerichten und weiteren Schweizer Gerichten. Unterstützt Volltextsuche, Geschäftsnummern- bzw. Urteilsnummern-Suche, Volltext-Abruf einzelner Entscheide, Hierarchien für Kantone und Gerichte sowie Facetten für Filter und Recherche.",
+  "tools": [
+   {
+    "name": "search",
+    "title": "Search decisions",
+    "description": "Full-text search across Swiss court judgments, court decisions and case law from entscheidsuche.ch. Covers decisions of the Federal Supreme Court (BGer, BGE) and cantonal courts such as Kantonsgericht, Obergericht or Verwaltungsgericht.\n\nTypical use cases:\n  - Search Federal Supreme Court judgments, BGE or rulings by topic\n  - Find Swiss case law on tenancy law, ZGB, OR, StGB or BV\n  - Verify case numbers, judgment numbers or citations\n  - Related tools: fetch_document, search_by_case_number, list_hierarchy, list_facets\n\nSearch syntax (Lucene query string):\n  - Phrase / case-number search: \"BGE 142 III 1\" (in quotes)\n  - Boolean operators: AND, OR, NOT (or +, -)\n  - Wildcards: * and ?\n  - The default operator between terms is AND.\n\nFilters are combined with AND. Use hierarchy IDs from `list_hierarchy` or `list_facets`.\n\nPagination: after the first call, pass the `next_cursor` value from the response as `search_after` in the next call.",
+    "inputSchema": {
+     "$defs": {
+      "Language": {
+       "description": "Verfügbare Sprachen der Entscheide.",
+       "enum": [
+        "de",
+        "fr",
+        "it"
+       ],
+       "title": "Language",
+       "type": "string"
+      }
+     },
+     "properties": {
+      "query": {
+       "default": "*",
+       "description": "Full-text query. \"...\" for phrases, AND/OR/NOT for Boolean operators, * and ? for wildcards. \"*\" matches everything.",
+       "title": "Query",
+       "type": "string"
+      },
+      "language": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/Language"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional preferred language for highlighting/display (de, fr, it). If omitted, the first available language field is returned — this does NOT filter; use `language_filter` for that."
+      },
+      "sort": {
+       "default": "relevance",
+       "description": "Optional sort order: 'relevance' | 'date' (decision date) | 'scrapedate'. Default is 'relevance'.",
+       "enum": [
+        "relevance",
+        "date",
+        "scrapedate"
+       ],
+       "title": "Sort",
+       "type": "string"
+      },
+      "size": {
+       "default": 20,
+       "description": "Results per page (1–100).",
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Size",
+       "type": "integer"
+      },
+      "search_after": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cursor from `next_cursor` of the previous response.",
+       "title": "Search After"
+      },
+      "decision_date_from": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lower bound for the decision date (YYYY-MM-DD, inclusive).",
+       "title": "Decision Date From"
+      },
+      "decision_date_to": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Upper bound for the decision date (YYYY-MM-DD, inclusive).",
+       "title": "Decision Date To"
+      },
+      "scrape_date_from": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lower bound for the scrape date (YYYY-MM-DD, inclusive).",
+       "title": "Scrape Date From"
+      },
+      "scrape_date_to": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Upper bound for the scrape date (YYYY-MM-DD, inclusive).",
+       "title": "Scrape Date To"
+      },
+      "hierarchy": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "List of hierarchy IDs (canton/court/chamber). Multiple IDs are combined with OR; with other filters, AND.",
+       "title": "Hierarchy"
+      },
+      "language_filter": {
+       "anyOf": [
+        {
+         "items": {
+          "$ref": "#/$defs/Language"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Filter by document language(s).",
+       "title": "Language Filter"
+      },
+      "include_aggregations": {
+       "default": false,
+       "description": "Include aggregations (distributions over the results).",
+       "title": "Include Aggregations",
+       "type": "boolean"
+      }
+     },
+     "title": "searchArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "$defs": {
+      "AggregationBucket": {
+       "properties": {
+        "key": {
+         "title": "Key"
+        },
+        "count": {
+         "title": "Count",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "key",
+        "count"
+       ],
+       "title": "AggregationBucket",
+       "type": "object"
+      },
+      "SearchHit": {
+       "description": "Ein einzelner Such-Treffer.",
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "title": {
+         "default": "",
+         "title": "Title",
+         "type": "string"
+        },
+        "abstract": {
+         "default": "",
+         "title": "Abstract",
+         "type": "string"
+        },
+        "text": {
+         "default": "",
+         "description": "Highlight excerpt from the full text.",
+         "title": "Text",
+         "type": "string"
+        },
+        "meta": {
+         "default": "",
+         "title": "Meta",
+         "type": "string"
+        },
+        "canton": {
+         "default": "",
+         "title": "Canton",
+         "type": "string"
+        },
+        "court": {
+         "default": "",
+         "description": "Court (derived from the ID).",
+         "title": "Court",
+         "type": "string"
+        },
+        "decision_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "ISO date YYYY-MM-DD.",
+         "title": "Decision Date"
+        },
+        "scrape_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "ISO date YYYY-MM-DD.",
+         "title": "Scrape Date"
+        },
+        "is_pdf": {
+         "default": false,
+         "title": "Is Pdf",
+         "type": "boolean"
+        },
+        "document_url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Direct download link to the original document.",
+         "title": "Document Url"
+        },
+        "original_url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "URL of the original source web page.",
+         "title": "Original Url"
+        },
+        "content_length": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Length of the indexed full text in characters. Only set by `fetch_document`.",
+         "title": "Content Length"
+        },
+        "text_truncated": {
+         "default": false,
+         "description": "True if the indexed full text was truncated by Elasticsearch at 100,000 characters. In that case `text` contains only the beginning of the decision; the complete document is available at `document_url`.",
+         "title": "Text Truncated",
+         "type": "boolean"
+        },
+        "sort": {
+         "anyOf": [
+          {
+           "items": {},
+           "type": "array"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Sort values of the hit (for search_after).",
+         "title": "Sort"
+        }
+       },
+       "required": [
+        "id"
+       ],
+       "title": "SearchHit",
+       "type": "object"
+      }
+     },
+     "description": "Antwort des `search`-Tools.",
+     "properties": {
+      "total": {
+       "title": "Total",
+       "type": "integer"
+      },
+      "hits": {
+       "items": {
+        "$ref": "#/$defs/SearchHit"
+       },
+       "title": "Hits",
+       "type": "array"
+      },
+      "next_cursor": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cursor for the next page. Pass it again as `search_after` in the next request. None if there are no further results.",
+       "title": "Next Cursor"
+      },
+      "aggregations": {
+       "anyOf": [
+        {
+         "additionalProperties": {
+          "items": {
+           "$ref": "#/$defs/AggregationBucket"
+          },
+          "type": "array"
+         },
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Aggregations"
+      }
+     },
+     "required": [
+      "total",
+      "hits"
+     ],
+     "title": "SearchResponse",
+     "type": "object"
+    }
+   },
+   {
+    "name": "search_by_case_number",
+    "title": "Search by case number",
+    "description": "Specialized search for case numbers, judgment numbers and BGE citations in Swiss court judgments. This tool automatically wraps the given case number in quotes and runs an exact phrase search, for example for 'BGE 142 III 1', '5A_396/2015' or similar references from the Federal Supreme Court (BGer, BGE) and cantonal case law.",
+    "inputSchema": {
+     "$defs": {
+      "Language": {
+       "description": "Verfügbare Sprachen der Entscheide.",
+       "enum": [
+        "de",
+        "fr",
+        "it"
+       ],
+       "title": "Language",
+       "type": "string"
+      }
+     },
+     "properties": {
+      "case_number": {
+       "description": "Case number (docket reference), BGE citation or judgment number, e.g. 'BGE 142 III 1' or '5A_396/2015'.",
+       "title": "Case Number",
+       "type": "string"
+      },
+      "language": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/Language"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional preferred language for highlighting/display (de, fr, it). If omitted, the first available language field is returned — this does NOT filter; use `language_filter` for that."
+      },
+      "sort": {
+       "default": "relevance",
+       "description": "Optional sort order: 'relevance' | 'date' (decision date) | 'scrapedate'. Default is 'relevance'.",
+       "enum": [
+        "relevance",
+        "date",
+        "scrapedate"
+       ],
+       "title": "Sort",
+       "type": "string"
+      },
+      "size": {
+       "default": 20,
+       "description": "Results per page (1–100).",
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Size",
+       "type": "integer"
+      },
+      "search_after": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cursor from `next_cursor` of the previous response.",
+       "title": "Search After"
+      },
+      "decision_date_from": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional lower bound for the decision date (YYYY-MM-DD).",
+       "title": "Decision Date From"
+      },
+      "decision_date_to": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional upper bound for the decision date (YYYY-MM-DD).",
+       "title": "Decision Date To"
+      },
+      "scrape_date_from": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional lower bound for the scrape date (YYYY-MM-DD).",
+       "title": "Scrape Date From"
+      },
+      "scrape_date_to": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional upper bound for the scrape date (YYYY-MM-DD).",
+       "title": "Scrape Date To"
+      },
+      "hierarchy": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional hierarchy IDs for canton/court/chamber.",
+       "title": "Hierarchy"
+      },
+      "language_filter": {
+       "anyOf": [
+        {
+         "items": {
+          "$ref": "#/$defs/Language"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional filter by document language(s).",
+       "title": "Language Filter"
+      },
+      "include_aggregations": {
+       "default": false,
+       "description": "Optionally include aggregations.",
+       "title": "Include Aggregations",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "case_number"
+     ],
+     "title": "search_by_case_numberArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "$defs": {
+      "AggregationBucket": {
+       "properties": {
+        "key": {
+         "title": "Key"
+        },
+        "count": {
+         "title": "Count",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "key",
+        "count"
+       ],
+       "title": "AggregationBucket",
+       "type": "object"
+      },
+      "SearchHit": {
+       "description": "Ein einzelner Such-Treffer.",
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "title": {
+         "default": "",
+         "title": "Title",
+         "type": "string"
+        },
+        "abstract": {
+         "default": "",
+         "title": "Abstract",
+         "type": "string"
+        },
+        "text": {
+         "default": "",
+         "description": "Highlight excerpt from the full text.",
+         "title": "Text",
+         "type": "string"
+        },
+        "meta": {
+         "default": "",
+         "title": "Meta",
+         "type": "string"
+        },
+        "canton": {
+         "default": "",
+         "title": "Canton",
+         "type": "string"
+        },
+        "court": {
+         "default": "",
+         "description": "Court (derived from the ID).",
+         "title": "Court",
+         "type": "string"
+        },
+        "decision_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "ISO date YYYY-MM-DD.",
+         "title": "Decision Date"
+        },
+        "scrape_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "ISO date YYYY-MM-DD.",
+         "title": "Scrape Date"
+        },
+        "is_pdf": {
+         "default": false,
+         "title": "Is Pdf",
+         "type": "boolean"
+        },
+        "document_url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Direct download link to the original document.",
+         "title": "Document Url"
+        },
+        "original_url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "URL of the original source web page.",
+         "title": "Original Url"
+        },
+        "content_length": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Length of the indexed full text in characters. Only set by `fetch_document`.",
+         "title": "Content Length"
+        },
+        "text_truncated": {
+         "default": false,
+         "description": "True if the indexed full text was truncated by Elasticsearch at 100,000 characters. In that case `text` contains only the beginning of the decision; the complete document is available at `document_url`.",
+         "title": "Text Truncated",
+         "type": "boolean"
+        },
+        "sort": {
+         "anyOf": [
+          {
+           "items": {},
+           "type": "array"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Sort values of the hit (for search_after).",
+         "title": "Sort"
+        }
+       },
+       "required": [
+        "id"
+       ],
+       "title": "SearchHit",
+       "type": "object"
+      }
+     },
+     "description": "Antwort des `search`-Tools.",
+     "properties": {
+      "total": {
+       "title": "Total",
+       "type": "integer"
+      },
+      "hits": {
+       "items": {
+        "$ref": "#/$defs/SearchHit"
+       },
+       "title": "Hits",
+       "type": "array"
+      },
+      "next_cursor": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cursor for the next page. Pass it again as `search_after` in the next request. None if there are no further results.",
+       "title": "Next Cursor"
+      },
+      "aggregations": {
+       "anyOf": [
+        {
+         "additionalProperties": {
+          "items": {
+           "$ref": "#/$defs/AggregationBucket"
+          },
+          "type": "array"
+         },
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Aggregations"
+      }
+     },
+     "required": [
+      "total",
+      "hits"
+     ],
+     "title": "SearchResponse",
+     "type": "object"
+    }
+   },
+   {
+    "name": "fetch_document",
+    "title": "Fetch decision",
+    "description": "Fetch a single Swiss court decision, judgment or Federal Supreme Court decision by its document ID (`_id`). Returns the indexed full text of the decision together with metadata, title, abstract and links. Use this when the full decision should be read or processed after a search. Note: for very long decisions the indexed text is capped at 100,000 characters; if `text_truncated` is true, the complete document is available at `document_url`.",
+    "inputSchema": {
+     "$defs": {
+      "Language": {
+       "description": "Verfügbare Sprachen der Entscheide.",
+       "enum": [
+        "de",
+        "fr",
+        "it"
+       ],
+       "title": "Language",
+       "type": "string"
+      }
+     },
+     "properties": {
+      "id": {
+       "description": "Document ID (e.g. 'CH_BGer_001_5A_123_2024_2024-06-15').",
+       "title": "Id",
+       "type": "string"
+      },
+      "language": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/Language"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional preferred language for title/abstract. If omitted, the first available language field is returned."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "title": "fetch_documentArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "$defs": {
+      "SearchHit": {
+       "description": "Ein einzelner Such-Treffer.",
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "title": {
+         "default": "",
+         "title": "Title",
+         "type": "string"
+        },
+        "abstract": {
+         "default": "",
+         "title": "Abstract",
+         "type": "string"
+        },
+        "text": {
+         "default": "",
+         "description": "Highlight excerpt from the full text.",
+         "title": "Text",
+         "type": "string"
+        },
+        "meta": {
+         "default": "",
+         "title": "Meta",
+         "type": "string"
+        },
+        "canton": {
+         "default": "",
+         "title": "Canton",
+         "type": "string"
+        },
+        "court": {
+         "default": "",
+         "description": "Court (derived from the ID).",
+         "title": "Court",
+         "type": "string"
+        },
+        "decision_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "ISO date YYYY-MM-DD.",
+         "title": "Decision Date"
+        },
+        "scrape_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "ISO date YYYY-MM-DD.",
+         "title": "Scrape Date"
+        },
+        "is_pdf": {
+         "default": false,
+         "title": "Is Pdf",
+         "type": "boolean"
+        },
+        "document_url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Direct download link to the original document.",
+         "title": "Document Url"
+        },
+        "original_url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "URL of the original source web page.",
+         "title": "Original Url"
+        },
+        "content_length": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Length of the indexed full text in characters. Only set by `fetch_document`.",
+         "title": "Content Length"
+        },
+        "text_truncated": {
+         "default": false,
+         "description": "True if the indexed full text was truncated by Elasticsearch at 100,000 characters. In that case `text` contains only the beginning of the decision; the complete document is available at `document_url`.",
+         "title": "Text Truncated",
+         "type": "boolean"
+        },
+        "sort": {
+         "anyOf": [
+          {
+           "items": {},
+           "type": "array"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "Sort values of the hit (for search_after).",
+         "title": "Sort"
+        }
+       },
+       "required": [
+        "id"
+       ],
+       "title": "SearchHit",
+       "type": "object"
+      }
+     },
+     "properties": {
+      "result": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/SearchHit"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      }
+     },
+     "required": [
+      "result"
+     ],
+     "title": "fetch_documentOutput",
+     "type": "object"
+    }
+   },
+   {
+    "name": "list_hierarchy",
+    "title": "List hierarchy buckets",
+    "description": "Returns the available hierarchy IDs for Swiss cantons, courts and chambers together with document counts. Useful for narrowing subsequent searches to the Federal Supreme Court, cantonal courts, Obergerichte or Verwaltungsgerichte.",
+    "inputSchema": {
+     "properties": {
+      "query": {
+       "default": "*",
+       "description": "Optional full-text query.",
+       "title": "Query",
+       "type": "string"
+      },
+      "size": {
+       "default": 1000,
+       "description": "Maximum number of entries.",
+       "maximum": 10000,
+       "minimum": 1,
+       "title": "Size",
+       "type": "integer"
+      }
+     },
+     "title": "list_hierarchyArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "$defs": {
+      "HierarchyEntry": {
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "count": {
+         "title": "Count",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "id",
+        "count"
+       ],
+       "title": "HierarchyEntry",
+       "type": "object"
+      }
+     },
+     "properties": {
+      "entries": {
+       "items": {
+        "$ref": "#/$defs/HierarchyEntry"
+       },
+       "title": "Entries",
+       "type": "array"
+      }
+     },
+     "required": [
+      "entries"
+     ],
+     "title": "HierarchyResponse",
+     "type": "object"
+    }
+   },
+   {
+    "name": "list_facets",
+    "title": "Facet tree (localized)",
+    "description": "Hierarchical facet tree with localized labels for cantons, courts and chambers. The `id` fields can be used in the `hierarchy` filter of the search.",
+    "inputSchema": {
+     "properties": {},
+     "title": "list_facetsArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "properties": {
+      "result": {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "title": "Result",
+       "type": "array"
+      }
+     },
+     "required": [
+      "result"
+     ],
+     "title": "list_facetsOutput",
+     "type": "object"
+    }
+   },
+   {
+    "name": "server_info",
+    "title": "Server info",
+    "description": "Version info and configured endpoint URLs of the MCP server for Swiss case law and court decisions.",
+    "inputSchema": {
+     "properties": {},
+     "title": "server_infoArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "server_infoDictOutput",
+     "type": "object"
+    }
+   }
+  ],
+  "resources": [
+   {
+    "name": "server-card",
+    "title": "MCP Server Card",
+    "uri": "mcp://server-card.json",
+    "description": "Structured metadata for the entscheidsuche MCP server.",
+    "mimeType": "application/json"
+   }
+  ]
+ }
+}

@@ -1,0 +1,1560 @@
+{
+ "url": "https://mcp.mainbook.ai/mcp",
+ "doc": {
+  "name": "MainBook Bank Statement Converter",
+  "version": "0.5.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Use convert_bank_statement for a new PDF. It creates a paid page-credit job, so do not call it speculatively. Use get_conversion after a timeout.",
+  "tools": [
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "description": "Convert one PDF bank statement through the complete MainBook workflow: create a job, upload, start, poll, and return structured data. This creates a job and spends page credits; it is not read-only.",
+    "inputSchema": {
+     "properties": {
+      "file_path": {
+       "anyOf": [
+        {
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Path to a PDF on the MCP server machine. This field is only available over stdio and is rejected in HTTP mode; remote clients must use file_url. The path must be inside the allowed folders, which default to Downloads, Desktop, and Documents. Exactly one of file_path and file_url is required.",
+       "title": "File Path"
+      },
+      "file_url": {
+       "anyOf": [
+        {
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Public HTTPS URL of a PDF for remote mode. Redirects and non-public network addresses are rejected. Exactly one source is required.",
+       "title": "File Url"
+      },
+      "result_type": {
+       "default": "json",
+       "description": "JSON is returned inline. Over stdio, XLSX or CSV is written to an allowed local folder and the full path is returned. HTTP mode returns safe download instructions. Binary bytes never enter model context.",
+       "enum": [
+        "json",
+        "xlsx",
+        "csv"
+       ],
+       "title": "Result Type",
+       "type": "string"
+      },
+      "timeout_seconds": {
+       "default": 50,
+       "description": "Internal polling budget from 30 to 900 seconds. Timeout leaves the job running and returns its job_id for get_conversion. The default stays under the 60-second request timeout most MCP clients enforce; a client that gives up first discards the job_id and the conversion looks lost.",
+       "maximum": 900,
+       "minimum": 30,
+       "title": "Timeout Seconds",
+       "type": "integer"
+      },
+      "idempotency_key": {
+       "anyOf": [
+        {
+         "maxLength": 255,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional value forwarded verbatim in the Idempotency-Key REST header.",
+       "title": "Idempotency Key"
+      },
+      "output_path": {
+       "anyOf": [
+        {
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional absolute result file or existing folder on the MCP server machine. Only available over stdio and only inside the allowed folders. The file extension is corrected to match result_type.",
+       "title": "Output Path"
+      }
+     },
+     "type": "object",
+     "title": "convert_bank_statementArguments"
+    },
+    "name": "convert_bank_statement",
+    "outputSchema": {
+     "properties": {
+      "job_id": {
+       "title": "Job Id",
+       "type": "string"
+      },
+      "state": {
+       "anyOf": [
+        {
+         "enum": [
+          "awaiting_upload",
+          "queued",
+          "processing",
+          "succeeded",
+          "succeeded_with_warnings",
+          "insufficient_credits",
+          "failed",
+          "expired"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "State"
+      },
+      "pages": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Pages"
+      },
+      "validation": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/JobValidation"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "result_type": {
+       "enum": [
+        "json",
+        "xlsx",
+        "csv"
+       ],
+       "title": "Result Type",
+       "type": "string"
+      },
+      "data": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/ConversionData"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null
+      },
+      "download": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/DownloadInstruction"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null
+      },
+      "saved_file": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/SavedFile"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null
+      },
+      "timed_out": {
+       "default": false,
+       "title": "Timed Out",
+       "type": "boolean"
+      },
+      "message": {
+       "title": "Message",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id",
+      "state",
+      "pages",
+      "validation",
+      "result_type",
+      "message"
+     ],
+     "type": "object",
+     "$defs": {
+      "ConversionData": {
+       "description": "Exact top-level JSON shape produced by the MainBook exporter.",
+       "properties": {
+        "document": {
+         "$ref": "#/$defs/ConversionDocument"
+        },
+        "transactions": {
+         "items": {
+          "$ref": "#/$defs/ConversionTransaction"
+         },
+         "title": "Transactions",
+         "type": "array"
+        },
+        "has_warnings": {
+         "title": "Has Warnings",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "document",
+        "transactions",
+        "has_warnings"
+       ],
+       "title": "ConversionData",
+       "type": "object"
+      },
+      "ConversionDocument": {
+       "description": "Document summary emitted by MainBook's JSON exporter.",
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "display_name": {
+         "title": "Display Name",
+         "type": "string"
+        },
+        "bank_name": {
+         "title": "Bank Name",
+         "type": "string"
+        },
+        "account_holder": {
+         "title": "Account Holder",
+         "type": "string"
+        },
+        "account_address": {
+         "title": "Account Address",
+         "type": "string"
+        },
+        "account_number_masked": {
+         "title": "Account Number Masked",
+         "type": "string"
+        },
+        "account_type": {
+         "title": "Account Type",
+         "type": "string"
+        },
+        "kind": {
+         "title": "Kind",
+         "type": "string"
+        },
+        "currency": {
+         "title": "Currency",
+         "type": "string"
+        },
+        "period_start": {
+         "title": "Period Start",
+         "type": "string"
+        },
+        "period_end": {
+         "title": "Period End",
+         "type": "string"
+        },
+        "billing_cycle_length_days": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Billing Cycle Length Days"
+        },
+        "starting_balance_cents": {
+         "title": "Starting Balance Cents",
+         "type": "integer"
+        },
+        "ending_balance_cents": {
+         "title": "Ending Balance Cents",
+         "type": "integer"
+        },
+        "transactions_count": {
+         "minimum": 0,
+         "title": "Transactions Count",
+         "type": "integer"
+        },
+        "net_credits_cents": {
+         "title": "Net Credits Cents",
+         "type": "integer"
+        },
+        "net_debits_cents": {
+         "title": "Net Debits Cents",
+         "type": "integer"
+        },
+        "credit_limit_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Credit Limit Cents"
+        },
+        "available_credit_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Available Credit Cents"
+        },
+        "previous_balance_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Previous Balance Cents"
+        },
+        "new_balance_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "New Balance Cents"
+        },
+        "payment_due_amount_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Payment Due Amount Cents"
+        },
+        "payment_due_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Payment Due Date"
+        },
+        "pages": {
+         "anyOf": [
+          {
+           "minimum": 1,
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Pages"
+        }
+       },
+       "required": [
+        "id",
+        "display_name",
+        "bank_name",
+        "account_holder",
+        "account_address",
+        "account_number_masked",
+        "account_type",
+        "kind",
+        "currency",
+        "period_start",
+        "period_end",
+        "billing_cycle_length_days",
+        "starting_balance_cents",
+        "ending_balance_cents",
+        "transactions_count",
+        "net_credits_cents",
+        "net_debits_cents",
+        "credit_limit_cents",
+        "available_credit_cents",
+        "previous_balance_cents",
+        "new_balance_cents",
+        "payment_due_amount_cents",
+        "payment_due_date"
+       ],
+       "title": "ConversionDocument",
+       "type": "object"
+      },
+      "ConversionTransaction": {
+       "description": "One exported transaction row, with integer-cent monetary fields.",
+       "properties": {
+        "row": {
+         "minimum": 1,
+         "title": "Row",
+         "type": "integer"
+        },
+        "source_file": {
+         "title": "Source File",
+         "type": "string"
+        },
+        "page": {
+         "minimum": 1,
+         "title": "Page",
+         "type": "integer"
+        },
+        "line_index": {
+         "minimum": 0,
+         "title": "Line Index",
+         "type": "integer"
+        },
+        "date": {
+         "title": "Date",
+         "type": "string"
+        },
+        "description": {
+         "title": "Description",
+         "type": "string"
+        },
+        "amount_cents": {
+         "title": "Amount Cents",
+         "type": "integer"
+        },
+        "transaction_type": {
+         "enum": [
+          "credit",
+          "debit"
+         ],
+         "title": "Transaction Type",
+         "type": "string"
+        },
+        "balance_after_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Balance After Cents"
+        },
+        "currency": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Currency"
+        },
+        "validation_status": {
+         "enum": [
+          "valid",
+          "system_mismatch",
+          "user_edited_mismatch",
+          "user_reviewed",
+          "user_accepted"
+         ],
+         "title": "Validation Status",
+         "type": "string"
+        },
+        "warning_flags": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Warning Flags",
+         "type": "array"
+        },
+        "cardholder": {
+         "default": "",
+         "title": "Cardholder",
+         "type": "string"
+        },
+        "cardholder_card_masked": {
+         "default": "",
+         "title": "Cardholder Card Masked",
+         "type": "string"
+        }
+       },
+       "required": [
+        "row",
+        "source_file",
+        "page",
+        "line_index",
+        "date",
+        "description",
+        "amount_cents",
+        "transaction_type",
+        "balance_after_cents",
+        "currency",
+        "validation_status",
+        "warning_flags"
+       ],
+       "title": "ConversionTransaction",
+       "type": "object"
+      },
+      "DownloadInstruction": {
+       "additionalProperties": false,
+       "properties": {
+        "job_id": {
+         "title": "Job Id",
+         "type": "string"
+        },
+        "result_type": {
+         "enum": [
+          "xlsx",
+          "csv"
+         ],
+         "title": "Result Type",
+         "type": "string"
+        },
+        "rest_endpoint": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Rest Endpoint"
+        },
+        "url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Url"
+        },
+        "expires_at": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Expires At"
+        },
+        "instruction": {
+         "title": "Instruction",
+         "type": "string"
+        }
+       },
+       "required": [
+        "job_id",
+        "result_type",
+        "instruction"
+       ],
+       "title": "DownloadInstruction",
+       "type": "object"
+      },
+      "JobValidation": {
+       "properties": {
+        "reconcilable": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Whether statement math can be reconciled; null means the document kind has no running-balance reconciliation, such as many credit-card statements.",
+         "title": "Reconcilable"
+        },
+        "passed": {
+         "description": "Whether MainBook's applicable statement-math checks passed.",
+         "title": "Passed",
+         "type": "boolean"
+        },
+        "mismatched_rows": {
+         "description": "Number of transaction rows that remain mathematically mismatched.",
+         "minimum": 0,
+         "title": "Mismatched Rows",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "reconcilable",
+        "passed",
+        "mismatched_rows"
+       ],
+       "title": "JobValidation",
+       "type": "object"
+      },
+      "SavedFile": {
+       "additionalProperties": false,
+       "properties": {
+        "path": {
+         "title": "Path",
+         "type": "string"
+        },
+        "reason": {
+         "title": "Reason",
+         "type": "string"
+        }
+       },
+       "required": [
+        "path",
+        "reason"
+       ],
+       "title": "SavedFile",
+       "type": "object"
+      }
+     },
+     "additionalProperties": false,
+     "description": "Structured result shared by convert_bank_statement and get_conversion.",
+     "title": "ConversionOutput"
+    },
+    "title": "Convert bank statement"
+   },
+   {
+    "annotations": {
+     "openWorldHint": true,
+     "readOnlyHint": true
+    },
+    "description": "Return total, reserved, and available MainBook credits. Every value is measured in PDF pages.",
+    "inputSchema": {
+     "properties": {},
+     "type": "object",
+     "title": "get_balanceArguments"
+    },
+    "name": "get_balance",
+    "outputSchema": {
+     "properties": {
+      "balance": {
+       "title": "Balance",
+       "type": "integer"
+      },
+      "reserved": {
+       "minimum": 0,
+       "title": "Reserved",
+       "type": "integer"
+      },
+      "available": {
+       "title": "Available",
+       "type": "integer"
+      },
+      "units": {
+       "const": "pages",
+       "default": "pages",
+       "title": "Units",
+       "type": "string"
+      },
+      "explanation": {
+       "title": "Explanation",
+       "type": "string"
+      }
+     },
+     "required": [
+      "balance",
+      "reserved",
+      "available",
+      "explanation"
+     ],
+     "type": "object",
+     "additionalProperties": false,
+     "title": "BalanceOutput"
+    },
+    "title": "Get page-credit balance"
+   },
+   {
+    "annotations": {
+     "openWorldHint": true,
+     "readOnlyHint": true
+    },
+    "description": "List one cursor page of conversion jobs visible to the MainBook account. Pass the returned next_cursor to continue.",
+    "inputSchema": {
+     "properties": {
+      "limit": {
+       "default": 25,
+       "description": "Jobs on this page, from 1 to 100.",
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      },
+      "cursor": {
+       "anyOf": [
+        {
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Opaque next_cursor from the previous page.",
+       "title": "Cursor"
+      }
+     },
+     "type": "object",
+     "title": "list_conversionsArguments"
+    },
+    "name": "list_conversions",
+    "outputSchema": {
+     "properties": {
+      "conversions": {
+       "items": {
+        "$ref": "#/$defs/Job"
+       },
+       "title": "Conversions",
+       "type": "array"
+      },
+      "next_cursor": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Next Cursor"
+      },
+      "count": {
+       "minimum": 0,
+       "title": "Count",
+       "type": "integer"
+      },
+      "units": {
+       "const": "pages",
+       "default": "pages",
+       "title": "Units",
+       "type": "string"
+      }
+     },
+     "required": [
+      "conversions",
+      "next_cursor",
+      "count"
+     ],
+     "type": "object",
+     "$defs": {
+      "Job": {
+       "properties": {
+        "job_id": {
+         "title": "Job Id",
+         "type": "string"
+        },
+        "state": {
+         "enum": [
+          "awaiting_upload",
+          "queued",
+          "processing",
+          "succeeded",
+          "succeeded_with_warnings",
+          "insufficient_credits",
+          "failed",
+          "expired"
+         ],
+         "title": "State",
+         "type": "string"
+        },
+        "filename": {
+         "title": "Filename",
+         "type": "string"
+        },
+        "file_format": {
+         "const": "pdf",
+         "title": "File Format",
+         "type": "string"
+        },
+        "pages": {
+         "minimum": 1,
+         "title": "Pages",
+         "type": "integer"
+        },
+        "credits_reserved": {
+         "anyOf": [
+          {
+           "minimum": 1,
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Credits Reserved"
+        },
+        "source": {
+         "enum": [
+          "web",
+          "api"
+         ],
+         "title": "Source",
+         "type": "string"
+        },
+        "created_at": {
+         "title": "Created At",
+         "type": "string"
+        },
+        "updated_at": {
+         "title": "Updated At",
+         "type": "string"
+        },
+        "validation": {
+         "anyOf": [
+          {
+           "$ref": "#/$defs/JobValidation"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "error": {
+         "anyOf": [
+          {
+           "$ref": "#/$defs/JobError"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "job_id",
+        "state",
+        "filename",
+        "file_format",
+        "pages",
+        "source",
+        "created_at",
+        "updated_at",
+        "validation",
+        "error"
+       ],
+       "title": "Job",
+       "type": "object"
+      },
+      "JobError": {
+       "properties": {
+        "category": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Category"
+        },
+        "reason": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Reason"
+        }
+       },
+       "required": [
+        "category",
+        "reason"
+       ],
+       "title": "JobError",
+       "type": "object"
+      },
+      "JobValidation": {
+       "properties": {
+        "reconcilable": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Whether statement math can be reconciled; null means the document kind has no running-balance reconciliation, such as many credit-card statements.",
+         "title": "Reconcilable"
+        },
+        "passed": {
+         "description": "Whether MainBook's applicable statement-math checks passed.",
+         "title": "Passed",
+         "type": "boolean"
+        },
+        "mismatched_rows": {
+         "description": "Number of transaction rows that remain mathematically mismatched.",
+         "minimum": 0,
+         "title": "Mismatched Rows",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "reconcilable",
+        "passed",
+        "mismatched_rows"
+       ],
+       "title": "JobValidation",
+       "type": "object"
+      }
+     },
+     "additionalProperties": false,
+     "title": "ListConversionsOutput"
+    },
+    "title": "List conversions"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "readOnlyHint": true
+    },
+    "description": "Get the current state of one MainBook conversion. When successful, return JSON inline or save XLSX/CSV locally over stdio. HTTP mode returns safe download instructions. Use this after convert_bank_statement times out.",
+    "inputSchema": {
+     "properties": {
+      "job_id": {
+       "description": "Conversion job UUID returned by MainBook.",
+       "minLength": 1,
+       "title": "Job Id",
+       "type": "string"
+      },
+      "result_type": {
+       "default": "json",
+       "description": "Result representation to retrieve after the job succeeds.",
+       "enum": [
+        "json",
+        "xlsx",
+        "csv"
+       ],
+       "title": "Result Type",
+       "type": "string"
+      },
+      "output_path": {
+       "anyOf": [
+        {
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional absolute result file or existing folder on the MCP server machine. Only available over stdio and only inside the allowed folders.",
+       "title": "Output Path"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "type": "object",
+     "title": "get_conversionArguments"
+    },
+    "name": "get_conversion",
+    "outputSchema": {
+     "properties": {
+      "job_id": {
+       "title": "Job Id",
+       "type": "string"
+      },
+      "state": {
+       "anyOf": [
+        {
+         "enum": [
+          "awaiting_upload",
+          "queued",
+          "processing",
+          "succeeded",
+          "succeeded_with_warnings",
+          "insufficient_credits",
+          "failed",
+          "expired"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "State"
+      },
+      "pages": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Pages"
+      },
+      "validation": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/JobValidation"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "result_type": {
+       "enum": [
+        "json",
+        "xlsx",
+        "csv"
+       ],
+       "title": "Result Type",
+       "type": "string"
+      },
+      "data": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/ConversionData"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null
+      },
+      "download": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/DownloadInstruction"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null
+      },
+      "saved_file": {
+       "anyOf": [
+        {
+         "$ref": "#/$defs/SavedFile"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null
+      },
+      "timed_out": {
+       "default": false,
+       "title": "Timed Out",
+       "type": "boolean"
+      },
+      "message": {
+       "title": "Message",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id",
+      "state",
+      "pages",
+      "validation",
+      "result_type",
+      "message"
+     ],
+     "type": "object",
+     "$defs": {
+      "ConversionData": {
+       "description": "Exact top-level JSON shape produced by the MainBook exporter.",
+       "properties": {
+        "document": {
+         "$ref": "#/$defs/ConversionDocument"
+        },
+        "transactions": {
+         "items": {
+          "$ref": "#/$defs/ConversionTransaction"
+         },
+         "title": "Transactions",
+         "type": "array"
+        },
+        "has_warnings": {
+         "title": "Has Warnings",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "document",
+        "transactions",
+        "has_warnings"
+       ],
+       "title": "ConversionData",
+       "type": "object"
+      },
+      "ConversionDocument": {
+       "description": "Document summary emitted by MainBook's JSON exporter.",
+       "properties": {
+        "id": {
+         "title": "Id",
+         "type": "string"
+        },
+        "display_name": {
+         "title": "Display Name",
+         "type": "string"
+        },
+        "bank_name": {
+         "title": "Bank Name",
+         "type": "string"
+        },
+        "account_holder": {
+         "title": "Account Holder",
+         "type": "string"
+        },
+        "account_address": {
+         "title": "Account Address",
+         "type": "string"
+        },
+        "account_number_masked": {
+         "title": "Account Number Masked",
+         "type": "string"
+        },
+        "account_type": {
+         "title": "Account Type",
+         "type": "string"
+        },
+        "kind": {
+         "title": "Kind",
+         "type": "string"
+        },
+        "currency": {
+         "title": "Currency",
+         "type": "string"
+        },
+        "period_start": {
+         "title": "Period Start",
+         "type": "string"
+        },
+        "period_end": {
+         "title": "Period End",
+         "type": "string"
+        },
+        "billing_cycle_length_days": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Billing Cycle Length Days"
+        },
+        "starting_balance_cents": {
+         "title": "Starting Balance Cents",
+         "type": "integer"
+        },
+        "ending_balance_cents": {
+         "title": "Ending Balance Cents",
+         "type": "integer"
+        },
+        "transactions_count": {
+         "minimum": 0,
+         "title": "Transactions Count",
+         "type": "integer"
+        },
+        "net_credits_cents": {
+         "title": "Net Credits Cents",
+         "type": "integer"
+        },
+        "net_debits_cents": {
+         "title": "Net Debits Cents",
+         "type": "integer"
+        },
+        "credit_limit_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Credit Limit Cents"
+        },
+        "available_credit_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Available Credit Cents"
+        },
+        "previous_balance_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Previous Balance Cents"
+        },
+        "new_balance_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "New Balance Cents"
+        },
+        "payment_due_amount_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Payment Due Amount Cents"
+        },
+        "payment_due_date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Payment Due Date"
+        },
+        "pages": {
+         "anyOf": [
+          {
+           "minimum": 1,
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Pages"
+        }
+       },
+       "required": [
+        "id",
+        "display_name",
+        "bank_name",
+        "account_holder",
+        "account_address",
+        "account_number_masked",
+        "account_type",
+        "kind",
+        "currency",
+        "period_start",
+        "period_end",
+        "billing_cycle_length_days",
+        "starting_balance_cents",
+        "ending_balance_cents",
+        "transactions_count",
+        "net_credits_cents",
+        "net_debits_cents",
+        "credit_limit_cents",
+        "available_credit_cents",
+        "previous_balance_cents",
+        "new_balance_cents",
+        "payment_due_amount_cents",
+        "payment_due_date"
+       ],
+       "title": "ConversionDocument",
+       "type": "object"
+      },
+      "ConversionTransaction": {
+       "description": "One exported transaction row, with integer-cent monetary fields.",
+       "properties": {
+        "row": {
+         "minimum": 1,
+         "title": "Row",
+         "type": "integer"
+        },
+        "source_file": {
+         "title": "Source File",
+         "type": "string"
+        },
+        "page": {
+         "minimum": 1,
+         "title": "Page",
+         "type": "integer"
+        },
+        "line_index": {
+         "minimum": 0,
+         "title": "Line Index",
+         "type": "integer"
+        },
+        "date": {
+         "title": "Date",
+         "type": "string"
+        },
+        "description": {
+         "title": "Description",
+         "type": "string"
+        },
+        "amount_cents": {
+         "title": "Amount Cents",
+         "type": "integer"
+        },
+        "transaction_type": {
+         "enum": [
+          "credit",
+          "debit"
+         ],
+         "title": "Transaction Type",
+         "type": "string"
+        },
+        "balance_after_cents": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Balance After Cents"
+        },
+        "currency": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Currency"
+        },
+        "validation_status": {
+         "enum": [
+          "valid",
+          "system_mismatch",
+          "user_edited_mismatch",
+          "user_reviewed",
+          "user_accepted"
+         ],
+         "title": "Validation Status",
+         "type": "string"
+        },
+        "warning_flags": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Warning Flags",
+         "type": "array"
+        },
+        "cardholder": {
+         "default": "",
+         "title": "Cardholder",
+         "type": "string"
+        },
+        "cardholder_card_masked": {
+         "default": "",
+         "title": "Cardholder Card Masked",
+         "type": "string"
+        }
+       },
+       "required": [
+        "row",
+        "source_file",
+        "page",
+        "line_index",
+        "date",
+        "description",
+        "amount_cents",
+        "transaction_type",
+        "balance_after_cents",
+        "currency",
+        "validation_status",
+        "warning_flags"
+       ],
+       "title": "ConversionTransaction",
+       "type": "object"
+      },
+      "DownloadInstruction": {
+       "additionalProperties": false,
+       "properties": {
+        "job_id": {
+         "title": "Job Id",
+         "type": "string"
+        },
+        "result_type": {
+         "enum": [
+          "xlsx",
+          "csv"
+         ],
+         "title": "Result Type",
+         "type": "string"
+        },
+        "rest_endpoint": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Rest Endpoint"
+        },
+        "url": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Url"
+        },
+        "expires_at": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Expires At"
+        },
+        "instruction": {
+         "title": "Instruction",
+         "type": "string"
+        }
+       },
+       "required": [
+        "job_id",
+        "result_type",
+        "instruction"
+       ],
+       "title": "DownloadInstruction",
+       "type": "object"
+      },
+      "JobValidation": {
+       "properties": {
+        "reconcilable": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Whether statement math can be reconciled; null means the document kind has no running-balance reconciliation, such as many credit-card statements.",
+         "title": "Reconcilable"
+        },
+        "passed": {
+         "description": "Whether MainBook's applicable statement-math checks passed.",
+         "title": "Passed",
+         "type": "boolean"
+        },
+        "mismatched_rows": {
+         "description": "Number of transaction rows that remain mathematically mismatched.",
+         "minimum": 0,
+         "title": "Mismatched Rows",
+         "type": "integer"
+        }
+       },
+       "required": [
+        "reconcilable",
+        "passed",
+        "mismatched_rows"
+       ],
+       "title": "JobValidation",
+       "type": "object"
+      },
+      "SavedFile": {
+       "additionalProperties": false,
+       "properties": {
+        "path": {
+         "title": "Path",
+         "type": "string"
+        },
+        "reason": {
+         "title": "Reason",
+         "type": "string"
+        }
+       },
+       "required": [
+        "path",
+        "reason"
+       ],
+       "title": "SavedFile",
+       "type": "object"
+      }
+     },
+     "additionalProperties": false,
+     "description": "Structured result shared by convert_bank_statement and get_conversion.",
+     "title": "ConversionOutput"
+    },
+    "title": "Get conversion"
+   }
+  ]
+ }
+}

@@ -1,0 +1,274 @@
+{
+ "url": "https://mcp.enyal.ai/mcp",
+ "doc": {
+  "name": "ENYAL by Greenland AI",
+  "version": "0.1.3+5208f45",
+  "protocolVersion": "2025-06-18",
+  "instructions": "ENYAL by Greenland AI — identity, OAuth & cryptographic trust layer for AI agents.\n\nENYAL encrypted-memory query. STRUCTURE tools (query_memory / get_entity / get_timeline / render) return graph STRUCTURE only (node_type, name_hash, relationships, chunk_ids, timestamps) — no content. CONTENT tools (query_memory_content / get_entity_content / get_timeline_content / get_node_content) return DECRYPTED content (names, summaries, evidence) and REQUIRE a memory:read:content-scoped token — a structure-only token calling them is rejected (403) by ENYAL. Same plan schema for both surfaces. Listing the tools (initialize, tools/list) needs no credential; every tool call needs your own ENYAL key (eyl_…) as Authorization: Bearer — this server holds none. Every tool is read-only.",
+  "tools": [
+   {
+    "name": "query_memory",
+    "description": "Execute a structured query plan over your encrypted knowledge graph. Returns STRUCTURE ONLY\n    (node_type, name_hash, relationships, chunk_ids, timestamps) — never content.\n\n    Plan schema:\n      {\n        \"entity_filters\": [{\"node_type\": <type>} | {\"name_hash\": <sha256-hex>}],\n        \"edge_filters\":   [{\"relationship\": <rel>, \"direction\": \"out\"|\"in\"|\"both\"}],\n        \"temporal_bounds\":{\"valid_from_after\": <ISO8601>, \"valid_to_before\": <ISO8601>},\n        \"limit\": <int <= 200>,\n        \"include_neighbours_depth\": <0-5>\n      }\n    node_type in {entity, concept, decision, person, organisation, event, source, synthesis}.\n    relationship in {references, contradicts, supports, supersedes, caused_by, related_to,\n    part_of, informed_by, led_to, verifies}. Account scope is enforced server-side; it cannot be\n    set from the plan.",
+    "inputSchema": {
+     "properties": {
+      "plan": {
+       "additionalProperties": true,
+       "description": "The structured query plan (a JSON object): entity_filters [{node_type} | {name_hash}], edge_filters [{relationship, direction out|in|both}], temporal_bounds {valid_from_after, valid_to_before} (ISO 8601), limit (<= 200), include_neighbours_depth (0-5). The schema and the allowed node_type / relationship values are in this tool's description.",
+       "title": "Plan",
+       "type": "object"
+      },
+      "include_chunks": {
+       "default": false,
+       "description": "Also return the chunk ids behind each node. Default false.",
+       "title": "Include Chunks",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "plan"
+     ],
+     "title": "query_memoryArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_entity",
+    "description": "Get one entity's STRUCTURE by name_hash (SHA-256 of the normalised name). No content.",
+    "inputSchema": {
+     "properties": {
+      "name_hash": {
+       "default": "",
+       "description": "SHA-256 hex of the entity's normalised name. Send it: without it the plan has no entity filter.",
+       "title": "Name Hash",
+       "type": "string"
+      },
+      "node_id": {
+       "default": "",
+       "description": "Accepted for compatibility but NOT used yet: the lookup is by name_hash only.",
+       "title": "Node Id",
+       "type": "string"
+      }
+     },
+     "title": "get_entityArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_timeline",
+    "description": "Temporally-ordered STRUCTURE view, optionally filtered by node_type and an ISO8601 date\n    range. No content.",
+    "inputSchema": {
+     "properties": {
+      "node_type": {
+       "default": "",
+       "description": "Only nodes of this type: entity, concept, decision, person, organisation, event, source or synthesis. Empty = all.",
+       "title": "Node Type",
+       "type": "string"
+      },
+      "valid_from_after": {
+       "default": "",
+       "description": "Only nodes valid from after this time (ISO 8601). Empty = no lower bound.",
+       "title": "Valid From After",
+       "type": "string"
+      },
+      "valid_to_before": {
+       "default": "",
+       "description": "Only nodes valid to before this time (ISO 8601). Empty = no upper bound.",
+       "title": "Valid To Before",
+       "type": "string"
+      }
+     },
+     "title": "get_timelineArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "render",
+    "description": "Render a structured query as a STRUCTURE-ONLY result set (β = structure; identical shape to\n    query_memory). Reserved for richer rendering when content access (γ) lands.",
+    "inputSchema": {
+     "properties": {
+      "plan": {
+       "additionalProperties": true,
+       "description": "The structured query plan (a JSON object): entity_filters [{node_type} | {name_hash}], edge_filters [{relationship, direction out|in|both}], temporal_bounds {valid_from_after, valid_to_before} (ISO 8601), limit (<= 200), include_neighbours_depth (0-5). The schema and the allowed node_type / relationship values are in this tool's description.",
+       "title": "Plan",
+       "type": "object"
+      }
+     },
+     "required": [
+      "plan"
+     ],
+     "title": "renderArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "verify_chunk",
+    "description": "Look up one identifier in ENYAL's PUBLIC verification index (relays GET /api/v1/verify/lookup/{id}; no decryption). ENYAL's\n    answer is returned unchanged: `found`, and for a chunk or proof its `anchor_status` with `bsv_tx_id`; for a txid, `chain_status`.\n    `degraded:true` means a source could not be checked (inconclusive, not an absence). ENYAL's route needs no key; calling it through\n    this server still needs your eyl_ bearer, like every tool call. An id that is not a UUID or hex is refused (invalid_id) and nothing\n    is sent.",
+    "inputSchema": {
+     "properties": {
+      "identifier": {
+       "description": "The id to look up: a chunk, proof or transfer id (UUID), or a BSV transaction id (hex), 8-64 characters.",
+       "title": "Identifier",
+       "type": "string"
+      }
+     },
+     "required": [
+      "identifier"
+     ],
+     "title": "verify_chunkArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "query_memory_content",
+    "description": "Execute a structured query plan and return DECRYPTED memory CONTENT (node names, summaries,\n    properties; edge evidence + endpoint names) alongside structure. SAME plan schema as query_memory.\n    REQUIRES a memory:read:content-scoped token — a structure-only token is rejected (403) by ENYAL.\n    Account scope is enforced server-side; it cannot be set from the plan.",
+    "inputSchema": {
+     "properties": {
+      "plan": {
+       "additionalProperties": true,
+       "description": "The structured query plan (a JSON object): entity_filters [{node_type} | {name_hash}], edge_filters [{relationship, direction out|in|both}], temporal_bounds {valid_from_after, valid_to_before} (ISO 8601), limit (<= 200), include_neighbours_depth (0-5). The schema and the allowed node_type / relationship values are in this tool's description.",
+       "title": "Plan",
+       "type": "object"
+      },
+      "include_chunks": {
+       "default": false,
+       "description": "Also return the chunk ids behind each node. Default false.",
+       "title": "Include Chunks",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "plan"
+     ],
+     "title": "query_memory_contentArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_entity_content",
+    "description": "Get one entity's DECRYPTED content by name_hash (SHA-256 of the normalised name).\n    Content scope required (403 otherwise).",
+    "inputSchema": {
+     "properties": {
+      "name_hash": {
+       "default": "",
+       "description": "SHA-256 hex of the entity's normalised name. Send it: without it the plan has no entity filter.",
+       "title": "Name Hash",
+       "type": "string"
+      },
+      "node_id": {
+       "default": "",
+       "description": "Accepted for compatibility but NOT used yet: the lookup is by name_hash only.",
+       "title": "Node Id",
+       "type": "string"
+      }
+     },
+     "title": "get_entity_contentArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_timeline_content",
+    "description": "Temporally-ordered DECRYPTED content view, optionally filtered by node_type + an ISO8601\n    date range. Same plan schema as get_timeline. Content scope required (403 otherwise).",
+    "inputSchema": {
+     "properties": {
+      "node_type": {
+       "default": "",
+       "description": "Only nodes of this type: entity, concept, decision, person, organisation, event, source or synthesis. Empty = all.",
+       "title": "Node Type",
+       "type": "string"
+      },
+      "valid_from_after": {
+       "default": "",
+       "description": "Only nodes valid from after this time (ISO 8601). Empty = no lower bound.",
+       "title": "Valid From After",
+       "type": "string"
+      },
+      "valid_to_before": {
+       "default": "",
+       "description": "Only nodes valid to before this time (ISO 8601). Empty = no upper bound.",
+       "title": "Valid To Before",
+       "type": "string"
+      }
+     },
+     "title": "get_timeline_contentArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_node_content",
+    "description": "Get a node's DECRYPTED content by name_hash PLUS its connected nodes' content (neighbour\n    depth, default 1; 0–5). Same plan schema as the structure tools. Content scope required (403).",
+    "inputSchema": {
+     "properties": {
+      "name_hash": {
+       "default": "",
+       "description": "SHA-256 hex of the entity's normalised name. Send it: without it the plan has no entity filter.",
+       "title": "Name Hash",
+       "type": "string"
+      },
+      "include_neighbours_depth": {
+       "default": 1,
+       "description": "How many hops of connected nodes to include, 0-5 (clamped). Default 1.",
+       "title": "Include Neighbours Depth",
+       "type": "integer"
+      }
+     },
+     "title": "get_node_contentArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,445 @@
+{
+ "url": "https://dealio.be/mcp",
+ "doc": {
+  "name": "Dealio: Belgian deals",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Promotions from 50+ Belgian retailers (supermarkets, drugstores, DIY, electronics, toys, pets, fashion), every discount worked out per item. Queries in Dutch work best (e.g. 'wasmiddel', 'airfryer', 'hondenvoer'). Every result has a `link` on dealio.be that opens the promotion: always give the user that link, it is the only way to the promotion (the tools give no links to the stores, except publish_card). To publish or share one promotion elsewhere (a social post, a message), call publish_card with its id: it returns the promotion as a square picture, a short link dealio.be/l/<code> that counts clicks and sends the reader to the store, the store's own page and a caption. Prices are what the stores showed when the data was refreshed (see `updated`); the store has the last word. Every store is fetched once a day, in the morning (the first from 05:00 Belgian time), and the data is updated as each store finishes; when a fetch fails, the store's previous promotions stay: list_stores says per store when it was last fetched. Quote prices as given: price per item, with the regular price when known. When you present several promotions, also give the link that opens them together on one page (dealio.be/lijst/…): search_deals and get_meal_ideas end with one for the promotions they list; list_link makes one for your own pick across searches, with a title. For 'which one should I buy' questions about a kind of appliance, call get_buying_guide first (researched buying guides: models compared, what each feature does and when you need it, tests and buyer ratings, every statement with its source), then get_model for one model. Name the sources the guide gives and link the guide's page. For 'what can I cook with this week's promotions' questions, call get_meal_ideas: dishes whose main ingredients are in promotion at the food stores the user shops at, on the day they shop, with the promotions and their links (ideas for a shopping list, not recipes). For 'what is the news about <store>' or 'any recalls / price news' questions, call get_news: Belgian consumer news of the last days (prices, promotions, stores, recalls, tests) summarised by dealio with the source and its article; filter by store or theme. For 'which actions run at <store>', 'is there 1+1 / cashback / geen btw / gratis levering / a voucher somewhere' questions, call get_campaigns: the store-wide campaigns (winkelacties) read from the stores' own sites, a percentage on a whole range or brand, multi-buy, cashback, free delivery, vouchers, loyalty-card deals, sales and announced ones, each with its terms and the promotions on dealio that fall under it. search_deals is for one product's price; get_campaigns for an action over a range, a brand, the basket or the whole store.",
+  "tools": [
+   {
+    "name": "search_deals",
+    "description": "Search the current promotions at Belgian retailers by product, brand or store, with optional filters. Returns the best matches (biggest per-item discount first unless sorted otherwise), each with price, discount, validity and a link to open it.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Words from the product, brand or kind of promotion, e.g. 'koffiecapsules', 'Philips', '1+1 gratis'. Optional."
+      },
+      "store": {
+       "type": "string",
+       "description": "Store name or slug, e.g. 'bol', 'Colruyt', 'albertheijn'. See list_stores. Optional."
+      },
+      "category": {
+       "type": "string",
+       "description": "Category slug or name: voeding, drank, verzorging, huishouden, baby, dier, elektronica, huis-tuin, mode, speelgoed, sport."
+      },
+      "min_discount": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 99,
+       "description": "Minimum discount per item, in percent."
+      },
+      "max_price": {
+       "type": "number",
+       "description": "Maximum price per item in euro."
+      },
+      "ends_within_days": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 60,
+       "description": "Only promotions that end within this many days."
+      },
+      "sort": {
+       "type": "string",
+       "enum": [
+        "relevance",
+        "discount",
+        "price",
+        "ends"
+       ],
+       "description": "Default: relevance when there is a query, else discount."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "description": "Results to return (default 10)."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Skip this many results (for the next page)."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search Belgian deals",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://dealio/cards"
+     },
+     "openai/toolInvocation/invoking": "Kortingen zoeken op dealio…",
+     "openai/toolInvocation/invoked": "Kortingen gevonden"
+    }
+   },
+   {
+    "name": "get_deal",
+    "description": "One promotion in full, by the id a search result gave.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "The `id` of a search result."
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Get one deal",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_buying_guide",
+    "description": "A researched buying guide (koopwijzer) for a kind of product, e.g. 'airfryer': the models compared (key specs, today's lowest promotion), what each feature does, when you need it and when not, and general facts, every statement with its source. Use it for 'best <product>' and 'which <product> should I buy' questions ('beste airfryer', 'welke wasmachine kopen'): it does not crown a winner, it gives the cited test and buyer scores with their sources. Without a type: the list of guides.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "type": {
+       "type": "string",
+       "description": "Kind of product, Dutch or English, e.g. 'airfryer', 'heteluchtfriteuse'. Optional."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Get a buying guide",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_model",
+    "description": "One model from a buying guide in full: the maker's specs, what tests and buyers say (score, summary, pros, cons, source), facts, and today's promotions for it with their links.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "model": {
+       "type": "string",
+       "description": "Model code or name, e.g. 'NA352', 'Philips NA555/00', 'MAF462B1', or the id get_buying_guide gave."
+      }
+     },
+     "required": [
+      "model"
+     ]
+    },
+    "annotations": {
+     "title": "Get one model",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_stores",
+    "description": "The stores in the data: slug, name, number of current promotions, the median discount per item where known, when the store was last fetched, and the pages of the store and its weekly overview. Also lists the category slugs.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List stores",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "publish_card",
+    "title": "Publish a promotion",
+    "description": "One promotion ready to publish elsewhere: the card as a picture (PNG, the same card the site's share button makes: store, photo, title, what you pay, regular price, label, end date; square by default, or 4:5 feed, 9:16 story, 1200x630 link preview; four designs: a shelf tag, b till receipt, d large photo, f 'Vandaag €x goedkoper' with the price large), a short link dealio.be/l/<code> that counts the click and sends the reader straight to the store's page, the store's page itself, the dealio link and a caption. Use the id from search_deals or get_deal.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "the promotion id (search_deals / get_deal)"
+      },
+      "size": {
+       "type": "string",
+       "enum": [
+        "1080x1080",
+        "1080x1350",
+        "1080x1920",
+        "1200x630"
+       ],
+       "description": "1080x1080 square (default), 1080x1350 feed, 1080x1920 story, 1200x630 link preview"
+      },
+      "style": {
+       "type": "string",
+       "enum": [
+        "a",
+        "b",
+        "d",
+        "f"
+       ],
+       "description": "a shelf tag, b till receipt, d large photo, f 'how much do you save today' (only with a saving). Default: the promotion's own."
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "One promotion as a card to share",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_link",
+    "description": "One link that opens several promotions together on one page of dealio.be (dealio.be/lijst/…), in the order given, with an optional title: for the promotions you propose to the user after one or more searches, so they need not open them one by one. Use the ids from search_deals, get_deal or get_meal_ideas (2 to 30). Unknown ids are reported and left out.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "ids": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "minItems": 1,
+       "maxItems": 30,
+       "description": "The promotion ids, in the order to show them."
+      },
+      "title": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "A short title for the page, e.g. 'Coca-Cola per liter' or 'Boodschappen voor zaterdag'. Optional."
+      }
+     },
+     "required": [
+      "ids"
+     ]
+    },
+    "annotations": {
+     "title": "One link for several promotions",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://dealio/cards"
+     },
+     "openai/toolInvocation/invoking": "Kortingen zoeken op dealio…",
+     "openai/toolInvocation/invoked": "Kortingen gevonden"
+    }
+   },
+   {
+    "name": "get_meal_ideas",
+    "description": "Meal ideas from the promotions (kookinspiratie): the dishes whose main ingredients are all in promotion at the given Belgian food store(s) on the day the user shops, with those promotions (price, deal, until when, link), the side ingredients that are in promotion too, and what else is needed that is not. Dish ideas for a shopping list, not recipes. Without stores: per food store how many dishes its promotions make today.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "stores": {
+       "type": "string",
+       "description": "One or more food stores, comma separated, by name or slug, e.g. 'Aldi', 'aldi, lidl', 'Delhaize'. Optional."
+      },
+      "day": {
+       "type": "string",
+       "description": "The shopping day: an ISO date (YYYY-MM-DD), 'today', 'tomorrow' or a weekday ('zaterdag', 'saturday'). Within the next 7 days. Default: today."
+      },
+      "moment": {
+       "type": "string",
+       "enum": [
+        "hoofdgerecht",
+        "soep",
+        "lunch",
+        "ontbijt",
+        "dessert",
+        "aperitief"
+       ],
+       "description": "Kind of dish. Default: hoofdgerecht (main course)."
+      },
+      "vegetarian": {
+       "type": "boolean",
+       "description": "Only vegetarian dishes, and only promotions without meat or fish. Default false."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "description": "Dishes to return (default 10)."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Skip this many dishes (for the next page)."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Meal ideas from the promotions",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://dealio/cards"
+     },
+     "openai/toolInvocation/invoking": "Gerechten zoeken op dealio…",
+     "openai/toolInvocation/invoked": "Gerechten gevonden"
+    }
+   },
+   {
+    "name": "get_news",
+    "description": "Belgian consumer news for people who want to save (dealio.be/nieuws/): prices, promotions, store openings and incidents, product recalls (FAVV), tests (Test-Aankoop), taxes and energy, summarised by dealio in two or three sentences with our own headline, the source and the link to its article, newest first. Filter by store (name or slug) or theme. Each item has dealio's link (the item on the news page) and the store pages it names.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "store": {
+       "type": "string",
+       "description": "Only news that names this store, by name or slug, e.g. 'Delhaize', 'aldi'. Optional."
+      },
+      "theme": {
+       "type": "string",
+       "enum": [
+        "prijzen",
+        "promoties",
+        "winkels",
+        "terugroeping",
+        "test",
+        "belasting-energie",
+        "besparen",
+        "koopjes",
+        "andere"
+       ],
+       "description": "Only this theme. Optional."
+      },
+      "q": {
+       "type": "string",
+       "description": "Words to find in the headline or summary (Dutch). Optional."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "description": "Items to return (default 10)."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Skip this many items (for the next page)."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Consumer news",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_campaigns",
+    "description": "The store campaigns (winkelacties) running at Belgian retailers, as read from the stores' own sites (dealio.be/acties/): a percentage on a whole range, brand or store, multi-buy (1+1, 2e halve prijs), cashback from the maker, a voucher, a gift, free delivery, loyalty-card deals, sales, no VAT, and announced ones. Not one product's price (that is search_deals). Each with store, kind, the advantage in a few words, what it applies to, condition, code, validity, whether it works on products or on the whole basket, dealio's link, and the promotions on dealio that fall under it (with their links). Filter by store, kind or words.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "store": {
+       "type": "string",
+       "description": "Store name or slug, e.g. 'Kruidvat', 'gamma'. See list_stores. Optional."
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "btw",
+        "procent",
+        "meerkoop",
+        "kortingsbon",
+        "cadeau",
+        "cashback",
+        "levering",
+        "klantenkaart",
+        "solden",
+        "inruil",
+        "aangekondigd",
+        "andere"
+       ],
+       "description": "Only this kind: btw (no VAT), procent (a percentage on a range), meerkoop (1+1, 2e halve prijs), kortingsbon (voucher), cadeau (gift), cashback, levering (delivery), klantenkaart (loyalty card), solden (sales), inruil (trade-in), aangekondigd (announced, not yet running), andere. Optional."
+      },
+      "q": {
+       "type": "string",
+       "description": "Words to find in the campaign's title, what it applies to, its condition or code (Dutch), e.g. 'verf', 'Nivea', 'speelgoed'. Optional."
+      },
+      "reach": {
+       "type": "string",
+       "enum": [
+        "product",
+        "mandje"
+       ],
+       "description": "product: the advantage is on certain products (a brand, a range, a category); mandje: on the basket, the order or the whole store. Optional."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "description": "Campaigns to return (default 10)."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Skip this many campaigns (for the next page)."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Store campaigns",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://dealio/cards",
+    "name": "dealio-cards",
+    "title": "Dealio: promotions as cards",
+    "mimeType": "text/html;profile=mcp-app",
+    "description": "The promotions of search_deals, list_link and get_meal_ideas as cards with tick-off boxes; every link opens dealio.be.",
+    "_meta": {
+     "ui": {
+      "csp": {
+       "resourceDomains": [
+        "https://dealio.be"
+       ],
+       "connectDomains": []
+      },
+      "prefersBorder": false
+     },
+     "openai/widgetDomain": "https://dealio.be",
+     "openai/widgetCSP": {
+      "resource_domains": [
+       "https://dealio.be"
+      ],
+      "connect_domains": []
+     },
+     "openai/widgetDescription": "The promotions as cards: picture, store, price per item with the regular price, discount, until when; a tick-off box per card and a link to dealio.be. Do not repeat every card in the answer."
+    }
+   }
+  ]
+ }
+}

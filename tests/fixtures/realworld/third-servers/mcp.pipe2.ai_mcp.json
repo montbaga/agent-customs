@@ -1,0 +1,1025 @@
+{
+ "url": "https://mcp.pipe2.ai/mcp",
+ "doc": {
+  "name": "pipe2-ai",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Pipe2.ai MCP Server: create and edit videos, images and audio with AI pipelines. Discover pipelines with list_pipelines and their inputs with get_pipeline_schema. Check the price with estimate_pipeline_cost, start a run with run_pipeline and get its result with wait_for_pipeline_run. Pipelines compose: pass a run's output assets by ID as inputs to the next pipeline.",
+  "tools": [
+   {
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Stop a pending or running pipeline run. Credits for work that did not happen are returned; work already finished may still be charged. A run that has already finished cannot be cancelled.",
+    "inputSchema": {
+     "properties": {
+      "run_id": {
+       "description": "The pipeline run ID returned by run_pipeline",
+       "type": "string"
+      }
+     },
+     "required": [
+      "run_id"
+     ],
+     "type": "object"
+    },
+    "name": "cancel_pipeline_run",
+    "outputSchema": {
+     "properties": {
+      "success": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "success"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Estimate the credits a pipeline run would cost before running it, with the same input you would pass to run_pipeline. Returns estimated_mc (the expected charge, in millicredits; 1000 = 1 credit), reservation_mc (what the run holds when it starts) and, for automatic model choice, the model it would route to. A run that holds its credits step by step also returns ceiling_mc, the most it can hold in total: it stops when the credits run out and keeps what it finished. Use it to confirm the cost with the user before a paid run or a multi-step chain.",
+    "inputSchema": {
+     "properties": {
+      "input": {
+       "description": "Pipeline input fields as a JSON object, as for run_pipeline. Unfinished inputs still return a price where the pipeline allows it.",
+       "properties": {},
+       "type": "object"
+      },
+      "pipeline_slug": {
+       "description": "The slug identifier of the pipeline (e.g., 'video-cut', 'image-generator')",
+       "type": "string"
+      }
+     },
+     "required": [
+      "pipeline_slug",
+      "input"
+     ],
+     "type": "object"
+    },
+    "name": "estimate_pipeline_cost",
+    "outputSchema": {
+     "properties": {
+      "ceiling_mc": {
+       "type": "integer"
+      },
+      "estimate_is_partial": {
+       "type": "boolean"
+      },
+      "estimated_mc": {
+       "type": "integer"
+      },
+      "incompatible_models": {},
+      "is_metered": {
+       "type": "boolean"
+      },
+      "length_unknown": {
+       "type": "boolean"
+      },
+      "model_input_schema": {},
+      "pipeline_slug": {
+       "type": "string"
+      },
+      "reservation_mc": {
+       "type": "integer"
+      },
+      "routed_model": {
+       "type": "string"
+      },
+      "routed_reason_code": {
+       "type": "string"
+      },
+      "routed_reason_params": {}
+     },
+     "required": [
+      "pipeline_slug",
+      "reservation_mc",
+      "estimated_mc",
+      "is_metered",
+      "estimate_is_partial",
+      "ceiling_mc",
+      "length_unknown",
+      "routed_model",
+      "routed_reason_code",
+      "routed_reason_params",
+      "incompatible_models",
+      "model_input_schema"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Check the status of a pipeline run. Returns status (pending/running/completed/failed), output data, error messages, timestamps, and generated asset URLs.",
+    "inputSchema": {
+     "properties": {
+      "run_id": {
+       "description": "The pipeline run ID returned by run_pipeline",
+       "type": "string"
+      }
+     },
+     "required": [
+      "run_id"
+     ],
+     "type": "object"
+    },
+    "name": "get_pipeline_run_status",
+    "outputSchema": {
+     "properties": {
+      "agent_actual_credits_mc": {
+       "type": "integer"
+      },
+      "assets": {
+       "items": {
+        "properties": {
+         "created_at": {
+          "type": "string"
+         },
+         "id": {
+          "type": "string"
+         },
+         "thumbnail_url": {
+          "type": "string"
+         },
+         "type": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "type",
+         "url",
+         "thumbnail_url",
+         "created_at"
+        ],
+        "type": "object"
+       },
+       "type": "array"
+      },
+      "completed_at": {
+       "type": "string"
+      },
+      "created_at": {
+       "type": "string"
+      },
+      "credits_charged": {
+       "type": "integer"
+      },
+      "error_message": {
+       "type": "string"
+      },
+      "id": {
+       "type": "string"
+      },
+      "input": {},
+      "output": {},
+      "parent_run_id": {
+       "type": "string"
+      },
+      "pipeline": {
+       "properties": {
+        "cancellable": {
+         "type": "boolean"
+        },
+        "input_schema": {},
+        "name": {
+         "type": "string"
+        },
+        "output_schema": {},
+        "parameter_aliases": {
+         "items": {
+          "properties": {
+           "alias": {
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           },
+           "number_scale": {
+            "type": "number"
+           },
+           "numeric_string": {
+            "type": "boolean"
+           },
+           "value_map": {}
+          },
+          "required": [
+           "alias",
+           "name",
+           "value_map",
+           "number_scale",
+           "numeric_string"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "translations": {
+         "items": {
+          "properties": {
+           "locale": {
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "locale",
+           "name"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        },
+        "ui_schema": {}
+       },
+       "required": [
+        "name",
+        "slug",
+        "output_schema",
+        "input_schema",
+        "parameter_aliases",
+        "ui_schema",
+        "cancellable",
+        "translations"
+       ],
+       "type": "object"
+      },
+      "pipeline_name": {
+       "type": "string"
+      },
+      "share_token": {
+       "type": "string"
+      },
+      "share_watermark": {
+       "type": "boolean"
+      },
+      "status": {
+       "type": "string"
+      },
+      "workflow_execution": {
+       "properties": {
+        "close_time": {
+         "type": "string"
+        },
+        "start_time": {
+         "type": "string"
+        },
+        "status": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "status",
+        "start_time",
+        "close_time"
+       ],
+       "type": "object"
+      }
+     },
+     "required": [
+      "id",
+      "status",
+      "input",
+      "output",
+      "error_message",
+      "credits_charged",
+      "parent_run_id",
+      "agent_actual_credits_mc",
+      "created_at",
+      "completed_at",
+      "share_token",
+      "share_watermark",
+      "pipeline_name",
+      "pipeline",
+      "assets",
+      "workflow_execution"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Get the input schema for a specific pipeline. Returns the JSON Schema describing required and optional input fields. Use this before running a pipeline to understand what inputs are needed.",
+    "inputSchema": {
+     "properties": {
+      "pipeline_slug": {
+       "description": "The slug identifier of the pipeline (e.g., 'image-generator', 'video-generator')",
+       "type": "string"
+      }
+     },
+     "required": [
+      "pipeline_slug"
+     ],
+     "type": "object"
+    },
+    "name": "get_pipeline_schema",
+    "outputSchema": {
+     "properties": {
+      "category": {
+       "type": "string"
+      },
+      "input_schema": {
+       "type": "object"
+      },
+      "name": {
+       "type": "string"
+      },
+      "providers": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "slug": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "name",
+      "category",
+      "input_schema"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "List all available AI video/image pipelines. Returns name, slug, description, category, credit cost, and required providers for each active pipeline.",
+    "inputSchema": {
+     "properties": {},
+     "required": [],
+     "type": "object"
+    },
+    "name": "list_pipelines",
+    "outputSchema": {
+     "properties": {
+      "pipelines": {
+       "items": {
+        "properties": {
+         "category": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "models": {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         "name": {
+          "type": "string"
+         },
+         "providers": {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         "slug": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "description",
+         "category",
+         "providers",
+         "models"
+        ],
+        "type": "object"
+       },
+       "type": "array"
+      }
+     },
+     "required": [
+      "pipelines"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "description": "Request a presigned S3 upload URL for a file. Use this for pipeline inputs that require file URLs (e.g., images, videos, audio).\n\n**Two-step upload flow:**\n1. Call this tool with filename and content_type to get a presigned upload URL and final asset URL\n2. PUT the file contents to the upload_url (presigned, expires in 5 minutes)\n3. Use the asset_url as the input value when running a pipeline\n\nSupported content types: image/* (max 10MB), video/* (max 50MB), audio/* (max 20MB)",
+    "inputSchema": {
+     "properties": {
+      "content_type": {
+       "description": "MIME type of the file (e.g., 'image/jpeg', 'image/png', 'video/mp4', 'audio/mpeg')",
+       "type": "string"
+      },
+      "filename": {
+       "description": "Name of the file to upload (e.g., 'photo.jpg', 'video.mp4')",
+       "type": "string"
+      }
+     },
+     "required": [
+      "filename",
+      "content_type"
+     ],
+     "type": "object"
+    },
+    "name": "request_upload",
+    "outputSchema": {
+     "properties": {
+      "asset_url": {
+       "type": "string"
+      },
+      "key": {
+       "type": "string"
+      },
+      "upload_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "upload_url",
+      "asset_url",
+      "key"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "description": "Run an AI pipeline by slug with the given input. Use list_pipelines to discover available pipelines, get_pipeline_schema to see required inputs and estimate_pipeline_cost to check the price. Returns a run ID; use wait_for_pipeline_run to get the result. A run's output assets can be passed by ID as inputs to another pipeline.",
+    "inputSchema": {
+     "properties": {
+      "input": {
+       "description": "Pipeline input fields as a JSON object. Use get_pipeline_schema to see required fields for each pipeline.",
+       "properties": {},
+       "type": "object"
+      },
+      "pipeline_slug": {
+       "description": "The slug identifier of the pipeline to run (e.g., 'image-generator', 'video-generator')",
+       "type": "string"
+      }
+     },
+     "required": [
+      "pipeline_slug",
+      "input"
+     ],
+     "type": "object"
+    },
+    "name": "run_pipeline",
+    "outputSchema": {
+     "properties": {
+      "run_id": {
+       "type": "string"
+      },
+      "workflow_id": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "run_id",
+      "workflow_id"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "description": "Wait until a pipeline run finishes, then return its final status, output and generated assets. Each call waits at most timeout_seconds; if the run is still going, the result says so and you can call it again. Prefer this to repeated get_pipeline_run_status calls.",
+    "inputSchema": {
+     "properties": {
+      "run_id": {
+       "description": "The pipeline run ID returned by run_pipeline",
+       "type": "string"
+      },
+      "timeout_seconds": {
+       "description": "How long to wait in this call, 1-55 seconds (default 45).",
+       "maximum": 55,
+       "minimum": 1,
+       "type": "number"
+      }
+     },
+     "required": [
+      "run_id"
+     ],
+     "type": "object"
+    },
+    "name": "wait_for_pipeline_run",
+    "outputSchema": {
+     "properties": {
+      "agent_actual_credits_mc": {
+       "type": "integer"
+      },
+      "assets": {
+       "items": {
+        "properties": {
+         "created_at": {
+          "type": "string"
+         },
+         "id": {
+          "type": "string"
+         },
+         "thumbnail_url": {
+          "type": "string"
+         },
+         "type": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "type",
+         "url",
+         "thumbnail_url",
+         "created_at"
+        ],
+        "type": "object"
+       },
+       "type": "array"
+      },
+      "completed_at": {
+       "type": "string"
+      },
+      "created_at": {
+       "type": "string"
+      },
+      "credits_charged": {
+       "type": "integer"
+      },
+      "error_message": {
+       "type": "string"
+      },
+      "id": {
+       "type": "string"
+      },
+      "input": {},
+      "output": {},
+      "parent_run_id": {
+       "type": "string"
+      },
+      "pipeline": {
+       "properties": {
+        "cancellable": {
+         "type": "boolean"
+        },
+        "input_schema": {},
+        "name": {
+         "type": "string"
+        },
+        "output_schema": {},
+        "parameter_aliases": {
+         "items": {
+          "properties": {
+           "alias": {
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           },
+           "number_scale": {
+            "type": "number"
+           },
+           "numeric_string": {
+            "type": "boolean"
+           },
+           "value_map": {}
+          },
+          "required": [
+           "alias",
+           "name",
+           "value_map",
+           "number_scale",
+           "numeric_string"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "translations": {
+         "items": {
+          "properties": {
+           "locale": {
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "locale",
+           "name"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        },
+        "ui_schema": {}
+       },
+       "required": [
+        "name",
+        "slug",
+        "output_schema",
+        "input_schema",
+        "parameter_aliases",
+        "ui_schema",
+        "cancellable",
+        "translations"
+       ],
+       "type": "object"
+      },
+      "pipeline_name": {
+       "type": "string"
+      },
+      "share_token": {
+       "type": "string"
+      },
+      "share_watermark": {
+       "type": "boolean"
+      },
+      "status": {
+       "type": "string"
+      },
+      "workflow_execution": {
+       "properties": {
+        "close_time": {
+         "type": "string"
+        },
+        "start_time": {
+         "type": "string"
+        },
+        "status": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "status",
+        "start_time",
+        "close_time"
+       ],
+       "type": "object"
+      }
+     },
+     "required": [
+      "id",
+      "status",
+      "input",
+      "output",
+      "error_message",
+      "credits_charged",
+      "parent_run_id",
+      "agent_actual_credits_mc",
+      "created_at",
+      "completed_at",
+      "share_token",
+      "share_watermark",
+      "pipeline_name",
+      "pipeline",
+      "assets",
+      "workflow_execution"
+     ],
+     "type": "object"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "use_audio_generator",
+    "description": "Guide for using the Audio Generator pipeline — Turn text into natural speech with dozens of voices, 70+ languages, and custom style directions for tone, accent, and pacing.",
+    "arguments": [
+     {
+      "name": "text",
+      "description": "Text to convert to speech.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_background_remover",
+    "description": "Guide for using the AI Background Remover pipeline — Remove the background and get a transparent PNG. Cut out the subject as is, or let AI refine it.",
+    "arguments": [
+     {
+      "name": "image_url",
+      "description": "Upload one image to remove its background. PNG, JPEG, WebP, GIF, HEIC, or HEIF; up to 20 MB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_captions",
+    "description": "Guide for using the AI Captions pipeline — Burn word-by-word captions into a video, in the style and colours you pick. The speech is transcribed for you, or attach your own SRT.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video to burn captions into, up to 30 minutes. MP4, MOV, or WebM.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_footage_search",
+    "description": "Guide for using the Footage Search pipeline — Find stock video for B-roll, establishing shots and backgrounds. Receive links to clips from Pexels and Pixabay.",
+    "arguments": [
+     {
+      "name": "query",
+      "description": "Describe the footage you need",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_image_editor",
+    "description": "Guide for using the Image Editor pipeline — Edit any image with AI. Change style, remove objects, modify elements, or transform the entire look.",
+    "arguments": [
+     {
+      "name": "image_urls",
+      "description": "Upload one image to edit it on its own or several to combine them into one result. Grok Imagine accepts up to 3, Grok Imagine Image 2.0 up to 5, and Gemini models up to 14.",
+      "required": true
+     },
+     {
+      "name": "instructions",
+      "description": "What to change, in plain language — the edit is applied to the whole image.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_image_generator",
+    "description": "Guide for using the Image Generator pipeline — Generate AI images from text or reference photos. Product shots, character art, posters with readable text, photoreal portraits, high resolution in seconds."
+   },
+   {
+    "name": "use_image_search",
+    "description": "Guide for using the Image Search pipeline — Search museum archives and stock photo libraries with AI-targeted queries that curate the best results from five sources.",
+    "arguments": [
+     {
+      "name": "query",
+      "description": "Describe what images you need",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_image_to_3d",
+    "description": "Guide for using the Image to 3D pipeline — Turn one image into a textured 3D model. Rotate it in your browser and download GLB, OBJ, or USDZ.",
+    "arguments": [
+     {
+      "name": "image_url",
+      "description": "Upload one image of the object. JPEG, PNG, WebP, BMP, TIFF, or GIF; 300–6000 px per side; up to 20 MB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_music_generator",
+    "description": "Guide for using the Music Generator pipeline — Generate original background music that matches any mood, genre, and length you describe. Royalty-free, ready in seconds.",
+    "arguments": [
+     {
+      "name": "prompt",
+      "description": "Describe genre, mood, instruments, tempo, key, structure, and the track's intended use.",
+      "required": true
+     },
+     {
+      "name": "duration_sec",
+      "description": "Requested track length in seconds. Model output can vary slightly.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_object_remover",
+    "description": "Guide for using the AI Object Remover pipeline — Name one thing in a video — a passer-by, a boom mic, a glass on a table — and get the same video without it: the thing and its shadow gone, and what was behind it in its place.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video up to 30 minutes. MP4, MOV, or WebM; up to 4 GB.",
+      "required": true
+     },
+     {
+      "name": "instructions",
+      "description": "What to take out and where it is. One object per run.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_transcription",
+    "description": "Guide for using the Transcription pipeline — Transcribe any video or audio file to text. Timestamps, speaker detection, and 99+ language support.",
+    "arguments": [
+     {
+      "name": "media_url",
+      "description": "Audio or video to transcribe. Asset id returned by an upload. See /docs/api/ for the upload flow.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_analysis",
+    "description": "Guide for using the AI Video Analysis pipeline — Understand a video before editing: get a summary, moments, chapters, speakers, shot information and an audio/visual activity map.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "Upload one video up to 30 minutes. MP4, MOV, or WebM; up to 4 GB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_cut",
+    "description": "Guide for using the AI Video Cut pipeline — Find highlights, shorten a recording or build a story from several videos. Receive separate clips and their source ranges.",
+    "arguments": [
+     {
+      "name": "video_urls",
+      "description": "Upload or select one to ten videos, up to 30 minutes together. MP4, MOV, or WebM; up to 4 GB each.",
+      "required": true
+     },
+     {
+      "name": "instructions",
+      "description": "What to keep and how: clips of the best moments, a short summary, a story from several videos, or the whole video without pauses and filler words. Give times when you know them, and how many clips and how long.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_design",
+    "description": "Guide for using the AI Video Design pipeline — Add titles, keyword graphics and inserts in a look you choose, without changing the video’s duration or sound.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video up to 30 minutes. MP4, MOV, or WebM.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_generator",
+    "description": "Guide for using the Video Generator pipeline — Create a new video from a prompt and references, or change an existing clip with a model that supports video editing."
+   },
+   {
+    "name": "use_video_masking",
+    "description": "Guide for using the AI Video Background Remover pipeline — Cut a person or object out of a short video as a transparent layer (or over a new background), plus its black-and-white matte: for example, lift the speaker out to lay her over slides.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "Upload one video up to 30 seconds long. MP4, MOV, or WebM; up to 500 MB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_redaction",
+    "description": "Guide for using the AI Video Redaction pipeline — Hide what should not be seen in a video: every face, or one object you name, followed and covered with a blur, a mosaic or a solid patch.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video up to 30 minutes. MP4, MOV, or WebM; up to 4 GB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_reframe",
+    "description": "Guide for using the Video Reframe pipeline — Change a video’s aspect ratio while following speakers, action and important content. Keep the original duration, shot order and audio.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "Upload or select the video to reframe.",
+      "required": true
+     },
+     {
+      "name": "aspect_ratio",
+      "description": "Choose the format for the finished video.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_repair",
+    "description": "Guide for using the AI Video Repair pipeline — Fix a video's picture: steady a shaky camera, even its colour and white balance, take the grain out and lift a dark picture, without changing its length or sound.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video up to 30 minutes. MP4, MOV, or WebM; up to 4 GB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_video_sound",
+    "description": "Guide for using the AI Video Sound pipeline — Add music, narration and sound effects or adjust the original audio. The picture, cuts and duration stay unchanged.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video up to 30 minutes. MP4, MOV, or WebM.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_voice_isolator",
+    "description": "Guide for using the AI Voice Isolator pipeline — Take the voice out of a noisy recording: background noise, music and room echo removed, as an MP3 of the same length.",
+    "arguments": [
+     {
+      "name": "media_url",
+      "description": "Upload one video or audio file up to 30 minutes long. MP4, MOV, WebM, MP3, WAV, M4A, FLAC, AAC or OGG; up to 4 GB.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_watermark",
+    "description": "Guide for using the Watermark pipeline — Put your logo in a corner of a video — for example your channel mark at the top right at 40% opacity — and receive a watermarked MP4.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "Public URL of the video to watermark.",
+      "required": true
+     },
+     {
+      "name": "logo_url",
+      "description": "PNG, SVG, or JPEG, PNG or SVG with transparency reads cleanest on any background",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "use_watermark_remover",
+    "description": "Guide for using the AI Watermark Remover pipeline — Take a watermark, logo or handle burned into a video out of the picture. The picture under a see-through mark comes back as it was; a solid mark is replaced with what was behind it.",
+    "arguments": [
+     {
+      "name": "video_url",
+      "description": "One video up to 30 minutes with the mark burned into its picture. MP4, MOV, or WebM; up to 4 GB.",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "billing://balance",
+    "name": "Credit Balance",
+    "description": "Your current credit balance, including available and reserved credits.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "billing://history",
+    "name": "Credit History",
+    "description": "Your credit transaction history showing purchases, usage, and refunds.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "assets://list",
+    "name": "List Assets",
+    "description": "List your generated assets (images, videos, audio). All assets from pipeline runs.",
+    "mimeType": "application/json"
+   }
+  ]
+ }
+}

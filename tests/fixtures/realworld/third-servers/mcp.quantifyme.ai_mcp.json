@@ -1,0 +1,598 @@
+{
+ "url": "https://mcp.quantifyme.ai/mcp",
+ "doc": {
+  "name": "quantifyme",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "QuantifyMe turns a trading strategy written in plain English into a backtested signal model for seven FX pairs. Each session gets an anonymous trial account automatically, with a small credit allowance; `link_account` connects an existing QuantifyMe account instead. `one_shot` takes the user's request as `prompt` (plus optional `symbol` and `timeframe`) and starts one deploy per call; each call creates a separate deploy and deploy card. The platform routes the request itself: a vague request ('deploy a 15min EURUSD model') deploys the best curated preset for that market, or a fresh build when there is none; a specific rule-based description ('buy when RSI < 30') generates a fresh strategy. A community strategy is another user's code: it deploys only after the user has seen its author and code (`get_strategy_code`) and picked it, by passing its `community_id` to `one_shot`. `one_shot` returns a `job_token` at once; `get_deploy_result(job_token)` waits for the deploy to finish and returns the out-of-sample stats, the live dashboard URL and the code source as text. Its `source` field says whether the code came from a curated preset, a fresh generation or a community strategy (with its author); a `suggestion` is a matching community strategy that was not deployed. `get_model_chart` returns a model's trades and stats for a chart. `list_models` and `list_deployed` show the account's models; `browse_community` and `find_strategy` search published community strategies; `get_quote` returns the latest price. QuantifyMe never places orders or moves money: it sends signals to the channels the user sets up (Telegram, email, Discord or webhook; the free plan and trial keys get Telegram, email and in-app; Discord and webhook need a paid plan), and `one_shot` sets up Telegram from `telegram_chat_id` or a webhook from `webhook_url`. Backtests and signals are information, not financial advice; no performance is promised.",
+  "tools": [
+   {
+    "name": "one_shot",
+    "title": "Deploy Strategy (generate + backtest + go live)",
+    "description": "End-to-end deploy: generate strategy → train → deploy live.\n\n    One of `prompt` (free-form NL), `preset` (curated winning strategy), or\n    `community_id` (copy a published community strategy) is required. If more\n    than one is passed, precedence is community_id > preset > prompt.\n\n    Args:\n      prompt: Natural-language strategy description (e.g. \"Buy when RSI < 30, sell > 70\").\n      symbol: Currency pair to backtest on. One of: EURUSD, USDJPY, GBPUSD,\n        USDCHF, USDCAD, AUDUSD, NZDUSD. Default EURUSD.\n      timeframe: Candle granularity. One of: 1min, 5min, 15min, 1h. Default 15min.\n      claude_model: Which Claude variant writes the code: \"sonnet\" (default, best\n        quality) or \"haiku\" (faster, cheaper). Generation is billed from the\n        account's credits. Ignored when `preset` is set (no generation needed).\n      preset: Curated winning-strategy slug. Skips Claude generation entirely\n        — deploys a pre-saved strategy known to backtest well on the chosen\n        symbol. Available slugs: ema_cross_fast, momentum, scalper_stack,\n        sma_only, trend_ema, volatility, bb_squeeze, all_mix, pivot_kid_ema.\n        Not every slug exists for every symbol; list_models shows what deployed.\n      community_id: Copy-trade a published community strategy. Pass the `id`\n        of an entry from `browse_community`. Loads that exact strategy code,\n        skips Claude generation, then trains + deploys it. `symbol`/`timeframe`\n        still apply to the backtest+deploy.\n      webhook_url: Optional webhook to receive live signals.\n      telegram_chat_id: Optional Telegram chat ID for signal delivery.\n\n    Returns at once (the deploy runs in the background so the live card can\n    stream progress) with:\n        - job_token (str): get_deploy_result(job_token) returns the final result.\n        - poll_url (str): the progress URL the live card polls.\n        - pending (bool): true; the deploy is still running.\n        - symbol, timeframe (str).\n\n    Each call starts one deploy and one deploy card, and is billed from the\n    account's credits. The server routes the request: a vague `prompt` deploys\n    the best curated preset for the market, or a fresh build when there is none;\n    specific rules generate a fresh strategy. A community strategy deploys only\n    after the user has seen its author and code (get_strategy_code) and picked\n    it, through its `community_id`.\n\n    get_deploy_result(job_token) waits for the deploy and returns the\n    out-of-sample stats, `stem`, `live_url` and `source`/`author` as text; its\n    `source` says when a pre-existing community strategy was used, and a\n    `suggestion` is a matching community strategy that was not deployed.\n    ",
+    "inputSchema": {
+     "properties": {
+      "prompt": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Prompt"
+      },
+      "symbol": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Symbol"
+      },
+      "timeframe": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Timeframe"
+      },
+      "claude_model": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Claude Model"
+      },
+      "preset": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Preset"
+      },
+      "community_id": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Community Id"
+      },
+      "webhook_url": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Webhook Url"
+      },
+      "telegram_chat_id": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Telegram Chat Id"
+      }
+     },
+     "title": "one_shotArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "one_shotDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Deploy Strategy (generate + backtest + go live)",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/qm-oneshot-v15.html",
+     "openai/widgetDescription": "A live-deployed QuantifyMe model: live progress, then backtest chart (candles + buy/sell arrows + trades) + a one-click live link."
+    }
+   },
+   {
+    "name": "get_deploy_result",
+    "title": "Get Deploy Result",
+    "description": "Wait for a `one_shot` deploy to finish and return its final result as text.\n\n    Takes the job_token `one_shot` returned. Waits until the deploy finishes, up\n    to about 2.5 minutes; past that it returns ok:false with pending:true, and a\n    later call with the same token picks the same deploy up again. It renders no\n    card of its own: the one_shot deploy card is the visual, where the client\n    renders it.\n\n    `source == \"community\"` means the deploy used a pre-existing strategy by\n    `@author` that the user picked. A `suggestion` is a community strategy that\n    matched a vague request and was not deployed; it deploys only after the user\n    has seen its author and code and picked it.\n\n    Args:\n      job_token: the token returned by `one_shot`.\n\n    Returns:\n      dict with: ok, stem, model, live_url, symbol, timeframe, channels (list),\n      stats:{ret, wr, pf, n, mdd} (out-of-sample test-split metrics), source\n      (\"preset\" | \"generated\" | \"community\"), author (community username if any),\n      author_url + strategy_url (links for the author and the community strategy),\n      community_id, suggest_custom (bool), suggestion ({community_id, title,\n      author} or null: matched, not deployed), and note (a one-line summary of\n      the source). On failure: {ok:false, error} (or {pending:true}).\n    ",
+    "inputSchema": {
+     "properties": {
+      "job_token": {
+       "title": "Job Token",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_token"
+     ],
+     "title": "get_deploy_resultArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "get_deploy_resultDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Get Deploy Result",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "link_account",
+    "title": "Link My QuantifyMe Account",
+    "description": "Link this chat to the user's existing QuantifyMe account.\n\n    For a user who already has a QuantifyMe account, who wonders why their\n    models are missing here, or who wants what they deploy here to show up in\n    their own dashboard.\n\n    By default this connector works with NO signup: it mints an anonymous trial\n    account per MCP session, so models deployed here belong to that throwaway\n    identity rather than to the user's real one. This returns a short-lived URL;\n    once the user opens it and approves, every later call that carries the same\n    OAuth bearer or the same MCP session acts as their account and deploys land\n    in their own model list. A client that opens a new MCP session on every turn\n    must link again in that session; every answer's `acting_as` line says which\n    identity was used.\n\n    Returns `link_url` and `link_code`: show the user both. They open the link,\n    sign in, type the code on the QuantifyMe page and approve; the code only\n    works for this chat. If the session is already linked, returns\n    already_linked:true and the account's username instead.\n    ",
+    "inputSchema": {
+     "properties": {},
+     "title": "link_accountArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "link_accountDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Link My QuantifyMe Account",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "list_models",
+    "title": "List Trained Models",
+    "description": "List the user's trained models with pre-computed train/test stats.\n    `acting_as` names the identity listed: the linked account or a trial user (#1962).",
+    "inputSchema": {
+     "properties": {},
+     "title": "list_modelsArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "list_modelsDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "List Trained Models",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "list_deployed",
+    "title": "List Deployed Live Models",
+    "description": "List the user's currently deployed (live) models.",
+    "inputSchema": {
+     "properties": {},
+     "title": "list_deployedArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "list_deployedDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "List Deployed Live Models",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/qm-deployed-v2.html",
+     "openai/widgetDescription": "The user's currently deployed live models and their delivery channels."
+    }
+   },
+   {
+    "name": "generate_strategy",
+    "title": "Generate Strategy Code (no training)",
+    "description": "Generate Python strategy code only: nothing is trained or deployed.\n\n    Returns the generated code for the user to read or edit; each call is billed\n    from the account's credits.\n\n    Args:\n      features: Plain-English description of features (e.g. \"RSI 14, Bollinger Bands\").\n      signals: Plain-English description of signal logic (e.g. \"Buy when RSI < 30\").\n      model: ML model name (default Random Forest).\n      risk: Plain-English risk rules (e.g. \"0.5% stop loss\").\n      description: Optional one-line summary; the generator weighs it as the\n        main request.\n      symbol: Currency pair the code should target. One of: EURUSD, USDJPY,\n        GBPUSD, USDCHF, USDCAD, AUDUSD, NZDUSD. Default EURUSD.\n      timeframe: Candle granularity. One of: 1min, 5min, 15min, 1h. Default 15min.\n      claude_model: \"sonnet\" (default) or \"haiku\" (faster, about a third of the credits).\n    ",
+    "inputSchema": {
+     "properties": {
+      "features": {
+       "default": "",
+       "title": "Features",
+       "type": "string"
+      },
+      "signals": {
+       "default": "",
+       "title": "Signals",
+       "type": "string"
+      },
+      "model": {
+       "default": "Random Forest",
+       "title": "Model",
+       "type": "string"
+      },
+      "risk": {
+       "default": "",
+       "title": "Risk",
+       "type": "string"
+      },
+      "description": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Description"
+      },
+      "symbol": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Symbol"
+      },
+      "timeframe": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Timeframe"
+      },
+      "claude_model": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Claude Model"
+      }
+     },
+     "title": "generate_strategyArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "generate_strategyDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Generate Strategy Code (no training)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "browse_community",
+    "title": "Browse Community Strategies (leaderboard)",
+    "description": "Browse the public community leaderboard of published strategies, ranked\n    by a composite performance score (best first). No signup or key needed.\n\n    Each entry's `id` is what `one_shot` takes as `community_id` to deploy a\n    live signal model running that exact strategy.\n\n    Args:\n      limit: How many top entries to return (default 20, max 200).\n      sort: Ranking metric, best-first — one of \"composite\" (default),\n        \"ret\" (total return), \"wr\" (win rate), \"sharpe\", \"n_trades\". Mirrors\n        the quantifyme.ai/community page's sortable columns. The sorted\n        entries keep their `id`, which one_shot(community_id=...) deploys.\n\n    Returns:\n      dict with:\n        - scripts (list[dict]): ranked entries, best first. Each has:\n            id (int — pass to one_shot as community_id), username, title,\n            description, created_at, score, and metrics {total_ret,\n            sharpe_strat, win_rate, n_trades, mdd, profit_factor}.\n        - count (int).\n        - metric (str): the sort key applied.\n    ",
+    "inputSchema": {
+     "properties": {
+      "limit": {
+       "default": 20,
+       "title": "Limit",
+       "type": "integer"
+      },
+      "sort": {
+       "default": "composite",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     "title": "browse_communityArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "browse_communityDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Browse Community Strategies (leaderboard)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/qm-community-v3.html",
+     "openai/widgetDescription": "Top community trading strategies, each with a one-click copy-and-deploy."
+    }
+   },
+   {
+    "name": "find_strategy",
+    "title": "Find a Matching Strategy",
+    "description": "Find a published community strategy that matches a plain-English idea.\n\n    Mirrors the quantifyme.ai landing page: \"Found <X> by @<author> (WR/PF):\n    use it, or generate fresh\". It is for browsing; a vague deploy request is\n    handled by one_shot(prompt=...) alone, which deploys the best curated preset\n    or a fresh build. A community strategy is another user's code, so it deploys\n    only after the user has seen its author and code (get_strategy_code with the\n    match's community_id) and picked it. The two outcomes:\n      - use the match: one_shot(community_id=<match.community_id>) deploys that\n        exact strategy, with no generation;\n      - generate fresh: one_shot(prompt=\"<their description>\") writes a new\n        custom strategy.\n    With no match, only the second applies.\n\n    Args:\n      description: the user's strategy idea in plain English (e.g. \"buy EURUSD\n        15min when RSI < 30, sell when RSI > 70\").\n      symbol: optional pair to constrain the match (EURUSD, USDJPY, GBPUSD,\n        USDCHF, USDCAD, AUDUSD, NZDUSD).\n      timeframe: optional granularity to constrain the match (1min/5min/15min/1h).\n\n    Returns:\n      dict with:\n        - match: the best existing strategy, or null. When present:\n            {community_id, title, username, wr, pf, ret, n_trades, symbol,\n             timeframe}. Pass community_id to one_shot to deploy it unchanged.\n        - description: echoed back; one_shot(prompt=...) with it generates fresh.\n        - suggestion: one sentence describing the match and the two outcomes.\n    ",
+    "inputSchema": {
+     "properties": {
+      "description": {
+       "title": "Description",
+       "type": "string"
+      },
+      "symbol": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Symbol"
+      },
+      "timeframe": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Timeframe"
+      }
+     },
+     "required": [
+      "description"
+     ],
+     "title": "find_strategyArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "find_strategyDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Find a Matching Strategy",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_strategy_code",
+    "title": "Get Community Strategy Code",
+    "description": "Get the actual Python code behind a community leaderboard strategy.\n\n    Takes an entry's `id` from `browse_community` or `find_strategy` and returns\n    its real `feature_engineering()` + `strategy_config()` source, for the user\n    to inspect or tweak. The same id passed to `one_shot` as `community_id`\n    deploys it unchanged. Read-only, no signup needed.\n\n    Args:\n      community_id: The `id` of a community entry (from `browse_community`).\n\n    Returns:\n      dict with: id, title, username, description, symbol, timeframe,\n      metrics {total_ret, win_rate, profit_factor, n_trades, mdd, sharpe_strat},\n      and `code` (the full Python source).\n    ",
+    "inputSchema": {
+     "properties": {
+      "community_id": {
+       "title": "Community Id",
+       "type": "integer"
+      }
+     },
+     "required": [
+      "community_id"
+     ],
+     "title": "get_strategy_codeArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "get_strategy_codeDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Get Community Strategy Code",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_quote",
+    "title": "Get Current Price (G7 FX quote)",
+    "description": "Get the latest price for a G7 FX pair — a quick \"what's it at now\" check.\n\n    Useful for context before deploying a strategy. The price is the close of\n    the most recent 1-minute bar from the platform's market feed (not a raw\n    live tick); FX markets close on weekends, so the `stale` flag marks a bar\n    that is more than 15 minutes old.\n\n    Args:\n      symbol: G7 pair — one of EURUSD, USDJPY, GBPUSD, USDCHF, USDCAD, AUDUSD,\n        NZDUSD. Default EURUSD.\n\n    Returns:\n      dict with: symbol, price (latest close), time (bar timestamp, UTC),\n      change + change_pct (vs the prior 1-min bar), stale (bool).\n    ",
+    "inputSchema": {
+     "properties": {
+      "symbol": {
+       "default": "EURUSD",
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     "title": "get_quoteArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "get_quoteDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Get Current Price (G7 FX quote)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_model_chart",
+    "title": "Show Backtest Chart (equity + trades)",
+    "description": "A trained model's backtest: trades, stats and the data for a cumulative-return chart.\n\n    Takes a model's `stem` (from `get_deploy_result`, `one_shot` or `list_models`)\n    and returns how it traded. In clients that render the openai/outputTemplate\n    widget (ChatGPT) it shows an interactive chart; elsewhere the structured\n    output carries the trades and stats a client can draw as a line chart of\n    the cumulative return and a trade table.\n\n    Args:\n      stem: The model stem (e.g. \"14_EURUSD_15min_Model_24\") from `list_models` / `one_shot`.\n\n    Returns:\n      dict with: ok, stem, symbol, timeframe, stats {ret, wr, pf, n, mdd, sharpe},\n      and trades [{type, entry_time, exit_time, entry_price, exit_price, pnl,\n      pnl_pct, exit_reason, period}] (most recent ~200). exit_reason is one of\n      TP / SL / close_only / signal / end. ret/mdd/wr are fractions; pnl_pct is percent.\n    ",
+    "inputSchema": {
+     "properties": {
+      "stem": {
+       "title": "Stem",
+       "type": "string"
+      }
+     },
+     "required": [
+      "stem"
+     ],
+     "title": "get_model_chartArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "get_model_chartDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "title": "Show Backtest Chart (equity + trades)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/qm-chart-v21.html",
+     "openai/widgetDescription": "A model's backtest: interactive price chart with buy/sell arrows + trade log + win-rate/profit-factor stats."
+    }
+   }
+  ],
+  "resources": [
+   {
+    "name": "qm-oneshot",
+    "title": "QuantifyMe deployed model",
+    "uri": "ui://widget/qm-oneshot-v15.html",
+    "description": "A live-deployed QuantifyMe model: live progress, then backtest chart (candles + buy/sell arrows + trades) + a one-click live link.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://mcp.quantifyme.ai",
+      "prefersBorder": true,
+      "csp": {
+       "connectDomains": [
+        "https://api.quantifyme.ai",
+        "https://mcp.quantifyme.ai"
+       ],
+       "resourceDomains": [
+        "https://mcp.quantifyme.ai"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "name": "qm-community",
+    "title": "QuantifyMe community leaderboard",
+    "uri": "ui://widget/qm-community-v3.html",
+    "description": "Top community trading strategies, each with a one-click copy-and-deploy.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://mcp.quantifyme.ai",
+      "prefersBorder": true,
+      "csp": {
+       "connectDomains": [
+        "https://api.quantifyme.ai",
+        "https://mcp.quantifyme.ai"
+       ],
+       "resourceDomains": [
+        "https://mcp.quantifyme.ai"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "name": "qm-deployed",
+    "title": "QuantifyMe live models",
+    "uri": "ui://widget/qm-deployed-v2.html",
+    "description": "The user's currently deployed live models and their delivery channels.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://mcp.quantifyme.ai",
+      "prefersBorder": true,
+      "csp": {
+       "connectDomains": [
+        "https://api.quantifyme.ai",
+        "https://mcp.quantifyme.ai"
+       ],
+       "resourceDomains": [
+        "https://mcp.quantifyme.ai"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "name": "qm-chart",
+    "title": "QuantifyMe backtest chart",
+    "uri": "ui://widget/qm-chart-v21.html",
+    "description": "A model's backtest: interactive price chart with buy/sell arrows + trade log + win-rate/profit-factor stats.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://mcp.quantifyme.ai",
+      "prefersBorder": true,
+      "csp": {
+       "connectDomains": [
+        "https://api.quantifyme.ai",
+        "https://mcp.quantifyme.ai"
+       ],
+       "resourceDomains": [
+        "https://mcp.quantifyme.ai"
+       ]
+      }
+     }
+    }
+   }
+  ]
+ }
+}
