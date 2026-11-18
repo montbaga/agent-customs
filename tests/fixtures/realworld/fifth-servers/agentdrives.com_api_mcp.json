@@ -1,0 +1,699 @@
+{
+ "url": "https://agentdrives.com/api/mcp",
+ "doc": {
+  "name": "AgentDrives: choose a tool, API or provider",
+  "version": "1.19.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Use when you or the user must choose a tool, API or provider for a task ('which email API should I use for receipts?', 'Stripe or Paddle?'): choose_provider_for_task takes the job, compare_providers 2 or 3 names, search_tools a name, domain or kind, get_provider one product. Each answer is from our own drive: its agent level (0-5), what an agent could and couldn't do by API, CLI or MCP, its price and free plan if known, and the date. Next to DX and lock-in, it shows how much setup your coding agent can do. AgentDrives is an independent lab: we send AI agents to sign up for and use real software, and publish how far they get. The results are free to reuse under CC BY 4.0 with a credit to AgentDrives; what's free and what's licensed: https://agentdrives.com/data/licence. Read-only and without an account. choose_provider_for_task answers \"which provider for X?\" from what our agent did in each product; search_tools shortlists products by what they do, category, minimum level (0-5) or whether an agent can pay or leave on its own; get_provider gives one product's headline (where the agent stopped, what it can and can't do, tips; brief: false for the full result); list_categories gives the category ids and the best level in each; get_category gives one category's top products; list_best_providers answers \"which provider works best for X?\", a category ranked by level with where each one stopped; list_changes gives the level moves and confirmed changes of the last days. At most 120 calls per 10 minutes per IP. Every product as JSON without a search: https://agentdrives.com/api/tools.json, 100 a page (next gives the following page, full the whole list in one dated file).",
+  "tools": [
+   {
+    "name": "choose_provider_for_task",
+    "title": "Choose a provider",
+    "description": "Use when you or the user must choose a tool, API or provider for a task (send email, take payments, host a database…): send the task in a few plain words ('send an invoice') with filters if they matter. Returns the products our agent drove for it, ranked by how far an agent got on its own (sign-up, key, the work, paying), each with what happened and its sign-up, docs and MCP links. Read-only, no key needed; 5 by default, up to 25; a product by name: search_tools.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "description": "The task in plain words, e.g. 'send an invoice'; or send capability"
+      },
+      "capability": {
+       "type": "string",
+       "description": "Instead of task: a capability id (GET /api/capabilities) or name"
+      },
+      "category": {
+       "type": "string",
+       "description": "Only this category id or name (list_categories)"
+      },
+      "self_signup": {
+       "type": "boolean",
+       "description": "true: only products our agent got a key for without a person"
+      },
+      "min_level": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 5,
+       "description": "Only products at this agent level (0-5) or higher"
+      },
+      "surface": {
+       "type": "string",
+       "pattern": "^(api|mcp|cli|sdk)(,(api|mcp|cli|sdk))*$",
+       "description": "Only products an agent can work by api, mcp, cli or sdk; a comma list wants all, e.g. mcp,cli"
+      },
+      "access": {
+       "type": "string",
+       "enum": [
+        "signup_without_human"
+       ],
+       "description": "Only products our agent got into without a person"
+      },
+      "pays_with": {
+       "type": "string",
+       "description": "Only products that take x402, mpp or card; a comma list takes any, e.g. x402,mpp"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "default": 5,
+       "description": "How many products, 1 to 25 (default 5)"
+      },
+      "brief": {
+       "type": "boolean",
+       "default": true,
+       "description": "true (default): each product with its next steps; false: every field"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Choose a provider",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "object"
+         }
+        },
+        {
+         "type": "object",
+         "required": [
+          "results"
+         ],
+         "properties": {
+          "results": {
+           "type": "array"
+          }
+         }
+        },
+        {
+         "type": "object",
+         "required": [
+          "covered",
+          "results",
+          "nearest_category"
+         ],
+         "properties": {
+          "covered": {
+           "const": false
+          },
+          "results": {
+           "type": [
+            "array",
+            "null"
+           ]
+          },
+          "nearest_category": {
+           "type": [
+            "object",
+            "null"
+           ]
+          }
+         }
+        },
+        {
+         "type": "object",
+         "required": [
+          "covered",
+          "results",
+          "nearest_tools"
+         ],
+         "properties": {
+          "covered": {
+           "const": false
+          },
+          "results": {
+           "type": [
+            "array",
+            "null"
+           ]
+          },
+          "nearest_tools": {
+           "type": [
+            "array",
+            "null"
+           ]
+          }
+         }
+        }
+       ],
+       "description": "Choose a provider"
+      }
+     }
+    }
+   },
+   {
+    "name": "search_tools",
+    "title": "Search the directory",
+    "description": "Use when you have a product's name, domain or kind in mind: send a short query ('stripe.com', 'postgres', 'invoicing') with filters for category, agent level, access or payment. Returns the products we drove, sorted by agent level (0-5), each with where our agent stopped; a task in plain words: choose_provider_for_task, one product in full: get_provider. Read-only, no key needed; up to 100 a page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Name, domain or what it does, e.g. 'stripe.com' or 'invoicing'; every word must match"
+      },
+      "category": {
+       "type": "string",
+       "description": "Only this category id or name (list_categories)"
+      },
+      "min_level": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 5,
+       "description": "Only products at this agent level (0-5) or higher"
+      },
+      "agent_can_buy": {
+       "type": "boolean",
+       "description": "true: only products our agent paid over x402, MPP or the like"
+      },
+      "agent_can_leave": {
+       "type": "boolean",
+       "description": "true: only products our agent cancelled and deleted on its own"
+      },
+      "pays_with": {
+       "type": "string",
+       "description": "Only products that take x402, mpp or card; a comma list takes any, e.g. x402,mpp; also l402, stripe-projects, acp, ucp, ap2, mcp-payment"
+      },
+      "access": {
+       "type": "string",
+       "enum": [
+        "signup_without_human",
+        "keyless",
+        "local",
+        "try_first",
+        "no_account",
+        "pay_per_call",
+        "key_by_api",
+        "mcp_signin",
+        "email_signup",
+        "browser_signup",
+        "by_name",
+        "person"
+       ],
+       "description": "Only products an agent gets into this way (signup_without_human: any way without a person; person: a person set it up)"
+      },
+      "surface": {
+       "type": "string",
+       "pattern": "^(api|mcp|cli|sdk)(,(api|mcp|cli|sdk))*$",
+       "description": "Only products an agent can work by api, mcp, cli or sdk; a comma list wants all, e.g. mcp,cli"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "default": 25,
+       "description": "Products per page, 1 to 100 (default 25)"
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "description": "Skip this many matches: the last answer's next_offset"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search the directory",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "slug",
+         "name",
+         "level",
+         "url"
+        ],
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "level": {
+          "type": "integer"
+         },
+         "url": {
+          "type": "string"
+         }
+        }
+       },
+       "description": "Search the directory"
+      },
+      "total": {
+       "type": "integer"
+      },
+      "offset": {
+       "type": "integer"
+      },
+      "next_offset": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "more": {
+       "type": "string"
+      },
+      "try": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   {
+    "name": "get_provider",
+    "title": "Get one product's drive result",
+    "description": "Use when you are about to use or recommend a product and need to know if an agent can work it on its own: send its slug from search_tools, or its name or domain. Returns its drive result: agent level (0-5), where our agent stopped, what it can and can't do, how it gets in and pays; only its API, MCP and CLI: get_agent_surfaces. Read-only, no key needed; the headline unless brief is false.",
+    "inputSchema": {
+     "type": "object",
+     "required": [
+      "slug"
+     ],
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "The product's directory slug from search_tools (e.g. 'attio'), or its name or domain"
+      },
+      "brief": {
+       "type": "boolean",
+       "default": true,
+       "description": "true (default here): the headline, 2.5 to 5 KB; false: the full record, 13 to 35 KB"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Get one product's drive result",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "object",
+       "required": [
+        "slug",
+        "name",
+        "level",
+        "page"
+       ],
+       "properties": {
+        "slug": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "level": {
+         "type": "integer"
+        },
+        "page": {
+         "type": "string"
+        }
+       },
+       "description": "Get one product's drive result"
+      }
+     }
+    }
+   },
+   {
+    "name": "get_agent_surfaces",
+    "title": "What an agent can use at a product",
+    "description": "Use when you picked a product and need to wire it up: its API, MCP server, CLI, SDK, docs and payment, each tested, documented, none_found or unknown, with the product's own URL for it and the date we saw it. The whole drive result: get_provider. Read-only, no key needed; about 1 KB.",
+    "inputSchema": {
+     "type": "object",
+     "required": [
+      "product"
+     ],
+     "properties": {
+      "product": {
+       "type": "string",
+       "description": "The product's directory slug from search_tools (e.g. 'attio'), or its name or domain"
+      }
+     }
+    },
+    "annotations": {
+     "title": "What an agent can use at a product",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "object",
+       "required": [
+        "slug",
+        "name",
+        "level",
+        "issues_found",
+        "surfaces",
+        "page"
+       ],
+       "properties": {
+        "slug": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "level": {
+         "type": "integer"
+        },
+        "issues_found": {
+         "type": [
+          "integer",
+          "null"
+         ]
+        },
+        "surfaces": {
+         "type": "object"
+        },
+        "page": {
+         "type": "string"
+        }
+       },
+       "description": "What an agent can use at a product"
+      }
+     }
+    }
+   },
+   {
+    "name": "compare_providers",
+    "title": "Compare products for a task",
+    "description": "Use when you or the user are deciding between 2 or 3 products for one task ('Stripe or Paddle?'): send their slugs (from search_tools), names or domains, and the task in a few plain words. For each: driven or only listed, agent level (0-5), how far our agent got at each step and where it stopped, what it did on the task, how to connect (MCP, API, CLI), the date and its page; a name we don't cover comes back in not_covered. Read-only, no key needed.",
+    "inputSchema": {
+     "type": "object",
+     "required": [
+      "tools"
+     ],
+     "properties": {
+      "tools": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "minItems": 2,
+       "maxItems": 3,
+       "description": "2 or 3 products, each a slug, name or domain"
+      },
+      "task": {
+       "type": "string",
+       "description": "The task in plain words: adds what our agent did on it at each"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Compare products for a task",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "object",
+       "required": [
+        "products",
+        "not_covered"
+       ],
+       "properties": {
+        "products": {
+         "type": "array"
+        },
+        "not_covered": {
+         "type": "array"
+        }
+       },
+       "description": "Compare products for a task"
+      }
+     }
+    }
+   },
+   {
+    "name": "list_categories",
+    "title": "List categories",
+    "description": "Use when you need a valid category id for choose_provider_for_task, search_tools or get_category: every category with its id, name, number of products and best agent level (0-5). Read-only, no key needed; no arguments.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List categories",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "category",
+         "name",
+         "tools",
+         "best_level"
+        ],
+        "properties": {
+         "category": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "tools": {
+          "type": "integer"
+         },
+         "best_level": {
+          "type": "integer"
+         }
+        }
+       },
+       "description": "List categories"
+      }
+     }
+    }
+   },
+   {
+    "name": "list_changes",
+    "title": "What changed lately",
+    "description": "Use when you need to know whether a product you picked still works as it did, or what moved lately: with a slug, every dated change at that product (level, surfaces, price and plan, each with its source); without, the level moves of the last days, newest first, with the cause and the level now. Its full drive result: get_provider. Read-only, no key needed; narrow it with days or category.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "days": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 31,
+       "default": 7,
+       "description": "Days back, 1 to 31 (default 7)"
+      },
+      "category": {
+       "type": "string",
+       "description": "Only this category id or name (list_categories)"
+      },
+      "slug": {
+       "type": "string",
+       "description": "Only this product: adds its every change since its first drive"
+      }
+     }
+    },
+    "annotations": {
+     "title": "What changed lately",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "object",
+       "description": "What changed lately"
+      }
+     }
+    }
+   },
+   {
+    "name": "get_category",
+    "title": "Get one category",
+    "description": "Use when you know the category and want a shortlist: its name, how many products AgentDrives drove in it, the best agent level (0-5) and its top 10 by level, each with its drive date and page. The rest: search_tools with the same category. Read-only, no key needed.",
+    "inputSchema": {
+     "type": "object",
+     "required": [
+      "category"
+     ],
+     "properties": {
+      "category": {
+       "type": "string",
+       "description": "A category id or name from list_categories, e.g. 'crm'"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Get one category",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "object",
+       "required": [
+        "category",
+        "name",
+        "tools",
+        "best_level",
+        "top"
+       ],
+       "properties": {
+        "category": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "tools": {
+         "type": "integer"
+        },
+        "best_level": {
+         "type": "integer"
+        },
+        "top": {
+         "type": "array"
+        }
+       },
+       "description": "Get one category"
+      }
+     }
+    }
+   },
+   {
+    "name": "list_best_providers",
+    "title": "Best providers in a category",
+    "description": "Use when asked \"which provider works best for X?\" in a category: its driven products ranked by agent level (0-5), each with where our agent stopped, and how many we drove in it; under 5, not enough drives yet. Then get_provider for one product. Read-only, no key needed.",
+    "inputSchema": {
+     "type": "object",
+     "required": [
+      "category"
+     ],
+     "properties": {
+      "category": {
+       "type": "string",
+       "description": "A focus category (payments, email, sign-in, scheduling, data) or any category id or name"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Best providers in a category",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "required": [
+      "result"
+     ],
+     "properties": {
+      "result": {
+       "type": "object",
+       "required": [
+        "category",
+        "name",
+        "n",
+        "min_n",
+        "enough"
+       ],
+       "properties": {
+        "category": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "n": {
+         "type": "integer"
+        },
+        "min_n": {
+         "type": "integer"
+        },
+        "enough": {
+         "type": "boolean"
+        }
+       },
+       "description": "Best providers in a category"
+      }
+     }
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "https://agentdrives.com/.well-known/agent-skills/check-agent-access/SKILL.md",
+    "name": "check-agent-access",
+    "title": "Check agent access",
+    "description": "Use when you or the user must choose a tool, API or provider for a task, or someone asks \"can my agent use X?\": whether an AI agent can sign up for and use each product on its own, from AgentDrives' test drives.",
+    "mimeType": "text/markdown"
+   }
+  ]
+ }
+}

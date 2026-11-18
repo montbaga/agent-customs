@@ -1,0 +1,512 @@
+{
+ "url": "https://mcp.aidemos.com/mcp",
+ "doc": {
+  "name": "aidemos-mcp",
+  "version": "2.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Evidence-backed answers about AI tools, from hands-on testing (published data only). START WITH `answer` for any 'which tool is best at X' question — it returns the resolved verdict in one call: winner for the asked criterion, ranked scores, the conditions each result holds under, dissent preserved, openable proof; it refuses honestly when we never tested the topic. Then: list_* to enumerate use cases, rankings, tools, comparisons, toolkits, personas, and categories; tools_in_ranking / rankings_for_tool to traverse; get_persona for everything tagged to a persona; get_tool / get_ranking / get_use_case for the full page as a JSON-structure + Markdown-content envelope; get_evidence for the raw observation cells behind any answer. Every entity has id, slug, and a full url.",
+  "tools": [
+   {
+    "name": "answer",
+    "description": "ANSWER a buyer question in ONE call: which tool is best at a specific capability, with proof. Returns the resolved verdict our testing team's evidence supports — a named winner FOR THE ASKED CRITERION, every tested tool ranked with a comparable score /5, the CONDITIONS each result holds under (e.g. 'clean tables yes; nested headers no'), dissenting observations preserved as openable links, the tie-break reason, and artifact proof URLs. Answers are materialized from the evidence substrate — the same question returns the same answer. Honestly refuses (coverage: not_tested) when we never tested the topic. Start HERE for any 'which tool is best at X' / 'A or B for X' question; use get_evidence for the raw cells behind it.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string",
+       "description": "The buyer question in natural language, e.g. 'Which document extraction tool best preserves table structure from scanned PDFs?'. Alternative: pass ranking + criterion explicitly."
+      },
+      "ranking": {
+       "type": "string",
+       "description": "Ranking slug (skips routing)."
+      },
+      "criterion": {
+       "type": "string",
+       "description": "Criterion slug or exact name (with `ranking`)."
+      },
+      "scenario": {
+       "type": "string",
+       "description": "Optional scenario/condition of interest."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_use_cases",
+    "description": "List published use-case pages (how-to guides): id, title, slug, url, persona, category, updated_at.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "description": "Max items to return. Omit for all."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Items to skip (paging)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_rankings",
+    "description": "List published ranking pages (\"best X\"): id, title, slug, url, use_case, persona, category, tools_count, winner, tested_as_of, updated_at.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "description": "Max items to return. Omit for all."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Items to skip (paging)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_tools",
+    "description": "List published AI tool pages: id, name, slug, url, domain, personas[], categories[].",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "description": "Max items to return. Omit for all."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Items to skip (paging)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_compares",
+    "description": "List published head-to-head comparison pages: id, title, slug, url, tool_a, tool_b, personas[], shared_use_cases[], updated_at.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "description": "Max items to return. Omit for all."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Items to skip (paging)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_toolkits",
+    "description": "List published toolkit pages (curated bundles): id, title, slug, url, category.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "description": "Max items to return. Omit for all."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Items to skip (paging)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_personas",
+    "description": "List personas with published-page counts per type {use_cases, rankings, tools, compares, toolkits}. The slugs are valid input for get_persona.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_categories",
+    "description": "List the category vocabulary in use with per-type counts and a source flag (\"collection\"|\"derived\"), sorted by total.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "search",
+    "description": "Search the published catalogue across use cases, rankings, tools, comparisons, and toolkits. Returns ranked light refs [{ kind, id, title, slug, url, snippet, score, meta }] — then call get_tool / get_ranking / get_use_case for full detail. `mode`: keyword (substring), semantic (meaning, via embeddings — finds pages by what they cover), or hybrid (default, fuses both). Optional filters: type[], persona, category.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Free-text search query."
+      },
+      "mode": {
+       "type": "string",
+       "enum": [
+        "keyword",
+        "semantic",
+        "hybrid"
+       ],
+       "description": "Search mode."
+      },
+      "type": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "use_case",
+         "ranking",
+         "tool",
+         "compare",
+         "toolkit"
+        ]
+       },
+       "description": "Restrict to these kinds (default: all)."
+      },
+      "persona": {
+       "type": "string",
+       "description": "Restrict to items tagged with this persona slug."
+      },
+      "category": {
+       "type": "string",
+       "description": "Restrict to this category (case-insensitive)."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "description": "Max results (default 20)."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "tools_in_ranking",
+    "description": "Given a ranking id, return the ranking {id,title,slug} and its ranked tools [{id,name,slug,url,rank,badge}] (badge: Best/Usable/Needs work/Unstable/Failed).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "ranking_id": {
+       "type": [
+        "string",
+        "integer"
+       ],
+       "description": "Ranking id (from list_rankings)."
+      }
+     },
+     "required": [
+      "ranking_id"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "rankings_for_tool",
+    "description": "Given a tool id, return the tool {id,name,slug} and every ranking it appears in [{id,title,slug,url,use_case,rank,badge}].",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "tool_id": {
+       "type": [
+        "string",
+        "integer"
+       ],
+       "description": "Tool id (from list_tools)."
+      }
+     },
+     "required": [
+      "tool_id"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_persona",
+    "description": "Given a persona slug (from list_personas), return everything tagged with it: persona, use_cases[], rankings[], compares[], toolkits[], tools[]. Mirrors a persona landing page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Persona slug, e.g. \"students\"."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_tool",
+    "description": "Full tool detail as a JSON+Markdown envelope: identity, pricing, per-feature scores, fit, FAQ, relationships (JSON) + our_take / in-depth review (Markdown). Includes `proof`: real artifact URLs (input/output screenshots, recordings) from the runs that tested it, each with the /evidence permalink for the finding it proves — you can cite evidence from THIS call. null if unknown. Pass `fields` to project to only the keys you need (token-efficient).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Tool seo_slug, e.g. \"affinda\" (from list_tools)."
+      },
+      "fields": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "id",
+         "name",
+         "slug",
+         "url",
+         "heading",
+         "website",
+         "domain",
+         "category",
+         "sub_category",
+         "content_type",
+         "personas",
+         "tags",
+         "rating",
+         "testing_history",
+         "features",
+         "pricing",
+         "fit",
+         "use_case_track_record",
+         "related_pages",
+         "related_reads",
+         "similar_tools",
+         "faq",
+         "demo_video",
+         "our_take",
+         "in_depth_review_md",
+         "proof"
+        ]
+       },
+       "description": "Optional projection: return ONLY these top-level fields (identity id/name/title/slug/url is always included) to control response size. Available: id, name, slug, url, heading, website, domain, category, sub_category, content_type, personas, tags, rating, testing_history, features, pricing, fit, use_case_track_record, related_pages, related_reads, similar_tools, faq, demo_video, our_take, in_depth_review_md, proof."
+      },
+      "proof": {
+       "type": "string",
+       "enum": [
+        "sample",
+        "full",
+        "none"
+       ],
+       "description": "How many proof artifacts to inline. \"sample\" (default) = up to 6 per tool, spread across distinct criteria so you see breadth; \"full\" = every artifact; \"none\" = counts only, no URLs. Counts (artifact_count / finding_count) are the TRUE totals in every mode, so you can always tell what you did not receive."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_ranking",
+    "description": "Full ranking detail as a JSON+Markdown envelope: ranked tools (rank/badge/scores), criteria, winner, breakdown (JSON) + verdicts / final take (Markdown). Every ranked tool carries `proof`: real artifact URLs from the exact evidence run this page is bound to, each with the /evidence permalink for the finding it proves — verdict and proof arrive together, no second call needed to cite evidence. `proof.artifact_count` is the true total and `proof.all_findings` is the get_evidence call that returns all of it. null if unknown. Pass `fields` to project to only the keys you need (token-efficient).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Ranking slug, e.g. \"resume-parsing-api\" (from list_rankings)."
+      },
+      "fields": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "id",
+         "title",
+         "slug",
+         "url",
+         "abstract",
+         "read_time",
+         "tested_date",
+         "category",
+         "use_case",
+         "personas",
+         "tags",
+         "winner",
+         "methodology",
+         "tools",
+         "breakdown",
+         "final_take",
+         "evidence_run"
+        ]
+       },
+       "description": "Optional projection: return ONLY these top-level fields (identity id/name/title/slug/url is always included) to control response size. Available: id, title, slug, url, abstract, read_time, tested_date, category, use_case, personas, tags, winner, methodology, tools, breakdown, final_take, evidence_run."
+      },
+      "proof": {
+       "type": "string",
+       "enum": [
+        "sample",
+        "full",
+        "none"
+       ],
+       "description": "How many proof artifacts to inline. \"sample\" (default) = up to 6 per tool, spread across distinct criteria so you see breadth; \"full\" = every artifact; \"none\" = counts only, no URLs. Counts (artifact_count / finding_count) are the TRUE totals in every mode, so you can always tell what you did not receive."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_use_case",
+    "description": "Full use-case detail as a JSON+Markdown envelope: step guide, pros/cons, FAQ, tools used (JSON) + the full narrative guide (Markdown, full_md). null if unknown. Pass `fields` to project to only the keys you need (token-efficient).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Use-case slug (from list_use_cases)."
+      },
+      "fields": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "id",
+         "title",
+         "slug",
+         "url",
+         "abstract",
+         "read_time",
+         "category",
+         "audience",
+         "personas",
+         "tags",
+         "tools_used",
+         "step_guide",
+         "what_to_expect",
+         "faq",
+         "full_md"
+        ]
+       },
+       "description": "Optional projection: return ONLY these top-level fields (identity id/name/title/slug/url is always included) to control response size. Available: id, title, slug, url, abstract, read_time, category, audience, personas, tags, tools_used, step_guide, what_to_expect, faq, full_md."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_evidence",
+    "description": "Query the evidence graph: observation cells (tool × test-scenario × criterion) → verdict, score, the researcher's note, and the REAL artifacts (input/output screenshots) that prove it. The ground truth behind every ranking — filter any combination of tool(s), scenario (slug, group tag, or name), criterion, verdict, or evidence state. evidence_state: \"verified\" = artifact-backed, \"observed\" = noted without artifact, \"scored-only\" = number only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "tool": {
+       "type": "string",
+       "description": "Tool slug or name, e.g. \"landing-ai\"."
+      },
+      "tools": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Several tools at once."
+      },
+      "ranking": {
+       "type": "string",
+       "description": "Ranking page slug — scope cells to the evidence run that published ranking is bound to (exactly what the page renders)."
+      },
+      "scenario": {
+       "type": "string",
+       "description": "Scenario slug, cross-run group tag (e.g. \"scanned-research-paper\"), or name fragment."
+      },
+      "criterion": {
+       "type": "string",
+       "description": "Criterion slug or name, e.g. \"table extraction\"."
+      },
+      "verdict": {
+       "type": "string",
+       "enum": [
+        "worked",
+        "mixed",
+        "struggled",
+        "failed"
+       ]
+      },
+      "evidence": {
+       "type": "string",
+       "enum": [
+        "verified",
+        "observed",
+        "scored-only"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "description": "Max cells (default 50)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "compare_tools",
+    "description": "Evidence-aligned comparison of two tools, honesty enforced structurally: head_to_head (cells from the SAME test input — provable same-input comparison), related_not_same_input (same dimension, different runs — flagged), and each tool's unique evidence. Built from real observation cells with artifacts, not prose.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "tool_a": {
+       "type": "string",
+       "description": "First tool slug, e.g. \"llamaparse\"."
+      },
+      "tool_b": {
+       "type": "string",
+       "description": "Second tool slug, e.g. \"landing-ai\"."
+      },
+      "criterion": {
+       "type": "string",
+       "description": "Optional: restrict to one criterion."
+      }
+     },
+     "required": [
+      "tool_a",
+      "tool_b"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ }
+}

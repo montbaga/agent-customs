@@ -1,0 +1,330 @@
+{
+ "url": "https://tutorping.ai/mcp",
+ "doc": {
+  "name": "tutorping",
+  "version": "1.3.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "TutorPing connects students with independent tutors. Anyone can search tutors, check availability, and book sessions; if no listed tutor fits, request_tutor asks TutorPing to find one (reply by email within 1 business day). For help right now, search results include free TutorPing AI Tutors (a chat link); they are AI, not people, so say so. Tutors who connect with their API key can also see student leads TutorPing found for them, get reply drafts, choose which communities are scanned for them, and manage bookings.",
+  "tools": [
+   {
+    "name": "search_tutors",
+    "title": "Search tutors",
+    "description": "Find independent tutors on TutorPing by subject, student level, and location. Returns tutors with a public page (first name and last initial, subject, level, area, reviews, page link with full details and rates, whether they can be booked directly), how many matching tutors TutorPing has in total with their profiles minus names (request_tutor matches the student with one, optionally a chosen tutorRef), and free TutorPing AI Tutors for the subject (clearly AI, not people; a chat link for help right now). Use for students or parents looking for a tutor (SAT/ACT, math, science, languages, music, and more). If no listed tutor fits, use request_tutor and TutorPing will match one. Always tell the user that an AI tutor is AI.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "subject": {
+       "description": "e.g. \"SAT\", \"chemistry\", \"piano\"",
+       "type": "string",
+       "maxLength": 80
+      },
+      "location": {
+       "description": "City or area, e.g. \"NYC\". Omit for online tutors anywhere.",
+       "type": "string",
+       "maxLength": 80
+      },
+      "level": {
+       "description": "e.g. \"high school\", \"college\"",
+       "type": "string",
+       "maxLength": 40
+      },
+      "maxHourlyRate": {
+       "description": "USD per hour",
+       "type": "number",
+       "exclusiveMinimum": 0
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "request_tutor",
+    "title": "Ask TutorPing to find a tutor",
+    "description": "Submit a request for TutorPing to match a student with a tutor, when search_tutors finds no fit or the user prefers to be matched. TutorPing replies by email within 1 business day with tutor options. Collect what the student needs, then confirm the details AND get the user's explicit agreement that TutorPing may share the request and contact details with matching tutors before calling. Ask only for a first name, never a child's full name.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "subject": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80,
+       "description": "e.g. \"SAT math\", \"AP Chemistry\", \"piano\""
+      },
+      "level": {
+       "description": "e.g. \"11th grade\", \"college\", \"adult beginner\"",
+       "type": "string",
+       "maxLength": 60
+      },
+      "location": {
+       "description": "City or area for in-person; omit if online only",
+       "type": "string",
+       "maxLength": 120
+      },
+      "online": {
+       "description": "true if online sessions are fine",
+       "type": "boolean"
+      },
+      "budgetPerHour": {
+       "description": "USD per hour",
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 1000
+      },
+      "schedule": {
+       "description": "e.g. \"weekday evenings, test on Dec 6\"",
+       "type": "string",
+       "maxLength": 200
+      },
+      "studentFirstName": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "email": {
+       "type": "string",
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+       "description": "Where TutorPing should send tutor options"
+      },
+      "phone": {
+       "type": "string",
+       "maxLength": 40
+      },
+      "notes": {
+       "description": "Goals, current scores, anything a tutor should know",
+       "type": "string",
+       "maxLength": 1000
+      },
+      "tutorRef": {
+       "description": "tutorRef of a profile from search_tutors the user liked; TutorPing asks that tutor first",
+       "type": "string",
+       "pattern": "^tp-[0-9a-f]{8}$"
+      },
+      "consent": {
+       "type": "boolean",
+       "const": true,
+       "description": "The user agreed TutorPing may share this request and contact details with matching tutors"
+      }
+     },
+     "required": [
+      "subject",
+      "email",
+      "consent"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_tutor",
+    "title": "Get tutor profile",
+    "description": "Full public profile for one TutorPing tutor (by slug from search_tutors).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 80
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_tutor_availability",
+    "title": "Get a tutor's open slots",
+    "description": "Open session times for a tutor, in the tutor's timezone. Use before request_booking.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 80
+      },
+      "days": {
+       "default": 14,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 30
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "request_booking",
+    "title": "Book a session with a tutor",
+    "description": "Book a student into one of a tutor's open slots (from get_tutor_availability). The tutor and the student both get a confirmation email. Confirm the time, name, and email with the user before calling.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 80
+      },
+      "date": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "YYYY-MM-DD"
+      },
+      "time": {
+       "type": "string",
+       "pattern": "^\\d{2}:\\d{2}$",
+       "description": "HH:MM, 24h, tutor's timezone — must match an open slot"
+      },
+      "studentName": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100
+      },
+      "studentEmail": {
+       "type": "string",
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+      },
+      "subject": {
+       "type": "string",
+       "maxLength": 100
+      },
+      "type": {
+       "default": "session",
+       "description": "\"trial\" only if the tutor offers a free trial",
+       "type": "string",
+       "enum": [
+        "session",
+        "trial"
+       ]
+      }
+     },
+     "required": [
+      "slug",
+      "date",
+      "time",
+      "studentName",
+      "studentEmail"
+     ]
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "tutoring_demand",
+    "title": "Tutoring demand",
+    "description": "How many people online recently asked for a tutor in a subject (from Reddit and other communities TutorPing monitors), in total. Useful for tutors deciding whether there is demand for their subject. The requests themselves are only shared with TutorPing tutors.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "subject": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 60,
+       "description": "e.g. \"SAT\", \"organic chemistry\", \"piano\""
+      },
+      "days": {
+       "default": 7,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 14
+      }
+     },
+     "required": [
+      "subject"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "ask_tutorping",
+    "title": "Ask TutorPing a question",
+    "description": "Ask anything about TutorPing, finding a tutor, or finding tutoring students that the other tools don't cover, in plain words. Returns which TutorPing tool or page fits, plus contact details. Do not include personal information.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 500
+      },
+      "askedFor": {
+       "description": "Who the question is for",
+       "type": "string",
+       "enum": [
+        "student-or-parent",
+        "tutor",
+        "tutoring-business",
+        "other"
+       ]
+      }
+     },
+     "required": [
+      "question"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "how_to_get_leads",
+    "title": "How TutorPing works for tutors",
+    "description": "Explains how a tutor gets student leads from TutorPing and connects their own AI assistant.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ]
+ }
+}

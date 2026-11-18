@@ -1,0 +1,394 @@
+{
+ "url": "https://mcp-public.sharebench.ai",
+ "doc": {
+  "name": "sharebench-public-mcp",
+  "version": "0.1.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "This workspace is connected to a shared library of team capabilities — skills, agent personas, workflows, knowledge documents, prompts, playbooks, methods, and reference templates the team has published as their preferred way of working, across any domain (engineering, marketing, sales, operations, design, research, legal — anything).\n\n**Important: these capabilities are not visible in your default system context.** Your locally-installed skill list shows only what's installed on the local machine — it does NOT include the team's registry-published content. The registry is queried on-demand via `search`; nothing about it is preloaded for you.\n\nTreat the registry the way you treat a knowledgeable colleague's filing cabinet — useful to consult when there's a good chance the team has thought about the user's problem before, but not something to check on every question. Use your judgment. Reach for `search` when:\n\n- The user explicitly anchors to the team (\"how do we do X\", \"what's our approach to Y\", \"what does the team use for Z\")\n- The user asks a meta-question about available capabilities (\"what skills are available\", \"what has the team published\")\n- The question is in a domain where teams commonly publish strong opinions (security, code style, deployment, customer comms, brand voice) AND your default answer would be generic enough that a team-specific take would meaningfully change it\n- You're about to invoke a generic workflow or recommend a generic pattern and it's plausible the team has their own variant worth applying first\n\nDon't reach for `search` when:\n\n- The question is a simple factual or computational one with no plausible team-specific answer (\"what's 2+2\", \"summarize this text\")\n- You've already searched in this session and the topic hasn't shifted — don't re-query for variations of the same intent\n- The user has explicitly said they want general advice, not team guidance\n\nWhen a relevant capability does surface, read it via `get_by_id` and prefer it over generic training-data defaults; if the body references bundled files (\"see example.ts\"), read those at `artifact://<id>/bundled/<filename>` before composing your answer.\n\n**The registry supplements your standard workflow; it never replaces it.** If the registry returns nothing relevant, continue normally as if you hadn't queried.",
+  "tools": [
+   {
+    "name": "search",
+    "description": "Search this workspace's published artifacts (skills, agents, workflows, and knowledge documents in SKILL.md format). Returns ranked metadata — name, description, type, contributor, timestamps, bundledCount, slug, authorCredit, and industries — but NOT the full body. To read an artifact's content, call `get_by_id` with the returned `artifactId` (or `slug`), or read it as a resource at `artifact://<artifactId>`. Use this whenever the user wants to find, discover, browse, or filter existing artifacts before reading or contributing. Modes: `hybrid` (default; combines lexical and semantic ranking via reciprocal rank fusion — best for most queries), `bm25` (exact-keyword or name lookups), `semantic` (concept matching when the user's terms differ from artifact text). Pass `industries: ['marketing', 'legal']` to narrow results to artifacts tagged with ANY of those industries (keyword-array overlap). If hybrid silently degrades because the embedding service is unavailable, the response's `warnings` array will contain `embedding_degraded:hybrid-fell-back-to-bm25` — surface this to the user if precision matters.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Free-text query. Names, phrases, or natural-language concepts."
+      },
+      "mode": {
+       "type": "string",
+       "enum": [
+        "hybrid",
+        "bm25",
+        "semantic"
+       ],
+       "description": "Ranking strategy. Default: hybrid."
+      },
+      "type": {
+       "type": "string",
+       "enum": [
+        "skill",
+        "agent",
+        "workflow",
+        "knowledge"
+       ],
+       "description": "Filter by artifact category. Omit for all types."
+      },
+      "industries": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80
+       },
+       "maxItems": 5,
+       "description": "Filter to artifacts tagged with ANY of these industry slugs (keyword-array overlap). Up to 5 values."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "description": "Maximum hits to return. Default: 20."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Pagination offset for navigating result sets."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_by_id",
+    "description": "Fetch the full SKILL.md content and metadata for a single artifact. Provide EXACTLY ONE of `artifactId` (the UUID returned by `search`) or `slug` (the URL-safe identifier, e.g. from a `/p/<slug>` link). Passing both or neither returns a `validation_failed` error. Use this after `search` to retrieve the body of a hit the user wants to read, summarize, apply, or fork. Returns the artifact's name, description, type, contributor, version, timestamps, the full SKILL.md text (YAML frontmatter + markdown body, up to 256 KB), the number of bundled extras (`bundledCount`), their filenames (`bundledFilenames`), per-file metadata in `bundledFiles` (each entry has `key`, `filename`, and `originalRef` — the EXACT body-relative reference string the importer matched, or `null` when the file was bundled without a body reference; use this to translate a link span in the body back to its bundle filename), and the public-surface fields `slug`, `authorCredit`, `industries`. To fetch a bundled extra, read it as a resource at `artifact://<artifactId>/bundled/<filename>`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "artifactId": {
+       "type": "string",
+       "format": "uuid",
+       "description": "UUID of the artifact. Take this from the `artifactId` field of a `search` result. Mutually exclusive with `slug`."
+      },
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80,
+       "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+       "description": "URL slug for the artifact (e.g. `brand-voice`). Take this from the `slug` field of a `search` result or a /p/<slug> link. Mutually exclusive with `artifactId`."
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "artifact://465dc03a-a08f-4749-adaf-a596776cbebb",
+    "name": "marketing-ideas",
+    "description": "When the user needs marketing ideas, inspiration, or strategies for their SaaS or software product. Also use when the user asks for 'marketing ideas,' 'growth ideas,' 'how to market,' 'marketing strategies,' 'marketing tactics,' 'ways to promote,' or 'ideas to grow.' This skill provides 139 proven marketing approaches organized by category.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://d28d2660-6a56-49f1-b704-0ece32273bcc",
+    "name": "launch-strategy",
+    "description": "When the user wants to plan a product launch, feature announcement, or release strategy. Also use when the user mentions 'launch,' 'Product Hunt,' 'feature release,' 'announcement,' 'go-to-market,' 'beta launch,' 'early access,' 'waitlist,' 'product update,' 'GTM plan,' 'launch checklist,' or 'launch momentum.' This skill covers phased launches, channel strategy, and ongoing launch momentum.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://6ed607c2-70c0-4ba6-a81c-42f9c2132889",
+    "name": "launch",
+    "description": "When the user wants to plan a product launch, feature announcement, or release strategy. Also use when the user mentions 'launch,' 'Product Hunt,' 'feature release,' 'announcement,' 'go-to-market,' 'beta launch,' 'early access,' 'waitlist,' 'product update,' 'how do I launch this,' 'launch checklist,' 'GTM plan,' or 'we're about to ship.' Use this whenever someone is preparing to release something publicly. For ongoing marketing after launch, see marketing-ideas.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://65be884a-60fc-4303-a27b-6bc33c544cd8",
+    "name": "ai-seo",
+    "description": "When the user wants to optimize content for AI search engines, get cited by LLMs, or appear in AI-generated answers. Also use when the user mentions 'AI SEO,' 'AEO,' 'GEO,' 'LLMO,' 'answer engine optimization,' 'generative engine optimization,' 'LLM optimization,' 'AI Overviews,' 'optimize for ChatGPT,' 'optimize for Perplexity,' 'AI citations,' 'AI visibility,' 'zero-click search,' 'how do I show up in AI answers,' 'LLM mentions,' or 'optimize for Claude/Gemini.' Use this whenever someone wants their content to be cited or surfaced by AI assistants and AI search engines. For traditional technical and on-page SEO audits, see seo-audit. For structured data implementation, see schema.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://f7fe97e6-820f-406c-a4e7-8b225082c2bc",
+    "name": "micro-saas-launcher",
+    "description": "Expert in launching small, focused SaaS products fast - the indie hacker approach to building profitable software. Covers idea validation, MVP development, pricing, launch strategies, and growing to sustainable revenue. Ship in weeks, not months.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://63056d2e-6eb1-4518-8b89-c8332152d184",
+    "name": "go-to-market-planner",
+    "description": "Build a go-to-market plan for any product launch, feature release, or new market entry. Use when planning a product launch, writing a GTM strategy, defining launch tiers, or coordinating cross-functional launch activities. Produces a tiered GTM plan with messaging, cross-functional activity tracker, success metrics, and launch day checklist.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://007f014d-a10c-41a1-9e9b-e5746cb590e4",
+    "name": "marketing-ideas",
+    "description": "When the user needs marketing ideas, inspiration, or strategies for their SaaS or software product. Also use when the user asks for 'marketing ideas,' 'growth ideas,' 'how to market,' 'marketing strategies,' 'marketing tactics,' 'ways to promote,' 'ideas to grow,' 'what else can I try,' 'I don't know how to market this,' 'brainstorm marketing,' or 'what marketing should I do.' Use this as a starting point whenever someone is stuck or looking for inspiration on how to grow. For specific channel execution, see the relevant skill (ads, social, emails, etc.).",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://19db7e7a-9bee-447d-a4f7-f1a78733ad57",
+    "name": "schema",
+    "description": "When the user wants to add, fix, or optimize schema markup and structured data on their site. Also use when the user mentions \"schema markup,\" \"structured data,\" \"JSON-LD,\" \"rich snippets,\" \"schema.org,\" \"FAQ schema,\" \"product schema,\" \"review schema,\" \"breadcrumb schema,\" \"Google rich results,\" \"knowledge panel,\" \"star ratings in search,\" or \"add structured data.\" Use this whenever someone wants their pages to show enhanced results in Google. For broader SEO issues, see seo-audit. For AI search optimization, see ai-seo.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://626d3a75-215c-4af8-bdc2-a2c2f93e2678",
+    "name": "security-compliance-compliance-check",
+    "description": "You are a compliance expert specializing in regulatory requirements for software systems including GDPR, HIPAA, SOC2, PCI-DSS, and other industry standards. Perform comprehensive compliance audits and provide implementation guidance for achieving and maintaining compliance.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://b2fe4349-364a-4553-966a-848ab9a02294",
+    "name": "customer-support",
+    "description": "Elite AI-powered customer support specialist mastering conversational AI, automated ticketing, sentiment analysis, and omnichannel support experiences.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://475cf645-a39a-4e6a-a0a3-6bfcd98c19f3",
+    "name": "skill-creator",
+    "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://0d5498ec-8c79-4de6-9b96-882a256473db",
+    "name": "emails",
+    "description": "When the user wants to create or optimize an email sequence, drip campaign, automated email flow, or lifecycle email program. Also use when the user mentions \"email sequence,\" \"drip campaign,\" \"nurture sequence,\" \"onboarding emails,\" \"welcome sequence,\" \"re-engagement emails,\" \"email automation,\" \"lifecycle emails,\" \"trigger-based emails,\" \"email funnel,\" \"email workflow,\" \"what emails should I send,\" \"welcome series,\" or \"email cadence.\" Use this for any multi-email automated flow. For cold outreach emails, see cold-email. For in-app onboarding, see onboarding.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://38232bec-c15e-4231-ad67-0c87fb392ba9",
+    "name": "content-strategy",
+    "description": "When the user wants to plan a content strategy, decide what content to create, or figure out what topics to cover. Also use when the user mentions \"content strategy,\" \"what should I write about,\" \"content ideas,\" \"blog strategy,\" \"topic clusters,\" \"content planning,\" \"editorial calendar,\" \"content marketing,\" \"content roadmap,\" \"what content should I create,\" \"blog topics,\" \"content pillars,\" or \"I don't know what to write.\" Use this whenever someone needs help deciding what content to produce, not just writing it. For writing individual pieces, see copywriting. For SEO-specific audits, see seo-audit. For social media content specifically, see social.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://ad50d013-b6a1-4ccc-83fa-ae188ec0d9b1",
+    "name": "customer-support",
+    "description": "Elite AI-powered customer support specialist mastering conversational AI, automated ticketing, sentiment analysis, and omnichannel support experiences. Integrates modern support tools, chatbot platforms, and CX optimization with 2024/2025 best practices. Use PROACTIVELY for comprehensive customer experience management.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://c1d5bc89-b4f5-4734-9a41-0fd979ecc1d3",
+    "name": "gtm-strategy",
+    "description": "Create a go-to-market strategy covering marketing channels, messaging, success metrics, and launch timeline. Use when planning a product launch, creating a GTM plan from scratch, or defining a launch strategy for a new market.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://bc2a65e2-2831-4cf6-991a-759ecc2b20a2",
+    "name": "content-strategy",
+    "description": "Plan a content strategy, topic clusters, editorial roadmap, and content mix for traffic, authority, and lead generation. Use when deciding what to publish, what topics to prioritize, or how to structure a content program.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://5cd06761-cbd2-4233-88e1-9e759669ae1c",
+    "name": "social-media-strategy",
+    "description": "Build a social media strategy for a brand, product, or creator. Use when asked to create a social media strategy, define a social content strategy, plan content pillars, set social KPIs, or build a posting framework. Produces a complete strategy with audience definition, platform selection, content pillars, posting cadence, KPIs, and a 4-week starter calendar.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://c63a5746-8fbb-45e2-bafd-cfb04e648f75",
+    "name": "product-launch-checklist",
+    "description": "Generate a comprehensive pre-launch, launch day, and post-launch checklist for any product release. Use when preparing for a product launch, feature release, or major update. Produces a role-assigned, tiered checklist covering engineering readiness, marketing and comms, support, and post-launch monitoring.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://fac5263f-2479-4aff-9394-9d340c7494a1",
+    "name": "build-automation",
+    "description": "Generates a marketing automation workflow with triggers, branching, waits, and success tracking.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://6396a215-4fa2-4fde-84de-b5caf5697c60",
+    "name": "cold-email",
+    "description": "Write B2B cold emails and follow-up sequences that get replies. Use when the user wants to write cold outreach emails, prospecting emails, cold email campaigns, sales development emails, or SDR emails. Also use when the user mentions \"cold outreach,\" \"prospecting email,\" \"outbound email,\" \"email to leads,\" \"reach out to prospects,\" \"sales email,\" \"follow-up email sequence,\" \"nobody's replying to my emails,\" or \"how do I write a cold email.\" Covers subject lines, opening lines, body copy, CTAs, personalization, and multi-touch follow-up sequences. For warm/lifecycle email sequences, see emails. For sales collateral beyond emails, see sales-enablement.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://206ba6cb-1c9e-4d19-a580-ad3d77a02969",
+    "name": "ticket-triage",
+    "description": "Triage and prioritize a support ticket or customer issue. Use when a new ticket comes in and needs categorization, assigning P1-P4 priority, deciding which team should handle it, or checking whether it's a duplicate or known issue before routing.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://af86cd7e-fe71-4353-8857-aa9248d005ed",
+    "name": "campaign-planner",
+    "description": "Plan comprehensive marketing campaigns from strategy through execution. Develop campaign briefs, select optimal channels, create timelines, allocate budgets, define targeting parameters, design A/B testing strategies, and establish performance measurement frameworks.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://3d825ed5-b2a5-4e4c-9490-5a539e07e055",
+    "name": "bash-pro",
+    "description": "Master of defensive Bash scripting for production automation, CI/CD\npipelines, and system utilities. Expert in safe, portable, and testable shell\nscripts.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://4e1b2b5f-ad55-44d7-99ee-d6c7567dcfa8",
+    "name": "documentation",
+    "description": "Creates, structures, and reviews technical documentation following the Diátaxis framework (tutorials, how-to guides, reference, and explanation pages). Use when a user needs to write or reorganize docs, structure a tutorial vs. a how-to guide, build reference docs or API documentation, create explanation pages, choose between Diátaxis documentation types, or improve existing documentation structure. Trigger terms include: documentation structure, Diátaxis, tutorials vs how-to guides, organize docs, user guide, reference docs, technical writing.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://d54244d9-eb35-460b-b65c-21aa7401cefd",
+    "name": "aeo-optimizer",
+    "description": "Optimize an article for Answer Engine Optimization (AEO) — restructuring content so AI engines like ChatGPT, Perplexity, and Claude can extract, quote, and cite it. Rewrites headings as questions, drops 50-80 word answer capsules, audits paragraph length, and flags trust signals. Use when asked to AEO-optimize, make content AI-readable, improve AI citation chances, or adapt an article for answer engines.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://5103674a-74b8-4b74-9b9a-92424371017f",
+    "name": "onboarding",
+    "description": "When the user wants to optimize post-signup onboarding, user activation, first-run experience, or time-to-value. Also use when the user mentions \"onboarding flow,\" \"activation rate,\" \"user activation,\" \"first-run experience,\" \"empty states,\" \"onboarding checklist,\" \"aha moment,\" \"new user experience,\" \"users aren't activating,\" \"nobody completes setup,\" \"low activation rate,\" \"users sign up but don't use the product,\" \"time to value,\" or \"first session experience.\" Use this whenever users are signing up but not sticking around. For signup/registration optimization, see signup. For ongoing email sequences, see emails.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://61159c96-7d13-47bc-9b0a-d7a78ac2ce91",
+    "name": "draft-response",
+    "description": "Draft a professional customer-facing response tailored to the situation and relationship. Use when answering a product question, responding to an escalation or outage, delivering bad news like a delay or won't-fix, declining a feature request, or replying to a billing issue.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://0cc1eccb-f41d-4c09-b271-cb2eb9bb5aa6",
+    "name": "onboarding-playbook",
+    "description": "Design customer onboarding playbooks with milestone tracking, training plans, health checks, and success criteria",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://76837d98-77c8-416e-a847-656a951c8f76",
+    "name": "product-launch-playbook",
+    "description": "Comprehensive product launch planning including GTM strategy, launch checklists, stakeholder communication, beta testing plans, and post-launch analysis. Execute successful product launches with coordinated teams.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://3e07a9ff-a332-43fe-9f00-284187906654",
+    "name": "content-marketer",
+    "description": "Elite content marketing strategist specializing in AI-powered content creation, omnichannel distribution, SEO optimization, and data-driven performance marketing.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://137ab495-fc3f-4dd2-b015-be638cc6dfa7",
+    "name": "fsi-compliance-checker",
+    "description": "Maps code, architecture, and infrastructure changes to specific control IDs in PCI-DSS v4.0 and MAS TRM (Singapore financial regulator), producing an audit-traceable findings report with per-control remediation.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://35f174c7-a568-4271-a571-9397735a6949",
+    "name": "bats-testing-patterns",
+    "description": "Master Bash Automated Testing System (Bats) for comprehensive shell script testing. Use when writing tests for shell scripts, CI/CD pipelines, or requiring test-driven development of shell utilities.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://9202ec1b-6616-48b8-a995-aade8173954c",
+    "name": "seo-geo",
+    "description": "SEO & GEO (Generative Engine Optimization) for websites.\nAnalyze keywords, generate schema markup, optimize for AI search engines\n(ChatGPT, Perplexity, Gemini, Copilot, Claude) and traditional search (Google, Bing).\nUse when user wants to improve search visibility.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://73df5ddb-4dc1-4d10-a272-9c1f72c1e10d",
+    "name": "launch-readiness",
+    "description": "Assesses pre-launch readiness across every function and produces an explicit Go / Conditional Go / No-Go recommendation. Use when preparing for any product or feature launch, running a pre-launch review, or determining whether a release is safe to ship. Produces a function-by-function readiness status, a ranked blockers list with owners and deadlines, a risk register, and a clearly reasoned launch recommendation.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://6ae56156-df78-4eb8-aa7a-1feb789fe07c",
+    "name": "iso42001-specialist",
+    "description": "ISO/IEC 42001:2023 AI Management System (AIMS) specialist for compliance teams running internal audits. Three decisions: (1) Where are the gaps against Clauses 4-10 and what do we close first? (2) What goes in the AI risk register and which Annex A controls treat each risk? (3) What's the 12-month internal audit plan that satisfies Clause 9.2? Use when preparing for certification, scoping internal audit cycles, or onboarding AI systems into an existing ISMS (27001) / QMS (13485) program. NOT an executive AI strategy skill (see chief-ai-officer-advisor). NOT EU AI Act compliance (see compliance-team-eu-ai-act).",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://c189d951-8e7b-442e-8111-8ab37626a8b1",
+    "name": "marketing-plan",
+    "description": "When the user needs a comprehensive marketing plan for a client, a company they advise, or their own product. Also use when the user mentions \"marketing plan,\" \"growth plan,\" \"GTM plan,\" \"go-to-market plan,\" \"AARRR plan,\" \"90-day marketing plan,\" \"12-month marketing roadmap,\" \"fractional CMO plan,\" or \"fCMO plan.\" Generates an exhaustive 13-section plan structured by AARRR (Acquisition, Activation, Retention, Referral, Revenue), customized to the client's current budget, team, and stage, mapped to future funding milestones, cross-referenced with the 139-idea marketing-ideas library and an embedded 17-section current-state audit rubric, with a full marketing operations stack showing which skills and MCP/API integrations execute each part. Outputs a Notion-paste-ready markdown document. For positioning and ICP context before planning, see product-marketing. For stage-specific deep work, see onboarding, signup, emails, referrals, pricing.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://07d391e0-5dc4-4941-be55-d9b73f9fd695",
+    "name": "database-migration",
+    "description": "Execute database migrations across ORMs and platforms with zero-downtime strategies, data transformation, and rollback procedures. Use when migrating databases, changing schemas, performing data transformations, or implementing zero-downtime deployment strategies.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://05c7fdcf-5f6c-45ec-8b43-d36646d8ad77",
+    "name": "tensorflow-and-deep-learning-rules",
+    "description": "TensorFlow and deep learning rules for building, training, evaluating, and deploying neural network models",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://a1c72126-79ba-48be-a537-63baffd65ff6",
+    "name": "docx",
+    "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://079a87bc-1634-4eed-a7bc-eea5ab7a640a",
+    "name": "qbr-builder",
+    "description": "Create Quarterly Business Reviews with account health scores, usage analytics, ROI analysis, expansion opportunities, and risk mitigation",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://3a394129-be88-402a-b06d-a8a905a500ba",
+    "name": "sop-builder",
+    "description": "Create Standard Operating Procedures with step-by-step workflows, RACI matrices, process maps, approval chains, and version control",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://ad87fe98-0ac5-47c2-a47b-c9f6a435d6e4",
+    "name": "seo-aeo-meta-description-generator",
+    "description": "Writes 3 title tag variants and 3 meta description variants per page with SERP preview, OG tags, and Twitter Card tags. Activate when the user wants to write meta tags, title tags, or social sharing tags for any page.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://df2ecedd-1a76-4758-b4f0-ba0b31535b71",
+    "name": "saas-mvp-launcher",
+    "description": "Use when planning or building a SaaS MVP from scratch. Provides a structured roadmap covering tech stack, architecture, auth, payments, and launch checklist.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://538281ca-67d4-46b8-a46b-4d303be2f32d",
+    "name": "email-campaign",
+    "description": "Write and sequence multi-email nurture or launch campaigns. Use when asked for an email sequence, drip campaign, onboarding emails, product launch emails, or nurture flow. Produces subject lines, preview text, full email body, and send-timing recommendations for each email in the sequence.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://3f53f039-6b60-48eb-8fc0-120fb89fda60",
+    "name": "design-clinical-campaign",
+    "description": "Produces clinical-grade campaign brief with targeting, creative guidance, and review plan.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://8d2550e4-268b-45a6-b0fd-2ec0cc4c104b",
+    "name": "ra-qm-skills",
+    "description": "Router/index for the 15 regulatory & quality-management skills bundled in this plugin (ISO 13485 QMS, EU MDR 2017/745, FDA submissions under QMSR, ISO 14971 risk, CAPA, document control, ISO 27001/ISMS, ISO 42001 AIMS, EU AI Act, GDPR/DSGVO, SOC 2, auditing). Use when a compliance request doesn't obviously match one skill and you need to pick the right one (e.g., 'prepare us for an ISO 13485 audit', 'is my AI system high-risk under the AI Act').",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://f1b6dfc5-aed9-440b-8dac-557543b9bbf7",
+    "name": "page-cro",
+    "description": "When the user wants to optimize, improve, or increase conversions on any marketing page — including homepage, landing pages, pricing pages, feature pages, or blog posts. Also use when the user says \"CRO,\" \"conversion rate optimization,\" \"this page isn't converting,\" \"improve conversions,\" or \"why isn't this page working.\" For signup/registration flows, see signup-flow-cro. For post-signup activation, see onboarding-cro. For forms outside of signup, see form-cro. For popups/modals, see popup-cro.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://f68b21ea-9dbf-4feb-bec2-26fdbe30a867",
+    "name": "email-sequence",
+    "description": "When the user wants to create or optimize an email sequence, drip campaign, automated email flow, or lifecycle email program. Also use when the user mentions \"email sequence,\" \"drip campaign,\" \"nurture sequence,\" \"onboarding emails,\" \"welcome sequence,\" \"re-engagement emails,\" \"email automation,\" or \"lifecycle emails.\" For in-app onboarding, see onboarding-cro.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://794fa684-c44e-4118-8d1a-24d7e4e06b3a",
+    "name": "app-store-optimization",
+    "description": "App Store Optimization (ASO) toolkit for researching keywords, analyzing competitor rankings, generating metadata suggestions, and improving app visibility on Apple App Store and Google Play Store. Use when the user asks about ASO, app store rankings, app metadata, app titles and descriptions, app store listings, app visibility, or mobile app marketing on iOS or Android. Supports keyword research and scoring, competitor keyword analysis, metadata optimization, A/B test planning, launch checklists, and tracking ranking changes.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "artifact://4574c694-8785-4a05-87e5-ffaaa7ff42a9",
+    "name": "comprehensive-review-security-auditor",
+    "description": "Expert security auditor specializing in DevSecOps, comprehensive cybersecurity, and compliance frameworks. Masters vulnerability assessment, threat modeling, secure authentication (OAuth2/OIDC), OWASP standards, cloud security, and security automation. Handles DevSecOps integration, compliance (GDPR/HIPAA/SOC2), and incident response. Use PROACTIVELY for security audits, DevSecOps, or compliance implementation.",
+    "mimeType": "text/markdown"
+   }
+  ]
+ }
+}

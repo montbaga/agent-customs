@@ -1,0 +1,2000 @@
+{
+ "url": "https://leavehacker.app/mcp",
+ "doc": {
+  "name": "Leave Hacker",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Leave Hacker (https://leavehacker.app) works out which days of annual leave to book around public holidays and weekends to get the most days off in a row, plans a whole leave year, and finds cheap flights that fit a break. It's the same planning logic as the Leave Hacker iPhone app. UK bank holidays come from gov.uk (Open Government Licence v3.0); Ireland's, each Australian state's and the US federal holidays from Leave Hacker's checked copy of the official lists (2026–2028); other countries' public holidays from Nager.Date.\n\nHow to use the tools well:\n- Ask or infer the person's region first. In the UK there are three sets of bank holidays: england-and-wales, scotland and northern-ireland. In Australia public holidays depend on the state or territory: pass AU-NSW, AU-VIC, AU-QLD, AU-WA, AU-SA, AU-TAS, AU-ACT or AU-NT. Ireland is IE. Elsewhere, pass a two-letter country code (US, DE...).\n- In the US, private employers choose which holidays they give: ask, and pass us_holidays (common = the usual six, federal = all 11, or custom with us_holiday_ids). Say \"PTO\" for leave there. In Ireland and Australia full-time workers get at least 20 days (four weeks) on top of public holidays.\n- In Ireland a public holiday at a weekend isn't moved. If the person gets the next working day off instead (ask; many employers give it), pass next_working_day_off: true.\n- \"Which days should I book around Easter / Christmas / the May bank holiday?\" → best_days_to_book (use the holiday filter). It lists \"book N days, get M off\" options per holiday.\n- \"Plan my year\" / \"I have 28 days of leave\" → plan_leave_year. Ask for their allowance, days already used, when their leave year starts (often January or April) and whether school holidays matter (school: parent or staff). Use year: next for next leave year.\n- When school holidays matter in the UK, ask which council the school is in (a town, county or the first half of the postcode is enough) and pass it as council to plan_leave_year, best_days_to_book (with school: parent) or get_school_holidays. Leave Hacker has the published term dates of over 100 councils, each checked against the council's own page; for school years a council hasn't published, and without a council, the tools use typical dates and say so.\n- \"Find flights for that break\" → find_trips with a departure airport (MAN, LGW, LON...) and the break's first and last day. Fares are cached and may change; when the result says sample, they are example prices only. The links are affiliate links: say that Leave Hacker may earn a commission.\n- \"How do I ask my manager?\" → leave_request_message with the dates to book.\n- get_bank_holidays and get_school_holidays list dates. Say whose school dates they are: a council's published dates (give its source link and when it was checked) or TYPICAL dates, which aren't official. Academies, church and independent schools can set their own, so tell people to check their school's.\nAlways show dates with the weekday (the tools give labels like \"Fri 26 Mar 2027\"), say which region the answer is for, and credit gov.uk for UK bank holidays. Breaks count every day off from first to last, weekends included. The tools only need regions, dates, numbers, airport codes and a council or the first half of a postcode: never send names, employers, schools' names, full addresses or calendar details. Nothing is stored.",
+  "tools": [
+   {
+    "name": "get_bank_holidays",
+    "title": "Bank holidays",
+    "description": "List the bank holidays (UK, from gov.uk) or public holidays (other countries, from Nager.Date) for a region in a year or between two dates, with weekdays and substitute days. Use it for questions like \"When are the bank holidays in Scotland in 2027?\". Ranges can be up to three years.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "region": {
+       "default": "england-and-wales",
+       "description": "Where the person works: england-and-wales, scotland or northern-ireland for UK bank holidays (from gov.uk); IE for Ireland; an Australian state or territory as AU-NSW, AU-VIC, AU-QLD, AU-WA, AU-SA, AU-TAS, AU-ACT or AU-NT (their public holidays differ a lot); US for US federal holidays; or a two-letter ISO 3166-1 country code such as DE or FR for other countries' public holidays (from Nager.Date). Defaults to england-and-wales.",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40
+      },
+      "year": {
+       "type": "integer",
+       "minimum": 2019,
+       "maximum": 2100,
+       "description": "Calendar year, e.g. 2027. Defaults to this year."
+      },
+      "from": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Start of a date range, instead of year (yyyy-MM-dd)."
+      },
+      "to": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "End of the date range, inclusive (yyyy-MM-dd)."
+      },
+      "next_working_day_off": {
+       "type": "boolean",
+       "description": "Ireland only: true if the person's employer gives the next working day off when a public holiday falls on a Saturday or Sunday (the civil service and banks do; Irish law doesn't require it, so the employer may give a day within a month, an extra day's leave or a day's pay instead). Adds those days, e.g. Mon 27 and Tue 28 Dec 2027. Default false."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Bank holidays",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "region": {
+       "type": "string"
+      },
+      "regionName": {
+       "type": "string"
+      },
+      "from": {
+       "type": "string"
+      },
+      "to": {
+       "type": "string"
+      },
+      "count": {
+       "type": "number"
+      },
+      "holidays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "substitute": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "date",
+         "label",
+         "name",
+         "substitute"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "source": {
+       "type": "string"
+      },
+      "sourceUrl": {
+       "type": "string"
+      },
+      "licence": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "url"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "attribution": {
+       "type": "string",
+       "description": "Credit to show with the dates"
+      }
+     },
+     "required": [
+      "region",
+      "regionName",
+      "from",
+      "to",
+      "count",
+      "holidays",
+      "notes",
+      "source",
+      "sourceUrl",
+      "licence",
+      "attribution"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "best_days_to_book",
+    "title": "Best days to book",
+    "description": "Find the days of annual leave to book around each public holiday (or cluster, such as Christmas and New Year) to get the most days off in a row: \"book 4 days, get 10 off\" options, cheapest first, with the exact dates. Use for \"Which days should I book around Easter 2027 in Scotland?\". Filter by holiday name (Easter, Christmas, Early May, Spring, Summer, St Patrick...). Past days are skipped. For parents in the UK, school: parent keeps leave inside the school holidays, using the council's published term dates when you pass council.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "region": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Where the person works: england-and-wales, scotland or northern-ireland for UK bank holidays (from gov.uk); IE for Ireland; an Australian state or territory as AU-NSW, AU-VIC, AU-QLD, AU-WA, AU-SA, AU-TAS, AU-ACT or AU-NT (their public holidays differ a lot); US for US federal holidays; or a two-letter ISO 3166-1 country code such as DE or FR for other countries' public holidays (from Nager.Date). Defaults to england-and-wales, or to the council's nation when council is given."
+      },
+      "year": {
+       "type": "integer",
+       "minimum": 2019,
+       "maximum": 2100,
+       "description": "Calendar year, e.g. 2027. Defaults to this year."
+      },
+      "from": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Start of a date range, instead of year (yyyy-MM-dd)."
+      },
+      "to": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "End of the date range, inclusive (yyyy-MM-dd)."
+      },
+      "holiday": {
+       "description": "Only holidays whose name contains this, e.g. \"Easter\", \"Christmas\", \"May\".",
+       "type": "string",
+       "maxLength": 60
+      },
+      "max_leave_days": {
+       "default": 9,
+       "description": "Most days of leave for one break. Default 9.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 15
+      },
+      "workdays": {
+       "minItems": 1,
+       "maxItems": 7,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "mon",
+         "tue",
+         "wed",
+         "thu",
+         "fri",
+         "sat",
+         "sun"
+        ]
+       },
+       "description": "Days the person works, e.g. [\"mon\",\"tue\",\"wed\",\"thu\"] for a four-day week. Defaults to Monday to Friday."
+      },
+      "us_holidays": {
+       "default": "federal",
+       "description": "US only: which holidays the person's employer gives. Private employers choose: common = the usual six (New Year's Day, Memorial Day, Independence Day, Labor Day, Thanksgiving, Christmas); federal = all 11 federal holidays; custom = the ones in us_holiday_ids. Default here: federal, to show every option.",
+       "type": "string",
+       "enum": [
+        "common",
+        "federal",
+        "custom"
+       ]
+      },
+      "us_holiday_ids": {
+       "maxItems": 12,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "new-years-day",
+         "mlk-day",
+         "washingtons-birthday",
+         "memorial-day",
+         "juneteenth",
+         "independence-day",
+         "labor-day",
+         "columbus-day",
+         "veterans-day",
+         "thanksgiving",
+         "day-after-thanksgiving",
+         "christmas-day"
+        ]
+       },
+       "description": "US only, with us_holidays: custom. Any of: new-years-day, mlk-day, washingtons-birthday, memorial-day, juneteenth, independence-day, labor-day, columbus-day, veterans-day, thanksgiving, day-after-thanksgiving, christmas-day (day-after-thanksgiving isn't federal, but many employers give it)."
+      },
+      "next_working_day_off": {
+       "type": "boolean",
+       "description": "Ireland only: true if the person's employer gives the next working day off when a public holiday falls on a Saturday or Sunday (the civil service and banks do; Irish law doesn't require it, so the employer may give a day within a month, an extra day's leave or a day's pay instead). Adds those days, e.g. Mon 27 and Tue 28 Dec 2027. Default false."
+      },
+      "school": {
+       "default": "none",
+       "description": "none (default); parent: children at school, so leave is only booked in the school holidays. UK only. School staff can't book leave in term: use plan_leave_year with school: staff.",
+       "type": "string",
+       "enum": [
+        "none",
+        "parent"
+       ]
+      },
+      "council": {
+       "description": "With school: parent. The UK council whose term dates the school follows: its name (\"Surrey\", \"Edinburgh\"), its id (\"surrey\", \"city-of-edinburgh\") or the first half of a postcode (\"GU1\", \"EH1\"), looked up in Leave Hacker's own copy of the ONS list. Send only the first half of a postcode, not the full one.",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 80
+      }
+     }
+    },
+    "annotations": {
+     "title": "Best days to book",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "region": {
+       "type": "string"
+      },
+      "regionName": {
+       "type": "string"
+      },
+      "from": {
+       "type": "string"
+      },
+      "to": {
+       "type": "string"
+      },
+      "maxLeaveDays": {
+       "type": "number"
+      },
+      "workdays": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "opportunities": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "holidays": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "date": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "date",
+            "label",
+            "name"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "best": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "start": {
+              "type": "object",
+              "properties": {
+               "date": {
+                "type": "string",
+                "description": "yyyy-MM-dd"
+               },
+               "label": {
+                "type": "string",
+                "description": "e.g. \"Fri 26 Mar 2027\""
+               }
+              },
+              "required": [
+               "date",
+               "label"
+              ],
+              "additionalProperties": false
+             },
+             "end": {
+              "type": "object",
+              "properties": {
+               "date": {
+                "type": "string",
+                "description": "yyyy-MM-dd"
+               },
+               "label": {
+                "type": "string",
+                "description": "e.g. \"Fri 26 Mar 2027\""
+               }
+              },
+              "required": [
+               "date",
+               "label"
+              ],
+              "additionalProperties": false
+             },
+             "daysOff": {
+              "type": "number",
+              "description": "Days off in a row, weekends and holidays included"
+             },
+             "leaveDays": {
+              "type": "number",
+              "description": "Days of leave to book"
+             },
+             "daysOffPerLeaveDay": {
+              "description": "Left out when the break needs no leave",
+              "type": "number"
+             },
+             "datesToBook": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "date": {
+                 "type": "string",
+                 "description": "yyyy-MM-dd"
+                },
+                "label": {
+                 "type": "string",
+                 "description": "e.g. \"Fri 26 Mar 2027\""
+                }
+               },
+               "required": [
+                "date",
+                "label"
+               ],
+               "additionalProperties": false
+              }
+             },
+             "holidays": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "date": {
+                 "type": "string"
+                },
+                "label": {
+                 "type": "string"
+                },
+                "name": {
+                 "type": "string"
+                }
+               },
+               "required": [
+                "date",
+                "label",
+                "name"
+               ],
+               "additionalProperties": false
+              }
+             }
+            },
+            "required": [
+             "start",
+             "end",
+             "daysOff",
+             "leaveDays",
+             "datesToBook",
+             "holidays"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "options": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "start": {
+             "type": "object",
+             "properties": {
+              "date": {
+               "type": "string",
+               "description": "yyyy-MM-dd"
+              },
+              "label": {
+               "type": "string",
+               "description": "e.g. \"Fri 26 Mar 2027\""
+              }
+             },
+             "required": [
+              "date",
+              "label"
+             ],
+             "additionalProperties": false
+            },
+            "end": {
+             "type": "object",
+             "properties": {
+              "date": {
+               "type": "string",
+               "description": "yyyy-MM-dd"
+              },
+              "label": {
+               "type": "string",
+               "description": "e.g. \"Fri 26 Mar 2027\""
+              }
+             },
+             "required": [
+              "date",
+              "label"
+             ],
+             "additionalProperties": false
+            },
+            "daysOff": {
+             "type": "number",
+             "description": "Days off in a row, weekends and holidays included"
+            },
+            "leaveDays": {
+             "type": "number",
+             "description": "Days of leave to book"
+            },
+            "daysOffPerLeaveDay": {
+             "description": "Left out when the break needs no leave",
+             "type": "number"
+            },
+            "datesToBook": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "date": {
+                "type": "string",
+                "description": "yyyy-MM-dd"
+               },
+               "label": {
+                "type": "string",
+                "description": "e.g. \"Fri 26 Mar 2027\""
+               }
+              },
+              "required": [
+               "date",
+               "label"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "holidays": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "date": {
+                "type": "string"
+               },
+               "label": {
+                "type": "string"
+               },
+               "name": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "date",
+               "label",
+               "name"
+              ],
+              "additionalProperties": false
+             }
+            }
+           },
+           "required": [
+            "start",
+            "end",
+            "daysOff",
+            "leaveDays",
+            "datesToBook",
+            "holidays"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "name",
+         "holidays",
+         "best",
+         "options"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "assumptions": {
+       "type": "string"
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "school": {
+       "type": "string"
+      },
+      "council": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "short": {
+           "type": "string"
+          },
+          "nation": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "short",
+          "nation"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The council whose published dates are used, or null for typical dates"
+      },
+      "schoolYears": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "schoolYear": {
+          "type": "string",
+          "description": "e.g. \"2026/27\""
+         },
+         "source": {
+          "type": "string",
+          "enum": [
+           "council",
+           "typical"
+          ],
+          "description": "council: the council's published term dates; typical: the usual pattern, not official"
+         },
+         "council": {
+          "type": "string"
+         },
+         "sourceUrl": {
+          "description": "The council's own page or PDF",
+          "type": "string"
+         },
+         "checked": {
+          "description": "yyyy-MM-dd the dates were last checked against it",
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "schoolYear",
+         "source"
+        ],
+        "additionalProperties": false
+       },
+       "description": "Where each school year's dates come from"
+      },
+      "trainingDays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string",
+          "description": "yyyy-MM-dd"
+         },
+         "label": {
+          "type": "string",
+          "description": "e.g. \"Fri 26 Mar 2027\""
+         }
+        },
+        "required": [
+         "date",
+         "label"
+        ],
+        "additionalProperties": false
+       },
+       "description": "The council's staff training (INSET) days: pupils are off, staff work"
+      },
+      "source": {
+       "type": "string"
+      },
+      "sourceUrl": {
+       "type": "string"
+      },
+      "licence": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "url"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "attribution": {
+       "type": "string",
+       "description": "Credit to show with the dates"
+      }
+     },
+     "required": [
+      "region",
+      "regionName",
+      "from",
+      "to",
+      "maxLeaveDays",
+      "workdays",
+      "opportunities",
+      "assumptions",
+      "notes",
+      "school",
+      "council",
+      "schoolYears",
+      "trainingDays",
+      "source",
+      "sourceUrl",
+      "licence",
+      "attribution"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "plan_leave_year",
+    "title": "Plan a leave year",
+    "description": "Plan a whole leave year: the set of breaks that turns the person's annual leave allowance into the most days off, using every bank holiday, with the dates to book for each break and the totals. Handles any leave year start date, part-time working days, three plan styles and school holidays (parents: breaks only in school holidays; school staff: the holidays themselves), from the council's published term dates when you pass council and typical dates otherwise. Use for \"Plan my 28 days of leave for 2027, I have kids at school in Leeds\".",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "region": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Where the person works: england-and-wales, scotland or northern-ireland for UK bank holidays (from gov.uk); IE for Ireland; an Australian state or territory as AU-NSW, AU-VIC, AU-QLD, AU-WA, AU-SA, AU-TAS, AU-ACT or AU-NT (their public holidays differ a lot); US for US federal holidays; or a two-letter ISO 3166-1 country code such as DE or FR for other countries' public holidays (from Nager.Date). Defaults to england-and-wales, or to the council's nation when council is given."
+      },
+      "allowance": {
+       "description": "Days of annual leave (PTO in the US) a year, not counting public holidays. Defaults to the usual for the region: 25 in the UK, 20 in Ireland and Australia (the legal minimum for full-time work), 15 in the US.",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 60
+      },
+      "us_holidays": {
+       "default": "common",
+       "description": "US only: which holidays the person's employer gives. Private employers choose: common = the usual six (New Year's Day, Memorial Day, Independence Day, Labor Day, Thanksgiving, Christmas); federal = all 11 federal holidays; custom = the ones in us_holiday_ids. Default here: common.",
+       "type": "string",
+       "enum": [
+        "common",
+        "federal",
+        "custom"
+       ]
+      },
+      "us_holiday_ids": {
+       "maxItems": 12,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "new-years-day",
+         "mlk-day",
+         "washingtons-birthday",
+         "memorial-day",
+         "juneteenth",
+         "independence-day",
+         "labor-day",
+         "columbus-day",
+         "veterans-day",
+         "thanksgiving",
+         "day-after-thanksgiving",
+         "christmas-day"
+        ]
+       },
+       "description": "US only, with us_holidays: custom. Any of: new-years-day, mlk-day, washingtons-birthday, memorial-day, juneteenth, independence-day, labor-day, columbus-day, veterans-day, thanksgiving, day-after-thanksgiving, christmas-day (day-after-thanksgiving isn't federal, but many employers give it)."
+      },
+      "next_working_day_off": {
+       "type": "boolean",
+       "description": "Ireland only: true if the person's employer gives the next working day off when a public holiday falls on a Saturday or Sunday (the civil service and banks do; Irish law doesn't require it, so the employer may give a day within a month, an extra day's leave or a day's pay instead). Adds those days, e.g. Mon 27 and Tue 28 Dec 2027. Default false."
+      },
+      "days_used": {
+       "default": 0,
+       "description": "Days of this leave year's allowance already taken or booked. Default 0.",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 60
+      },
+      "leave_year_start_month": {
+       "default": 1,
+       "description": "Month the leave year starts, 1–12 (1 = January, 4 = April). Default 1.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 12
+      },
+      "leave_year_start_day": {
+       "default": 1,
+       "description": "Day of the month the leave year starts. Default 1.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 31
+      },
+      "workdays": {
+       "minItems": 1,
+       "maxItems": 7,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "mon",
+         "tue",
+         "wed",
+         "thu",
+         "fri",
+         "sat",
+         "sun"
+        ]
+       },
+       "description": "Days the person works, e.g. [\"mon\",\"tue\",\"wed\",\"thu\"] for a four-day week. Defaults to Monday to Friday."
+      },
+      "style": {
+       "default": "mix",
+       "description": "mix: two proper holidays of 9+ days, the rest long weekends (default). longWeekends: as many 3–5 day weekends as possible. bigTrips: fewer trips of 9+ days.",
+       "type": "string",
+       "enum": [
+        "mix",
+        "longWeekends",
+        "bigTrips"
+       ]
+      },
+      "school": {
+       "default": "none",
+       "description": "none (default); parent: children at school, so breaks only in the school holidays; staff: works in a school, so the school holidays are the breaks. UK only.",
+       "type": "string",
+       "enum": [
+        "none",
+        "parent",
+        "staff"
+       ]
+      },
+      "council": {
+       "description": "With school: parent or staff. The UK council whose term dates the school follows: its name (\"Surrey\", \"Edinburgh\"), its id (\"surrey\", \"city-of-edinburgh\") or the first half of a postcode (\"GU1\", \"EH1\"), looked up in Leave Hacker's own copy of the ONS list. Send only the first half of a postcode, not the full one. Without it, typical school holidays (Northern Ireland: the Department of Education's dates).",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 80
+      },
+      "year": {
+       "description": "Which leave year: current or next. Defaults to current, or next when under 90 days are left.",
+       "type": "string",
+       "enum": [
+        "current",
+        "next"
+       ]
+      },
+      "leave_year_starting": {
+       "description": "Instead of year: the calendar year the leave year starts in, e.g. 2027 for January–December 2027 or April 2027–March 2028.",
+       "type": "integer",
+       "minimum": 2019,
+       "maximum": 2100
+      }
+     }
+    },
+    "annotations": {
+     "title": "Plan a leave year",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "region": {
+       "type": "string"
+      },
+      "regionName": {
+       "type": "string"
+      },
+      "leaveYear": {
+       "type": "object",
+       "properties": {
+        "start": {
+         "type": "object",
+         "properties": {
+          "date": {
+           "type": "string",
+           "description": "yyyy-MM-dd"
+          },
+          "label": {
+           "type": "string",
+           "description": "e.g. \"Fri 26 Mar 2027\""
+          }
+         },
+         "required": [
+          "date",
+          "label"
+         ],
+         "additionalProperties": false
+        },
+        "end": {
+         "type": "object",
+         "properties": {
+          "date": {
+           "type": "string",
+           "description": "yyyy-MM-dd"
+          },
+          "label": {
+           "type": "string",
+           "description": "e.g. \"Fri 26 Mar 2027\""
+          }
+         },
+         "required": [
+          "date",
+          "label"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "required": [
+        "start",
+        "end"
+       ],
+       "additionalProperties": false
+      },
+      "plannedFrom": {
+       "type": "string"
+      },
+      "allowance": {
+       "type": "number"
+      },
+      "daysUsed": {
+       "type": "number"
+      },
+      "budget": {
+       "type": "number"
+      },
+      "style": {
+       "type": "string"
+      },
+      "school": {
+       "type": "string"
+      },
+      "workdays": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "totals": {
+       "type": "object",
+       "properties": {
+        "breaks": {
+         "type": "number"
+        },
+        "daysOff": {
+         "type": "number"
+        },
+        "leaveUsed": {
+         "type": "number"
+        },
+        "leftover": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "breaks",
+        "daysOff",
+        "leaveUsed",
+        "leftover"
+       ],
+       "additionalProperties": false
+      },
+      "breaks": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "start": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string",
+            "description": "yyyy-MM-dd"
+           },
+           "label": {
+            "type": "string",
+            "description": "e.g. \"Fri 26 Mar 2027\""
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         },
+         "end": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string",
+            "description": "yyyy-MM-dd"
+           },
+           "label": {
+            "type": "string",
+            "description": "e.g. \"Fri 26 Mar 2027\""
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         },
+         "daysOff": {
+          "type": "number",
+          "description": "Days off in a row, weekends and holidays included"
+         },
+         "leaveDays": {
+          "type": "number",
+          "description": "Days of leave to book"
+         },
+         "daysOffPerLeaveDay": {
+          "description": "Left out when the break needs no leave",
+          "type": "number"
+         },
+         "datesToBook": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "date": {
+             "type": "string",
+             "description": "yyyy-MM-dd"
+            },
+            "label": {
+             "type": "string",
+             "description": "e.g. \"Fri 26 Mar 2027\""
+            }
+           },
+           "required": [
+            "date",
+            "label"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "holidays": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "date": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "date",
+            "label",
+            "name"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "start",
+         "end",
+         "daysOff",
+         "leaveDays",
+         "datesToBook",
+         "holidays"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "bankHolidays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "date",
+         "label",
+         "name"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "schoolHolidays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "start": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string",
+            "description": "yyyy-MM-dd"
+           },
+           "label": {
+            "type": "string",
+            "description": "e.g. \"Fri 26 Mar 2027\""
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         },
+         "end": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string",
+            "description": "yyyy-MM-dd"
+           },
+           "label": {
+            "type": "string",
+            "description": "e.g. \"Fri 26 Mar 2027\""
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         },
+         "typical": {
+          "type": "boolean",
+          "description": "True: the usual pattern, not the council's published dates"
+         }
+        },
+        "required": [
+         "name",
+         "start",
+         "end",
+         "typical"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "assumptions": {
+       "type": "string"
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "council": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "short": {
+           "type": "string"
+          },
+          "nation": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "short",
+          "nation"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The council whose published dates are used, or null for typical dates"
+      },
+      "schoolYears": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "schoolYear": {
+          "type": "string",
+          "description": "e.g. \"2026/27\""
+         },
+         "source": {
+          "type": "string",
+          "enum": [
+           "council",
+           "typical"
+          ],
+          "description": "council: the council's published term dates; typical: the usual pattern, not official"
+         },
+         "council": {
+          "type": "string"
+         },
+         "sourceUrl": {
+          "description": "The council's own page or PDF",
+          "type": "string"
+         },
+         "checked": {
+          "description": "yyyy-MM-dd the dates were last checked against it",
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "schoolYear",
+         "source"
+        ],
+        "additionalProperties": false
+       },
+       "description": "Where each school year's dates come from"
+      },
+      "trainingDays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string",
+          "description": "yyyy-MM-dd"
+         },
+         "label": {
+          "type": "string",
+          "description": "e.g. \"Fri 26 Mar 2027\""
+         }
+        },
+        "required": [
+         "date",
+         "label"
+        ],
+        "additionalProperties": false
+       },
+       "description": "The council's staff training (INSET) days: pupils are off, staff work"
+      },
+      "source": {
+       "type": "string"
+      },
+      "sourceUrl": {
+       "type": "string"
+      },
+      "licence": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "url"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "attribution": {
+       "type": "string",
+       "description": "Credit to show with the dates"
+      }
+     },
+     "required": [
+      "region",
+      "regionName",
+      "leaveYear",
+      "plannedFrom",
+      "allowance",
+      "daysUsed",
+      "budget",
+      "style",
+      "school",
+      "workdays",
+      "totals",
+      "breaks",
+      "bankHolidays",
+      "schoolHolidays",
+      "assumptions",
+      "notes",
+      "council",
+      "schoolYears",
+      "trainingDays",
+      "source",
+      "sourceUrl",
+      "licence",
+      "attribution"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_school_holidays",
+    "title": "School holidays",
+    "description": "School holiday dates in the UK for a calendar year (half terms, Easter, summer, Christmas, and training days). With council, that council's published term dates, each school year with the council's source link and the date Leave Hacker last checked it; for a school year it hasn't published, and without a council, TYPICAL dates, which are the usual pattern and not official (Northern Ireland: the Department of Education's dates). Every holiday says which it is. Academies and independent schools can set their own, so tell the person to check their school's.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "region": {
+       "type": "string",
+       "enum": [
+        "england-and-wales",
+        "scotland",
+        "northern-ireland"
+       ],
+       "description": "UK nation: england-and-wales, scotland or northern-ireland. Defaults to england-and-wales, or to the council's nation when council is given."
+      },
+      "council": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 80,
+       "description": "The UK council whose term dates the school follows: its name (\"Surrey\", \"Edinburgh\"), its id (\"surrey\", \"city-of-edinburgh\") or the first half of a postcode (\"GU1\", \"EH1\"), looked up in Leave Hacker's own copy of the ONS list. Send only the first half of a postcode, not the full one."
+      },
+      "year": {
+       "type": "integer",
+       "minimum": 2019,
+       "maximum": 2100,
+       "description": "Calendar year, e.g. 2027. Defaults to this year."
+      }
+     }
+    },
+    "annotations": {
+     "title": "School holidays",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "region": {
+       "type": "string"
+      },
+      "regionName": {
+       "type": "string"
+      },
+      "year": {
+       "type": "number"
+      },
+      "typical": {
+       "type": "boolean",
+       "description": "True when every date here is typical, not published"
+      },
+      "council": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "short": {
+           "type": "string"
+          },
+          "nation": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "short",
+          "nation"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The council whose published dates are used, or null for typical dates"
+      },
+      "schoolYears": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "schoolYear": {
+          "type": "string",
+          "description": "e.g. \"2026/27\""
+         },
+         "source": {
+          "type": "string",
+          "enum": [
+           "council",
+           "typical"
+          ],
+          "description": "council: the council's published term dates; typical: the usual pattern, not official"
+         },
+         "council": {
+          "type": "string"
+         },
+         "sourceUrl": {
+          "description": "The council's own page or PDF",
+          "type": "string"
+         },
+         "checked": {
+          "description": "yyyy-MM-dd the dates were last checked against it",
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "schoolYear",
+         "source"
+        ],
+        "additionalProperties": false
+       },
+       "description": "Where each school year's dates come from"
+      },
+      "trainingDays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string",
+          "description": "yyyy-MM-dd"
+         },
+         "label": {
+          "type": "string",
+          "description": "e.g. \"Fri 26 Mar 2027\""
+         }
+        },
+        "required": [
+         "date",
+         "label"
+        ],
+        "additionalProperties": false
+       },
+       "description": "The council's staff training (INSET) days: pupils are off, staff work"
+      },
+      "schoolHolidays": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "start": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string",
+            "description": "yyyy-MM-dd"
+           },
+           "label": {
+            "type": "string",
+            "description": "e.g. \"Fri 26 Mar 2027\""
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         },
+         "end": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string",
+            "description": "yyyy-MM-dd"
+           },
+           "label": {
+            "type": "string",
+            "description": "e.g. \"Fri 26 Mar 2027\""
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         },
+         "days": {
+          "type": "number"
+         },
+         "typical": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "name",
+         "start",
+         "end",
+         "days",
+         "typical"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "caveat": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "region",
+      "regionName",
+      "year",
+      "typical",
+      "council",
+      "schoolYears",
+      "trainingDays",
+      "schoolHolidays",
+      "notes",
+      "caveat"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "find_trips",
+    "title": "Find cheap flights for a break",
+    "description": "Find the cheapest return flights from a departure airport that fit a break, one per destination, cheapest first, with booking links. Prices are cached airline fares in the departure country's currency (GBP, EUR, AUD or USD) and can change; if the result says sample, they are example prices only. Links go through leavehacker.app/go and are affiliate links: Leave Hacker may earn a commission if you book, at no extra cost to you. Say so when you share them. Use for \"Find cheap flights from Manchester that fit the May bank holiday weekend\" (work out the break's dates with best_days_to_book first).",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "origin": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 3,
+       "description": "Departure airport or city IATA code, e.g. MAN (Manchester), LGW (Gatwick), EDI (Edinburgh), BHX, LON (all London airports)."
+      },
+      "depart": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Outbound date, the first day of the break (yyyy-MM-dd)."
+      },
+      "return": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Return date, the last day of the break (yyyy-MM-dd)."
+      },
+      "limit": {
+       "default": 10,
+       "description": "How many destinations to return, up to 20. Default 10.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20
+      }
+     },
+     "required": [
+      "origin",
+      "depart",
+      "return"
+     ]
+    },
+    "annotations": {
+     "title": "Find cheap flights for a break",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "origin": {
+       "type": "string"
+      },
+      "depart": {
+       "type": "object",
+       "properties": {
+        "date": {
+         "type": "string",
+         "description": "yyyy-MM-dd"
+        },
+        "label": {
+         "type": "string",
+         "description": "e.g. \"Fri 26 Mar 2027\""
+        }
+       },
+       "required": [
+        "date",
+        "label"
+       ],
+       "additionalProperties": false
+      },
+      "return": {
+       "type": "object",
+       "properties": {
+        "date": {
+         "type": "string",
+         "description": "yyyy-MM-dd"
+        },
+        "label": {
+         "type": "string",
+         "description": "e.g. \"Fri 26 Mar 2027\""
+        }
+       },
+       "required": [
+        "date",
+        "label"
+       ],
+       "additionalProperties": false
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217: GBP from the UK, EUR from Ireland, AUD from Australia, USD from the US"
+      },
+      "sample": {
+       "type": "boolean",
+       "description": "True: example prices, not real offers"
+      },
+      "priceNote": {
+       "type": "string"
+      },
+      "fares": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "destination": {
+          "type": "string"
+         },
+         "city": {
+          "type": "string"
+         },
+         "country": {
+          "type": "string"
+         },
+         "price": {
+          "type": "number",
+          "description": "Per person, return, in currency"
+         },
+         "airline": {
+          "description": "IATA airline code, when known",
+          "type": "string"
+         },
+         "transfers": {
+          "type": "number"
+         },
+         "departAt": {
+          "type": "string"
+         },
+         "returnAt": {
+          "type": "string"
+         },
+         "fitsDates": {
+          "type": "boolean",
+          "description": "False: a from-price on other dates that month; the link searches the break's dates"
+         },
+         "url": {
+          "type": "string",
+          "description": "Affiliate booking link"
+         }
+        },
+        "required": [
+         "destination",
+         "city",
+         "country",
+         "price",
+         "transfers",
+         "departAt",
+         "returnAt",
+         "fitsDates",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "searchAllUrl": {
+       "type": "string"
+      },
+      "affiliate": {
+       "type": "boolean",
+       "const": true
+      },
+      "disclosure": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "origin",
+      "depart",
+      "return",
+      "currency",
+      "sample",
+      "priceNote",
+      "fares",
+      "searchAllUrl",
+      "affiliate",
+      "disclosure"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "leave_request_message",
+    "title": "Leave request message",
+    "description": "Write the short, polite message asking a manager for the leave days of a break, in the same words as the Leave Hacker app. Pass the dates to book; the break's first and last day are worked out from the weekends (and bank holidays, if you pass region) either side unless you pass them.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "dates_to_book": {
+       "minItems": 1,
+       "maxItems": 60,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "description": "A day of leave (yyyy-MM-dd)."
+       },
+       "description": "The working days to book as leave (yyyy-MM-dd)."
+      },
+      "break_start": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "First day off, if known (yyyy-MM-dd)."
+      },
+      "break_end": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Last day off, if known (yyyy-MM-dd)."
+      },
+      "region": {
+       "description": "Optional, to count bank holidays next to the dates: england-and-wales, scotland or northern-ireland for UK bank holidays (from gov.uk); IE for Ireland; an Australian state or territory as AU-NSW, AU-VIC, AU-QLD, AU-WA, AU-SA, AU-TAS, AU-ACT or AU-NT (their public holidays differ a lot); US for US federal holidays; or a two-letter ISO 3166-1 country code such as DE or FR for other countries' public holidays (from Nager.Date).",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "dates_to_book"
+     ]
+    },
+    "annotations": {
+     "title": "Leave request message",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string"
+      },
+      "datesToBook": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string",
+          "description": "yyyy-MM-dd"
+         },
+         "label": {
+          "type": "string",
+          "description": "e.g. \"Fri 26 Mar 2027\""
+         }
+        },
+        "required": [
+         "date",
+         "label"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "break": {
+       "type": "object",
+       "properties": {
+        "start": {
+         "type": "object",
+         "properties": {
+          "date": {
+           "type": "string",
+           "description": "yyyy-MM-dd"
+          },
+          "label": {
+           "type": "string",
+           "description": "e.g. \"Fri 26 Mar 2027\""
+          }
+         },
+         "required": [
+          "date",
+          "label"
+         ],
+         "additionalProperties": false
+        },
+        "end": {
+         "type": "object",
+         "properties": {
+          "date": {
+           "type": "string",
+           "description": "yyyy-MM-dd"
+          },
+          "label": {
+           "type": "string",
+           "description": "e.g. \"Fri 26 Mar 2027\""
+          }
+         },
+         "required": [
+          "date",
+          "label"
+         ],
+         "additionalProperties": false
+        },
+        "daysOff": {
+         "type": "number"
+        },
+        "leaveDays": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "start",
+        "end",
+        "daysOff",
+        "leaveDays"
+       ],
+       "additionalProperties": false
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "message",
+      "datesToBook",
+      "break",
+      "notes"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "plan_my_year",
+    "title": "Plan my leave year",
+    "description": "Plan a whole leave year with Leave Hacker: the best breaks for your allowance, then flights and a message to your manager.",
+    "arguments": [
+     {
+      "name": "region",
+      "description": "england-and-wales, scotland, northern-ireland or a country code",
+      "required": false
+     },
+     {
+      "name": "allowance",
+      "description": "Days of annual leave a year, e.g. 25",
+      "required": false
+     },
+     {
+      "name": "school",
+      "description": "none, parent or staff",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "best_days_around",
+    "title": "Best days to book around a holiday",
+    "description": "Which days of leave to book around one bank holiday (Easter, Christmas, a May bank holiday) for the most days off.",
+    "arguments": [
+     {
+      "name": "holiday",
+      "description": "e.g. \"Easter\", \"Christmas\", \"Early May\"",
+      "required": true
+     },
+     {
+      "name": "year",
+      "description": "e.g. 2027",
+      "required": false
+     },
+     {
+      "name": "region",
+      "description": "england-and-wales, scotland, northern-ireland or a country code",
+      "required": false
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "title": "Bank holidays 2026: England and Wales",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/england-and-wales/2026",
+    "name": "bank-holidays-england-and-wales-2026"
+   },
+   {
+    "title": "Bank holidays 2027: England and Wales",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/england-and-wales/2027",
+    "name": "bank-holidays-england-and-wales-2027"
+   },
+   {
+    "title": "Bank holidays 2028: England and Wales",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/england-and-wales/2028",
+    "name": "bank-holidays-england-and-wales-2028"
+   },
+   {
+    "title": "Bank holidays 2026: Scotland",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/scotland/2026",
+    "name": "bank-holidays-scotland-2026"
+   },
+   {
+    "title": "Bank holidays 2027: Scotland",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/scotland/2027",
+    "name": "bank-holidays-scotland-2027"
+   },
+   {
+    "title": "Bank holidays 2028: Scotland",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/scotland/2028",
+    "name": "bank-holidays-scotland-2028"
+   },
+   {
+    "title": "Bank holidays 2026: Northern Ireland",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/northern-ireland/2026",
+    "name": "bank-holidays-northern-ireland-2026"
+   },
+   {
+    "title": "Bank holidays 2027: Northern Ireland",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/northern-ireland/2027",
+    "name": "bank-holidays-northern-ireland-2027"
+   },
+   {
+    "title": "Bank holidays 2028: Northern Ireland",
+    "description": "UK bank holidays (gov.uk, Open Government Licence v3.0) or other countries' public holidays (Nager.Date) for a region and year, as JSON. region: england-and-wales, scotland, northern-ireland or a two-letter country code.",
+    "mimeType": "application/json",
+    "uri": "leavehacker://bank-holidays/northern-ireland/2028",
+    "name": "bank-holidays-northern-ireland-2028"
+   }
+  ]
+ }
+}

@@ -1,0 +1,237 @@
+{
+ "url": "https://leafwright.co/mcp",
+ "doc": {
+  "name": "leafwright",
+  "version": "0.2.4",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Leafwright renders HTML, public URLs, and published Handlebars templates into PDFs, and returns a signed download link.\n\nEvery render is a tracked job with readable logs, so when a layout breaks you can read the cause — a font that 404'd, an asset that timed out, content overflowing the page — and repair the template from it.\n\nTwo ways to authenticate. Either follow the 401: any other tool answers 401 with a WWW-Authenticate header naming the OAuth discovery document, and a client that supports OAuth 2.1 registers itself from there. Or call leafwright_login, which needs no token, show the returned verification_url and user_code to the person, and once they approve call leafwright_auth_status with the device_code it gave you. Keep that device_code: this transport stores nothing between requests.\n\nUntil a token is in hand only the login tools are listed. That means unauthenticated, not empty: the document tools appear once authentication completes.",
+  "tools": [
+   {
+    "name": "leafwright_login",
+    "title": "Log in to Leafwright",
+    "description": "Start a browser login flow for Leafwright MCP. Open the returned URL, choose an organization and project, then call leafwright_auth_status.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "client_name": {
+       "description": "Optional client name shown in Leafwright.",
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "const": "pending"
+      },
+      "verification_url": {
+       "type": "string"
+      },
+      "user_code": {
+       "type": "string"
+      },
+      "device_code": {
+       "type": "string"
+      },
+      "expires_at": {
+       "type": "string"
+      },
+      "next_step": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "status",
+      "verification_url",
+      "user_code",
+      "device_code",
+      "expires_at",
+      "next_step"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "leafwright_auth_status",
+    "title": "Leafwright auth status",
+    "description": "Check whether Leafwright MCP is authenticated. Completes a pending browser login if approved. Pass the device_code returned by leafwright_login when the client has no local storage, which is the case over HTTP.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "device_code": {
+       "description": "The device_code from leafwright_login. Required when the client stores no local auth state.",
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "connected",
+        "not_authenticated",
+        "pending"
+       ]
+      },
+      "token_source": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "active_project_id": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "token": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "userId": {
+         "type": "string"
+        },
+        "orgId": {
+         "type": "string"
+        },
+        "defaultProjectId": {
+         "type": "string"
+        },
+        "tokenPreview": {
+         "type": "string"
+        },
+        "permissions": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "expiresAt": {
+         "type": "string"
+        },
+        "revokedAt": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "lastUsedAt": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "createdAt": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "id",
+        "userId",
+        "orgId",
+        "defaultProjectId",
+        "tokenPreview",
+        "permissions",
+        "expiresAt",
+        "revokedAt",
+        "lastUsedAt",
+        "createdAt"
+       ],
+       "additionalProperties": false
+      },
+      "next_step": {
+       "type": "string"
+      },
+      "user_code": {
+       "type": "string"
+      },
+      "expires_at": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "leafwright_logout",
+    "title": "Log out of Leafwright",
+    "description": "Revoke the stored Leafwright MCP token and clear local auth state.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "const": "logged_out"
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ }
+}

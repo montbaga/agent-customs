@@ -2,8 +2,9 @@
 //
 // The text rules in rules.js read English. Two checks here cover other languages:
 //
-//   1. Requests for card details or passwords in ten widely used languages: Spanish,
-//      French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi and Arabic.
+//   1. Requests for card details or passwords in twelve widely used languages: Spanish,
+//      French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi, Arabic, Dutch
+//      and Indonesian.
 //      A sentence counts when it has a request word and a secret word and no negation
 //      word at all, so "never ask for passwords" in any of them is not read as a request.
 //      Rules.js reports these as C-SECRETS, the same as in English.
@@ -225,6 +226,37 @@ export const SECRET_LANGUAGES = [
     ),
     negations: [words("[وف]?لا", "[وف]?لن", "[وف]?لم", "ليس", "أبدا", "أبداً", "ابدا", "دون", "بدون", "عدم", "ممنوع", "إياك", "اياك")],
   },
+  {
+    code: "nl", name: "Dutch",
+    // Orders only: "vraagt" ("asks") describes the visitor asking, and "vraag" alone is also
+    // "question", so it counts only before its object.
+    asks: words(
+      "vraag (?:de|het|om|naar|hun|zijn|haar|uw|je|jouw|hem|hen)", "verzamel",
+      "laat (?:\\p{L}+ ){0,3}?(?:geven|noemen|invoeren|intypen|typen|sturen|opsturen|doorgeven|voorlezen|delen)",
+      "(?:geef|stuur|noem|deel|typ|voer|vul|lees|bevestig|zeg|vertel) (?:me|mij|ons)",
+      "(?:geef|stuur|noem|deel|typ|voer|vul|bevestig|zend) (?:je|jouw|uw|hun|zijn|haar|de|het)",
+    ),
+    secrets: words(
+      "wachtwoord(?:en)?", "\\p{L}*kaartnummer\\p{L}*", "\\p{L}*kaartgegevens", "pincode", "cvv2?", "cvc",
+      "beveiligingscode\\p{L}*", "verificatiecode\\p{L}*", "toegangscode\\p{L}*", "eenmalige code", "inloggegevens",
+      "bankgegevens", "herstelzin", "vervaldatum (?:van )?(?:de |je |uw )?kaart",
+    ),
+    negations: [words("niet", "nooit", "geen", "zonder", "verboden", "vermijd")],
+  },
+  {
+    code: "id", name: "Indonesian",
+    // Imperatives only: the "me-" forms ("meminta") describe someone asking.
+    asks: words(
+      "minta(?:lah)?", "tanyakan(?:lah)?", "kumpulkan", "kirim(?:kan|lah)?", "berikan(?:lah)?", "bagikan",
+      "masukkan(?:lah)?", "ketik(?:kan)?", "sebutkan", "beritahu(?:kan)?", "beri tahu",
+    ),
+    // "pin" alone is also a map pin, and "kartu kredit" alone is often how someone pays.
+    secrets: words(
+      "kata sandi", "sandi", "nomor kartu(?: kredit| debit| atm)?", "data kartu", "cvv2?", "cvc",
+      "kode (?:otp|verifikasi|keamanan|rahasia|akses|pin)", "otp", "frasa pemulihan", "pin (?:atm|kartu|anda|kamu)",
+    ),
+    negations: [words("jangan", "tidak", "bukan", "tanpa", "dilarang", "hindari", "tak")],
+  },
 ];
 
 // Sentences end at these marks in the scripts above, or at a line break. A Latin full stop
@@ -286,7 +318,7 @@ export function foreignSecretRequests(normalized) {
 const hostileSeq = (verbs, objects, gap = 60) =>
   new RegExp(`${EDGE_BEFORE}(?:${verbs})${EDGE_AFTER}[^.!?\n]{0,${gap}}${EDGE_BEFORE}(?:${objects})${EDGE_AFTER}`, "iu");
 
-// Takeover, conversation-exfil, and download-and-run orders across the 10 checked languages plus
+// Takeover, conversation-exfil, and download-and-run orders across the 12 checked languages plus
 // Turkish and Polish (for tool/parameter descriptions where plain C-LANGUAGE is CONDITIONS).
 const HOSTILE_ACTION_LANGUAGES = [
   {
@@ -373,7 +405,31 @@ const HOSTILE_ACTION_LANGUAGES = [
     exfil: /(?:أرسل|ارسل|مرر).{0,24}(?:سجل\s+المحادثة|المحادثة|موجه\s+النظام)/iu,
     exec: /(?:نز[ّ]?ل|حم[ّ]?ل|ثب[ّ]?ت).{0,24}(?:شغ[ّ]?ل|نف[ّ]?ذ)/iu,
   },
+  {
+    name: "Dutch",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "nl").negations,
+    override: hostileSeq("negeer\\p{L}*|vergeet|vergeten|omzeil\\p{L}*|overschrijf\\p{L}*|negeren", "instructie\\p{L}*|regel\\p{L}*|richtlijn\\p{L}*|opdracht\\p{L}*|aanwijzing\\p{L}*|systeemprompt\\p{L}*", 55),
+    exfil: hostileSeq("stuur|verstuur|zend|verzend|deel (?:de|het|alle|je|uw)|kopieer|plak", "chatgeschiedenis|chatverloop|gespreksgeschiedenis|(?:volledige|hele) (?:gesprek|conversatie)|systeemprompt\\p{L}*"),
+    // Only Dutch forms: "download" and "open" are English words too.
+    exec: hostileSeq("downloaden|installeer\\p{L}*|installeren", "uitvoeren|voer (?:\\p{L}+ ){0,2}?uit|starten|openen"),
+  },
+  {
+    name: "Indonesian",
+    negations: SECRET_LANGUAGES.find((l) => l.code === "id").negations,
+    override: hostileSeq("abaikan\\p{L}*|lupakan\\p{L}*|langgar\\p{L}*|lewati", "instruksi|aturan|perintah|pedoman|petunjuk|prompt", 55),
+    exfil: hostileSeq("kirim\\p{L}*|teruskan|bagikan|salin", "riwayat (?:obrolan|percakapan|chat)|(?:seluruh|semua|isi) (?:percakapan|obrolan)|prompt sistem"),
+    exec: hostileSeq("unduh|pasang|instal(?:kan|lah)?", "jalankan|buka|eksekusi"),
+  },
 ];
+
+// A negation cancels a hostile order only when it governs it: inside the matched words or
+// in the few words right before them. "…, nicht an den Nutzer" at the end of the sentence
+// does not turn "Ignoriere alle vorherigen Anweisungen" round.
+function negatesNear(lang, candidate, m) {
+  const start = Math.max(0, m.index - 30);
+  const window = candidate.slice(start, m.index + m[0].length);
+  return lang.negations.some((nre) => nre.test(window));
+}
 
 export function foreignHostileRequests(normalized, kind) {
   const hits = [];
@@ -386,7 +442,7 @@ export function foreignHostileRequests(normalized, kind) {
         if (!re) continue;
         const m = candidate.match(re);
         if (!m) continue;
-        if (lang.negations.some((nre) => nre.test(candidate))) continue;
+        if (negatesNear(lang, candidate, m)) continue;
         if (seen.has(rawSentence)) break;
         seen.add(rawSentence);
         hits.push({ match: m[0], excerpt: rawSentence, language: lang.name });
@@ -516,32 +572,78 @@ function extractProse(sentence) {
   return { cleaned, tokens, latin: tokens.map((w) => w.toLowerCase()) };
 }
 
+// Short glosses in brackets ("(prévisions du jour)") and short quoted examples ("3,2 tấn")
+// inside an English sentence. A quoted full sentence is not an example: it is judged as text.
 function stripInlineExamples(sentence) {
+  const removed = [];
   let parenGroups = 0;
   let parenWords = 0;
+  const parenRemoved = [];
   const afterParens = sentence.replace(/\([^()\n]{1,70}\)/g, (m) => {
     const inner = m.slice(1, -1).trim();
     if (/https?:\/\//i.test(inner) || hasForeignHostileText(inner)) return m;
-    const words = inner.split(/\s+/).filter(Boolean);
-    if (words.length > 5) return m;
+    const words = fragmentWords(inner);
+    if (words > 5) return m;
     parenGroups += 1;
-    parenWords += words.length;
+    parenWords += words;
+    parenRemoved.push(inner);
     return " ";
   });
-  let out = parenGroups <= 2 && parenWords <= 6 ? afterParens : sentence;
+  const keepParens = parenGroups <= 2 && parenWords <= 6;
+  let out = keepParens ? afterParens : sentence;
+  if (keepParens) removed.push(...parenRemoved);
 
   let quoteGroups = 0;
   let quoteWords = 0;
-  const afterQuotes = out.replace(/"[^"\n]{1,90}"|'[^'\n]{1,90}'|«[^»\n]{1,90}»/g, (m) => {
+  const quoteRemoved = [];
+  const afterQuotes = out.replace(/"[^"\n]{1,90}"|'[^'\n]{1,90}'|«[^»\n]{1,90}»|“[^”\n]{1,90}”/g, (m) => {
     const inner = m.slice(1, -1).trim();
     if (/https?:\/\//i.test(inner) || hasForeignHostileText(inner)) return m;
-    const words = [...inner.matchAll(LATIN_WORD)];
-    if (words.length > 8) return m;
+    const words = fragmentWords(inner);
+    if (words > 4) return m;
     quoteGroups += 1;
-    quoteWords += words.length;
+    quoteWords += words;
+    quoteRemoved.push(inner);
     return " ";
   });
-  return quoteGroups <= 2 && quoteWords <= 8 ? afterQuotes : out;
+  if (quoteGroups <= 4 && quoteWords <= 10) {
+    out = afterQuotes;
+    removed.push(...quoteRemoved);
+  }
+  return { text: out, removed };
+}
+
+// Words in a fragment: whitespace-separated pieces with a letter, and two characters of a
+// script written without spaces (Chinese, Japanese, Thai …) for one word.
+function fragmentWords(fragment) {
+  const spaced = fragment.split(/\s+/).filter((w) => /\p{L}/u.test(w)).length;
+  const dense = (fragment.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/gu) || []).length;
+  return Math.max(spaced, Math.round(dense / 2));
+}
+
+// The language of a short fragment (an example or gloss), when it is clearly not English:
+// a few letters of another script, or two or more lower-case foreign words with no English.
+// Single words, codes ("en, de") and names ("Diário da República") do not count.
+function foreignFragmentLanguage(fragment) {
+  let best = null;
+  for (const script of SCRIPTS) {
+    const letters = (fragment.match(script.re) || []).length;
+    if (letters >= 2 && (!best || letters > best.letters)) best = { name: script.name, letters };
+  }
+  if (best) return best.name;
+  const { tokens } = extractProse(fragment);
+  const words = tokens.filter((w) => w.length > 2 && !/^\p{Lu}/u.test(w)).map((w) => w.toLowerCase());
+  if (words.length < 2) return null;
+  const english = words.filter((w) => STRONG_ENGLISH.has(w) || isEnglishWord(w)).length;
+  if (english > 0) return null;
+  let top = null;
+  for (const [name, set] of LATIN_WORDS) {
+    const count = tokens.map((w) => w.toLowerCase()).filter((w) => set.has(w)).length;
+    if (!top || count > top.count) top = { name, count };
+  }
+  const accents = /[^\x00-\x7f]/.test(words.join(""));
+  if (top.count >= 1 || accents) return top.count ? top.name : UNRECOGNISED;
+  return null;
 }
 
 const QUOTED_TOOL_EXAMPLE_LINE = /^\s*(?:[-*•>→]+\s*)?(['"])([^'"\n]{1,100})\1\s*(?:→|->|=>|:)\s*[a-z_][a-z0-9_]*\s*\(/i;
@@ -564,43 +666,75 @@ const QUOTED_TOOL_EXAMPLE_LINE = /^\s*(?:[-*•>→]+\s*)?(['"])([^'"\n]{1,100})
  * :return: The language's name, or null for English or too little text to tell.
  */
 export function otherLanguageOf(sentence) {
-  let { cleaned: text, tokens, latin } = extractProse(sentence);
+  const detail = otherLanguageDetail(sentence);
+  return detail && !detail.soft ? detail.language : null;
+}
+
+/**
+ * The same, with short examples kept visible: an English sentence whose only foreign words
+ * are a short gloss, a quoted example or a quoted sample query comes back as
+ * {language, soft: true}, so it is reported as a note rather than silently ignored.
+ *
+ * :param sentence: One sentence of cleaned text.
+ * :return: {language, soft} or null.
+ */
+export function otherLanguageDetail(sentence) {
+  // A short quoted sample query (<= 8 words) pointing at a tool call in English documentation.
+  // Quotes in a checked language were just checked for secret requests and takeover orders;
+  // one in a language Agent Customs cannot check is a note, not a hold.
+  const qm = sentence.match(QUOTED_TOOL_EXAMPLE_LINE);
+  if (qm) {
+    const qInner = qm[2].trim();
+    if (fragmentWords(qInner) <= 8 && !hasForeignHostileText(qInner) && !/https?:\/\//i.test(qInner)) {
+      const lang = foreignFragmentLanguage(qInner);
+      return lang && !CHECKED_LANGUAGES.has(lang) ? { language: lang, soft: true } : null;
+    }
+  }
+
+  // If short glosses in brackets or short quoted examples sit inside an English sentence,
+  // judge the English sentence around them. Glosses in a checked language were checked before
+  // they were set aside (stripInlineExamples); one in another language is a note.
+  let probe = sentence;
+  let softLanguage = null;
+  const stripped = stripInlineExamples(sentence);
+  if (stripped.text !== sentence) {
+    const outer = extractProse(stripped.text);
+    const outerLatinStr = outer.latin.join("");
+    const outerScript = scriptOf(stripped.text);
+    if (outer.latin.length >= 3 && !/[^\x00-\x7f]/.test(outerLatinStr) && !(outerScript && outerScript.units >= 3)) {
+      const outerEngKnown = outer.latin.filter((w) => ENGLISH.has(w) || isEnglishWord(w)).length;
+      const outerCandidates = [...new Set(outer.tokens.filter((w) => !/^\p{Lu}{2,}$/u.test(w)).map((w) => w.toLowerCase()))];
+      const maxOuterForeign = LATIN_WORDS.reduce((m, [, set]) => Math.max(m, outerCandidates.filter((w) => set.has(w)).length), 0);
+      if (outerEngKnown >= 1 && maxOuterForeign < 2) {
+        probe = stripped.text;
+        softLanguage = stripped.removed.map(foreignFragmentLanguage).find((l) => l && !CHECKED_LANGUAGES.has(l)) || null;
+      }
+    }
+  }
+
+  const best = scriptOf(probe);
+  if (best && best.units >= 3) return { language: best.name, soft: false };
+  const { cleaned: text, tokens, latin } = extractProse(probe);
+  const verdict = judgeLatin(text, tokens, latin);
+  if (verdict) return { language: verdict, soft: false };
+  return softLanguage ? { language: softLanguage, soft: true } : null;
+}
+
+// The non-Latin script most of a text is written in, weighed in words.
+function scriptOf(text) {
   let best = null;
   for (const script of SCRIPTS) {
-    const letters = (sentence.match(script.re) || []).length;
+    const letters = (text.match(script.re) || []).length;
     if (!letters) continue;
     const units = script.dense ? letters / 2 : letters / 5;
     if (!best || units > best.units) best = { name: script.name, units };
   }
   // Japanese mixes kana with Chinese characters: any kana makes it Japanese.
-  if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
-  if (best && best.units >= 3) return best.name;
+  if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) best.name = "Japanese";
+  return best;
+}
 
-  // A short quoted sample query (<= 8 words) pointing at a tool call in English documentation is not foreign instructions.
-  const qm = sentence.match(QUOTED_TOOL_EXAMPLE_LINE);
-  if (qm) {
-    const qInner = qm[2].trim();
-    const qWords = qInner.split(/\s+/).filter(Boolean);
-    if (qWords.length <= 8 && !hasForeignHostileText(qInner) && !/https?:\/\//i.test(qInner)) {
-      return null;
-    }
-  }
-
-  // If benign short parenthetical glosses or short quoted examples sit inside a clearly ASCII
-  // English phrase, judge the outer English sentence rather than its glosses/examples.
-  const withoutExamples = stripInlineExamples(sentence);
-  if (withoutExamples !== sentence) {
-    const outer = extractProse(withoutExamples);
-    const outerLatinStr = outer.latin.join("");
-    if (outer.latin.length >= 3 && !/[^\x00-\x7f]/.test(outerLatinStr)) {
-      const outerEngKnown = outer.latin.filter((w) => ENGLISH.has(w) || isEnglishWord(w)).length;
-      const outerCandidates = [...new Set(outer.tokens.filter((w) => !/^\p{Lu}{2,}$/u.test(w)).map((w) => w.toLowerCase()))];
-      const maxOuterForeign = LATIN_WORDS.reduce((m, [, set]) => Math.max(m, outerCandidates.filter((w) => set.has(w)).length), 0);
-      if (outerEngKnown >= 1 && maxOuterForeign < 2) {
-        ({ cleaned: text, tokens, latin } = outer);
-      }
-    }
-  }
+function judgeLatin(text, tokens, latin) {
   const english = latin.filter((w) => STRONG_ENGLISH.has(w)).length;
   const candidateWords = [...new Set(tokens.filter((w) => !/^\p{Lu}{2,}$/u.test(w)).map((w) => w.toLowerCase()))];
   let top = null;
@@ -662,11 +796,31 @@ export function otherLanguageSentences(normalized) {
   const seen = new Set();
   for (const sentence of [...sentences(normalized), ...wrappedSentences(normalized)]) {
     if (seen.has(sentence)) continue;
-    const language = otherLanguageOf(sentence);
-    if (language) {
+    const detail = otherLanguageDetail(sentence);
+    if (detail) {
       seen.add(sentence);
-      hits.push({ match: language, excerpt: sentence, language });
+      hits.push({ match: detail.language, excerpt: sentence, language: detail.language, soft: detail.soft,
+        words: foreignWordCount(sentence) });
     }
   }
   return hits;
 }
+
+// How many words of a sentence are not English: Latin words that are not English words, words
+// in other scripts, and two characters of Chinese or Japanese for one word.
+function foreignWordCount(sentence) {
+  const { tokens } = extractProse(sentence);
+  const latinForeign = tokens.filter((w) => !ENGLISH.has(w.toLowerCase()) && !isEnglishWord(w.toLowerCase())).length;
+  const dense = (sentence.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/gu) || []).length;
+  const otherScripts = (sentence.match(/(?:(?![\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}])\p{L})+/gu) || []).length;
+  return latinForeign + otherScripts + Math.round(dense / 2);
+}
+
+// Languages whose requests for secrets and takeover orders are checked word by word (above),
+// with the script names used when only the script is known (Cyrillic is read as Russian,
+// Arabic script as Arabic, Devanagari as Hindi). Text in any other language is only seen as
+// "not English".
+export const CHECKED_LANGUAGES = new Set([
+  ...SECRET_LANGUAGES.map((l) => l.name),
+  "Cyrillic script (such as Russian)", "Arabic script (such as Arabic, Persian or Urdu)", "Devanagari script (such as Hindi)",
+]);

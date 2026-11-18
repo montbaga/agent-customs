@@ -1,0 +1,371 @@
+{
+ "url": "https://klarbon.app/mcp",
+ "doc": {
+  "name": "Klarbon",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Klarbon opens, checks and converts European e-invoices and bank statements. Call list_formats first to see the format ids. Give files as base64 or as a public https address. open_invoice and list_formats are free; check_invoice is free within the account's daily checks; convert_invoice and convert_bank_statement spend credits from the Klarbon account behind the API key, as each description states. Files are processed for the request, without a document archive.",
+  "tools": [
+   {
+    "name": "list_formats",
+    "title": "List formats",
+    "description": "Lists every e-invoice and bank statement format Klarbon handles, with what each can do now: open, check, convert from, convert to, make. Free, no API key needed.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List formats",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "open_invoice",
+    "title": "Open an e-invoice",
+    "description": "Reads an e-invoice (XRechnung, ZUGFeRD, Factur-X, Peppol BIS, UBL, CII and more) into structured data: parties, lines, totals, VAT, payment details. Optionally returns print-ready HTML. Free; without an API key the anonymous daily limit applies. Files are processed for the request, without a document archive.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "file_base64": {
+       "description": "The file's bytes as base64. Give this or file_url.",
+       "type": "string",
+       "maxLength": 27962031
+      },
+      "file_url": {
+       "description": "A public https address of the file. Private and local addresses are refused.",
+       "type": "string",
+       "maxLength": 2048,
+       "format": "uri"
+      },
+      "filename": {
+       "description": "The file's name, which helps recognise its format.",
+       "type": "string",
+       "maxLength": 200
+      },
+      "html": {
+       "description": "Also return the invoice as complete, print-ready HTML.",
+       "type": "boolean"
+      },
+      "locale": {
+       "description": "The language of the HTML's labels.",
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "nl",
+        "it",
+        "es",
+        "pl",
+        "pt",
+        "ro",
+        "sk"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "Open an e-invoice",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "check_invoice",
+    "title": "Check an e-invoice",
+    "description": "Validates an e-invoice against EN 16931 and its national rules (XRechnung, Peppol BIS and others), with each finding explained in plain words and how to fix it. With country, also applies that country's national rules on top of EN 16931 (France: the CTC rules), only when asked; Klarbon never infers the country. Free within the account's daily checks; needs an API key.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "file_base64": {
+       "description": "The file's bytes as base64. Give this or file_url.",
+       "type": "string",
+       "maxLength": 27962031
+      },
+      "file_url": {
+       "description": "A public https address of the file. Private and local addresses are refused.",
+       "type": "string",
+       "maxLength": 2048,
+       "format": "uri"
+      },
+      "filename": {
+       "description": "The file's name, which helps recognise its format.",
+       "type": "string",
+       "maxLength": 200
+      },
+      "ruleset": {
+       "description": "A rule set id, or auto (the default) to pick it from the file. Leave it out when you give country.",
+       "type": "string",
+       "enum": [
+        "auto",
+        "en16931-ubl",
+        "en16931-cii",
+        "en16931-ubl-creditnote",
+        "xrechnung-3.0-ubl",
+        "xrechnung-3.0-cii",
+        "peppol-bis3-invoice",
+        "peppol-bis3-creditnote",
+        "facturx-1.07-minimum",
+        "facturx-1.07-basicwl",
+        "facturx-1.07-basic",
+        "facturx-1.07-en16931",
+        "facturx-1.07-extended",
+        "zugferd-2.3-minimum",
+        "zugferd-2.3-basicwl",
+        "zugferd-2.3-basic",
+        "zugferd-2.3-en16931",
+        "zugferd-2.3-extended",
+        "facturx-1.09-minimum",
+        "facturx-1.09-basicwl",
+        "facturx-1.09-basic",
+        "facturx-1.09-en16931",
+        "facturx-1.09-extended",
+        "zugferd-2.5-minimum",
+        "zugferd-2.5-basicwl",
+        "zugferd-2.5-basic",
+        "zugferd-2.5-en16931",
+        "zugferd-2.5-extended",
+        "nlcius",
+        "nlcius-cii",
+        "fr-ctc",
+        "fr-ctc-cii"
+       ]
+      },
+      "country": {
+       "description": "Also apply this country's national rules on top of EN 16931 (FR: the French CTC rules). Only when you give it; Klarbon never infers a country from the file.",
+       "type": "string",
+       "enum": [
+        "FR"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "Check an e-invoice",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "convert_invoice",
+    "title": "Convert an e-invoice",
+    "description": "Converts an e-invoice to another format (for example UBL to XRechnung, or CII to a Factur-X PDF) and validates the result; only a valid file is returned. Costs 1 call per invoice from the account's API balance, or 1 credit once the API balance is empty, charged only on success. Needs an API key.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "file_base64": {
+       "description": "The file's bytes as base64. Give this or file_url.",
+       "type": "string",
+       "maxLength": 27962031
+      },
+      "file_url": {
+       "description": "A public https address of the file. Private and local addresses are refused.",
+       "type": "string",
+       "maxLength": 2048,
+       "format": "uri"
+      },
+      "filename": {
+       "description": "The file's name, which helps recognise its format.",
+       "type": "string",
+       "maxLength": 200
+      },
+      "target": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$",
+       "description": "A format id that list_formats shows with convertTo, such as xrechnung or peppol-bis-billing."
+      },
+      "profile": {
+       "description": "The profile, for formats that have several.",
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$"
+      },
+      "label_locale": {
+       "description": "The language of a rendered PDF's labels.",
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "nl",
+        "it",
+        "es",
+        "pl",
+        "pt",
+        "ro",
+        "sk"
+       ]
+      },
+      "idempotency_key": {
+       "description": "Any unique string. Calling again with the same key and arguments within 24 hours never charges again.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 255,
+       "pattern": "^[\\x21-\\x7e]+$"
+      }
+     },
+     "required": [
+      "target"
+     ]
+    },
+    "annotations": {
+     "title": "Convert an e-invoice",
+     "readOnlyHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "convert_bank_statement",
+    "title": "Convert a bank statement",
+    "description": "Converts a bank statement file (CAMT.053, MT940, CODA, Norma 43, CFONB 120, BAI2, OFX, QIF and more) to another format such as CAMT.053, MT940, CSV or Excel, and checks that the balances reconcile. When the file leaves something open, such as the date order or the opening balance, the answer is a need: call again with the same file, the answer and the resume token. Costs 1 call per started 500 transactions from the account's API balance, or credits once the API balance is empty, charged only on success. A PDF statement or scan read automatically (beta, a draft to check) costs 5 calls per started 10 pages from the API balance, or 1 credit per started 10 pages once it cannot cover that. Needs an API key.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "file_base64": {
+       "description": "The file's bytes as base64. Give this or file_url.",
+       "type": "string",
+       "maxLength": 27962031
+      },
+      "file_url": {
+       "description": "A public https address of the file. Private and local addresses are refused.",
+       "type": "string",
+       "maxLength": 2048,
+       "format": "uri"
+      },
+      "filename": {
+       "description": "The file's name, which helps recognise its format.",
+       "type": "string",
+       "maxLength": 200
+      },
+      "target": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$",
+       "description": "A bank format id, such as camt-053, mt940, bank-csv or xlsx."
+      },
+      "statement_number": {
+       "description": "The statement number MT940 and CODA carry.",
+       "type": "string",
+       "pattern": "^\\d{1,5}$"
+      },
+      "opening_balance": {
+       "description": "The answer to an openingBalance need: the opening balance the file does not print, as a decimal string.",
+       "type": "string",
+       "pattern": "^-?(?:0|[1-9]\\d{0,17})(?:\\.\\d{1,8})?$"
+      },
+      "date_order": {
+       "description": "The answer to a dateOrder need: how the file writes its dates.",
+       "type": "string",
+       "enum": [
+        "dmy",
+        "mdy",
+        "ymd"
+       ]
+      },
+      "century": {
+       "description": "The answer to a century need: the century of the file's two-digit years.",
+       "type": "string",
+       "enum": [
+        "1900",
+        "2000"
+       ]
+      },
+      "currency": {
+       "description": "The answer to a currency need: an ISO 4217 code, for a file that states no currency.",
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      },
+      "decimal_separator": {
+       "description": "The answer to a decimalSeparator need: the decimal separator of the file's amounts.",
+       "type": "string",
+       "enum": [
+        ".",
+        ","
+       ]
+      },
+      "account": {
+       "description": "The answer to an account need, for a file with several accounts: the chosen account's position in the need's accounts list.",
+       "type": "string",
+       "pattern": "^\\d{1,5}$"
+      },
+      "resume": {
+       "description": "The resume token from the last need answer.",
+       "type": "string",
+       "maxLength": 16777216
+      },
+      "idempotency_key": {
+       "description": "Any unique string. Calling again with the same key and arguments within 24 hours never charges again.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 255,
+       "pattern": "^[\\x21-\\x7e]+$"
+      }
+     },
+     "required": [
+      "target"
+     ]
+    },
+    "annotations": {
+     "title": "Convert a bank statement",
+     "readOnlyHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "check_vat_numbers",
+    "title": "Check EU VAT numbers in VIES",
+    "description": "Checks up to 25 EU VAT numbers (and Northern Ireland's XI numbers) in the European Commission's VIES service: valid or not valid now, with the registered name and address where the member state gives them. Each number's format and published check digits are checked first, and one that fails is not sent. unavailable means the member state did not answer, never that the number is invalid. Free: without an API key the anonymous daily limit applies, with one 500 numbers a day. Nothing about the numbers is kept.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "numbers": {
+       "minItems": 1,
+       "maxItems": 25,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 40
+       },
+       "description": "VAT numbers as written, with or without the country prefix (EL for Greece, XI for Northern Ireland)."
+      },
+      "country": {
+       "description": "The country of numbers given without their prefix.",
+       "type": "string",
+       "pattern": "^[A-Za-z]{2}$"
+      },
+      "requester": {
+       "description": "Your own VAT number, so VIES returns a consultation number for each answer.",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "numbers"
+     ]
+    },
+    "annotations": {
+     "title": "Check EU VAT numbers in VIES",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    }
+   }
+  ]
+ }
+}

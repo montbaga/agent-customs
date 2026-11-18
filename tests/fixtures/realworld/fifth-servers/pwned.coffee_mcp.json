@@ -1,0 +1,236 @@
+{
+ "url": "https://pwned.coffee/mcp",
+ "doc": {
+  "name": "pwned.coffee",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "pwned.coffee: live security incidents with patch status and fixed versions, updated hourly. Not security advice: confirm against the vendor advisory linked on each incident.",
+  "tools": [
+   {
+    "name": "todays_specials",
+    "title": "Today's specials",
+    "description": "Live security incidents right now (CVEs, breaches, supply-chain compromises) with severity, patch status, fixed versions and ids. Pass stack ids to see only what touches your stack. Known ids: nextjs, react, node, bun, php, python, ruby, go, java, wordpress, drupal, magento, perl, proof-tools, dotnet, rust, npm, pypi, github-actions, docker, vscode, browser-ext, linux, linux-services, openssh, nginx, apache, kubernetes, postgres, mysql, redis, gitlab, ci, atlassian, self-hosted, selfhost-apps, paas, cloudflare, aws, gcp, azure, vps, databases-cloud, ai-gateways, ai-keys, ml-infra, mcp, chrome, apple, android, windows, office, office-suites, password-managers, messaging, crypto-wallets, vpn-edge, ics, remote-support, vmware, security-tools, health-it, erp.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "stack": {
+       "description": "Stack ids to filter by, e.g. [\"nextjs\",\"npm\"]. Omit for everything.",
+       "maxItems": 60,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "lookup_cve",
+    "title": "Look up a CVE",
+    "description": "The incident covering a CVE or GHSA id, or a named bug (e.g. HTTP2Shell): summary, severity, patch status, fixed versions, timeline and sources.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 4,
+       "maxLength": 40,
+       "description": "e.g. CVE-2026-12345, GHSA-xxxx-xxxx-xxxx or HTTP2Shell"
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "check_lockfile",
+    "title": "Check a lockfile",
+    "description": "Match the packages and versions in a lockfile against incidents that state fixed versions, and print a receipt: what you use, the version, affected or not, and the exact upgrade. Accepts package-lock.json, yarn.lock, pnpm-lock.yaml, requirements.txt, poetry.lock, uv.lock, Pipfile.lock, composer.lock, go.sum, go.mod, Cargo.lock, Gemfile.lock, a Dockerfile, an .nvmrc / .node-version (\"node\") or a GitHub Actions workflow (\"actions\"). For several files at once, use check_repo.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "content": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 3000000,
+       "description": "The lockfile text, as-is."
+      },
+      "ecosystem": {
+       "default": "auto",
+       "description": "Which reader to use. \"auto\" detects from the content. \"node\" is an .nvmrc or .node-version file, \"actions\" a GitHub Actions workflow.",
+       "type": "string",
+       "enum": [
+        "auto",
+        "npm",
+        "pypi",
+        "composer",
+        "go",
+        "cargo",
+        "rubygems",
+        "docker",
+        "node",
+        "actions"
+       ]
+      }
+     },
+     "required": [
+      "content"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "check_repo",
+    "title": "Check a whole repo",
+    "description": "Send the files that describe what a project runs (lockfiles, Dockerfiles, .github/workflows/*.yml, wrangler.toml, vercel.json, next.config.*, compose files) in one call. Returns one receipt: every affected package with the exact command to fix it in the tool the repo already uses, actions and images to check, and live incidents for the detected stack that the files cannot rule out.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "files": {
+       "minItems": 1,
+       "maxItems": 40,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "Repo-relative path, e.g. \"apps/web/package-lock.json\""
+         },
+         "content": {
+          "type": "string",
+          "maxLength": 3000000
+         }
+        },
+        "required": [
+         "path",
+         "content"
+        ]
+       },
+       "description": "Up to 40 files. Paths matter: they pick the reader and the fix command."
+      }
+     },
+     "required": [
+      "files"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "whats_new",
+    "title": "What's new since",
+    "description": "Incidents created or updated since a point in time, newest first. Use it to re-check only what changed since your last run. Accepts \"24h\", \"7d\", \"90m\" or an ISO timestamp.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "since": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "\"24h\", \"7d\", or an ISO timestamp like 2026-10-23T08:00:00Z"
+      },
+      "stack": {
+       "description": "Optional stack ids to filter by.",
+       "maxItems": 60,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "since"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "diff_since",
+    "title": "What changed since, with sources",
+    "description": "Every correction, new ticket and fix-status change since a point in time, each with the source behind it (the same log as /corrections). Use it to audit what the board changed since your last run. Accepts an ISO 8601 timestamp, or \"24h\", \"7d\", \"90m\".",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "since": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "An ISO 8601 timestamp like 2026-10-24T00:00:00Z, or \"24h\", \"7d\""
+      },
+      "stack": {
+       "description": "Optional stack ids to filter by.",
+       "maxItems": 60,
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "since"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "protect_my_repo",
+    "title": "Check this repo against today's specials",
+    "description": "Reads the lockfiles, Dockerfiles, workflows and deploy configs, sends them to check_repo, and proposes the upgrades as a diff without applying them."
+   },
+   {
+    "name": "morning_check",
+    "title": "What changed overnight",
+    "description": "Calls whats_new for the last 24 hours, filtered to the stack this repo uses, and says whether anything needs doing today."
+   }
+  ]
+ }
+}

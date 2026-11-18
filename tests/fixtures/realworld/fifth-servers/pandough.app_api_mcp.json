@@ -1,0 +1,392 @@
+{
+ "url": "https://pandough.app/api/mcp",
+ "doc": {
+  "name": "pandough",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "search_flours",
+    "description": "Search the Pandough flour database. Returns flour names, protein %, W strength, hydration ranges, and types. Use this to help users find the right flour for their bake.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "query": {
+       "description": "Search term (name, brand, or type)",
+       "type": "string",
+       "maxLength": 200
+      },
+      "tag": {
+       "description": "Filter by tag (e.g. 'pizza', 'bread', 'pastry')",
+       "type": "string",
+       "maxLength": 50
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search Flours",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_flour_details",
+    "description": "Get detailed information about a specific flour by its slug. Returns full profile including protein, W strength, hydration curve, maturation profiles, and description.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "description": "Flour slug (e.g. 'caputo-pizzeria', 'manitoba-oro')",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Get Flour Details",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "list_recipes",
+    "description": "List the dough recipe styles plan_bake supports. Call this when a user names a style (Neapolitan, classica, focaccia, bread, baguette) so you pass the correct recipeSlug instead of guessing — and so you never confuse a style word like 'classica' with a flour whose name contains it.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List Recipes",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "plan_bake",
+    "description": "Create a bake plan with ingredient calculations. Returns exact ingredient amounts in grams, an auto-sized yeast amount, a fermentation schedule, dough warnings, and a calculator URL the user can open in Pandough with all parameters prefilled. Before calling this, gather the inputs that actually determine a good plan (skip any the user already volunteered): (1) Strongly ask which oven model they use — call search_ovens and pass ovenSlug. If it is unlisted, ask for ovenType plus ovenMaxCelsius. Oven capability materially changes the hydration band and bake feasibility; if the user declines, proceed but say the result is not oven-adapted. (2) Which flour(s) do they have? — call search_flours to resolve a flourSlug (or pass flourBlend for a 2–5 flour cut, e.g. a Pulcinella base with 30% Manitoba); this is what makes hydration and warnings flour-aware. (3) Their room temperature and fridge temperature — pass roomTempCelsius/fridgeTempCelsius; temperature is the dominant driver of yeast amount and timing. (4) How they mix/knead (by hand, stand mixer, no-knead) — plan_bake does not return technique guidance, so pair it with a troubleshoot call for method advice. (5) Do they want a preferment? — pass `preferment` for a biga, poolish, tiga, cold/long biga, or a natural sourdough starter. The yeast figure accounts for the preferment, and the calculator link opens with the build already set up, so recommending a biga in prose without passing this param hands the user a direct dough. Don't interrogate a user who already gave a full brief.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "recipeSlug": {
+       "description": "Recipe type slug. Supported: neapolitan-pizza, classica-pizza, focaccia, artisan-bread, baguette (call list_recipes for the full list). When the user names a style like 'classica', pass that style here — do NOT confuse it with a flour whose name happens to contain the word.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120
+      },
+      "flourSlug": {
+       "description": "Flour slug from search_flours (e.g. 'caputo-pizzeria'). For a single flour. Mutually exclusive with flourBlend.",
+       "type": "string",
+       "maxLength": 120
+      },
+      "flourBlend": {
+       "description": "A weighted flour blend (2–5 flours summing to 100%), e.g. [{flourSlug:'caputo-pizzeria',percent:70},{flourSlug:'manitoba-oro',percent:30}]. Mutually exclusive with flourSlug.",
+       "minItems": 2,
+       "maxItems": 5,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "flourSlug": {
+          "description": "Component flour slug from search_flours",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+         },
+         "percent": {
+          "description": "This flour's share of the blend (1–99); the set must sum to 100",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 99
+         }
+        },
+        "required": [
+         "flourSlug",
+         "percent"
+        ]
+       }
+      },
+      "hydrationPercent": {
+       "description": "Target hydration percentage (40–110)",
+       "type": "number",
+       "minimum": 40,
+       "maximum": 110
+      },
+      "servings": {
+       "description": "Number of portions/pizzas (1–50, default: 4)",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "roomTempHours": {
+       "description": "Room-temperature fermentation hours (0–168). Pass BOTH this and fridgeTempHours to lock the split; naming only a total lets the engine choose. These hours are the bulk before the fridge: when the fridge leg is above 0 the plan adds the recipe's final proof at room temperature after the fridge (a warm-up) on top of them, and says so. Room legs above 14h are clamped with a warning.",
+       "type": "number",
+       "minimum": 0,
+       "maximum": 168
+      },
+      "fridgeTempHours": {
+       "description": "Cold fermentation hours (0–168). Pass BOTH this and roomTempHours to lock the split. A locked fridge leg above 0 is followed by a warm-up at room temperature (the recipe's final proof), shown as its own schedule line.",
+       "type": "number",
+       "minimum": 0,
+       "maximum": 168
+      },
+      "stages": {
+       "description": "The full main-dough fermentation schedule as ordered stages (1–6), e.g. [{durationHours:1,tempCelsius:22},{durationHours:21,tempCelsius:4},{durationHours:2,tempCelsius:22}] for 1h at room temperature, 21h in the fridge, then a 2h warm-up. Use it when the user describes more than a room leg and a fridge leg, an order other than room then fridge, or a stage at its own temperature. The stages are the whole schedule: nothing is added (include the warm-up after the fridge yourself) and the calculator link opens on exactly these stages. Mutually exclusive with roomTempHours / fridgeTempHours. Room-temperature stages above 14h are clamped with a warning.",
+       "minItems": 1,
+       "maxItems": 6,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "durationHours": {
+          "description": "Length of this stage in hours",
+          "type": "number",
+          "minimum": 0.25,
+          "maximum": 168
+         },
+         "tempCelsius": {
+          "description": "Temperature of this stage in °C (the fridge temperature for a cold stage)",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 35
+         }
+        },
+        "required": [
+         "durationHours",
+         "tempCelsius"
+        ]
+       }
+      },
+      "roomTempCelsius": {
+       "description": "The user's real kitchen temperature in °C (2–40). The single biggest driver of yeast amount and timing — ask the user for it.",
+       "type": "number",
+       "minimum": 2,
+       "maximum": 40
+      },
+      "fridgeTempCelsius": {
+       "description": "The user's real fridge temperature in °C (0–12). Ask the user for it when a cold ferment is involved.",
+       "type": "number",
+       "minimum": 0,
+       "maximum": 12
+      },
+      "ovenSlug": {
+       "description": "Exact oven model slug from search_ovens. Strongly preferred: the engine uses the model's real ceiling and oven class to adapt hydration and bake feasibility. Mutually exclusive with manual ovenType/ovenMaxCelsius.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120
+      },
+      "ovenType": {
+       "description": "Oven class for an unlisted model. Pass together with ovenMaxCelsius; prefer ovenSlug when search_ovens finds the model.",
+       "type": "string",
+       "enum": [
+        "home-electric",
+        "home-gas",
+        "portable-gas",
+        "portable-electric",
+        "wood-fired",
+        "pellet",
+        "hybrid",
+        "kamado"
+       ]
+      },
+      "ovenMaxCelsius": {
+       "description": "The real maximum temperature in °C for an unlisted oven (100–600). This is what constrains hydration and bake time.",
+       "type": "number",
+       "minimum": 100,
+       "maximum": 600
+      },
+      "ovenMinCelsius": {
+       "description": "Optional minimum set temperature in °C for an unlisted oven.",
+       "type": "number",
+       "minimum": 0,
+       "maximum": 400
+      },
+      "bakeTime": {
+       "description": "Target bake time as an ISO 8601 datetime with the user's UTC offset for that date, e.g. '2026-06-10T18:00:00+02:00' for 18:00 in Warsaw in June (+01:00 in winter: the offset follows daylight saving time). 'Z' means UTC, not the user's local time. Must be in the future.",
+       "type": "string",
+       "format": "date-time",
+       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+      },
+      "preferment": {
+       "description": "Plan the bake around a preferment (biga, poolish, tiga, sourdough…). The yeast figure returned accounts for it, and the calculator link opens with the build already set up.",
+       "type": "object",
+       "properties": {
+        "type": {
+         "description": "Preferment style. poolish = 100% hydration, fast, extensible. biga = stiff (~45-50%). biga-fredda = one long cold hold. biga-lunga = 24h cold then 24h warm. tiga = tiga-style build. sourdough = natural starter (no commercial yeast).",
+         "type": "string",
+         "enum": [
+          "poolish",
+          "biga",
+          "biga-fredda",
+          "biga-lunga",
+          "tiga",
+          "sourdough",
+          "old-dough"
+         ]
+        },
+        "percentFlour": {
+         "description": "Share of the TOTAL flour that goes into the preferment (1-100). Defaults: 30 for biga/poolish/tiga, 15 for sourdough.",
+         "type": "number",
+         "minimum": 1,
+         "maximum": 100
+        },
+        "hydrationPercent": {
+         "description": "Preferment hydration % (40-200). Defaults to the style's canonical value (poolish 100, biga ~45).",
+         "type": "number",
+         "minimum": 40,
+         "maximum": 200
+        },
+        "stages": {
+         "description": "The build program, leg by leg — e.g. [{durationHours:24,tempCelsius:4},{durationHours:24,tempCelsius:18}] for a long biga. Omit to use the style's default program.",
+         "minItems": 1,
+         "maxItems": 6,
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "durationHours": {
+            "description": "Length of this leg in hours",
+            "type": "number",
+            "minimum": 0.25,
+            "maximum": 96
+           },
+           "tempCelsius": {
+            "description": "Temperature of this leg in °C (use ~4 for the fridge)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 40
+           }
+          },
+          "required": [
+           "durationHours",
+           "tempCelsius"
+          ]
+         }
+        },
+        "flourSlug": {
+         "description": "Build the preferment from a specific flour (slug from search_flours). Omit to use the main flour.",
+         "type": "string",
+         "maxLength": 120
+        }
+       },
+       "required": [
+        "type"
+       ]
+      },
+      "locale": {
+       "description": "UI locale for the returned calculator link (e.g. 'en', 'pl', 'it'). Defaults to 'en'.",
+       "type": "string",
+       "enum": [
+        "en",
+        "pl",
+        "de",
+        "es",
+        "it",
+        "nl",
+        "fr",
+        "ja",
+        "ko",
+        "sv",
+        "pt",
+        "hu",
+        "cs"
+       ]
+      }
+     },
+     "required": [
+      "recipeSlug"
+     ]
+    },
+    "annotations": {
+     "title": "Plan a Bake",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "troubleshoot",
+    "description": "Search the Pandough baking knowledge base for troubleshooting advice, technique guides, and flour science. Returns curated expert content about common baking issues.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "issue": {
+       "description": "The baking issue or question (e.g. 'sticky dough', 'no oven spring', 'cold proof technique')",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 300
+      }
+     },
+     "required": [
+      "issue"
+     ]
+    },
+    "annotations": {
+     "title": "Troubleshoot Dough",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "search_ovens",
+    "description": "Search the Pandough oven database. Returns oven specs (max temperature, type, fuel) plus recommended bake settings — top/deck heat, bake time, and deck material — computed for a Neapolitan pizza by the same heat engine the site uses.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "query": {
+       "description": "Search term (oven name, brand)",
+       "type": "string",
+       "maxLength": 200
+      },
+      "type": {
+       "description": "Oven type filter (e.g. 'pizza-oven', 'home-oven', 'outdoor')",
+       "type": "string",
+       "maxLength": 50
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search Ovens",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "list_active_bakes",
+    "description": "List the signed-in baker's scheduled and active bakes plus live temperature-sensor readings when a device is reporting. The first call prompts the chat app to authorize a Pandough account (OAuth scope bakes:read). Needs Pro (or cancelled-Pro). Returns ids, flour, hydration, schedule, a calculator session link, and probe temps (air around the dough, not dough core).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List Active Bakes",
+     "readOnlyHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ]
+ }
+}

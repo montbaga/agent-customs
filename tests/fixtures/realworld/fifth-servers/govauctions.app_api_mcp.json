@@ -1,0 +1,585 @@
+{
+ "url": "https://govauctions.app/api/mcp",
+ "doc": {
+  "name": "govauctions.app",
+  "version": "1.0.3",
+  "protocolVersion": "2025-06-18",
+  "instructions": "GovAuctions.app is a free public site where people search live government surplus auctions (vehicles, equipment, electronics, seized property) and check what comparable lots actually sold for before bidding. This server exposes that same data to code: live listings, sold-price comps, price trends, and the Flip Score resale signal.",
+  "tools": [
+   {
+    "name": "search_listings",
+    "title": "Search live GSA listings",
+    "description": "Search live GSA federal-surplus auction listings (facts only — no images). Filter by state, category, keyword, price, or distance from a US ZIP code. Works signed out (up to 25 rows per page). Raw listings cover sanctioned federal sources; sold-price comps span the full market.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "country": {
+       "type": "string",
+       "enum": [
+        "US"
+       ],
+       "default": "US"
+      },
+      "state": {
+       "type": "string",
+       "description": "2-letter state code"
+      },
+      "category": {
+       "type": "string"
+      },
+      "source": {
+       "type": "string",
+       "enum": [
+        "gsa"
+       ],
+       "default": "gsa"
+      },
+      "q": {
+       "type": "string",
+       "description": "Title keyword"
+      },
+      "priceMin": {
+       "type": "number"
+      },
+      "priceMax": {
+       "type": "number"
+      },
+      "zip": {
+       "type": "string",
+       "description": "US 5-digit ZIP to search around. Limits results to lots within radiusMiles, orders them nearest-first, and adds distanceMiles to each."
+      },
+      "radiusMiles": {
+       "type": "number",
+       "description": "Radius from `zip`, in miles (default 100, max 500). Requires `zip`.",
+       "maximum": 500,
+       "default": 100
+      },
+      "sort": {
+       "type": "string",
+       "enum": [
+        "ending-soonest",
+        "newest"
+       ],
+       "description": "Result order. Default is soonest-ending (nearest-first when `zip` is given). Use `newest` to order by the lot's own listing date, newest first - that is the ordering a recurring \"what is new\" check needs, because under the default a brand-new lot can sit anywhere in the results."
+      },
+      "limit": {
+       "type": "integer",
+       "maximum": 100,
+       "default": 25,
+       "description": "Rows per page. Signed out, capped at 25."
+      },
+      "offset": {
+       "type": "integer",
+       "default": 0
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search live GSA listings",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_listing",
+    "title": "Get a listing",
+    "description": "Get one live GSA listing by its id (facts only). Works signed out.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Get a listing",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_sold_comps",
+    "title": "Sold-price comps",
+    "description": "Sold-price comps for a described item, computed across the full government-surplus market in any market listed in `country`. Signed out: coverage (how many comparable sales, confidence, a coarse price band) plus `categoryStats`, the 25th/median/75th percentile of every sale in the item's category (in `state` when it has enough sales). Signed in or with an API key: the 25th/median/75th percentile for this item itself. `liveListingsUrl` links to the live auctions for the same item. A miss says which kind it is: reason `insufficient_comps` (too few comparable sales yet) is worth retrying, reason `category_not_priceable` (real-estate) never is — that category cannot be priced from a title. A catch-all `category` such as `miscellaneous` is not refused: it is dropped and the item is priced on its title alone, with `requestedCategory` and `categoryDropped` echoed back — check the resolved `category` and `confidence` before trusting the range. `pricedAs`, when present, is what was actually priced: a spelling fix, or the listing title with its lot count, lot number or serial removed. When the `category` you sent holds nothing like the item and another category clearly does, the range comes from that one, with `requestedCategory` and `categoryOverridden` echoed back. A miss can still carry `categoryStats` when the item's category is clear, and `retryHint` when the query was a long listing title: retry with just the brand and model.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "q": {
+       "type": "string",
+       "description": "Item description, e.g. '2015 Ford F-150'"
+      },
+      "category": {
+       "type": "string"
+      },
+      "country": {
+       "type": "string",
+       "enum": [
+        "US",
+        "UK",
+        "CA",
+        "AU",
+        "DE",
+        "FR",
+        "NL"
+       ],
+       "default": "US"
+      },
+      "state": {
+       "type": "string",
+       "description": "Optional 2-letter state/region code for a regional range. Falls back to the national range when that state has too few sales; the response's `scope` field says which you got."
+      },
+      "include": {
+       "type": "string",
+       "description": "Set to \"comps\" to also return the individual sales the range was computed from (title, final price, sale month, state). Requires a key; the number returned is capped by plan. Not served for EU markets (DE, FR, NL, PL): the range is returned with `compsWithheld: true`."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "How many underlying sales to return with include=comps. Capped by plan."
+      }
+     },
+     "required": [
+      "q"
+     ]
+    },
+    "annotations": {
+     "title": "Sold-price comps",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_sold_comps_batch",
+    "title": "Sold-price comps, many at once",
+    "description": "get_sold_comps for a list of items in one call. Each query is either a string ('2015 Ford F-150') or an object with its own q/category/country/state. Each item costs one valuation lookup, exactly as if sent alone; an item that comes back without a range is not charged. If the monthly allowance runs out part-way, the items already priced are returned and `batch.truncated` names the rest. Batch size is capped by plan (10 on the free allowance). Requires sign-in or an API key.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "queries": {
+       "type": "array",
+       "minItems": 1,
+       "maxItems": 100,
+       "items": {
+        "oneOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           },
+           "category": {
+            "type": "string"
+           },
+           "country": {
+            "type": "string",
+            "enum": [
+             "US",
+             "UK",
+             "CA",
+             "AU",
+             "DE",
+             "FR",
+             "NL"
+            ]
+           },
+           "state": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        ]
+       }
+      },
+      "country": {
+       "type": "string",
+       "enum": [
+        "US",
+        "UK",
+        "CA",
+        "AU",
+        "DE",
+        "FR",
+        "NL"
+       ],
+       "default": "US",
+       "description": "Default market for every query."
+      },
+      "state": {
+       "type": "string",
+       "description": "Default 2-letter state/region code for every query."
+      }
+     },
+     "required": [
+      "queries"
+     ]
+    },
+    "annotations": {
+     "title": "Sold-price comps, many at once",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_flip_score",
+    "title": "Flip Score",
+    "description": "GovAuctions Flip Score resale signal for one live lot, from any source, in any market with sold-price comps (valued against that market's comp archive): estimated value, effective bid, discount, and the link to the lot on its source site. Pass the lot id as it appears in a govauctions.app lot URL. Requires sign-in or an API key.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Flip Score",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_sold_history",
+    "title": "Sold history",
+    "description": "The individual archived sales behind an item: title, final price, sale month and state, plus the range they produce. Use when you want the evidence rather than just the number. Query-anchored — describe an item; there is no way to list the archive. Requires sign-in or an API key.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "q": {
+       "type": "string",
+       "description": "Item description, e.g. '2015 Ford F-150'"
+      },
+      "category": {
+       "type": "string"
+      },
+      "country": {
+       "type": "string",
+       "enum": [
+        "US",
+        "UK",
+        "CA",
+        "AU"
+       ],
+       "default": "US"
+      },
+      "state": {
+       "type": "string",
+       "description": "Optional 2-letter state/region code."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "How many sales to return. Capped by plan."
+      }
+     },
+     "required": [
+      "q"
+     ]
+    },
+    "annotations": {
+     "title": "Sold history",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_price_trend",
+    "title": "Price trend",
+    "description": "Month-by-month median sale price for an item, plus the first-to-last change — 'is this category softening?'. Computed from the same comps as get_sold_comps, so it never contradicts that range. Returns an empty series when too few months clear the sample threshold. Requires sign-in or an API key.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "q": {
+       "type": "string",
+       "description": "Item description, e.g. 'forklift'"
+      },
+      "category": {
+       "type": "string"
+      },
+      "country": {
+       "type": "string",
+       "enum": [
+        "US",
+        "UK",
+        "CA",
+        "AU",
+        "DE",
+        "FR",
+        "NL"
+       ],
+       "default": "US"
+      },
+      "state": {
+       "type": "string",
+       "description": "Optional 2-letter state/region code."
+      }
+     },
+     "required": [
+      "q"
+     ]
+    },
+    "annotations": {
+     "title": "Price trend",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_comp_coverage",
+    "title": "Comp coverage",
+    "description": "How much sold-price data we hold per category for a market, and which categories can never be priced. Check this before building on the comps tools — it is the honest answer about what we cannot do. Works signed out.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "country": {
+       "type": "string",
+       "enum": [
+        "US",
+        "UK",
+        "CA",
+        "AU",
+        "DE",
+        "FR",
+        "NL"
+       ],
+       "default": "US"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Comp coverage",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_api_usage",
+    "title": "API usage",
+    "description": "This key's usage for the current month: total calls and the separate valuation allowance (which comps, sold history, trend and flip-score draw down), plus the reset date. Call it to pace a long run instead of hitting a 429 mid-task. Every other signed-in tool result already carries the same numbers in `_meta.usage`, so this is rarely needed. Free: it does not count against either allowance. Requires sign-in or an API key.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "API usage",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp"
+      ]
+     }
+    ],
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp"
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

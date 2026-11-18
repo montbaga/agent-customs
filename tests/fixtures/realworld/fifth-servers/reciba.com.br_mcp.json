@@ -1,0 +1,374 @@
+{
+ "url": "https://reciba.com.br/mcp",
+ "doc": {
+  "name": "Reciba",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Reciba drafts and verifies Brazilian receipts, quotes and service orders. The person always reviews the preview and issues the document on reciba.com.br from their own account, with a confirmed e-mail; the issuer is always that account, never a name taken from the conversation. Amounts are in Brazilian reais; dates use YYYY-MM-DD and months YYYY-MM. This connector does not draft tax invoices (nota fiscal) or health-service receipts that professionals must issue in Receita Saúde, and it gives no price advice. The declaração de residência, declaração de união estável and declaração de renda (a personal statement of income, not a tax return) and the recibo de salário are made by the person directly on reciba.com.br, not through this connector. Results are in Brazilian Portuguese.",
+  "tools": [
+   {
+    "name": "amount_in_words",
+    "title": "Amount in words",
+    "description": "Writes an amount in Brazilian reais in words, in Brazilian Portuguese, the way it appears on receipts (1500,50 becomes \"mil e quinhentos reais e cinquenta centavos\"). Accepts 0 to 999.999.999,99. Stores nothing.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "valor": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "string",
+         "maxLength": 40
+        }
+       ],
+       "description": "Valor em reais: número (1500.5) ou texto (\"1.500,50\")."
+      }
+     },
+     "required": [
+      "valor"
+     ]
+    },
+    "annotations": {
+     "title": "Amount in words",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "valor": {
+       "type": "number"
+      },
+      "por_extenso": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "valor",
+      "por_extenso"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_document_types",
+    "title": "List document types",
+    "description": "Lists the document types Reciba can draft from a conversation (payment receipt, rent receipt, service quote and service order, for Brazil) and the fields of each one, with the type id that prepare_document takes. Reads nothing about the person. Tax invoices (nota fiscal) and health-service receipts for income tax are not available here. The declaração de residência, declaração de união estável and declaração de renda (a personal statement of income, not a tax return) and the recibo de salário are made by the person directly on reciba.com.br, not through this connector.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List document types",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "tipos": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "tipo": {
+          "type": "string",
+          "description": "Identificador do tipo, para prepare_document."
+         },
+         "nome": {
+          "type": "string"
+         },
+         "descricao": {
+          "type": "string"
+         },
+         "campos": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "rotulo": {
+             "type": "string"
+            },
+            "obrigatorio": {
+             "type": "boolean"
+            },
+            "formato": {
+             "type": "string",
+             "description": "texto, textolongo, moeda (reais), data (AAAA-MM-DD), mesano (AAAA-MM), telefone, escolha ou lista de itens."
+            },
+            "opcoes": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            },
+            "ajuda": {
+             "type": "string"
+            },
+            "colunas": {
+             "description": "Só nas listas de itens: as colunas de cada item.",
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "id": {
+                "type": "string"
+               },
+               "rotulo": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "id",
+               "rotulo"
+              ],
+              "additionalProperties": false
+             }
+            }
+           },
+           "required": [
+            "id",
+            "rotulo",
+            "obrigatorio",
+            "formato"
+           ],
+           "additionalProperties": false
+          }
+         }
+        },
+        "required": [
+         "tipo",
+         "nome",
+         "descricao",
+         "campos"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "regras": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "tipos",
+      "regras"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "prepare_document",
+    "title": "Prepare a document",
+    "description": "Drafts a Brazilian payment receipt, rent receipt, service quote or service order on Reciba from the details in the conversation and returns a single-use link where the person reviews the full preview and issues it from their own Reciba account. This tool issues, charges and sends nothing. It is for documents the person issues about their own service, sale or rental. It is not for a tax invoice (nota fiscal), for a receipt that someone else has to issue (for example a dentist's or a landlord's receipt for the person), for health-service receipts that professionals issue in Receita Saúde, or for advice on prices, such as how much to charge. CPF, CNPJ and RG numbers are not accepted; the person adds them on the site if needed. Amounts in reais as \"1500,00\"; dates as YYYY-MM-DD; months as YYYY-MM; item lists as arrays of objects with the columns of the type.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "tipo": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 40,
+       "description": "Identificador do tipo (ver list_document_types): recibo-pagamento, recibo-aluguel, orcamento ou ordem-servico."
+      },
+      "campos": {
+       "type": "object",
+       "propertyNames": {
+        "type": "string"
+       },
+       "additionalProperties": {},
+       "description": "Os campos do tipo, pelo id. Valores em reais como \"1500,00\"; datas AAAA-MM-DD; mês AAAA-MM; listas de itens como array de objetos com as colunas do tipo."
+      }
+     },
+     "required": [
+      "tipo",
+      "campos"
+     ]
+    },
+    "annotations": {
+     "title": "Prepare a document",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "tipo": {
+       "type": "string"
+      },
+      "link_para_conferir": {
+       "type": "string",
+       "description": "Entregue este link à pessoa. Abre uma vez só, dentro do prazo."
+      },
+      "link_vale_por_dias": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "campos_aceitos": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "campos_ignorados": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Campos que não existem no tipo ou que o assistente não pode mandar (CPF, CNPJ, RG)."
+      },
+      "obrigatorios_faltando": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "A pessoa completa no site."
+      },
+      "proximo_passo": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "tipo",
+      "link_para_conferir",
+      "link_vale_por_dias",
+      "campos_aceitos",
+      "campos_ignorados",
+      "obrigatorios_faltando",
+      "proximo_passo"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "verify_document",
+    "title": "Verify a document",
+    "description": "Checks a document issued on Reciba from the verification code printed under its QR code (32 characters) or from its reciba.com.br/d/ link: document type, issue date and time, whether it was issued from the issuer's own account with a confirmed e-mail at that moment, whether the other party registered acceptance, and the status of its public timestamp (OpenTimestamps). Returns no personal data: no names or e-mail addresses of the people involved. When a document looks forged or misused, the result includes where to report it.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "codigo": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120,
+       "description": "Código de verificação impresso no documento, ou o link reciba.com.br/d/<código>."
+      }
+     },
+     "required": [
+      "codigo"
+     ]
+    },
+    "annotations": {
+     "title": "Verify a document",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "encontrado": {
+       "type": "boolean"
+      },
+      "tipo": {
+       "type": "string"
+      },
+      "emitido_em": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "autenticado": {
+       "description": "Emitente com e-mail confirmado e emissão registrada.",
+       "type": "boolean"
+      },
+      "aceite_registrado": {
+       "type": "boolean"
+      },
+      "registro_bitcoin": {
+       "description": "Registro do documento no Bitcoin, um carimbo de tempo público pelo OpenTimestamps.",
+       "type": "object",
+       "properties": {
+        "estado": {
+         "type": "string",
+         "enum": [
+          "registrado",
+          "em_andamento",
+          "sem_registro"
+         ],
+         "description": "registrado: o carimbo de tempo do documento está conferido num bloco do Bitcoin; em_andamento: o registro ainda espera o bloco; sem_registro: o documento não tem registro no Bitcoin."
+        },
+        "bloco": {
+         "description": "Só em registrado: a altura do bloco do Bitcoin.",
+         "type": "integer",
+         "exclusiveMinimum": 0,
+         "maximum": 9007199254740991
+        },
+        "hora_do_bloco": {
+         "description": "Só em registrado: a hora do bloco (ISO 8601, UTC).",
+         "type": "string"
+        }
+       },
+       "required": [
+        "estado"
+       ],
+       "additionalProperties": false
+      },
+      "pagina_de_verificacao": {
+       "type": "string"
+      },
+      "aviso": {
+       "type": "string"
+      },
+      "denuncia": {
+       "type": "object",
+       "properties": {
+        "email": {
+         "type": "string"
+        },
+        "assunto": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "email",
+        "assunto"
+       ],
+       "additionalProperties": false,
+       "description": "Onde denunciar documento falso ou uso indevido."
+      }
+     },
+     "required": [
+      "encontrado",
+      "aviso",
+      "denuncia"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ }
+}

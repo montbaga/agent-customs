@@ -1,0 +1,5447 @@
+{
+ "url": "https://mcp.zorgverzekering.chat/mcp",
+ "doc": {
+  "name": "Zorgverzekering.chat",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Dutch health insurance (zorgverzekering) data for comparing basic policies (basisverzekering), supplementary packages (aanvullend, tand) and care providers. This service gives information, not advice.\n1. Never state premiums, coverage (dekkingen), deductibles (eigen risico) or contract status from memory; always use the tools.\n2. Do not ask about health, conditions, diagnoses, medicines or treatments. If the user mentions planned care themselves (e.g. 10 physiotherapy sessions), you may pass it as a category and count to estimate their own costs; otherwise use the defaults. This never sets premiums or acceptance: basic premiums are equal for everyone by law, and nothing is stored. Other inputs: year, birth years, providers to keep, choice of providers, voluntary deductible, group scheme, payment term, current policy (get_intake_schema).\n3. Answer in the user's language and pass taal ('nl' or 'en'). In English, briefly explain Dutch terms (eigen risico = deductible).\n4. For every list state the sort key (meta.sorteersleutel); for every calculation state the assumptions (aannames); cite the sources in bronnen.\n5. Provide information, not advice: the user decides. For each policy you present, link its page (detailUrl or the bekijk link in acties); signing up happens there. Offer the bewaar link to save a comparison.\nIf check_zorgaanbieder returns status onbekend with herkomst null, the dataset has no contract data; do not retry, suggest the insurer's care finder (zorgzoeker).",
+  "tools": [
+   {
+    "name": "get_wettelijke_parameters",
+    "title": "Statutory health insurance parameters",
+    "description": "Returns the statutory Dutch health insurance parameters (wettelijke parameters) for an insurance year: the mandatory deductible (verplicht eigen risico), the voluntary deductible options (vrijwillig eigen risico), care exempt from the deductible, the healthcare allowance (zorgtoeslag) maximums and income and asset limits, statutory co-payments (eigen bijdragen), the premium publication date and the switching deadline (overstapdeadline). status 'voorlopig' means provisional until parliament has voted. Use this tool instead of your own knowledge for any of these amounts. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027. During the switching season (November-December) users usually mean the coming year."
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "jaar"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "jaar": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "status": {
+         "type": "string",
+         "enum": [
+          "voorlopig",
+          "definitief"
+         ]
+        },
+        "verplichtEigenRisicoCent": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 9007199254740991
+        },
+        "vrijwilligOpties": {
+         "type": "array",
+         "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+         }
+        },
+        "tranchePerBehandelingCent": {
+         "anyOf": [
+          {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "erUitzonderingen": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "zorgtoeslag": {
+         "type": "object",
+         "properties": {
+          "maxToeslagAlleenstaandCent": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "maxToeslagPartnersCent": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "inkomensgrensAlleenstaandCent": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "inkomensgrensPartnersCent": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "vermogensgrensAlleenstaandCent": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          "vermogensgrensPartnersCent": {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "maxToeslagAlleenstaandCent",
+          "maxToeslagPartnersCent",
+          "inkomensgrensAlleenstaandCent",
+          "inkomensgrensPartnersCent",
+          "vermogensgrensAlleenstaandCent",
+          "vermogensgrensPartnersCent"
+         ],
+         "additionalProperties": false
+        },
+        "eigenBijdragen": {
+         "type": "object",
+         "properties": {
+          "kraamzorgPerUurCent": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "hoortoestelPct": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 100
+          },
+          "zittendZiekenvervoerPerJaarCent": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          },
+          "geneesmiddelenGvsMaxPerJaarCent": {
+           "type": "integer",
+           "minimum": 0,
+           "maximum": 9007199254740991
+          }
+         },
+         "required": [
+          "kraamzorgPerUurCent"
+         ],
+         "additionalProperties": false
+        },
+        "premiePublicatieDeadline": {
+         "type": "string"
+        },
+        "overstapDeadline": {
+         "type": "string"
+        },
+        "bronUrl": {
+         "type": "string"
+        },
+        "bronDatum": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "jaar",
+        "status",
+        "verplichtEigenRisicoCent",
+        "vrijwilligOpties",
+        "tranchePerBehandelingCent",
+        "erUitzonderingen",
+        "zorgtoeslag",
+        "eigenBijdragen",
+        "premiePublicatieDeadline",
+        "overstapDeadline",
+        "bronUrl",
+        "bronDatum"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Statutory health insurance parameters",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_verzekeraars",
+    "title": "List health insurers",
+    "description": "Lists all Dutch health insurers (verzekeraars) for an insurance year with their insurer group (concern), the policy types they offer (natura, restitutie, combinatie, budget), the number of basic policies and supplementary packages, and customer ratings with their source. Use it to resolve an insurer name to a verzekeraarId for the other tools. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027. During the switching season (November-December) users usually mean the coming year."
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "jaar"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "verzekeraars": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "concern": {
+            "type": "string"
+           },
+           "risicodrager": {
+            "type": "string"
+           },
+           "uzovi": {
+            "type": "string"
+           },
+           "label": {
+            "type": "string"
+           },
+           "kvk": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "afmRegistratie": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "website": {
+            "type": "string"
+           },
+           "zorgzoekerUrl": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "polistypen": {
+            "type": "array",
+            "items": {
+             "type": "string",
+             "enum": [
+              "natura",
+              "restitutie",
+              "combinatie",
+              "budget"
+             ]
+            }
+           },
+           "aantalBasispolissen": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "aantalAanvullendePakketten": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "ratings": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "verzekeraarId": {
+               "type": "string"
+              },
+              "bron": {
+               "type": "string"
+              },
+              "score": {
+               "type": "number"
+              },
+              "schaal": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "n": {
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": -9007199254740991,
+                 "maximum": 9007199254740991
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "periode": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "url": {
+               "type": [
+                "string",
+                "null"
+               ]
+              }
+             },
+             "required": [
+              "verzekeraarId",
+              "bron",
+              "score",
+              "schaal",
+              "n",
+              "periode",
+              "url"
+             ],
+             "additionalProperties": false
+            }
+           }
+          },
+          "required": [
+           "id",
+           "concern",
+           "risicodrager",
+           "uzovi",
+           "label",
+           "kvk",
+           "afmRegistratie",
+           "website",
+           "zorgzoekerUrl",
+           "polistypen",
+           "aantalBasispolissen",
+           "aantalAanvullendePakketten",
+           "ratings"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "totaal": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Total number of matches across all pages."
+        }
+       },
+       "required": [
+        "verzekeraars",
+        "totaal"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "List health insurers",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "zoek_basisverzekeringen",
+    "title": "Search basic health insurance policies",
+    "description": "Searches Dutch basic health insurance policies (basisverzekering) for an insurance year. Returns per policy the premium per month and per year at the chosen voluntary deductible (vrijwillig eigen risico), the policy type, freedom of choice of care providers (zorgkeuze, based on reimbursement of non-contracted care, niet-gecontracteerde zorg), customer rating, a link to the policy page (detailUrl; afsluitUrl is only filled over the REST API) and source ids. Filter by policy type, insurer, minimum reimbursement for non-contracted care and care type (zorgsoort); sort by premie, zorgkeuze or rating and always tell the user the sort key (meta.sorteersleutel). The insured care itself is the same in every basic policy by law; policies differ in premium and choice of providers. Paginated with limit and cursor. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027. During the switching season (November-December) users usually mean the coming year."
+      },
+      "eigenRisico": {
+       "default": "0",
+       "description": "Voluntary deductible (vrijwillig eigen risico) in whole euros used to price the premium: 0 (default), 100, 200, 300, 400 or 500. It comes on top of the mandatory deductible (verplicht eigen risico).",
+       "type": "string",
+       "enum": [
+        "0",
+        "100",
+        "200",
+        "300",
+        "400",
+        "500"
+       ]
+      },
+      "type": {
+       "description": "Policy type: natura (only contracted care fully reimbursed), restitutie (free choice of provider), combinatie (mix), budget (lowest premium, limited choice).",
+       "type": "string",
+       "enum": [
+        "natura",
+        "restitutie",
+        "combinatie",
+        "budget"
+       ]
+      },
+      "verzekeraarId": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+       "description": "Insurer id (verzekeraar), e.g. 'vgz', as returned by list_verzekeraars."
+      },
+      "minVergoedingNietGecontracteerd": {
+       "description": "Minimum reimbursement percentage (0-100) for care from non-contracted providers (niet-gecontracteerde zorg). Applies to zorgsoort if given, otherwise to every care type of the policy.",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100
+      },
+      "zorgsoort": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "pattern": "^[a-z][a-z0-9_]*$",
+       "description": "Type of care (zorgsoort), lowercase key such as 'ziekenhuis' (hospital), 'kliniek', 'ggz' (mental healthcare), 'fysio', 'wijkverpleging', 'apotheek'."
+      },
+      "sorteer": {
+       "default": "premie",
+       "description": "Sort order: premie (lowest annual premium first, default), zorgkeuze (most freedom of choice first), rating (highest customer rating first).",
+       "type": "string",
+       "enum": [
+        "premie",
+        "zorgkeuze",
+        "rating"
+       ]
+      },
+      "limit": {
+       "default": 10,
+       "description": "Maximum number of results per page (1-50, default 10).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "cursor": {
+       "description": "Opaque pagination cursor: pass meta.cursor from the previous response to get the next page.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 500
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "jaar"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "polissen": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "polisId": {
+            "type": "string"
+           },
+           "naam": {
+            "type": "string"
+           },
+           "jaar": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "verzekeraarId": {
+            "type": "string"
+           },
+           "verzekeraarLabel": {
+            "type": "string"
+           },
+           "concern": {
+            "type": "string"
+           },
+           "type": {
+            "type": "string",
+            "enum": [
+             "natura",
+             "restitutie",
+             "combinatie",
+             "budget"
+            ]
+           },
+           "premieDefinitief": {
+            "type": "boolean"
+           },
+           "vrijwilligEigenRisico": {
+            "type": "string",
+            "enum": [
+             "0",
+             "100",
+             "200",
+             "300",
+             "400",
+             "500"
+            ]
+           },
+           "premieMaandCent": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "premieJaarCent": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "zorgkeuze": {
+            "type": "string",
+            "enum": [
+             "volledig",
+             "ruim",
+             "beperkt"
+            ]
+           },
+           "vergoedingNietGecontracteerd": {
+            "type": "object",
+            "propertyNames": {
+             "type": "string"
+            },
+            "additionalProperties": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 100
+            }
+           },
+           "budgetBeperkingen": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "selectieveContractering": {
+                "type": "boolean"
+               },
+               "alleenOnline": {
+                "type": "boolean"
+               },
+               "medicijnenPostorder": {
+                "type": "boolean"
+               }
+              },
+              "additionalProperties": false
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "rating": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "afsluitUrl": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "detailUrl": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "bronIds": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           }
+          },
+          "required": [
+           "polisId",
+           "naam",
+           "jaar",
+           "verzekeraarId",
+           "verzekeraarLabel",
+           "concern",
+           "type",
+           "premieDefinitief",
+           "vrijwilligEigenRisico",
+           "premieMaandCent",
+           "premieJaarCent",
+           "zorgkeuze",
+           "vergoedingNietGecontracteerd",
+           "budgetBeperkingen",
+           "rating",
+           "afsluitUrl",
+           "detailUrl",
+           "bronIds"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "totaal": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Total number of matches across all pages."
+        }
+       },
+       "required": [
+        "polissen",
+        "totaal"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Search basic health insurance policies",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_polis",
+    "title": "Get policy details",
+    "description": "Returns the full record of one basic policy (basisverzekering) or one supplementary or dental package (aanvullende verzekering, tandartsverzekering): premiums per deductible level or age band, reimbursement of non-contracted care, coverage per taxonomy category (dekkingen: maximum amount, percentage, number of treatments, period; a line with variant true is an extra line under its category, with the insurer's own name in rubriek, and does not count in calculations or comparisons), waiting period (wachttijd), acceptance rules (acceptatie), gesloten (true: package no longer available to new customers; existing policyholders keep it), a summary in the requested language and a source id per field that get_bron can quote. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "polisId": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+       "description": "Policy id (polisId) of a basic policy or supplementary package, e.g. '2027-vgz-natura', as returned by the search tools."
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "polisId"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "oneOf": [
+        {
+         "type": "object",
+         "properties": {
+          "polisSoort": {
+           "type": "string",
+           "const": "basis"
+          },
+          "polis": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "jaar": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "verzekeraarId": {
+             "type": "string"
+            },
+            "naam": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string",
+             "enum": [
+              "natura",
+              "restitutie",
+              "combinatie",
+              "budget"
+             ]
+            },
+            "premieDefinitief": {
+             "type": "boolean"
+            },
+            "vergoedingNietGecontracteerd": {
+             "type": "object",
+             "propertyNames": {
+              "type": "string"
+             },
+             "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+             }
+            },
+            "budgetBeperkingen": {
+             "anyOf": [
+              {
+               "type": "object",
+               "properties": {
+                "selectieveContractering": {
+                 "type": "boolean"
+                },
+                "alleenOnline": {
+                 "type": "boolean"
+                },
+                "medicijnenPostorder": {
+                 "type": "boolean"
+                }
+               },
+               "additionalProperties": false
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "modelovereenkomstBronId": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "voorwaardenVersie": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "samenvattingNl": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "samenvattingEn": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "afsluitUrl": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "premies": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "vrijwilligEigenRisico": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50000
+               },
+               "termijn": {
+                "type": "string",
+                "enum": [
+                 "maand",
+                 "kwartaal",
+                 "halfjaar",
+                 "jaar"
+                ]
+               },
+               "premieCent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+               },
+               "bronId": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "vrijwilligEigenRisico",
+               "termijn",
+               "premieCent",
+               "bronId"
+              ],
+              "additionalProperties": false
+             }
+            }
+           },
+           "required": [
+            "id",
+            "jaar",
+            "verzekeraarId",
+            "naam",
+            "type",
+            "premieDefinitief",
+            "vergoedingNietGecontracteerd",
+            "budgetBeperkingen",
+            "modelovereenkomstBronId",
+            "voorwaardenVersie",
+            "samenvattingNl",
+            "samenvattingEn",
+            "afsluitUrl",
+            "premies"
+           ],
+           "additionalProperties": false
+          },
+          "verzekeraar": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "concern": {
+             "type": "string"
+            },
+            "risicodrager": {
+             "type": "string"
+            },
+            "uzovi": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "kvk": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "afmRegistratie": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "website": {
+             "type": "string"
+            },
+            "zorgzoekerUrl": {
+             "type": [
+              "string",
+              "null"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "concern",
+            "risicodrager",
+            "uzovi",
+            "label",
+            "kvk",
+            "afmRegistratie",
+            "website",
+            "zorgzoekerUrl"
+           ],
+           "additionalProperties": false
+          },
+          "zorgkeuze": {
+           "type": "string",
+           "enum": [
+            "volledig",
+            "ruim",
+            "beperkt"
+           ]
+          },
+          "samenvatting": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "detailUrl": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "polisSoort",
+          "polis",
+          "verzekeraar",
+          "zorgkeuze",
+          "samenvatting",
+          "detailUrl"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "object",
+         "properties": {
+          "polisSoort": {
+           "type": "string",
+           "const": "aanvullend"
+          },
+          "polis": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "jaar": {
+             "type": "integer",
+             "minimum": -9007199254740991,
+             "maximum": 9007199254740991
+            },
+            "verzekeraarId": {
+             "type": "string"
+            },
+            "naam": {
+             "type": "string"
+            },
+            "soort": {
+             "type": "string",
+             "enum": [
+              "aanvullend",
+              "tand",
+              "combinatie"
+             ]
+            },
+            "basisVereist": {
+             "type": "boolean"
+            },
+            "basisPolisIds": {
+             "anyOf": [
+              {
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "acceptatie": {
+             "type": "string",
+             "enum": [
+              "geen",
+              "vragenlijst",
+              "leeftijdsgrens",
+              "afwijzing_mogelijk",
+              "onbekend"
+             ]
+            },
+            "maxInstapleeftijd": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "wachttijdMaanden": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            },
+            "kindGratis": {
+             "type": "boolean"
+            },
+            "gesloten": {
+             "default": false,
+             "type": "boolean"
+            },
+            "opzegregels": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "vergoedingenwijzerBronId": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "samenvattingNl": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "samenvattingEn": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "afsluitUrl": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "premies": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "leeftijdVan": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+               },
+               "leeftijdTot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+               },
+               "premieCentMaand": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+               },
+               "bronId": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "leeftijdVan",
+               "leeftijdTot",
+               "premieCentMaand",
+               "bronId"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "dekkingen": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+               },
+               "categorie": {
+                "type": "string",
+                "enum": [
+                 "fysio",
+                 "oefentherapie",
+                 "ergotherapie",
+                 "logopedie",
+                 "dietetiek",
+                 "podotherapie",
+                 "huidtherapie",
+                 "tand_controle",
+                 "tand_behandeling",
+                 "tand_kronen_bruggen",
+                 "orthodontie_kind",
+                 "orthodontie_volwassen",
+                 "tand_ongeval",
+                 "bril_lenzen",
+                 "ooglaser",
+                 "hoortoestel",
+                 "buitenland_spoed",
+                 "buitenland_gepland",
+                 "repatriering",
+                 "vaccinaties_reis",
+                 "alternatieve_geneeswijzen",
+                 "acupunctuur",
+                 "chiropractie_osteopathie",
+                 "homeopathische_middelen",
+                 "kraamzorg_eigen_bijdrage",
+                 "bevalling_ziekenhuis_zonder_indicatie",
+                 "anticonceptie",
+                 "kinderopvang_ziek",
+                 "ivf_extra",
+                 "preventie_cursus",
+                 "sportmedisch",
+                 "stoppen_met_roken",
+                 "dieetadvies",
+                 "psychologische_zorg_extra",
+                 "mindfulness",
+                 "hulpmiddelen",
+                 "medicijnen_eigen_bijdrage",
+                 "plastische_chirurgie",
+                 "sterilisatie",
+                 "overgangsconsulent",
+                 "herstel_zorghotel",
+                 "mantelzorg_vervanging",
+                 "overlijden_vervoer",
+                 "eigen_risico_compensatie",
+                 "medische_pedicure",
+                 "stottertherapie",
+                 "ontharing",
+                 "camouflagetherapie",
+                 "kunstgebit",
+                 "orthoptie",
+                 "buitenland_tand_spoed",
+                 "buitenland_hulpverlening",
+                 "kraampakket",
+                 "kraamzorg_extra",
+                 "lactatiekunde",
+                 "zwangerschapscursus",
+                 "therapeutisch_kamp",
+                 "griepvaccinatie",
+                 "beweegprogramma",
+                 "gezondheidscheck",
+                 "lidmaatschap_patientenvereniging",
+                 "steunzolen",
+                 "borstkolf",
+                 "plaswekker",
+                 "pruik",
+                 "borstprothese",
+                 "hospice",
+                 "verblijf_bezoek",
+                 "vervoer_verblijf_behandeling",
+                 "ziekenvervoer_extra",
+                 "mantelzorgmakelaar",
+                 "mantelzorg_cursus",
+                 "second_opinion",
+                 "juridische_bijstand"
+                ]
+               },
+               "maxBedragCent": {
+                "anyOf": [
+                 {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "percentage": {
+                "anyOf": [
+                 {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "maxAantal": {
+                "anyOf": [
+                 {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "periode": {
+                "type": "string",
+                "enum": [
+                 "kalenderjaar",
+                 "2jaar",
+                 "3jaar",
+                 "eenmalig",
+                 "looptijd",
+                 "4jaar",
+                 "5jaar",
+                 "per_gebeurtenis"
+                ]
+               },
+               "per": {
+                "type": "string",
+                "enum": [
+                 "persoon",
+                 "polis"
+                ]
+               },
+               "eigenBijdrageCent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+               },
+               "eigenBijdragePer": {
+                "type": "string",
+                "enum": [
+                 "jaar",
+                 "behandeling"
+                ]
+               },
+               "maxBedragPerBehandelingCent": {
+                "default": null,
+                "anyOf": [
+                 {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "gedeeldMet": {
+                "type": "array",
+                "items": {
+                 "type": "string",
+                 "enum": [
+                  "fysio",
+                  "oefentherapie",
+                  "ergotherapie",
+                  "logopedie",
+                  "dietetiek",
+                  "podotherapie",
+                  "huidtherapie",
+                  "tand_controle",
+                  "tand_behandeling",
+                  "tand_kronen_bruggen",
+                  "orthodontie_kind",
+                  "orthodontie_volwassen",
+                  "tand_ongeval",
+                  "bril_lenzen",
+                  "ooglaser",
+                  "hoortoestel",
+                  "buitenland_spoed",
+                  "buitenland_gepland",
+                  "repatriering",
+                  "vaccinaties_reis",
+                  "alternatieve_geneeswijzen",
+                  "acupunctuur",
+                  "chiropractie_osteopathie",
+                  "homeopathische_middelen",
+                  "kraamzorg_eigen_bijdrage",
+                  "bevalling_ziekenhuis_zonder_indicatie",
+                  "anticonceptie",
+                  "kinderopvang_ziek",
+                  "ivf_extra",
+                  "preventie_cursus",
+                  "sportmedisch",
+                  "stoppen_met_roken",
+                  "dieetadvies",
+                  "psychologische_zorg_extra",
+                  "mindfulness",
+                  "hulpmiddelen",
+                  "medicijnen_eigen_bijdrage",
+                  "plastische_chirurgie",
+                  "sterilisatie",
+                  "overgangsconsulent",
+                  "herstel_zorghotel",
+                  "mantelzorg_vervanging",
+                  "overlijden_vervoer",
+                  "eigen_risico_compensatie",
+                  "medische_pedicure",
+                  "stottertherapie",
+                  "ontharing",
+                  "camouflagetherapie",
+                  "kunstgebit",
+                  "orthoptie",
+                  "buitenland_tand_spoed",
+                  "buitenland_hulpverlening",
+                  "kraampakket",
+                  "kraamzorg_extra",
+                  "lactatiekunde",
+                  "zwangerschapscursus",
+                  "therapeutisch_kamp",
+                  "griepvaccinatie",
+                  "beweegprogramma",
+                  "gezondheidscheck",
+                  "lidmaatschap_patientenvereniging",
+                  "steunzolen",
+                  "borstkolf",
+                  "plaswekker",
+                  "pruik",
+                  "borstprothese",
+                  "hospice",
+                  "verblijf_bezoek",
+                  "vervoer_verblijf_behandeling",
+                  "ziekenvervoer_extra",
+                  "mantelzorgmakelaar",
+                  "mantelzorg_cursus",
+                  "second_opinion",
+                  "juridische_bijstand"
+                 ]
+                }
+               },
+               "stapelbaar": {
+                "type": "boolean"
+               },
+               "voorwaardenTekst": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "bronId": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "bronAnchor": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "extractieStatus": {
+                "type": "string",
+                "enum": [
+                 "automatisch",
+                 "gereviewed"
+                ]
+               },
+               "variant": {
+                "default": false,
+                "type": "boolean"
+               },
+               "rubriek": {
+                "default": null,
+                "anyOf": [
+                 {
+                  "type": "string",
+                  "maxLength": 120
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               }
+              },
+              "required": [
+               "categorie",
+               "maxBedragCent",
+               "percentage",
+               "maxAantal",
+               "periode",
+               "per",
+               "eigenBijdrageCent",
+               "maxBedragPerBehandelingCent",
+               "gedeeldMet",
+               "stapelbaar",
+               "voorwaardenTekst",
+               "bronId",
+               "bronAnchor",
+               "extractieStatus",
+               "variant",
+               "rubriek"
+              ],
+              "additionalProperties": false
+             }
+            }
+           },
+           "required": [
+            "id",
+            "jaar",
+            "verzekeraarId",
+            "naam",
+            "soort",
+            "basisVereist",
+            "basisPolisIds",
+            "acceptatie",
+            "maxInstapleeftijd",
+            "wachttijdMaanden",
+            "kindGratis",
+            "gesloten",
+            "opzegregels",
+            "vergoedingenwijzerBronId",
+            "samenvattingNl",
+            "samenvattingEn",
+            "afsluitUrl",
+            "premies",
+            "dekkingen"
+           ],
+           "additionalProperties": false
+          },
+          "verzekeraar": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "concern": {
+             "type": "string"
+            },
+            "risicodrager": {
+             "type": "string"
+            },
+            "uzovi": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "kvk": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "afmRegistratie": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "website": {
+             "type": "string"
+            },
+            "zorgzoekerUrl": {
+             "type": [
+              "string",
+              "null"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "concern",
+            "risicodrager",
+            "uzovi",
+            "label",
+            "kvk",
+            "afmRegistratie",
+            "website",
+            "zorgzoekerUrl"
+           ],
+           "additionalProperties": false
+          },
+          "samenvatting": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "detailUrl": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "polisSoort",
+          "polis",
+          "verzekeraar",
+          "samenvatting",
+          "detailUrl"
+         ],
+         "additionalProperties": false
+        }
+       ]
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get policy details",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "zoek_aanvullende_pakketten",
+    "title": "Search supplementary and dental packages",
+    "description": "Finds Dutch supplementary health insurance and dental packages (aanvullende verzekering, tandartsverzekering) that meet all coverage requirements (eisen), for example at least 12 physiotherapy sessions (categorie 'fysio', minAantal 12) or at least 500 euros for dental treatment ('tand_behandeling', minBedragCent 50000). Returns the premium at the given age, acceptance rules (acceptatie: medical questionnaire or age limit), waiting period (wachttijd), whether children are insured for free, and the matching coverage lines (requirements are checked on main lines only; extra lines have variant true). Packages no longer available to new customers (gesloten) are left out. Use taxonomy category codes only; never pass diagnoses or medicines. Paginated with limit and cursor. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027. During the switching season (November-December) users usually mean the coming year."
+      },
+      "eisen": {
+       "default": [],
+       "description": "Coverage requirements (eisen); a package must meet all of them. Empty = all packages.",
+       "maxItems": 10,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "categorie": {
+          "type": "string",
+          "enum": [
+           "fysio",
+           "oefentherapie",
+           "ergotherapie",
+           "logopedie",
+           "dietetiek",
+           "podotherapie",
+           "huidtherapie",
+           "tand_controle",
+           "tand_behandeling",
+           "tand_kronen_bruggen",
+           "orthodontie_kind",
+           "orthodontie_volwassen",
+           "tand_ongeval",
+           "bril_lenzen",
+           "ooglaser",
+           "hoortoestel",
+           "buitenland_spoed",
+           "buitenland_gepland",
+           "repatriering",
+           "vaccinaties_reis",
+           "alternatieve_geneeswijzen",
+           "acupunctuur",
+           "chiropractie_osteopathie",
+           "homeopathische_middelen",
+           "kraamzorg_eigen_bijdrage",
+           "bevalling_ziekenhuis_zonder_indicatie",
+           "anticonceptie",
+           "kinderopvang_ziek",
+           "ivf_extra",
+           "preventie_cursus",
+           "sportmedisch",
+           "stoppen_met_roken",
+           "dieetadvies",
+           "psychologische_zorg_extra",
+           "mindfulness",
+           "hulpmiddelen",
+           "medicijnen_eigen_bijdrage",
+           "plastische_chirurgie",
+           "sterilisatie",
+           "overgangsconsulent",
+           "herstel_zorghotel",
+           "mantelzorg_vervanging",
+           "overlijden_vervoer",
+           "eigen_risico_compensatie",
+           "medische_pedicure",
+           "stottertherapie",
+           "ontharing",
+           "camouflagetherapie",
+           "kunstgebit",
+           "orthoptie",
+           "buitenland_tand_spoed",
+           "buitenland_hulpverlening",
+           "kraampakket",
+           "kraamzorg_extra",
+           "lactatiekunde",
+           "zwangerschapscursus",
+           "therapeutisch_kamp",
+           "griepvaccinatie",
+           "beweegprogramma",
+           "gezondheidscheck",
+           "lidmaatschap_patientenvereniging",
+           "steunzolen",
+           "borstkolf",
+           "plaswekker",
+           "pruik",
+           "borstprothese",
+           "hospice",
+           "verblijf_bezoek",
+           "vervoer_verblijf_behandeling",
+           "ziekenvervoer_extra",
+           "mantelzorgmakelaar",
+           "mantelzorg_cursus",
+           "second_opinion",
+           "juridische_bijstand"
+          ],
+          "description": "Coverage category code from the taxonomy, e.g. fysio (physiotherapy), tand_behandeling (dental treatment), orthodontie_kind, bril_lenzen, buitenland_spoed."
+         },
+         "minBedragCent": {
+          "description": "Minimum reimbursement per year in euro cents, e.g. 50000 = 500 euros.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2500000
+         },
+         "minAantal": {
+          "description": "Minimum number of treatments/sessions/days per year, e.g. 12 physiotherapy sessions.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999
+         }
+        },
+        "required": [
+         "categorie"
+        ]
+       }
+      },
+      "leeftijd": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 120,
+       "description": "Age of the insured person on 1 January of jaar; supplementary premiums depend on age."
+      },
+      "soort": {
+       "description": "Package kind: aanvullend (supplementary), tand (dental) or combinatie (both in one package).",
+       "type": "string",
+       "enum": [
+        "aanvullend",
+        "tand",
+        "combinatie"
+       ]
+      },
+      "verzekeraarId": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+       "description": "Insurer id (verzekeraar), e.g. 'vgz', as returned by list_verzekeraars."
+      },
+      "maxPremieCentMaand": {
+       "description": "Maximum premium per month in euro cents at this age, e.g. 2500 = 25 euros.",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100000
+      },
+      "basisPolisId": {
+       "description": "Only packages that can be combined with this basic policy (polisId); most packages require a basic policy from the same insurer group (concern).",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      },
+      "limit": {
+       "default": 10,
+       "description": "Maximum number of results per page (1-50, default 10).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "cursor": {
+       "description": "Opaque pagination cursor: pass meta.cursor from the previous response to get the next page.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 500
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "jaar",
+      "leeftijd"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "pakketten": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "polisId": {
+            "type": "string"
+           },
+           "naam": {
+            "type": "string"
+           },
+           "jaar": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "verzekeraarId": {
+            "type": "string"
+           },
+           "verzekeraarLabel": {
+            "type": "string"
+           },
+           "concern": {
+            "type": "string"
+           },
+           "soort": {
+            "type": "string",
+            "enum": [
+             "aanvullend",
+             "tand",
+             "combinatie"
+            ]
+           },
+           "premieCentMaand": {
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "premieCentJaar": {
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "acceptatie": {
+            "type": "string",
+            "enum": [
+             "geen",
+             "vragenlijst",
+             "leeftijdsgrens",
+             "afwijzing_mogelijk",
+             "onbekend"
+            ]
+           },
+           "maxInstapleeftijd": {
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "wachttijdMaanden": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "kindGratis": {
+            "type": "boolean"
+           },
+           "basisVereist": {
+            "type": "boolean"
+           },
+           "dekkingen": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "id": {
+               "type": "integer",
+               "minimum": -9007199254740991,
+               "maximum": 9007199254740991
+              },
+              "categorie": {
+               "type": "string",
+               "enum": [
+                "fysio",
+                "oefentherapie",
+                "ergotherapie",
+                "logopedie",
+                "dietetiek",
+                "podotherapie",
+                "huidtherapie",
+                "tand_controle",
+                "tand_behandeling",
+                "tand_kronen_bruggen",
+                "orthodontie_kind",
+                "orthodontie_volwassen",
+                "tand_ongeval",
+                "bril_lenzen",
+                "ooglaser",
+                "hoortoestel",
+                "buitenland_spoed",
+                "buitenland_gepland",
+                "repatriering",
+                "vaccinaties_reis",
+                "alternatieve_geneeswijzen",
+                "acupunctuur",
+                "chiropractie_osteopathie",
+                "homeopathische_middelen",
+                "kraamzorg_eigen_bijdrage",
+                "bevalling_ziekenhuis_zonder_indicatie",
+                "anticonceptie",
+                "kinderopvang_ziek",
+                "ivf_extra",
+                "preventie_cursus",
+                "sportmedisch",
+                "stoppen_met_roken",
+                "dieetadvies",
+                "psychologische_zorg_extra",
+                "mindfulness",
+                "hulpmiddelen",
+                "medicijnen_eigen_bijdrage",
+                "plastische_chirurgie",
+                "sterilisatie",
+                "overgangsconsulent",
+                "herstel_zorghotel",
+                "mantelzorg_vervanging",
+                "overlijden_vervoer",
+                "eigen_risico_compensatie",
+                "medische_pedicure",
+                "stottertherapie",
+                "ontharing",
+                "camouflagetherapie",
+                "kunstgebit",
+                "orthoptie",
+                "buitenland_tand_spoed",
+                "buitenland_hulpverlening",
+                "kraampakket",
+                "kraamzorg_extra",
+                "lactatiekunde",
+                "zwangerschapscursus",
+                "therapeutisch_kamp",
+                "griepvaccinatie",
+                "beweegprogramma",
+                "gezondheidscheck",
+                "lidmaatschap_patientenvereniging",
+                "steunzolen",
+                "borstkolf",
+                "plaswekker",
+                "pruik",
+                "borstprothese",
+                "hospice",
+                "verblijf_bezoek",
+                "vervoer_verblijf_behandeling",
+                "ziekenvervoer_extra",
+                "mantelzorgmakelaar",
+                "mantelzorg_cursus",
+                "second_opinion",
+                "juridische_bijstand"
+               ]
+              },
+              "maxBedragCent": {
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 9007199254740991
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "percentage": {
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 100
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "maxAantal": {
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 9007199254740991
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "periode": {
+               "type": "string",
+               "enum": [
+                "kalenderjaar",
+                "2jaar",
+                "3jaar",
+                "eenmalig",
+                "looptijd",
+                "4jaar",
+                "5jaar",
+                "per_gebeurtenis"
+               ]
+              },
+              "per": {
+               "type": "string",
+               "enum": [
+                "persoon",
+                "polis"
+               ]
+              },
+              "eigenBijdrageCent": {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 9007199254740991
+              },
+              "eigenBijdragePer": {
+               "type": "string",
+               "enum": [
+                "jaar",
+                "behandeling"
+               ]
+              },
+              "maxBedragPerBehandelingCent": {
+               "default": null,
+               "anyOf": [
+                {
+                 "type": "integer",
+                 "minimum": 0,
+                 "maximum": 9007199254740991
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "gedeeldMet": {
+               "type": "array",
+               "items": {
+                "type": "string",
+                "enum": [
+                 "fysio",
+                 "oefentherapie",
+                 "ergotherapie",
+                 "logopedie",
+                 "dietetiek",
+                 "podotherapie",
+                 "huidtherapie",
+                 "tand_controle",
+                 "tand_behandeling",
+                 "tand_kronen_bruggen",
+                 "orthodontie_kind",
+                 "orthodontie_volwassen",
+                 "tand_ongeval",
+                 "bril_lenzen",
+                 "ooglaser",
+                 "hoortoestel",
+                 "buitenland_spoed",
+                 "buitenland_gepland",
+                 "repatriering",
+                 "vaccinaties_reis",
+                 "alternatieve_geneeswijzen",
+                 "acupunctuur",
+                 "chiropractie_osteopathie",
+                 "homeopathische_middelen",
+                 "kraamzorg_eigen_bijdrage",
+                 "bevalling_ziekenhuis_zonder_indicatie",
+                 "anticonceptie",
+                 "kinderopvang_ziek",
+                 "ivf_extra",
+                 "preventie_cursus",
+                 "sportmedisch",
+                 "stoppen_met_roken",
+                 "dieetadvies",
+                 "psychologische_zorg_extra",
+                 "mindfulness",
+                 "hulpmiddelen",
+                 "medicijnen_eigen_bijdrage",
+                 "plastische_chirurgie",
+                 "sterilisatie",
+                 "overgangsconsulent",
+                 "herstel_zorghotel",
+                 "mantelzorg_vervanging",
+                 "overlijden_vervoer",
+                 "eigen_risico_compensatie",
+                 "medische_pedicure",
+                 "stottertherapie",
+                 "ontharing",
+                 "camouflagetherapie",
+                 "kunstgebit",
+                 "orthoptie",
+                 "buitenland_tand_spoed",
+                 "buitenland_hulpverlening",
+                 "kraampakket",
+                 "kraamzorg_extra",
+                 "lactatiekunde",
+                 "zwangerschapscursus",
+                 "therapeutisch_kamp",
+                 "griepvaccinatie",
+                 "beweegprogramma",
+                 "gezondheidscheck",
+                 "lidmaatschap_patientenvereniging",
+                 "steunzolen",
+                 "borstkolf",
+                 "plaswekker",
+                 "pruik",
+                 "borstprothese",
+                 "hospice",
+                 "verblijf_bezoek",
+                 "vervoer_verblijf_behandeling",
+                 "ziekenvervoer_extra",
+                 "mantelzorgmakelaar",
+                 "mantelzorg_cursus",
+                 "second_opinion",
+                 "juridische_bijstand"
+                ]
+               }
+              },
+              "stapelbaar": {
+               "type": "boolean"
+              },
+              "voorwaardenTekst": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "bronId": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "bronAnchor": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "extractieStatus": {
+               "type": "string",
+               "enum": [
+                "automatisch",
+                "gereviewed"
+               ]
+              },
+              "variant": {
+               "default": false,
+               "type": "boolean"
+              },
+              "rubriek": {
+               "default": null,
+               "anyOf": [
+                {
+                 "type": "string",
+                 "maxLength": 120
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              }
+             },
+             "required": [
+              "categorie",
+              "maxBedragCent",
+              "percentage",
+              "maxAantal",
+              "periode",
+              "per",
+              "eigenBijdrageCent",
+              "maxBedragPerBehandelingCent",
+              "gedeeldMet",
+              "stapelbaar",
+              "voorwaardenTekst",
+              "bronId",
+              "bronAnchor",
+              "extractieStatus",
+              "variant",
+              "rubriek"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "afsluitUrl": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "detailUrl": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "bronIds": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           }
+          },
+          "required": [
+           "polisId",
+           "naam",
+           "jaar",
+           "verzekeraarId",
+           "verzekeraarLabel",
+           "concern",
+           "soort",
+           "premieCentMaand",
+           "premieCentJaar",
+           "acceptatie",
+           "maxInstapleeftijd",
+           "wachttijdMaanden",
+           "kindGratis",
+           "basisVereist",
+           "dekkingen",
+           "afsluitUrl",
+           "detailUrl",
+           "bronIds"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "totaal": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Total number of matches across all pages."
+        }
+       },
+       "required": [
+        "pakketten",
+        "totaal"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Search supplementary and dental packages",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "zoek_zorgaanbieder",
+    "title": "Search care providers",
+    "description": "Searches Dutch care providers (zorgaanbieders), such as hospitals, clinics and physiotherapists, in the national AGB register by name, city (plaats), postcode or care type (zorgsoort). Returns the AGB code, address and, when a postcode is given, the distance. Provide at least one of naam, plaats or postcode, then pass the AGB code to check_zorgaanbieder. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "naam": {
+       "description": "(Part of) the name of the care provider.",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 100
+      },
+      "plaats": {
+       "description": "City or town (plaats), e.g. Utrecht.",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 80
+      },
+      "postcode": {
+       "description": "Dutch postcode (4 digits, optionally 2 letters), e.g. 3511 or 3511AB; results get a distance.",
+       "type": "string",
+       "pattern": "^\\d{4}\\s?([A-Za-z]{2})?$"
+      },
+      "zorgsoort": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "pattern": "^[a-z][a-z0-9_]*$",
+       "description": "Type of care (zorgsoort), lowercase key such as 'ziekenhuis' (hospital), 'kliniek', 'ggz' (mental healthcare), 'fysio', 'wijkverpleging', 'apotheek'."
+      },
+      "limit": {
+       "default": 10,
+       "description": "Maximum number of results per page (1-50, default 10).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "zorgaanbieders": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "agbCode": {
+            "type": "string"
+           },
+           "naam": {
+            "type": "string"
+           },
+           "soort": {
+            "type": "string"
+           },
+           "vestigingAgb": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "adres": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "straat": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "postcode": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "plaats": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "straat",
+               "postcode",
+               "plaats"
+              ],
+              "additionalProperties": false
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "afstandKm": {
+            "type": [
+             "number",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "agbCode",
+           "naam",
+           "soort",
+           "vestigingAgb",
+           "adres",
+           "afstandKm"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "totaal": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Total number of matches across all pages."
+        }
+       },
+       "required": [
+        "zorgaanbieders",
+        "totaal"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Search care providers",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "check_zorgaanbieder",
+    "title": "Check care provider contract status",
+    "description": "Checks per basic policy whether a care provider (zorgaanbieder, by AGB code) has a contract with the insurer (gecontracteerd) for a care type (zorgsoort), and which percentage of the costs is reimbursed without a contract. Each result states its origin (herkomst: insurer publication, the insurer's provider search (zorgzoeker), or cache) and the date it was retrieved. If herkomst is null the dataset has no contract information for that policy (status onbekend); calling again does not change that. Contracts can change during the year, so suggest the user confirms with the insurer. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "agbCode": {
+       "type": "string",
+       "pattern": "^\\d{8}$",
+       "description": "AGB code (8 digits) of the care provider, from zoek_zorgaanbieder."
+      },
+      "polisIds": {
+       "minItems": 1,
+       "maxItems": 20,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+       },
+       "description": "Basic policy ids (polisId) to check, e.g. from zoek_basisverzekeringen."
+      },
+      "zorgsoort": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "pattern": "^[a-z][a-z0-9_]*$",
+       "description": "Type of care (zorgsoort), lowercase key such as 'ziekenhuis' (hospital), 'kliniek', 'ggz' (mental healthcare), 'fysio', 'wijkverpleging', 'apotheek'."
+      },
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027. During the switching season (November-December) users usually mean the coming year."
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "agbCode",
+      "polisIds",
+      "zorgsoort",
+      "jaar"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "agbCode": {
+         "type": "string"
+        },
+        "zorgsoort": {
+         "type": "string"
+        },
+        "zorgaanbieder": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "naam": {
+             "type": "string"
+            },
+            "soort": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "naam",
+            "soort"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "resultaten": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "polisId": {
+            "type": "string"
+           },
+           "polisNaam": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "verzekeraarId": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "status": {
+            "type": "string",
+            "enum": [
+             "gecontracteerd",
+             "deels",
+             "niet",
+             "onbekend"
+            ]
+           },
+           "vergoedingNietGecontracteerdPct": {
+            "anyOf": [
+             {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "omzetplafond": {
+            "type": [
+             "boolean",
+             "null"
+            ]
+           },
+           "herkomst": {
+            "anyOf": [
+             {
+              "type": "string",
+              "enum": [
+               "publicatie",
+               "zorgzoeker",
+               "zorgweb",
+               "cache",
+               "wordt_opgehaald"
+              ]
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "opgehaaldOp": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "bronId": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "polisId",
+           "polisNaam",
+           "verzekeraarId",
+           "status",
+           "vergoedingNietGecontracteerdPct",
+           "omzetplafond",
+           "herkomst",
+           "opgehaaldOp",
+           "bronId"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "opnieuwProberenNaSeconden": {
+         "anyOf": [
+          {
+           "type": "integer",
+           "minimum": -9007199254740991,
+           "maximum": 9007199254740991
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "agbCode",
+        "zorgsoort",
+        "zorgaanbieder",
+        "resultaten",
+        "opnieuwProberenNaSeconden"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Check care provider contract status",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "bereken_jaarkosten",
+    "title": "Calculate annual healthcare costs",
+    "description": "Calculates the expected total annual costs for a household scenario: basic and supplementary premiums, collective discount (collectiviteitskorting, supplementary only), expected deductible (eigen risico), statutory co-payments (eigen bijdragen) and care costs that are not reimbursed, per person and in total, with all assumptions (aannames) and warnings such as provisional premiums. Input is a Scenario: insurance year, 1 to 8 persons with year of birth, chosen policy ids, voluntary deductible and, only if the user volunteers it, planned care per taxonomy category with counts (verwachtGebruik, optional). Do not ask about health; never put diagnoses, medicines or free text in the scenario; get_intake_schema lists the questions and allowed categories. Children under 18 pay no basic premium and no deductible. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027."
+      },
+      "personen": {
+       "minItems": 1,
+       "maxItems": 8,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,32}$",
+          "description": "Short person id, e.g. 'p1'. Unique within the scenario."
+         },
+         "geboortejaar": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2027,
+          "description": "Year of birth (geboortejaar)."
+         },
+         "geboortemaand": {
+          "description": "Month of birth (1-12), optional. Only used in the year the person turns 18 (premium and deductible start the month after the birthday); if omitted, June is assumed.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+         },
+         "polisBasisId": {
+          "anyOf": [
+           {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "description": "Chosen or current basic policy (basisverzekering) id; null = not chosen yet."
+         },
+         "polisAanvullendIds": {
+          "default": [],
+          "description": "Chosen supplementary and dental package (aanvullend/tand) ids.",
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+           "type": "string",
+           "minLength": 1,
+           "maxLength": 100,
+           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          }
+         },
+         "vrijwilligEigenRisico": {
+          "default": "0",
+          "description": "Voluntary deductible (vrijwillig eigen risico) in whole euros, on top of the mandatory deductible.",
+          "type": "string",
+          "enum": [
+           "0",
+           "100",
+           "200",
+           "300",
+           "400",
+           "500"
+          ]
+         },
+         "verwachtGebruik": {
+          "default": [],
+          "description": "Expected care use per category and count. No diagnoses, no free text.",
+          "maxItems": 60,
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "categorie": {
+             "type": "string",
+             "enum": [
+              "fysio",
+              "oefentherapie",
+              "ergotherapie",
+              "logopedie",
+              "dietetiek",
+              "podotherapie",
+              "huidtherapie",
+              "tand_controle",
+              "tand_behandeling",
+              "tand_kronen_bruggen",
+              "orthodontie_kind",
+              "orthodontie_volwassen",
+              "tand_ongeval",
+              "bril_lenzen",
+              "ooglaser",
+              "hoortoestel",
+              "buitenland_spoed",
+              "buitenland_gepland",
+              "repatriering",
+              "vaccinaties_reis",
+              "alternatieve_geneeswijzen",
+              "acupunctuur",
+              "chiropractie_osteopathie",
+              "homeopathische_middelen",
+              "kraamzorg_eigen_bijdrage",
+              "bevalling_ziekenhuis_zonder_indicatie",
+              "anticonceptie",
+              "kinderopvang_ziek",
+              "ivf_extra",
+              "preventie_cursus",
+              "sportmedisch",
+              "stoppen_met_roken",
+              "dieetadvies",
+              "psychologische_zorg_extra",
+              "mindfulness",
+              "hulpmiddelen",
+              "medicijnen_eigen_bijdrage",
+              "plastische_chirurgie",
+              "sterilisatie",
+              "overgangsconsulent",
+              "herstel_zorghotel",
+              "mantelzorg_vervanging",
+              "overlijden_vervoer",
+              "eigen_risico_compensatie",
+              "medische_pedicure",
+              "stottertherapie",
+              "ontharing",
+              "camouflagetherapie",
+              "kunstgebit",
+              "orthoptie",
+              "buitenland_tand_spoed",
+              "buitenland_hulpverlening",
+              "kraampakket",
+              "kraamzorg_extra",
+              "lactatiekunde",
+              "zwangerschapscursus",
+              "therapeutisch_kamp",
+              "griepvaccinatie",
+              "beweegprogramma",
+              "gezondheidscheck",
+              "lidmaatschap_patientenvereniging",
+              "steunzolen",
+              "borstkolf",
+              "plaswekker",
+              "pruik",
+              "borstprothese",
+              "hospice",
+              "verblijf_bezoek",
+              "vervoer_verblijf_behandeling",
+              "ziekenvervoer_extra",
+              "mantelzorgmakelaar",
+              "mantelzorg_cursus",
+              "second_opinion",
+              "juridische_bijstand",
+              "huisarts",
+              "medisch_specialist",
+              "medicijnen",
+              "ggz_basis",
+              "fysio_basis",
+              "hulpmiddelen_basis",
+              "ziekenvervoer",
+              "wijkverpleging",
+              "verloskunde",
+              "kraamzorg",
+              "lab_diagnostiek",
+              "mondzorg_basis",
+              "fysio_chronisch",
+              "fysio_artrose",
+              "fysio_etalagebenen",
+              "bekkenfysio",
+              "lab_huisartspraktijk",
+              "ziekenvervoer_zittend",
+              "medicijnen_gvs_bijdrage"
+             ],
+             "description": "Care category code from the coverage taxonomy (e.g. fysio, tand_controle, huisarts). Never a diagnosis or medicine."
+            },
+            "aantal": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 999,
+             "description": "Expected number of treatments, sessions, hours or items in the year."
+            },
+            "tariefCentOverride": {
+             "description": "Price per treatment in euro cents; omit to use the reference tariff (zorgtarief_referentie).",
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 2500000
+            }
+           },
+           "required": [
+            "categorie",
+            "aantal"
+           ]
+          }
+         },
+         "verwachtErPlichtigCent": {
+          "description": "Expected deductible-liable (eigen-risicoplichtige) costs in euro cents; overrides the estimate from verwachtGebruik.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000
+         },
+         "vasteZorgaanbieders": {
+          "default": [],
+          "description": "Care providers this person wants to keep using.",
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "agbCode": {
+             "type": "string",
+             "pattern": "^\\d{8}$",
+             "description": "AGB code (8 digits) of the care provider, from zoek_zorgaanbieder."
+            },
+            "zorgsoort": {
+             "type": "string",
+             "minLength": 2,
+             "maxLength": 40,
+             "pattern": "^[a-z][a-z0-9_]*$",
+             "description": "Type of care, e.g. 'ziekenhuis', 'fysio', 'ggz'."
+            }
+           },
+           "required": [
+            "agbCode",
+            "zorgsoort"
+           ]
+          }
+         }
+        },
+        "required": [
+         "id",
+         "geboortejaar",
+         "polisBasisId"
+        ]
+       },
+       "description": "1 to 8 persons in the household, each with a unique id."
+      },
+      "termijn": {
+       "default": "maand",
+       "description": "Premium payment term (betaaltermijn).",
+       "type": "string",
+       "enum": [
+        "maand",
+        "kwartaal",
+        "halfjaar",
+        "jaar"
+       ]
+      },
+      "collectiefId": {
+       "description": "Collective contract (collectiviteit) id, if any; discounts apply to supplementary only.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (default) or en.",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "jaar",
+      "personen"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "jaar": {
+         "type": "number"
+        },
+        "totaalCent": {
+         "type": "number"
+        },
+        "perPersoon": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "persoonId": {
+            "type": "string"
+           },
+           "regels": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "soort": {
+               "type": "string",
+               "enum": [
+                "premie_basis",
+                "premie_aanvullend",
+                "korting_collectief",
+                "eigen_risico",
+                "eigen_bijdrage",
+                "niet_vergoed"
+               ]
+              },
+              "omschrijving": {
+               "type": "string"
+              },
+              "bedragCent": {
+               "type": "number"
+              },
+              "bronId": {
+               "type": "string"
+              },
+              "aannames": {
+               "default": [],
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              }
+             },
+             "required": [
+              "soort",
+              "omschrijving",
+              "bedragCent",
+              "aannames"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "subtotaalCent": {
+            "type": "number"
+           }
+          },
+          "required": [
+           "persoonId",
+           "regels",
+           "subtotaalCent"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "aannames": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "waarschuwingen": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "jaar",
+        "totaalCent",
+        "perPersoon",
+        "aannames",
+        "waarschuwingen"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Calculate annual healthcare costs",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "vergelijk_polissen",
+    "title": "Compare policies",
+    "description": "Compares 2 to 4 policies of the same insurance year and returns only the differences, grouped by aspect: premium (premie), choice of care providers (zorgkeuze), coverage per category (dekking), acceptance rules (acceptatie), waiting period (wachttijd), policy type and conditions (voorwaarden). Works for basic policies or for supplementary packages. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "polisIds": {
+       "minItems": 2,
+       "maxItems": 4,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+       },
+       "description": "2 to 4 policy ids (polisId) of the same year: all basic policies or all supplementary packages."
+      },
+      "jaar": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Insurance year (verzekeringsjaar), e.g. 2027. During the switching season (November-December) users usually mean the coming year."
+      },
+      "aspecten": {
+       "description": "Only compare these aspects: premie, zorgkeuze, dekking, acceptatie, wachttijd, type, voorwaarden. Default: all.",
+       "minItems": 1,
+       "maxItems": 7,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "premie",
+         "zorgkeuze",
+         "dekking",
+         "acceptatie",
+         "wachttijd",
+         "type",
+         "voorwaarden"
+        ]
+       }
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "polisIds",
+      "jaar"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "polissen": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "polisId": {
+            "type": "string"
+           },
+           "polisSoort": {
+            "type": "string",
+            "enum": [
+             "basis",
+             "aanvullend"
+            ]
+           },
+           "naam": {
+            "type": "string"
+           },
+           "jaar": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "verzekeraarId": {
+            "type": "string"
+           },
+           "verzekeraarLabel": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "polisId",
+           "polisSoort",
+           "naam",
+           "jaar",
+           "verzekeraarId",
+           "verzekeraarLabel"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "perAspect": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "aspect": {
+            "type": "string",
+            "enum": [
+             "premie",
+             "zorgkeuze",
+             "dekking",
+             "acceptatie",
+             "wachttijd",
+             "type",
+             "voorwaarden"
+            ]
+           },
+           "verschillen": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "aspect": {
+               "type": "string",
+               "enum": [
+                "premie",
+                "zorgkeuze",
+                "dekking",
+                "acceptatie",
+                "wachttijd",
+                "type",
+                "voorwaarden"
+               ]
+              },
+              "sleutel": {
+               "type": "string"
+              },
+              "waardeA": {},
+              "waardeB": {},
+              "omschrijving": {
+               "type": "string"
+              },
+              "polisIdA": {
+               "type": "string"
+              },
+              "polisIdB": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "aspect",
+              "sleutel",
+              "waardeA",
+              "waardeB",
+              "omschrijving",
+              "polisIdA",
+              "polisIdB"
+             ],
+             "additionalProperties": false
+            }
+           }
+          },
+          "required": [
+           "aspect",
+           "verschillen"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "aantalVerschillen": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        }
+       },
+       "required": [
+        "polissen",
+        "perAspect",
+        "aantalVerschillen"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Compare policies",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "vergelijk_jaren",
+    "title": "Compare a policy across years",
+    "description": "Shows what changed in a policy between two insurance years (jaargangen), for example 2026 and 2027: premium, coverage per category, reimbursement of non-contracted care and conditions. Useful in the switching season (overstapseizoen) to explain why a policy became more expensive or lost coverage. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "polisId": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+       "description": "Policy id (polisId) of a basic policy or supplementary package, e.g. '2027-vgz-natura', as returned by the search tools."
+      },
+      "jaarA": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Earlier insurance year, e.g. 2026."
+      },
+      "jaarB": {
+       "type": "integer",
+       "minimum": 2020,
+       "maximum": 2100,
+       "description": "Later insurance year, e.g. 2027."
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "polisId",
+      "jaarA",
+      "jaarB"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "naam": {
+         "type": "string"
+        },
+        "polisSoort": {
+         "type": "string",
+         "enum": [
+          "basis",
+          "aanvullend"
+         ]
+        },
+        "verzekeraarId": {
+         "type": "string"
+        },
+        "jaarA": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "jaarB": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "polisIdA": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "polisIdB": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "verschillen": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "aspect": {
+            "type": "string",
+            "enum": [
+             "premie",
+             "zorgkeuze",
+             "dekking",
+             "acceptatie",
+             "wachttijd",
+             "type",
+             "voorwaarden"
+            ]
+           },
+           "sleutel": {
+            "type": "string"
+           },
+           "waardeA": {},
+           "waardeB": {},
+           "omschrijving": {
+            "type": "string"
+           },
+           "jaarA": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "jaarB": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           }
+          },
+          "required": [
+           "aspect",
+           "sleutel",
+           "waardeA",
+           "waardeB",
+           "omschrijving",
+           "jaarA",
+           "jaarB"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "naam",
+        "polisSoort",
+        "verzekeraarId",
+        "jaarA",
+        "jaarB",
+        "polisIdA",
+        "polisIdB",
+        "verschillen"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Compare a policy across years",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_intake_schema",
+    "title": "Get intake questions",
+    "description": "Returns the ordered intake questionnaire for building a Scenario for bereken_jaarkosten: insurance year, persons with year of birth, optional planned care as categories and counts (only if the user offers it; no diagnoses), care providers to keep, preference for choice of providers, voluntary deductible (vrijwillig eigen risico), collective contract (collectiviteit), payment term and current policy. Each question lists its allowed values and the Scenario field it maps to. Ask only what is needed, in this order. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "vragen": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "vraag": {
+            "type": "string"
+           },
+           "toelichting": {
+            "type": "string"
+           },
+           "type": {
+            "type": "string",
+            "enum": [
+             "getal",
+             "keuze",
+             "lijst",
+             "tekst"
+            ]
+           },
+           "verplicht": {
+            "type": "boolean"
+           },
+           "toegestaneWaarden": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "waarde": {
+               "type": "string"
+              },
+              "label": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "waarde",
+              "label"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "scenarioPad": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "filterPad": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "vraag",
+           "toelichting",
+           "type",
+           "verplicht",
+           "scenarioPad"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "regels": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "taal",
+        "vragen",
+        "regels"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get intake questions",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_bron",
+    "title": "Quote a source passage",
+    "description": "Returns a short passage (at most 500 characters, in Dutch) from an official source document (bron), such as an insurer's policy conditions (modelovereenkomst), coverage overview (vergoedingenwijzer), premium overview or a government publication, with its URL, version and date. Use a bronId and anchor (page or section) from the bronnen of another tool response to quote and cite the exact wording. Provides information, not advice: the user makes the decision and signs up with the insurer themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "bronId": {
+       "type": "string",
+       "pattern": "^[A-Za-z0-9._-]{1,128}$",
+       "description": "Source id (bronId) from the bronnen list of another tool response."
+      },
+      "anchor": {
+       "description": "Page or section within the source, e.g. 'p.14', from bronnen[].anchor.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 60,
+       "pattern": "^[A-Za-z0-9 ._#:-]+$"
+      },
+      "taal": {
+       "default": "nl",
+       "description": "Response language: nl (Dutch, default) or en (English).",
+       "type": "string",
+       "enum": [
+        "nl",
+        "en"
+       ]
+      }
+     },
+     "required": [
+      "bronId"
+     ]
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "data": {
+       "type": "object",
+       "properties": {
+        "bronId": {
+         "type": "string"
+        },
+        "titel": {
+         "type": "string"
+        },
+        "type": {
+         "type": "string",
+         "enum": [
+          "premieoverzicht",
+          "modelovereenkomst",
+          "vergoedingenwijzer",
+          "ziekenhuislijst",
+          "zorgzoeker",
+          "overheid"
+         ]
+        },
+        "url": {
+         "type": "string"
+        },
+        "versie": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "datum": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "anchor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "passage": {
+         "type": "string",
+         "maxLength": 500
+        },
+        "afgekapt": {
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "bronId",
+        "titel",
+        "type",
+        "url",
+        "versie",
+        "datum",
+        "anchor",
+        "passage",
+        "afgekapt"
+       ],
+       "additionalProperties": false
+      },
+      "samenvatting": {
+       "type": "string"
+      },
+      "bronnen": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "titel": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "versie": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "datum": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "anchor": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "titel",
+         "url",
+         "versie",
+         "datum",
+         "anchor"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "aannames": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "engineVersie": {
+         "type": "string"
+        },
+        "datasetVersie": {
+         "type": "string"
+        },
+        "taal": {
+         "type": "string",
+         "enum": [
+          "nl",
+          "en"
+         ]
+        },
+        "gegenereerdOp": {
+         "type": "string"
+        },
+        "sorteersleutel": {
+         "type": "string"
+        },
+        "cursor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "affiliateMelding": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "engineVersie",
+        "datasetVersie",
+        "taal"
+       ],
+       "additionalProperties": false
+      },
+      "acties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "bewaar",
+           "afsluiten",
+           "bekijk"
+          ]
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "data",
+      "samenvatting",
+      "bronnen",
+      "aannames",
+      "meta",
+      "acties"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Quote a source passage",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "zorgverzekering_intake",
+    "title": "Zorgverzekering intake",
+    "description": "Intake questions, in order, for comparing Dutch health insurance (information, not advice). Argument taal: nl or en.",
+    "arguments": [
+     {
+      "name": "taal",
+      "description": "Language: 'nl' (default) or 'en'",
+      "required": false
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "title": "Combinatie (Aevitae 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-aevitae-combinatie",
+    "name": "2027-aevitae-combinatie"
+   },
+   {
+    "title": "Natura (Aevitae 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-aevitae-natura",
+    "name": "2027-aevitae-natura"
+   },
+   {
+    "title": "Natura Select (Aevitae 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-aevitae-natura-select",
+    "name": "2027-aevitae-natura-select"
+   },
+   {
+    "title": "Basis Exclusief (Aon Verzekeringen 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-aon-zka-basis-exclusief",
+    "name": "2027-aon-zka-basis-exclusief"
+   },
+   {
+    "title": "Basis Start (Aon Verzekeringen 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-aon-zka-basis-start",
+    "name": "2027-aon-zka-basis-start"
+   },
+   {
+    "title": "Basis Zeker (Aon Verzekeringen 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-aon-zka-basis-zeker",
+    "name": "2027-aon-zka-basis-zeker"
+   },
+   {
+    "title": "a.s.r. Bewuste Keuze (a.s.r. 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-asr-a-s-r-bewuste-keuze",
+    "name": "2027-asr-a-s-r-bewuste-keuze"
+   },
+   {
+    "title": "a.s.r. Eigen Keuze (a.s.r. 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-asr-a-s-r-eigen-keuze",
+    "name": "2027-asr-a-s-r-eigen-keuze"
+   },
+   {
+    "title": "a.s.r. Ruime Keuze (a.s.r. 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-asr-a-s-r-ruime-keuze",
+    "name": "2027-asr-a-s-r-ruime-keuze"
+   },
+   {
+    "title": "Zorg Zeker Polis (AZVZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-azvz-zorg-zeker-polis",
+    "name": "2027-azvz-zorg-zeker-polis"
+   },
+   {
+    "title": "VGZbewuzt Basisverzekering (VGZbewuzt 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-bewuzt-vgzbewuzt-basisverzekering",
+    "name": "2027-bewuzt-vgzbewuzt-basisverzekering"
+   },
+   {
+    "title": "Bewust Verzekerd Combinatie (Care4Life 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-care4life-bewust-verzekerd-combinatie",
+    "name": "2027-care4life-bewust-verzekerd-combinatie"
+   },
+   {
+    "title": "Bewust Verzekerd Natura (Care4Life 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-care4life-bewust-verzekerd-natura",
+    "name": "2027-care4life-bewust-verzekerd-natura"
+   },
+   {
+    "title": "Bewust Verzekerd Natura Select (Care4Life 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-care4life-bewust-verzekerd-natura-select",
+    "name": "2027-care4life-bewust-verzekerd-natura-select"
+   },
+   {
+    "title": "CZ Zorg-op-maatpolis (CZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-cz-zorg-op-maatpolis",
+    "name": "2027-cz-zorg-op-maatpolis"
+   },
+   {
+    "title": "CZ Zorgbewustpolis (CZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-cz-zorgbewustpolis",
+    "name": "2027-cz-zorgbewustpolis"
+   },
+   {
+    "title": "CZ Zorgvariatiepolis (CZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-cz-zorgvariatiepolis",
+    "name": "2027-cz-zorgvariatiepolis"
+   },
+   {
+    "title": "CZdirect (CZdirect 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-czdirect-czdirect",
+    "name": "2027-czdirect-czdirect"
+   },
+   {
+    "title": "Principe Polis (De christelijke zorgverzekeraar 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-dcz-principe-polis",
+    "name": "2027-dcz-principe-polis"
+   },
+   {
+    "title": "Alles Verzorgd Polis (De Friesland 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-de-friesland-alles-verzorgd-polis",
+    "name": "2027-de-friesland-alles-verzorgd-polis"
+   },
+   {
+    "title": "Zelf Bewust Polis (De Friesland 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-de-friesland-zelf-bewust-polis",
+    "name": "2027-de-friesland-zelf-bewust-polis"
+   },
+   {
+    "title": "DSW Basisverzekering (DSW 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-dsw-basisverzekering",
+    "name": "2027-dsw-basisverzekering"
+   },
+   {
+    "title": "Basis (FBTO 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-fbto-basis",
+    "name": "2027-fbto-basis"
+   },
+   {
+    "title": "Basis Plus (FBTO 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-fbto-basis-plus",
+    "name": "2027-fbto-basis-plus"
+   },
+   {
+    "title": "Basis Vrij (FBTO 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-fbto-basis-vrij",
+    "name": "2027-fbto-basis-vrij"
+   },
+   {
+    "title": "HollandZorg Basisverzekering (HollandZorg 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-hollandzorg-basisverzekering",
+    "name": "2027-hollandzorg-basisverzekering"
+   },
+   {
+    "title": "Goede Keuze (Ik kies zelf van a.s.r. 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-ik-kies-zelf-goede-keuze",
+    "name": "2027-ik-kies-zelf-goede-keuze"
+   },
+   {
+    "title": "Juiste Keuze (Ik kies zelf van a.s.r. 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-ik-kies-zelf-juiste-keuze",
+    "name": "2027-ik-kies-zelf-juiste-keuze"
+   },
+   {
+    "title": "Vrije Keuze (Ik kies zelf van a.s.r. 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-ik-kies-zelf-vrije-keuze",
+    "name": "2027-ik-kies-zelf-vrije-keuze"
+   },
+   {
+    "title": "ZorgActief (Interpolis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-interpolis-zorgactief",
+    "name": "2027-interpolis-zorgactief"
+   },
+   {
+    "title": "IZA Basis Keuze (IZA 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-iza-basis-keuze",
+    "name": "2027-iza-basis-keuze"
+   },
+   {
+    "title": "IZA Eigen Keuze (IZA 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-iza-eigen-keuze",
+    "name": "2027-iza-eigen-keuze"
+   },
+   {
+    "title": "IZA Ruime Keuze (IZA 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-iza-ruime-keuze",
+    "name": "2027-iza-ruime-keuze"
+   },
+   {
+    "title": "IZZ Basisverzekering Variant Basis (IZZ Zorgverzekering door VGZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-izz-basisverzekering-variant-basis",
+    "name": "2027-izz-basisverzekering-variant-basis"
+   },
+   {
+    "title": "IZZ Basisverzekering Variant Bewuzt (IZZ Zorgverzekering door VGZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-izz-basisverzekering-variant-bewuzt",
+    "name": "2027-izz-basisverzekering-variant-bewuzt"
+   },
+   {
+    "title": "IZZ Basisverzekering Variant Combinatie (IZZ Zorgverzekering door VGZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-izz-basisverzekering-variant-combinatie",
+    "name": "2027-izz-basisverzekering-variant-combinatie"
+   },
+   {
+    "title": "IZZ Basisverzekering Variant Natura (IZZ Zorgverzekering door VGZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-izz-basisverzekering-variant-natura",
+    "name": "2027-izz-basisverzekering-variant-natura"
+   },
+   {
+    "title": "Just Basic (Just 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-just-basic",
+    "name": "2027-just-basic"
+   },
+   {
+    "title": "Menzis Basis (Menzis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-menzis-basis",
+    "name": "2027-menzis-basis"
+   },
+   {
+    "title": "Menzis Basis Voordelig (Menzis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-menzis-basis-voordelig",
+    "name": "2027-menzis-basis-voordelig"
+   },
+   {
+    "title": "Menzis Basis Vrij (Menzis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-menzis-basis-vrij",
+    "name": "2027-menzis-basis-vrij"
+   },
+   {
+    "title": "NN Zorg Voordelig (Nationale-Nederlanden 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-nn-zorg-voordelig",
+    "name": "2027-nn-zorg-voordelig"
+   },
+   {
+    "title": "NN Zorg Vrij (Nationale-Nederlanden 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-nn-zorg-vrij",
+    "name": "2027-nn-zorg-vrij"
+   },
+   {
+    "title": "OHRA Zorgverzekering Combinatie (OHRA 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-ohra-zorgverzekering-combinatie",
+    "name": "2027-ohra-zorgverzekering-combinatie"
+   },
+   {
+    "title": "ONVZ Bewuste Keuze Basisverzekering (ONVZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-onvz-bewuste-keuze-basisverzekering",
+    "name": "2027-onvz-bewuste-keuze-basisverzekering"
+   },
+   {
+    "title": "ONVZ Ruime Keuze Basisverzekering (ONVZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-onvz-ruime-keuze-basisverzekering",
+    "name": "2027-onvz-ruime-keuze-basisverzekering"
+   },
+   {
+    "title": "ONVZ Vrije Keuze Basisverzekering (ONVZ 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-onvz-vrije-keuze-basisverzekering",
+    "name": "2027-onvz-vrije-keuze-basisverzekering"
+   },
+   {
+    "title": "PZP Zorg-op-maatpolis (PZP Politie Zorgpolis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-pzp-zorg-op-maatpolis",
+    "name": "2027-pzp-zorg-op-maatpolis"
+   },
+   {
+    "title": "PZP Zorgbewustpolis (PZP Politie Zorgpolis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-pzp-zorgbewustpolis",
+    "name": "2027-pzp-zorgbewustpolis"
+   },
+   {
+    "title": "PZP Zorgvariatiepolis (PZP Politie Zorgpolis 2027)",
+    "description": "Summary and coverage (dekkingen) of a basic or supplementary policy as markdown.",
+    "mimeType": "text/markdown",
+    "uri": "polis://2027/2027-pzp-zorgvariatiepolis",
+    "name": "2027-pzp-zorgvariatiepolis"
+   }
+  ]
+ }
+}

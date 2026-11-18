@@ -1,0 +1,584 @@
+{
+ "url": "https://ai.immoswipe.ch/mcp",
+ "doc": {
+  "name": "immoswipe-ai",
+  "version": "1.3.0",
+  "protocolVersion": "2025-03-26",
+  "tools": [
+   {
+    "name": "search_listings",
+    "description": "Search Swiss apartments and houses for rent or sale. Supports city filtering (Zürich, Bern, Basel, Geneva), price (CHF), rooms, and square meters. EXAMPLES: \"apartments in Zurich under 2000\", \"3-room flat in Bern\", \"house to buy in Basel\".",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "address_city": {
+       "type": "string",
+       "description": "Swiss city name. Examples: \"Zürich\", \"Bern\", \"Basel\", \"Geneva\", \"Lausanne\". Supports partial matching."
+      },
+      "price_type": {
+       "type": "string",
+       "enum": [
+        "rent",
+        "sell",
+        "serviced"
+       ],
+       "description": "Transaction type: rent=rentals, sell=purchase, serviced=short-term"
+      },
+      "property_category": {
+       "description": "Category slug or array of slugs: \"apartment\", \"house\", \"adjoining-rooms\", \"parking-lot\", \"trade-industry\". Defaults to residential categories.",
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "array",
+         "items": {
+          "type": [
+           "string",
+           "number"
+          ]
+         }
+        }
+       ]
+      },
+      "property_type": {
+       "description": "Property type or array of types: \"apartment\", \"house\", \"studio\", \"commercial\". Empty for all.",
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       ]
+      },
+      "availability_type": {
+       "type": "string",
+       "description": "\"long_term\" for permanent rentals, \"short_term\" for vacation rentals. Empty for all."
+      },
+      "amenities": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Desired amenities, e.g. \"parking\", \"balcony\", \"elevator\", \"dishwasher\""
+      },
+      "min_rent_monthly_price": {
+       "type": "number",
+       "description": "Minimum monthly rent for rental properties in CHF"
+      },
+      "max_rent_monthly_price": {
+       "type": "number",
+       "description": "Maximum monthly rent for rental properties in CHF"
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ],
+       "description": "Language: en=English, de=German"
+      },
+      "max_monthly_price": {
+       "type": "number",
+       "description": "Maximum monthly rent in CHF"
+      },
+      "min_monthly_price": {
+       "type": "number",
+       "description": "Minimum monthly rent in CHF"
+      },
+      "max_sales_price": {
+       "type": "number",
+       "description": "Maximum purchase price in CHF"
+      },
+      "min_sales_price": {
+       "type": "number",
+       "description": "Minimum purchase price in CHF"
+      },
+      "min_number_of_rooms": {
+       "type": "number",
+       "description": "Minimum number of rooms"
+      },
+      "min_square_meters": {
+       "type": "number",
+       "description": "Minimum living area in m²"
+      },
+      "max_square_meters": {
+       "type": "number",
+       "description": "Maximum living area in m²"
+      },
+      "per_page": {
+       "type": "number",
+       "description": "Results per page (1-50, default 10)"
+      },
+      "page": {
+       "type": "number",
+       "description": "Page number for pagination"
+      },
+      "bounds": {
+       "type": "object",
+       "description": "Geographic bounding box: {north, south, east, west}",
+       "properties": {
+        "north": {
+         "type": "number"
+        },
+        "south": {
+         "type": "number"
+        },
+        "east": {
+         "type": "number"
+        },
+        "west": {
+         "type": "number"
+        }
+       }
+      }
+     },
+     "required": []
+    }
+   },
+   {
+    "name": "get_listing_detail",
+    "description": "Get full details for a specific property by ID. Returns amenities, pricing breakdown, contact info, images.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "number",
+       "description": "Property ID from search results"
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": [
+      "listing_id"
+     ]
+    }
+   },
+   {
+    "name": "get_similar_listings",
+    "description": "Return listings similar to a given property (same area/category).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "number",
+       "description": "Property ID"
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": [
+      "listing_id"
+     ]
+    }
+   },
+   {
+    "name": "get_popular_listings",
+    "description": "Fetch the most popular/trending Swiss property listings.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": []
+    }
+   },
+   {
+    "name": "get_reserved_ranges",
+    "description": "Check availability/booking dates for a specific property. Returns blocked date ranges.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "number",
+       "description": "Property ID"
+      },
+      "from_date": {
+       "type": "string",
+       "description": "Start date YYYY-MM-DD"
+      },
+      "to_date": {
+       "type": "string",
+       "description": "End date YYYY-MM-DD"
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": [
+      "listing_id",
+      "from_date",
+      "to_date"
+     ]
+    }
+   },
+   {
+    "name": "search_guides",
+    "description": "Search Immoswipe blog/guide articles about Swiss housing: renting tips, expat relocation guides, buying advice, deposits, tenancy law. Use for \"how to\" / advice questions. Returns titles, slugs and links; use get_guide to read the full article.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Optional keyword to filter articles by title/preview"
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": []
+    }
+   },
+   {
+    "name": "get_guide",
+    "description": "Read the full Markdown text of a specific Immoswipe guide/blog article by slug (get the slug from search_guides).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "Article slug, e.g. \"expat-guide-switzerland\". Numeric ID also works."
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    }
+   },
+   {
+    "name": "get_faqs",
+    "description": "Get Immoswipe FAQs about using the platform, renting, listing a property, photography/tour services and pricing.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "search_by": {
+       "type": "string",
+       "description": "Optional keyword to filter FAQs"
+      },
+      "role": {
+       "type": "string",
+       "description": "Optional audience: \"provider\" (landlords) or \"tenant\""
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": []
+    }
+   },
+   {
+    "name": "check_rental_chances",
+    "description": "Wohnungs-Chancen-Check for Swiss tenants: rates chances on the rental market (tenant score 0–100) from a search profile using real BFS vacancy, rent and ZKB market data, and suggests better alternative regions. Use for \"how are my chances of finding a 3.5-room flat in Zürich for 2200\". Afterwards the tenant can register in the pool via join_tenant_pool.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "location": {
+       "type": "string",
+       "description": "Desired place/region, e.g. \"Zürich\". Free text, geocoded server-side."
+      },
+      "rooms": {
+       "type": "string",
+       "enum": [
+        "rooms_1_5",
+        "rooms_2_5",
+        "rooms_3_5",
+        "rooms_4_5",
+        "rooms_5_5_plus"
+       ],
+       "description": "rooms_1_5=1.5 … rooms_5_5_plus=5.5+"
+      },
+      "budget": {
+       "type": "string",
+       "enum": [
+        "budget_under_1000",
+        "budget_1000_1500",
+        "budget_1500_2000",
+        "budget_2000_2500",
+        "budget_2500_3000",
+        "budget_3000_3500",
+        "budget_3500_4000",
+        "budget_over_4000",
+        "budget_over_5000"
+       ],
+       "description": "Monthly budget in CHF (budget_over_4000 = 4000–5000, budget_over_5000 = >5000)"
+      },
+      "household": {
+       "type": "string",
+       "enum": [
+        "single",
+        "shared_flat",
+        "couple_no_kids",
+        "couple_with_kids",
+        "family_with_kids"
+       ],
+       "description": "Household type"
+      },
+      "timeframe": {
+       "type": "string",
+       "enum": [
+        "asap",
+        "within_3_months",
+        "within_6_months",
+        "within_12_months",
+        "browsing"
+       ],
+       "description": "When they are searching"
+      },
+      "income": {
+       "type": "string",
+       "enum": [
+        "income_under_60k",
+        "income_60k_80k",
+        "income_80k_100k",
+        "income_100k_130k",
+        "income_130k_180k",
+        "income_over_180k"
+       ],
+       "description": "Optional gross annual income (improves tax estimate)"
+      },
+      "workplace_address": {
+       "type": "string",
+       "description": "Optional workplace address for a commute estimate"
+      },
+      "search_radius_km": {
+       "type": "number",
+       "description": "Optional search radius around the location in km, e.g. 15"
+      },
+      "location_type": {
+       "type": "string",
+       "enum": [
+        "city",
+        "district",
+        "canton"
+       ],
+       "description": "Optional kind of place"
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": [
+      "location",
+      "rooms",
+      "budget",
+      "household",
+      "timeframe"
+     ]
+    }
+   },
+   {
+    "name": "join_tenant_pool",
+    "description": "Register a Swiss tenant in the Immoswipe Mieter-Pool so property managers see their search profile and contact them about matching units. WRITE operation with personal data: ONLY call after the user has EXPLICITLY agreed to join the pool. consent must be true. Typical flow: run check_rental_chances first, then offer the sign-up.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "First name"
+      },
+      "last_name": {
+       "type": "string",
+       "description": "Optional last name (derived from name if omitted)"
+      },
+      "email": {
+       "type": "string",
+       "description": "Email for match notifications"
+      },
+      "phone": {
+       "type": "string",
+       "description": "Optional phone number"
+      },
+      "location": {
+       "type": "string",
+       "description": "Desired place/region"
+      },
+      "rooms": {
+       "type": "string",
+       "enum": [
+        "rooms_1_5",
+        "rooms_2_5",
+        "rooms_3_5",
+        "rooms_4_5",
+        "rooms_5_5_plus"
+       ]
+      },
+      "budget": {
+       "type": "string",
+       "enum": [
+        "budget_under_1000",
+        "budget_1000_1500",
+        "budget_1500_2000",
+        "budget_2000_2500",
+        "budget_2500_3000",
+        "budget_3000_3500",
+        "budget_3500_4000",
+        "budget_over_4000",
+        "budget_over_5000"
+       ]
+      },
+      "household": {
+       "type": "string",
+       "enum": [
+        "single",
+        "shared_flat",
+        "couple_no_kids",
+        "couple_with_kids",
+        "family_with_kids"
+       ]
+      },
+      "timeframe": {
+       "type": "string",
+       "enum": [
+        "asap",
+        "within_3_months",
+        "within_6_months",
+        "within_12_months",
+        "browsing"
+       ]
+      },
+      "income": {
+       "type": "string",
+       "enum": [
+        "income_under_60k",
+        "income_60k_80k",
+        "income_80k_100k",
+        "income_100k_130k",
+        "income_130k_180k",
+        "income_over_180k"
+       ]
+      },
+      "workplace_address": {
+       "type": "string"
+      },
+      "search_radius_km": {
+       "type": "number",
+       "description": "Optional search radius around the location in km, e.g. 15"
+      },
+      "location_type": {
+       "type": "string",
+       "enum": [
+        "city",
+        "district",
+        "canton"
+       ]
+      },
+      "preferences": {
+       "type": "object",
+       "description": "Optional amenity wishes from the conversation. Lowercase English feature keys: \"balcony\", \"terrace\", \"dishwasher\", \"washing machine\", \"garage\", \"parking\", \"elevator\", \"garden\", \"view\", \"pets allowed\", \"wheelchair access\", \"new building\", \"old building\", \"quiet location\", \"floor heating\", \"air conditioner\", \"storage room\", \"fitness center\", \"swimming pool\", \"free wifi\". exclude also accepts \"ground_floor\", \"basement\", \"attic\".",
+       "properties": {
+        "must_have": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Hard requirements — a unit lacking any of them is not matched"
+        },
+        "nice_to_have": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Soft wishes — raise the match score, never exclude"
+        },
+        "exclude": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Deal breakers — a unit with any of them is filtered out"
+        }
+       }
+      },
+      "score": {
+       "type": "number",
+       "description": "Optional tenant score from check_rental_chances"
+      },
+      "consent": {
+       "type": "boolean",
+       "description": "Must be true. Only set after the user explicitly agreed to join the Mieter-Pool, having been told that property managers will see their profile AND that an Immoswipe account is created as part of the sign-up."
+      },
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ],
+       "description": "Language of the confirmation and verification emails"
+      }
+     },
+     "required": [
+      "name",
+      "email",
+      "location",
+      "rooms",
+      "budget",
+      "consent"
+     ]
+    }
+   },
+   {
+    "name": "get_pool_stats",
+    "description": "Public counters for the Immoswipe Mieter-Pool: how many tenants are registered and how many Chancen-Checks have been run. Aggregate numbers only, no personal data. Use to show a tenant the pool size before offering the sign-up via join_tenant_pool.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "locale": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de"
+       ]
+      }
+     },
+     "required": []
+    }
+   }
+  ]
+ }
+}

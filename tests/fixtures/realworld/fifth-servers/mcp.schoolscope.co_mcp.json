@@ -1,0 +1,4313 @@
+{
+ "url": "https://mcp.schoolscope.co/mcp",
+ "doc": {
+  "name": "schoolscope",
+  "version": "3.10.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "SchoolScope answers questions about California K-12 schools from public data: the California Department of Education (CAASPP test results, chronic absenteeism, suspension, ELPAC, graduation and a-g completion, college-going), UC InfoCenter admissions, College Board AP authorizations, and NCES (the private school directory and attendance-boundary records).\n\nSchools are identified by a slug, the last segment of the school's address on schoolscope.co (https://schoolscope.co/ca/school/<slug>), for example \"lowell-high-3407\". find_schools returns slugs; school_profile, compare_schools, similar_schools and feeder_path take them. district_profile takes a district name.\n\nTools:\n- find_schools: schools by name, city or district (query), in a zip code (zip), within a radius of a city, zip or coordinate (near), or the top-ranked schools at one level (level alone). level, type (charter, standard, private) and tk filter any of these.\n- school_profile: one school in full: verdict, Scope Score and percentile per level, test results, growth, climate, student groups, high-school outcomes, year-over-year movement, contact details and how to apply, with the application dates SchoolScope holds.\n- compare_schools: two to four schools side by side; for high schools it adds graduation, a-g completion, college-going, UC admissions, AP and IB.\n- similar_schools: schools at the same level and in the same peer class with a similar free/reduced-lunch share and size, and where the school stands among them.\n- feeder_path: the schools students arrive from and continue to, and the endpoint high school's outcomes.\n- district_profile: a district's scored schools by level, with per-level averages.\n- my_watchlist: the schools saved to the user's SchoolScope account, each with its band, percentile and next published application date; it needs a linked account (OAuth scope watchlist:read).\n- my_applications: the user's application tracker for 2027–28: each school's door (how it takes applications), status, the nearest upcoming published date with the page it was read from, the family's own dates and note. It needs a linked account (OAuth scope applications:read).\n- track_application: adds a school (by slug) to the user's application tracker, or changes its status or note. It changes the user's saved list, so a host confirms it with the user first. Statuses: planning (\"Planning to apply\"), applied (\"Applied\"), confirmed (\"Confirmation checked\"), waiting (\"Waiting for the lottery or letter\"), offer (\"Offered a seat\"), waitlisted (\"Waitlisted\"), accepted (\"Accepted\"), declined (\"Declined\"). A list holds at most 30 schools. It needs a linked account (OAuth scope applications:write).\n- start_age: which school year a child is transitional kindergarten (TK) or kindergarten age, from a birth month and year under California Education Code § 48000; the day matters only for a September birthday. With a district, it adds that district's upcoming choice-window dates SchoolScope holds. find_schools with tk lists the schools that offer TK.\n\nHow the data works:\n- The Scope Score places a public or charter school against others at the same level, on a scale from 50 to 100. 75 is the typical California school. 100 is the best result in the state. Say the score first, then its band and percentile; never say it as a score out of 100. Elementary, middle and high are scored separately and never ranked together. A band comes from the school's percentile in its ranking pool.\n- Private schools, schools whose results are published without a rating, and continuation and alternative schools have no Scope Score. A continuation or alternative school has a band and a percentile within its own class.\n- Elementary and middle results are from spring 2026 tests. High-school Scope Scores and rates use the reviewed spring 2025 model. Each result labels its year.\n- Private schools take no state tests and are never scored or ranked.\n- Scope Scores rank public schools within a level only (elementary, middle and high are never mixed); private schools are never scored. Schools whose enrollment is assigned rather than chosen — juvenile court, county community, community day and special-education schools — publish no score, band, archetype or rank at all: the evidence is shown, the verdict is withheld. Continuation schools and DASS-flagged alternative/dropout-recovery schools are ranked only within their own peer class, not against all California schools at that level: each has a band and a percentile within that class, and no Scope Score on the scale regular schools share.\n- Chronic absenteeism and suspension figures are CDE's reported all-students rates for 2025–26.\n- Growth compares a school's grade-level results two years apart. School-by-grade records do not follow individual children. The growth index is a 0-100 position centred on 50, not a percentile.",
+  "tools": [
+   {
+    "name": "find_schools",
+    "title": "Find California schools",
+    "description": "Find California schools four ways, whichever fits the question: free text over school/city/district names (`query`), inside a zip code (`zip`), within a radius of a place or coordinate (`near`), or the top-ranked schools at one level (`level` alone). Returns band, Scope Score, archetype and profile URL for each match. Private schools are flagged and never ranked — they have no state testing data. Supply exactly one of query, zip or near; or none plus a level for a top list. Set `tk: true` to limit any of these searches to schools with active transitional kindergarten (TK) enrollment — a filter that composes with query, zip, near and level, and every result carries a `hasTk` field. Set `type` to `charter` to list only charter schools (they admit by application and lottery, not by address), `standard` for district-run public schools, or `private`; like `tk`, it composes with every mode.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "query": {
+       "description": "Free text: school, city or district name, e.g. 'lowell', 'palo alto unified'",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 100
+      },
+      "zip": {
+       "description": "5-digit California zip code, e.g. '94110'",
+       "type": "string",
+       "pattern": "^\\d{5}$"
+      },
+      "near": {
+       "description": "A point to search around: 'lat,lng' (e.g. '37.4299,-122.1285'), a 5-digit zip, or a California city name. Zips and city names resolve to the centre of the schools we hold there, so no external geocoding is needed. Radius search crosses district and city lines on purpose — that is the point of asking geographically.",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 100
+      },
+      "radius_miles": {
+       "description": "Radius for `near`, in miles. Default 5. Ignored unless `near` is set.",
+       "default": 5,
+       "type": "number",
+       "minimum": 0.5,
+       "maximum": 25
+      },
+      "level": {
+       "description": "Restrict to one level. A campus matches every level it teaches (a K-8 matches elementary and middle) and reports that level's score. Applied before the result limit. Elementary, middle and high are scored on separate scales and are never mixed; without a level, results are grouped by level. With no query/zip/near, returns the top-ranked schools at this level.",
+       "type": "string",
+       "enum": [
+        "elementary",
+        "middle",
+        "high"
+       ]
+      },
+      "type": {
+       "description": "Limit to one kind of school: 'charter' (publicly funded, admits by application and lottery), 'standard' (district-run public school) or 'private' (never scored). Applied before the result limit, so a filtered search is complete, not a filtered slice.",
+       "type": "string",
+       "enum": [
+        "standard",
+        "charter",
+        "private"
+       ]
+      },
+      "tk": {
+       "description": "true limits results to schools with active transitional kindergarten (TK) enrollment.",
+       "type": "boolean"
+      },
+      "limit": {
+       "default": 10,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      }
+     }
+    },
+    "annotations": {
+     "title": "Find California schools",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://schoolscope/school-explorer"
+     },
+     "openai/outputTemplate": "ui://schoolscope/school-explorer",
+     "openai/widgetAccessible": true
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "heading": {
+       "type": "string"
+      },
+      "point": {
+       "type": "object",
+       "properties": {
+        "lat": {
+         "type": "number"
+        },
+        "lng": {
+         "type": "number"
+        },
+        "resolvedFrom": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "lat",
+        "lng",
+        "resolvedFrom"
+       ],
+       "additionalProperties": false
+      },
+      "radiusMiles": {
+       "type": "number"
+      },
+      "schools": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "slug": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "ogImage": {
+          "type": "string"
+         },
+         "city": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "zip": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "lat": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "lng": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "district": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "county": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "schoolType": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "level": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "scored": {
+          "type": "boolean"
+         },
+         "hasTk": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctExceeded": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctMetAbove": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortGrowthScalePoints": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortSpan": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "growthIndex": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "chronicAbsentRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "suspensionRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "archetype": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "patterns": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "evidence": {
+             "type": "string"
+            },
+            "question": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "label",
+            "evidence",
+            "question"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "matchNote": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "distanceMiles": {
+          "type": "number"
+         },
+         "freeLunchPct": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "enrollment": {
+          "type": [
+           "number",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "name",
+         "slug",
+         "url",
+         "ogImage",
+         "city",
+         "zip",
+         "lat",
+         "lng",
+         "district",
+         "county",
+         "schoolType",
+         "level",
+         "scored",
+         "hasTk",
+         "scopeScore",
+         "band",
+         "statePercentile",
+         "pctExceeded",
+         "pctMetAbove",
+         "cohortGrowthScalePoints",
+         "cohortSpan",
+         "growthIndex",
+         "chronicAbsentRate",
+         "suspensionRate",
+         "archetype",
+         "patterns",
+         "peerClass"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "rankingCaveat": {
+       "type": "string"
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "schools",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "school_profile",
+    "title": "School profile",
+    "description": "The full SchoolScope profile for one school by slug: verdict and archetype, Scope Score with band and percentile per level, CAASPP exceeded/met split, cohort growth (school-by-grade aggregates two years apart, in SBAC scale-score points, reported as a 0-100 index centred on the state average), climate (absenteeism, suspension, ELPAC), equity gaps by student group, teacher stability, and — for high schools — graduation, college destinations, UC admissions history, AP courses, and IB programmes. Also answers \"is this school improving?\" with a year-over-year table of statewide percentile and the underlying rates; the Scope Score is excluded there because it is normalised within each year and is not comparable across them. For public schools it also returns the profile's own `answer` (one sentence about all students, each subject against California's rate for the same grades), up to three selected `takeaways` (each with figures, comparisons, a question where one applies, and a generated receipt naming source, year, grades, population, n and how the comparison was built), and `studentGroups` (every group by income, race or ethnicity, language and disability with 30+ students tested in each subject, against the same group in the same grades in the district and statewide). Current data year 2026.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "description": "The school's slug: the last segment of its schoolscope.co/ca/school/<slug> address, e.g. 'lowell-high-3407'. Give this, or nces_id, or cds_code.",
+       "type": "string",
+       "minLength": 1
+      },
+      "nces_id": {
+       "description": "The federal NCES school id (12 digits), or a private school's PSS id. Use it when you hold an official id and not a slug.",
+       "type": "string",
+       "minLength": 6,
+       "maxLength": 14
+      },
+      "cds_code": {
+       "description": "California's 14-digit county-district-school (CDS) code, with or without dashes.",
+       "type": "string",
+       "minLength": 14,
+       "maxLength": 18
+      }
+     }
+    },
+    "annotations": {
+     "title": "School profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://schoolscope/school-card"
+     },
+     "openai/outputTemplate": "ui://schoolscope/school-card",
+     "openai/widgetAccessible": true
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "school": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "ogImage": {
+         "type": "string"
+        },
+        "type": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "city": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "district": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "zip": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "county": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "enrollment": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "hasTk": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "contact": {
+         "type": "object",
+         "properties": {
+          "address": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "phone": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "website": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "grades": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "address",
+          "phone",
+          "website",
+          "grades"
+         ],
+         "additionalProperties": false
+        },
+        "apply": {
+         "type": "object",
+         "properties": {
+          "door": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "summary": {
+           "type": "string"
+          },
+          "steps": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "dates": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "date": {
+              "type": "string"
+             },
+             "label": {
+              "type": "string"
+             },
+             "url": {
+              "type": "string"
+             },
+             "source": {
+              "type": "string",
+              "enum": [
+               "school",
+               "district"
+              ]
+             },
+             "read": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "note": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "date",
+             "label",
+             "url",
+             "source",
+             "read",
+             "note"
+            ],
+            "additionalProperties": false
+           }
+          },
+          "charterAuthorizer": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "charterTermExpires": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "door",
+          "summary",
+          "steps",
+          "dates",
+          "charterAuthorizer",
+          "charterTermExpires"
+         ],
+         "additionalProperties": false
+        },
+        "dataYear": {
+         "type": "number"
+        },
+        "primaryLevel": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "peerClass": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "scored": {
+         "type": "boolean"
+        },
+        "levels": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "level": {
+            "type": "string"
+           },
+           "year": {
+            "type": "number"
+           },
+           "scopeScore": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "band": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "statePercentile": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "pctExceeded": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "pctMetAbove": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "oneLiner": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "cohortGrowthScalePoints": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "cohortSpan": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "growthIndex": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "gradeGapThisYearPp": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "chronicAbsentRate": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "suspensionRate": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "archetype": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "patterns": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "key": {
+               "type": "string"
+              },
+              "label": {
+               "type": "string"
+              },
+              "evidence": {
+               "type": "string"
+              },
+              "question": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "key",
+              "label",
+              "evidence",
+              "question"
+             ],
+             "additionalProperties": false
+            }
+           }
+          },
+          "required": [
+           "level",
+           "year",
+           "scopeScore",
+           "band",
+           "statePercentile",
+           "pctExceeded",
+           "pctMetAbove",
+           "oneLiner",
+           "cohortGrowthScalePoints",
+           "cohortSpan",
+           "growthIndex",
+           "gradeGapThisYearPp",
+           "chronicAbsentRate",
+           "suspensionRate",
+           "archetype",
+           "patterns"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "answer": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "sentence": {
+             "type": "string"
+            },
+            "gradeSpan": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "receipt": {
+             "type": "object",
+             "properties": {
+              "source": {
+               "type": "string"
+              },
+              "schoolYear": {
+               "type": "string"
+              },
+              "grades": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "population": {
+               "type": "string"
+              },
+              "students": {
+               "type": [
+                "number",
+                "null"
+               ]
+              },
+              "studentsBySubject": {
+               "anyOf": [
+                {
+                 "type": "object",
+                 "properties": {
+                  "ela": {
+                   "type": [
+                    "number",
+                    "null"
+                   ]
+                  },
+                  "math": {
+                   "type": [
+                    "number",
+                    "null"
+                   ]
+                  }
+                 },
+                 "required": [
+                  "ela",
+                  "math"
+                 ],
+                 "additionalProperties": false
+                },
+                {
+                 "type": "null"
+                }
+               ]
+              },
+              "comparison": {
+               "type": "string"
+              },
+              "sourceTables": {
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              }
+             },
+             "required": [
+              "source",
+              "schoolYear",
+              "grades",
+              "population",
+              "students",
+              "studentsBySubject",
+              "comparison",
+              "sourceTables"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "required": [
+            "sentence",
+            "gradeSpan",
+            "receipt"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "takeaways": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "kind": {
+            "type": "string"
+           },
+           "measure": {
+            "type": "string"
+           },
+           "population": {
+            "type": "string"
+           },
+           "sentence": {
+            "type": "string"
+           },
+           "figures": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "subject": {
+               "type": [
+                "string",
+                "null"
+               ]
+              },
+              "value": {
+               "type": "number"
+              },
+              "display": {
+               "type": "string"
+              },
+              "label": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "subject",
+              "value",
+              "display",
+              "label"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "references": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "label": {
+               "type": "string"
+              },
+              "value": {
+               "type": "number"
+              },
+              "display": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "label",
+              "value",
+              "display"
+             ],
+             "additionalProperties": false
+            }
+           },
+           "ask": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "receipt": {
+            "type": "object",
+            "properties": {
+             "source": {
+              "type": "string"
+             },
+             "schoolYear": {
+              "type": "string"
+             },
+             "grades": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "population": {
+              "type": "string"
+             },
+             "students": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "studentsBySubject": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {
+                 "ela": {
+                  "type": [
+                   "number",
+                   "null"
+                  ]
+                 },
+                 "math": {
+                  "type": [
+                   "number",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "ela",
+                 "math"
+                ],
+                "additionalProperties": false
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "comparison": {
+              "type": "string"
+             },
+             "sourceTables": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             }
+            },
+            "required": [
+             "source",
+             "schoolYear",
+             "grades",
+             "population",
+             "students",
+             "studentsBySubject",
+             "comparison",
+             "sourceTables"
+            ],
+            "additionalProperties": false
+           }
+          },
+          "required": [
+           "id",
+           "kind",
+           "measure",
+           "population",
+           "sentence",
+           "figures",
+           "references",
+           "ask",
+           "receipt"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "studentGroups": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "year": {
+             "type": "number"
+            },
+            "grades": {
+             "type": "array",
+             "items": {
+              "type": "number"
+             }
+            },
+            "reference": {
+             "type": "string"
+            },
+            "groups": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "code": {
+                "type": "string"
+               },
+               "label": {
+                "type": "string"
+               },
+               "grades": {
+                "type": "array",
+                "items": {
+                 "type": "number"
+                }
+               },
+               "ela": {
+                "type": "object",
+                "properties": {
+                 "tested": {
+                  "type": "number"
+                 },
+                 "metOrExceeded": {
+                  "type": "number"
+                 },
+                 "district": {
+                  "type": [
+                   "number",
+                   "null"
+                  ]
+                 },
+                 "california": {
+                  "type": [
+                   "number",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "tested",
+                 "metOrExceeded",
+                 "district",
+                 "california"
+                ],
+                "additionalProperties": false
+               },
+               "math": {
+                "type": "object",
+                "properties": {
+                 "tested": {
+                  "type": "number"
+                 },
+                 "metOrExceeded": {
+                  "type": "number"
+                 },
+                 "district": {
+                  "type": [
+                   "number",
+                   "null"
+                  ]
+                 },
+                 "california": {
+                  "type": [
+                   "number",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "tested",
+                 "metOrExceeded",
+                 "district",
+                 "california"
+                ],
+                "additionalProperties": false
+               },
+               "equityFinding": {
+                "type": "boolean"
+               }
+              },
+              "required": [
+               "code",
+               "label",
+               "grades",
+               "ela",
+               "math",
+               "equityFinding"
+              ],
+              "additionalProperties": false
+             }
+            },
+            "fewerThan30": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            },
+            "noPublishedRate": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            },
+            "note": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "year",
+            "grades",
+            "reference",
+            "groups",
+            "fewerThan30",
+            "noPublishedRate",
+            "note"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "highSchool": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "outcomesYear": {
+             "type": "number"
+            },
+            "graduationRate": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "agCompletionRate": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "collegeGoing": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "collegeGoingClass": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "ucLatest": {
+             "anyOf": [
+              {
+               "type": "object",
+               "properties": {},
+               "additionalProperties": {}
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "apOwnCourses": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "apProviderCourses": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "ib": {
+             "anyOf": [
+              {
+               "type": "object",
+               "properties": {},
+               "additionalProperties": {}
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "outcomesYear",
+            "graduationRate",
+            "agCompletionRate",
+            "collegeGoing",
+            "collegeGoingClass",
+            "ucLatest",
+            "apOwnCourses",
+            "apProviderCourses",
+            "ib"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "name",
+        "slug",
+        "url",
+        "ogImage",
+        "type",
+        "city",
+        "district",
+        "enrollment",
+        "hasTk"
+       ],
+       "additionalProperties": false
+      },
+      "trend": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "number"
+         },
+         "level": {
+          "type": "string"
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctExceeded": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctMetAbove": {
+          "type": [
+           "number",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "year",
+         "level",
+         "statePercentile",
+         "pctExceeded",
+         "pctMetAbove"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "school",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "feeder_path",
+    "title": "K-12 feeder path",
+    "description": "The K-12 feeder path for a school: which schools students typically arrive from, where they go next, and — for elementary/middle schools — the endpoint high school with its graduation and college-going outcomes. Boundary-based (the district's own published boundaries where we have them, else NCES SABS 2015-16), shown alongside scores, never inside them.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "URL slug of the school"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "K-12 feeder path",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://schoolscope/compare-table"
+     },
+     "openai/outputTemplate": "ui://schoolscope/compare-table",
+     "openai/widgetAccessible": true
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "school": {
+       "type": "string"
+      },
+      "subject": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "city": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "ogImage": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name",
+        "slug",
+        "url",
+        "city",
+        "ogImage"
+       ],
+       "additionalProperties": false
+      },
+      "feedsFrom": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "ogImage": {
+          "type": "string"
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "schoolType": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "relationship": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "source": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "overlapPct": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "levelFrom": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "levelTo": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "lineage": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "url",
+         "ogImage",
+         "band",
+         "schoolType",
+         "relationship",
+         "source",
+         "overlapPct",
+         "levelFrom",
+         "levelTo",
+         "scopeScore",
+         "statePercentile",
+         "peerClass",
+         "lineage"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "feedsInto": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "ogImage": {
+          "type": "string"
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "schoolType": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "relationship": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "source": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "overlapPct": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "levelFrom": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "levelTo": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "lineage": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "url",
+         "ogImage",
+         "band",
+         "schoolType",
+         "relationship",
+         "source",
+         "overlapPct",
+         "levelFrom",
+         "levelTo",
+         "scopeScore",
+         "statePercentile",
+         "peerClass",
+         "lineage"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "endpoint": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "slug": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "ogImage": {
+           "type": "string"
+          },
+          "scopeScore": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "statePercentile": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "band": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "peerClass": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "source": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "lineage": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "graduationRate": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "collegeGoingRate": {
+           "type": [
+            "number",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "slug",
+          "name",
+          "url",
+          "ogImage",
+          "scopeScore",
+          "statePercentile",
+          "band",
+          "peerClass",
+          "source",
+          "lineage",
+          "graduationRate",
+          "collegeGoingRate"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "school",
+      "subject",
+      "feedsFrom",
+      "feedsInto",
+      "endpoint",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "compare_schools",
+    "title": "Compare schools",
+    "description": "Compare 2-4 public schools side by side: band, Scope Score and percentile, exceeded/met split, cohort growth (aggregate school-by-grade cohorts across the grade span, as a 0-100 index centred on the state average), and CDE's reported chronic absenteeism and suspension rates, each labelled with its year. High schools add graduation, a-g completion, college-going, UC admissions, AP courses and IB programmes. A school with no cohort comparison reports no growth figure rather than a substitute; that is missing evidence, not flat growth. Schools are only comparable within the same level (elementary/middle/high are separate rankings). Private schools cannot be compared — they have no state testing data.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slugs": {
+       "minItems": 2,
+       "maxItems": 4,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1
+       },
+       "description": "2-4 school slugs, each the last segment of a schoolscope.co/ca/school/<slug> address, e.g. ['lowell-high-3407', 'henry-m-gunn-high-2904']"
+      }
+     },
+     "required": [
+      "slugs"
+     ]
+    },
+    "annotations": {
+     "title": "Compare schools",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://schoolscope/compare-table"
+     },
+     "openai/outputTemplate": "ui://schoolscope/compare-table",
+     "openai/widgetAccessible": true
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "compared": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "city": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "ogImage": {
+          "type": "string"
+         },
+         "level": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "year": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "archetype": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "patterns": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "evidence": {
+             "type": "string"
+            },
+            "question": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "label",
+            "evidence",
+            "question"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "pctExceeded": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctMetAbove": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortGrowthScalePoints": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortSpan": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "growthIndex": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "gradeGapThisYearPp": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "chronicAbsentRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "suspensionRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "highSchool": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "outcomesYear": {
+              "type": "number"
+             },
+             "graduationRate": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "agCompletionRate": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "collegeGoing": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "collegeGoingClass": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "ucLatest": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "apOwnCourses": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "apProviderCourses": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "ib": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             }
+            },
+            "required": [
+             "outcomesYear",
+             "graduationRate",
+             "agCompletionRate",
+             "collegeGoing",
+             "collegeGoingClass",
+             "ucLatest",
+             "apOwnCourses",
+             "apProviderCourses",
+             "ib"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "url",
+         "city",
+         "ogImage",
+         "level",
+         "year",
+         "scopeScore",
+         "band",
+         "statePercentile",
+         "archetype",
+         "patterns",
+         "pctExceeded",
+         "pctMetAbove",
+         "cohortGrowthScalePoints",
+         "cohortSpan",
+         "growthIndex",
+         "gradeGapThisYearPp",
+         "chronicAbsentRate",
+         "suspensionRate",
+         "peerClass",
+         "highSchool"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "excludedPrivate": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "excludedClosed": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "compared",
+      "excludedPrivate",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "district_profile",
+    "title": "District profile",
+    "description": "A California district roll-up, level by level: each level's average Scope Score, percentile, exceeded-standard share and CDE chronic absenteeism across its comprehensive schools, and every scored school ranked within its level. Elementary, middle and high are never averaged or ranked together. Continuation and alternative schools are listed apart, unnumbered, because they are ranked only within their own peer class. Match by district name.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "district": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 100,
+       "description": "District name or fragment, e.g. 'palo alto unified'"
+      }
+     },
+     "required": [
+      "district"
+     ]
+    },
+    "annotations": {
+     "title": "District profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "district": {
+       "type": "string"
+      },
+      "county": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "stats": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "schoolCount": {
+           "type": "number"
+          },
+          "byLevel": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "level": {
+              "type": "string"
+             },
+             "year": {
+              "type": "number"
+             },
+             "schoolCount": {
+              "type": "number"
+             },
+             "avgScore": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "avgPercentile": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "avgExceeded": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "avgChronicAbsentRate": {
+              "type": [
+               "number",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "level",
+             "year",
+             "schoolCount",
+             "avgScore",
+             "avgPercentile",
+             "avgExceeded",
+             "avgChronicAbsentRate"
+            ],
+            "additionalProperties": false
+           }
+          }
+         },
+         "required": [
+          "schoolCount",
+          "byLevel"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "schools": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "slug": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "ogImage": {
+          "type": "string"
+         },
+         "city": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "zip": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "lat": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "lng": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "district": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "county": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "schoolType": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "level": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "scored": {
+          "type": "boolean"
+         },
+         "hasTk": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctExceeded": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctMetAbove": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortGrowthScalePoints": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortSpan": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "growthIndex": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "chronicAbsentRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "suspensionRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "archetype": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "patterns": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "evidence": {
+             "type": "string"
+            },
+            "question": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "label",
+            "evidence",
+            "question"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "matchNote": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "distanceMiles": {
+          "type": "number"
+         },
+         "freeLunchPct": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "enrollment": {
+          "type": [
+           "number",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "name",
+         "slug",
+         "url",
+         "ogImage",
+         "city",
+         "zip",
+         "lat",
+         "lng",
+         "district",
+         "county",
+         "schoolType",
+         "level",
+         "scored",
+         "hasTk",
+         "scopeScore",
+         "band",
+         "statePercentile",
+         "pctExceeded",
+         "pctMetAbove",
+         "cohortGrowthScalePoints",
+         "cohortSpan",
+         "growthIndex",
+         "chronicAbsentRate",
+         "suspensionRate",
+         "archetype",
+         "patterns",
+         "peerClass"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "rankingCaveat": {
+       "type": "string"
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "district",
+      "county",
+      "stats",
+      "schools",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "similar_schools",
+    "title": "Similar schools",
+    "description": "Schools serving a similar student population to a given school — same level, same peer class, comparable free/reduced-lunch share and enrollment size — with the subject's standing among them. This is the fair comparison: a raw ranking largely reflects who enrolls, so a school's position against demographic peers says far more about the school itself than its statewide rank does. Public schools only.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Slug of the school to find peers for: the last segment of its schoolscope.co/ca/school/<slug> address, e.g. 'lowell-high-3407'."
+      },
+      "limit": {
+       "default": 10,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Similar schools",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://schoolscope/school-explorer"
+     },
+     "openai/outputTemplate": "ui://schoolscope/school-explorer",
+     "openai/widgetAccessible": true
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "subject": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "ogImage": {
+         "type": "string"
+        },
+        "city": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "zip": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "lat": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "lng": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "district": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "county": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "schoolType": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "level": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "scored": {
+         "type": "boolean"
+        },
+        "hasTk": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "scopeScore": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "band": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "statePercentile": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "pctExceeded": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "pctMetAbove": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "cohortGrowthScalePoints": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "cohortSpan": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "growthIndex": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "chronicAbsentRate": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "suspensionRate": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "archetype": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "patterns": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "key": {
+            "type": "string"
+           },
+           "label": {
+            "type": "string"
+           },
+           "evidence": {
+            "type": "string"
+           },
+           "question": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "key",
+           "label",
+           "evidence",
+           "question"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "peerClass": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "matchNote": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "distanceMiles": {
+         "type": "number"
+        },
+        "freeLunchPct": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "enrollment": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "name",
+        "slug",
+        "url",
+        "ogImage",
+        "city",
+        "zip",
+        "lat",
+        "lng",
+        "district",
+        "county",
+        "schoolType",
+        "level",
+        "scored",
+        "hasTk",
+        "scopeScore",
+        "band",
+        "statePercentile",
+        "pctExceeded",
+        "pctMetAbove",
+        "cohortGrowthScalePoints",
+        "cohortSpan",
+        "growthIndex",
+        "chronicAbsentRate",
+        "suspensionRate",
+        "archetype",
+        "patterns",
+        "peerClass"
+       ],
+       "additionalProperties": false
+      },
+      "peers": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "slug": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "ogImage": {
+          "type": "string"
+         },
+         "city": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "zip": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "lat": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "lng": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "district": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "county": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "schoolType": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "level": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "scored": {
+          "type": "boolean"
+         },
+         "hasTk": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctExceeded": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "pctMetAbove": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortGrowthScalePoints": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "cohortSpan": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "growthIndex": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "chronicAbsentRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "suspensionRate": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "archetype": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "patterns": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "key": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "evidence": {
+             "type": "string"
+            },
+            "question": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "key",
+            "label",
+            "evidence",
+            "question"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "matchNote": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "distanceMiles": {
+          "type": "number"
+         },
+         "freeLunchPct": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "enrollment": {
+          "type": [
+           "number",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "name",
+         "slug",
+         "url",
+         "ogImage",
+         "city",
+         "zip",
+         "lat",
+         "lng",
+         "district",
+         "county",
+         "schoolType",
+         "level",
+         "scored",
+         "hasTk",
+         "scopeScore",
+         "band",
+         "statePercentile",
+         "pctExceeded",
+         "pctMetAbove",
+         "cohortGrowthScalePoints",
+         "cohortSpan",
+         "growthIndex",
+         "chronicAbsentRate",
+         "suspensionRate",
+         "archetype",
+         "patterns",
+         "peerClass"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "freeLunchWindow": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "number"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "outscoredPeers": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "matchedPeerCount": {
+       "type": "number"
+      },
+      "rankingCaveat": {
+       "type": "string"
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "subject",
+      "peers",
+      "freeLunchWindow",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "my_watchlist",
+    "title": "My saved schools",
+    "description": "The schools the authenticated user has saved on SchoolScope, newest first, each with its band, Scope Score and percentile at its lead level and the nearest upcoming published application date with the page it was read from. Private schools are listed unscored. Requires the `watchlist:read` OAuth scope.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "My saved schools",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "watchlist": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "schoolType": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "level": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "scopeScore": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "statePercentile": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "band": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "peerClass": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "nextDate": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "date": {
+              "type": "string"
+             },
+             "label": {
+              "type": "string"
+             },
+             "url": {
+              "type": "string"
+             },
+             "source": {
+              "type": "string",
+              "enum": [
+               "school",
+               "district"
+              ]
+             },
+             "read": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "note": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "date",
+             "label",
+             "url",
+             "source",
+             "read",
+             "note"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "url",
+         "schoolType",
+         "level",
+         "scopeScore",
+         "statePercentile",
+         "band",
+         "peerClass",
+         "nextDate"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "rankingCaveat": {
+       "type": "string"
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "watchlist",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "watchlist:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "my_applications",
+    "title": "My applications",
+    "description": "The authenticated user's SchoolScope application tracker for 2027–28, in the order schools were added: each school's door (how it takes applications), status, the nearest upcoming published application date with the page it was read from, the family's own upcoming dates, and their note. Requires the `applications:read` OAuth scope.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "My applications",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "admissionYear": {
+       "type": "string"
+      },
+      "max": {
+       "type": "number"
+      },
+      "applications": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "door": {
+          "type": "string"
+         },
+         "how": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         },
+         "added": {
+          "type": "string"
+         },
+         "updated": {
+          "type": "string"
+         },
+         "nextDate": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "date": {
+              "type": "string"
+             },
+             "label": {
+              "type": "string"
+             },
+             "url": {
+              "type": "string"
+             },
+             "source": {
+              "type": "string",
+              "enum": [
+               "school",
+               "district"
+              ]
+             },
+             "read": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "note": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "date",
+             "label",
+             "url",
+             "source",
+             "read",
+             "note"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "ownDates": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "date": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "date",
+            "label"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "closed": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "url",
+         "door",
+         "how",
+         "status",
+         "note",
+         "added",
+         "updated",
+         "nextDate",
+         "ownDates",
+         "closed"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "admissionYear",
+      "max",
+      "applications",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "applications:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "track_application",
+    "title": "Track an application",
+    "description": "Adds a school to the authenticated user's SchoolScope application tracker, or changes the status or note of a school already on it. A new entry takes the school's door and how-to-apply line from SchoolScope's record and starts at \"planning\" (\"Planning to apply\") unless a status is given. It changes the user's saved list. Statuses, in order: planning (\"Planning to apply\"), applied (\"Applied\"), confirmed (\"Confirmation checked\"), waiting (\"Waiting for the lottery or letter\"), offer (\"Offered a seat\"), waitlisted (\"Waitlisted\"), accepted (\"Accepted\"), declined (\"Declined\"). A list holds at most 30 schools. Requires the `applications:write` OAuth scope.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[a-z0-9-]+$",
+       "description": "The school's slug: the last segment of its schoolscope.co/ca/school/<slug> address, e.g. 'lowell-high-3407'."
+      },
+      "status": {
+       "description": "Where the family stands with this school.",
+       "type": "string",
+       "enum": [
+        "planning",
+        "applied",
+        "confirmed",
+        "waiting",
+        "offer",
+        "waitlisted",
+        "accepted",
+        "declined"
+       ]
+      },
+      "note": {
+       "description": "The family's note on this school, up to 500 characters; it replaces any earlier note, and an empty string clears it.",
+       "type": "string",
+       "maxLength": 500
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Track an application",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "result": {
+       "type": "string",
+       "enum": [
+        "added",
+        "updated",
+        "unchanged"
+       ]
+      },
+      "application": {
+       "type": "object",
+       "properties": {
+        "slug": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "door": {
+         "type": "string"
+        },
+        "how": {
+         "type": "string"
+        },
+        "status": {
+         "type": "string"
+        },
+        "note": {
+         "type": "string"
+        },
+        "added": {
+         "type": "string"
+        },
+        "updated": {
+         "type": "string"
+        },
+        "nextDate": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "date": {
+             "type": "string"
+            },
+            "label": {
+             "type": "string"
+            },
+            "url": {
+             "type": "string"
+            },
+            "source": {
+             "type": "string",
+             "enum": [
+              "school",
+              "district"
+             ]
+            },
+            "read": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "note": {
+             "type": [
+              "string",
+              "null"
+             ]
+            }
+           },
+           "required": [
+            "date",
+            "label",
+            "url",
+            "source",
+            "read",
+            "note"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "ownDates": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "date": {
+            "type": "string"
+           },
+           "label": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "date",
+           "label"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "closed": {
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "slug",
+        "name",
+        "url",
+        "door",
+        "how",
+        "status",
+        "note",
+        "added",
+        "updated",
+        "nextDate",
+        "ownDates",
+        "closed"
+       ],
+       "additionalProperties": false
+      },
+      "meta": {
+       "type": "object",
+       "properties": {
+        "data_year": {
+         "type": "number"
+        },
+        "score_years": {
+         "type": "object",
+         "properties": {
+          "elementary": {
+           "type": "number"
+          },
+          "middle": {
+           "type": "number"
+          },
+          "high": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "elementary",
+          "middle",
+          "high"
+         ],
+         "additionalProperties": false
+        },
+        "source_agency": {
+         "type": "string"
+        },
+        "attribution": {
+         "type": "string"
+        },
+        "climate_year": {
+         "type": "number"
+        },
+        "climate_basis": {
+         "type": "string"
+        },
+        "methodology_url": {
+         "type": "string"
+        },
+        "comparability": {
+         "type": "string"
+        },
+        "score_scale": {
+         "type": "string"
+        },
+        "growth_basis": {
+         "type": "string"
+        },
+        "generated_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "data_year",
+        "source_agency",
+        "attribution",
+        "methodology_url",
+        "comparability",
+        "growth_basis",
+        "generated_at"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "result",
+      "application",
+      "meta"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "applications:write"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "start_age",
+    "title": "TK and kindergarten start age",
+    "description": "Which school year a California child is transitional kindergarten (TK) or kindergarten age, from a birth month and year, under California Education Code § 48000 (TK: fourth birthday by September 1; kindergarten: fifth birthday on or before September 1). The birth day matters only in September, where September 1 and September 2–30 fall on different sides of the cutoff; without it, both outcomes are given. With a district, it adds that district's upcoming choice-window dates SchoolScope holds.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "birth_year": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "The child's birth year, e.g. 2022."
+      },
+      "birth_month": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 12,
+       "description": "The child's birth month, 1-12."
+      },
+      "birth_day": {
+       "description": "Only for a September birthday: the day of the month. Ignored for other months.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 30
+      },
+      "district": {
+       "description": "Optional: the family's school district name, e.g. 'san diego unified'.",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 100
+      }
+     },
+     "required": [
+      "birth_year",
+      "birth_month"
+     ]
+    },
+    "annotations": {
+     "title": "TK and kindergarten start age",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "planning": {
+       "type": "object",
+       "properties": {
+        "schoolYear": {
+         "type": "string"
+        },
+        "turnFourBy": {
+         "type": "string"
+        },
+        "tkBornFrom": {
+         "type": "string"
+        },
+        "tkBornThrough": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "schoolYear",
+        "turnFourBy",
+        "tkBornFrom",
+        "tkBornThrough"
+       ],
+       "additionalProperties": false
+      },
+      "outcomes": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "born": {
+          "type": "string"
+         },
+         "tkSchoolYear": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "kindergartenSchoolYear": {
+          "type": "string"
+         },
+         "planningYearStage": {
+          "type": "string",
+          "enum": [
+           "not_yet_tk_age",
+           "tk",
+           "kindergarten",
+           "past_kindergarten"
+          ]
+         }
+        },
+        "required": [
+         "born",
+         "tkSchoolYear",
+         "kindergartenSchoolYear",
+         "planningYearStage"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "rule": {
+       "type": "object",
+       "properties": {
+        "source": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "tk": {
+         "type": "string"
+        },
+        "kindergarten": {
+         "type": "string"
+        },
+        "arithmetic": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "source",
+        "url",
+        "tk",
+        "kindergarten",
+        "arithmetic"
+       ],
+       "additionalProperties": false
+      },
+      "district": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "county": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "county"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "choiceYear": {
+       "type": "string"
+      },
+      "choiceDates": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "date",
+         "label",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "planning",
+      "outcomes",
+      "rule",
+      "district",
+      "choiceYear",
+      "choiceDates"
+     ],
+     "additionalProperties": false
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "schoolscope://methodology/scope-score",
+    "name": "scope-score-methodology",
+    "description": "How the Scope Score works — weights derived live from the scoring config",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "schoolscope://methodology/archetypes",
+    "name": "school-archetypes",
+    "description": "Independent SchoolScope findings, evidence requirements and questions for parents",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "schoolscope://data/sources",
+    "name": "data-sources",
+    "description": "Every public data source behind SchoolScope, with vintage",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "ui://schoolscope/school-explorer",
+    "name": "school-explorer-view",
+    "description": "Interactive school-results view (MCP Apps): a proximity plot of schools by distance and direction for place searches, shared school rows with results bars for name searches and similar schools, one school level at a time.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://widgets.schoolscope.co",
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": [
+        "https://schoolscope.co"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "uri": "ui://schoolscope/school-card",
+    "name": "school-card-view",
+    "description": "Interactive single-school view (MCP Apps): the Scope Score with its band and percentile, the generated sentence and up to two findings, with follow-up questions.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://widgets.schoolscope.co",
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": [
+        "https://schoolscope.co"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "uri": "ui://schoolscope/compare-table",
+    "name": "compare-table-view",
+    "description": "Interactive comparison and feeder-path view (MCP Apps): scores and test-result bars for 2-4 schools at one level, or the schools on a school's attendance-zone path.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "https://widgets.schoolscope.co",
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": [
+        "https://schoolscope.co"
+       ]
+      }
+     }
+    }
+   }
+  ]
+ }
+}

@@ -16,6 +16,7 @@
 import { analyzeCapabilities } from "./capabilities.js";
 import { fingerprintConfig } from "./canonical.js";
 import { diffSnapshots, matchesPin, peerPolicyOf, promptOf, snapshotOf } from "./diff.js";
+import { CHECKED_LANGUAGES, UNRECOGNISED } from "./languages.js";
 import { PROTOCOL_PROFILES, evaluateForeignPapers } from "./protocols.js";
 import { TEXT_RULES, findUrls, scanText, unbackedAuthority } from "./rules.js";
 import { findMixedScriptWords, normalizeForRules, revealHidden, scanHidden } from "./unicode.js";
@@ -319,24 +320,36 @@ export async function analyzeNetwork(input) {
     if (hit.rule.id === "C-PERSONAL" && field.agent && peerGuarded(field.agent)) {
       severity = "low";
       detail += " It asks on its own site; its peer rule stops this when another site runs it.";
-    } else if (hit.rule.id === "C-EXEC" && !isInstructionField) {
+    } else if (hit.rule.id === "C-EXEC" && !isInstructionField && severity !== "medium") {
       const directsVisitor = Boolean(hit.language)
-        || /\b(?:ask|tell|have|get|instruct|direct|urge)\s+(?:the\s+)?(?:visitor|user|guest|customer|client|them)\b|\b(?:visitor|user|guest|customer)\s+(?:should|must|needs?\s+to|has\s+to)\b/i.test(hit.excerpt || "");
+        || /\b(?:ask|tell|have|get|instruct|direct|urge|recommend|advise|encourage|let)\s+(?:the\s+)?(?:visitor|user|guest|customer|client|them)\b|\b(?:visitor|user|guest|customer)\s+(?:should|must|needs?\s+to|has\s+to)\b/i.test(hit.excerpt || "");
       if (!directsVisitor) {
         severity = "medium";
         detail += " Found in tool/schema documentation rather than assistant instructions; verify it is reference docs rather than user coercion.";
       }
-    } else if (hit.rule.id === "C-EXFIL" && !isInstructionField) {
+    } else if (hit.rule.id === "C-EXFIL" && !isInstructionField && severity !== "medium") {
       const ex = hit.excerpt || "";
       const hardLeak = Boolean(hit.language)
-        || /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex);
+        || /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex)
+        // What the visitor said, or a secret, is private wherever it is sent.
+        || /\b(?:everything|all|what|whatever)\s+(?:they|the\s+(?:user|visitor|customer|guest))\s+(?:typed|said|wrote|asked|entered)\b|\b(?:user|visitor|customer|guest)'?s?\s+(?:words|input|replies)\b|\b(?:passwords?|passcodes?|card\s+numbers?|cvv2?|cvc|pins?|otps?|seed\s+(?:phrases?|words?)|credentials?)\b/i.test(ex);
       if (!hardLeak) {
         severity = "medium";
         detail += " Found in a tool description referencing a configured deployment server without an embedded external URL.";
       }
-    } else if (hit.rule.id === "C-LANGUAGE" && !isInstructionField) {
-      severity = "medium";
-      detail += " Found in tool/schema documentation rather than server instructions.";
+    } else if (hit.rule.id === "C-LANGUAGE" && !isInstructionField && severity !== "medium") {
+      // Languages whose secret requests and takeover orders are checked word by word may be
+      // read in documentation with a note. A whole sentence in any other language could say
+      // anything, so it stays held for a person.
+      // "A language Agent Customs doesn't recognise" is usually a checked language with few
+      // common words in the sentence, so only a named unchecked language counts here.
+      const unchecked = !CHECKED_LANGUAGES.has(hit.language) && hit.language !== UNRECOGNISED;
+      if (unchecked && (hit.words || 0) >= 6) {
+        detail += " A whole sentence in a language Agent Customs cannot check, even though it is in tool documentation.";
+      } else {
+        severity = "medium";
+        detail += " Found in tool/schema documentation rather than server instructions.";
+      }
     }
     add({ rule: effectiveRule, category: "contraband", severity, title,
       detail, evidence: hit.excerpt, where: { agent: field.agent, field: field.field }, why: hit.whyOverride || hit.rule.why, fix: hit.fixOverride || hit.rule.fix });
@@ -599,6 +612,19 @@ export async function analyzeNetwork(input) {
       why: "When untrusted text, sensitive data access, and external destinations meet in the same path, polite wording alone cannot prevent data exfiltration.",
       fix: "Separate agents that read sensitive data from agents or tools that contact outside hosts.",
     });
+  } else if (capabilities.softTrifecta) {
+    const topPath = capabilities.softPaths[0];
+    add({
+      rule: "S-TRIFECTA",
+      category: "privacy",
+      severity: "medium",
+      title: "Possible data path through fields that look like the server's own",
+      detail: topPath ? `Capability path, if those fields are not the server's own: ${topPath.reason}.`
+        : "Untrusted input, fields described as the server's own handles, and external egress meet in one path.",
+      where: { agent: topPath?.through || "" },
+      why: "The fields are described as tokens or keys this server issues itself, which is usually true. Wording alone cannot prove it, so the path stays visible.",
+      fix: "Describe where each token comes from, or keep tools that send data out separate from tools that take credentials.",
+    });
   }
 
   // ---- Identity: fingerprint and drift ---------------------------------------
@@ -858,7 +884,8 @@ function splitIdentifier(key) {
     .trim();
 }
 
-const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|credit ?cards?|debit ?cards?|cvv2?|cvc|csc|passwords?(?!\s+(?:setup|reset|change|recovery|policy)(?:\s+(?:link|url|page|token))?\b)|passcodes?|passphrases?|otp(?:\s*code)?|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
+// "creditCardLimits" or "debit card count" describe money or cards, not the card itself.
+const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|(?:credit|debit) ?cards?(?! ?(?:limits?|balances?|counts?|amounts?|totals?|fees?|rates?|types?|brands?|issuers?|networks?|debts?|payments?|repayments?|spend(?:ing)?|utili[sz]ation|apr|interest|accepted|surcharges?|providers?)\b)|cvv2?|cvc|csc|passwords?(?!\s+(?:setup|reset|change|recovery|policy)(?:\s+(?:link|url|page|token))?\b)|passcodes?|passphrases?|otp(?:\s*code)?|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
 const PASSWORD_GATE_PARAM_RE = /\boptional\s+password\s+to\b|\b(?:set|add|remove|clear|protect|lock|gate)\s+(?:a|an|this|the|optional)?\s*password\b[^.]{0,30}\b(?:page|site|link|url|file|room|document|pdf)\b|\bpassword[- ]?(?:gate|protect(?:ed)?)\s+(?:a|an|this|the)?\s*(?:page|site|link|url|file|room|document|pdf)\b/i;
 const PASSWORD_REUSE_RE = /\b(?:same\s+password|reuse|online\s+bank|banking|e-?mail|account\s+password|existing\s+password)\b/i;
 const LOGIN_TOOL_NAME_RE = /^(?:login|sign_?in|auth(?:enticate)?|verify_password)/i;

@@ -1,0 +1,4419 @@
+{
+ "url": "https://mcp.402lounge.com/mcp",
+ "doc": {
+  "name": "402lounge",
+  "version": "0.5.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "402lounge: receipts and a register for AI agents that pay with x402 (USDC on Base). Every account is a company: lounge.signup creates it with you as its agent and your wallet; company.update adds the legal data the monthly vouchers need; company.invite and company.join bring more agents in. After every x402 payment call receipts.record with the transaction hash and the URL you paid; a receipt with the seller, the description, the paying agent and a EUR value follows. register.lookup tells you who is behind a payTo address before you pay. The company gets one document per seller every month (invoices.list), the month so far is in invoices.draft. Free tools work without an account. People connect over OAuth: the first tool that needs the account opens the sign-in on app.402lounge.com, and the app then acts with their role in the company. Call lounge.requirements first if you are new.",
+  "tools": [
+   {
+    "name": "lounge.requirements",
+    "title": "What you need to join",
+    "description": "Rules, prices, the current terms and the exact sentences you will sign. Free, no account.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.terms",
+    "title": "Current terms",
+    "description": "Versions, hashes and links of the terms and the privacy notice. With accept: true you confirm a new version: first call returns a challenge, second call with proof {message, signature} records it.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "accept": {
+       "description": "true confirms the current terms and privacy notice. The first call returns the challenge to sign, the second call sends it as proof",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.signup",
+    "title": "Create your account",
+    "description": "Free. Your account is a company from the first call, named after you until company.update adds the legal data. With invite_code you join an existing company instead. Proves your wallet with a signature: first call returns a challenge, second call with proof {message, signature} creates the account. Wallets that cannot sign pay 0.001 USDC over HTTP instead (pay_instead in the answer), once payments are open.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 40,
+       "description": "Your name as an agent, unique inside your company, e.g. \"Research\""
+      },
+      "invite_code": {
+       "description": "From company.invite, to join that company",
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 12
+      },
+      "email": {
+       "description": "Optional: where documents and notices of your new company go. Ignored with invite_code.",
+       "type": "string",
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+      },
+      "address": {
+       "description": "Your wallet address, so the challenge comes back as a finished message",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      },
+      "provider": {
+       "description": "awal, cdp, viem, other",
+       "type": "string",
+       "maxLength": 40
+      },
+      "accept": {
+       "type": "object",
+       "properties": {
+        "terms": {
+         "type": "string"
+        },
+        "privacy": {
+         "type": "string"
+        },
+        "business": {
+         "type": "boolean",
+         "const": true
+        }
+       },
+       "required": [
+        "terms",
+        "privacy",
+        "business"
+       ],
+       "description": "What you accept: the terms and privacy versions from lounge.requirements, and business: true, because 402lounge is for businesses only"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "name",
+      "accept"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.me",
+    "title": "You and your company",
+    "description": "Who you are (agent and role), your company with its agents, people and level, its wallets, your apps, terms state and pending notices.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.agent.update",
+    "title": "Rename yourself",
+    "description": "Your name inside the company, 1 to 40 characters, unique in the company. Company data lives in company.update.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 40,
+       "description": "Your new name, 1 to 40 characters, unique in your company"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "name"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.wallet.add",
+    "title": "Add a wallet",
+    "description": "The new wallet proves itself: first call returns a challenge for it, second call with wallet_proof {message, signature} adds it. It belongs to your company and you operate it. How many follows the plan: Free 1, Books 5 per agent and 15 in all, Books for teams without limit.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "The wallet to add, 0x followed by 40 hex characters"
+      },
+      "provider": {
+       "description": "Optional: what holds the key: awal, cdp, viem or other",
+       "type": "string",
+       "maxLength": 40
+      },
+      "wallet_proof": {
+       "description": "Second call only: the challenge message the first call returned, and the signature of that wallet over it",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "address"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.wallet.remove",
+    "title": "Remove a wallet",
+    "description": "Your own wallets (admins: any wallet of the company). Not the one you sign in with, and never your last one. Sessions made with that wallet end. Its receipts stay.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "The wallet to remove"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "address"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.wallet.primary",
+    "title": "Set your sign-in wallet",
+    "description": "The wallet you sign in with. It has to be assigned to you.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "The wallet you sign in with from now on. It has to be assigned to you"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "address"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.wallet.list",
+    "title": "Wallets",
+    "description": "All wallets of your company, each with the agent that operates it. mine: true lists only yours.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "mine": {
+       "description": "true lists only the wallets you operate",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.session",
+    "title": "Session tokens",
+    "description": "create: a new lg_ token (needs a signature or an existing token). list and revoke manage them.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "create",
+        "list",
+        "revoke"
+       ],
+       "description": "create a new lg_ token, list your sessions or revoke one"
+      },
+      "session_id": {
+       "description": "revoke: the session to end, from list",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "action"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.apps",
+    "title": "Connected apps",
+    "description": "Which clients this agent has used. deactivate ends their sessions, activate turns them back on, disconnect forgets them.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "default": "list",
+       "description": "list (default) shows the clients. deactivate ends a client's sessions, activate turns it back on, disconnect forgets it",
+       "type": "string",
+       "enum": [
+        "list",
+        "deactivate",
+        "activate",
+        "disconnect"
+       ]
+      },
+      "app_client": {
+       "description": "The client as list names it. Needed for every action but list",
+       "type": "string",
+       "maxLength": 40
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.notices",
+    "title": "Notices",
+    "description": "Terms changes, moderation decisions, deletion and security notes, for you and for your company. ack marks one as read.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "default": "list",
+       "description": "list (default) shows the notices, ack marks one as read",
+       "type": "string",
+       "enum": [
+        "list",
+        "ack"
+       ]
+      },
+      "id": {
+       "description": "ack: the notice to mark as read, from list",
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "all": {
+       "description": "list: also the notices you have read already",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.dashboard.link",
+    "title": "Dashboard link",
+    "description": "A one-time browser link (10 minutes) into your company's dashboard, signed in as you, for the human behind you.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.account.export",
+    "title": "Export your data",
+    "description": "Everything 402lounge keeps about you as an agent off chain, as JSON. The company's books come from receipts.list and invoices.list.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "lounge.account.delete",
+    "title": "Delete yourself",
+    "description": "Schedules your deletion as an agent in 7 days. cancel: true keeps you. Your wallets and receipts stay with the company. Needs a fresh signature with the delete statement (first call returns the challenge).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "confirm": {
+       "type": "boolean",
+       "const": true,
+       "description": "Must be true: you want this agent deleted in 7 days"
+      },
+      "cancel": {
+       "description": "true keeps you: it cancels a deletion that is scheduled",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "confirm"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "receipts.record",
+    "title": "Report a payment you made",
+    "description": "Call this after every x402 payment: the transaction hash from the PAYMENT-RESPONSE header plus the URL you paid. 402lounge matches it with the transfer on Base and writes a receipt with the seller from the register, the catalogue description and a provisional EUR value. Free.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "tx_hash": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{64}$",
+       "description": "The settlement transaction, 0x plus 64 hex characters"
+      },
+      "resource_url": {
+       "description": "The URL you paid for (the 402 resource)",
+       "type": "string",
+       "maxLength": 500,
+       "format": "uri"
+      },
+      "amount": {
+       "description": "What you paid, in USDC, e.g. \"0.002\"",
+       "type": "string",
+       "maxLength": 24
+      },
+      "description": {
+       "description": "What you bought, in your words. The seller's catalogue wins when it knows the URL.",
+       "type": "string",
+       "maxLength": 280
+      },
+      "pay_to": {
+       "description": "The payTo address from the payment requirements",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      },
+      "network": {
+       "description": "base or base-sepolia. Default: the network 402lounge runs on, base",
+       "type": "string",
+       "enum": [
+        "base",
+        "base-sepolia"
+       ]
+      },
+      "payment_response": {
+       "description": "The raw PAYMENT-RESPONSE header, if you still have it",
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 4000
+        },
+        {
+         "type": "object",
+         "propertyNames": {
+          "type": "string"
+         },
+         "additionalProperties": {}
+        }
+       ]
+      },
+      "supply": {
+       "description": "What you bought: gift_card for a gift card or other voucher (a Bitrefill order of a gift card, for example), service for everything else, an eSIM included. Leave it out when unsure, the seller's routes decide then",
+       "type": "string",
+       "enum": [
+        "service",
+        "gift_card"
+       ]
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "tx_hash"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "receipts.list",
+    "title": "Your company's receipts",
+    "description": "Receipts of your company for one month (default: the current month, Europe/Berlin), newest first, each with the agent that paid. Totals per seller and per agent, and the reports still waiting for the chain. mine: true, agent_id or wallet narrow it.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "month": {
+       "description": "Like 2026-10",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "status": {
+       "description": "Only receipts with this seller status",
+       "type": "string",
+       "enum": [
+        "verified",
+        "listed",
+        "unverified"
+       ]
+      },
+      "limit": {
+       "description": "How many receipts, 1 to 200",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200
+      },
+      "before": {
+       "description": "Page: the smallest receipt id of the previous page",
+       "type": "integer",
+       "exclusiveMinimum": 0,
+       "maximum": 9007199254740991
+      },
+      "mine": {
+       "description": "Only the receipts of wallets you operated",
+       "type": "boolean"
+      },
+      "agent_id": {
+       "description": "Only one agent of the company",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "wallet": {
+       "description": "Only one paying wallet",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "receipts.get",
+    "title": "One receipt",
+    "description": "A single receipt of your company by id or transaction hash.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 66,
+       "description": "Receipt id or 0x transaction hash"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "receipts.set_supply",
+    "title": "Say what a payment bought",
+    "description": "Mark a payment as a gift card purchase (gift_card) or as a service (service). Gift card purchases go onto a monthly document of their own without reverse charge, because selling a multi-purpose voucher is no supply. An eSIM or a single-purpose voucher bought through a gift card seller is a service. Owner, admin and finance, while no valid document lists the payment (error receipt_on_document names it, cancel it first). Your choice stays, nothing overwrites it.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 66,
+       "description": "Receipt id or 0x transaction hash"
+      },
+      "supply": {
+       "type": "string",
+       "enum": [
+        "service",
+        "gift_card"
+       ],
+       "description": "gift_card or service"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "id",
+      "supply"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "receipts.name_wallet",
+    "title": "Name a wallet you paid",
+    "description": "Your company's own name for a payTo wallet the register does not know, so its receipts say who was paid (e.g. a receipt that needs you because the wallet has no name). The name shows on your company's receipts only, marked as your name, never in the register. name null forgets it. Everyone in the company but viewers and the adviser.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "The payTo wallet you paid, 0x followed by 40 hex characters"
+      },
+      "name": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 60
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Who that wallet belongs to, up to 60 characters. null forgets the name"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "address",
+      "name"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "receipts.refunds",
+    "title": "Refunds sellers paid back",
+    "description": "USDC a seller sent back to one of your wallets, read from Base. 402lounge links a refund to the payments it pays back when the amount matches one payment or the newest ones exactly, the receipts then show it under refunded. list (default, month or state narrow it), get (id), link (id plus payments, each a receipt id or tx hash with an optional usdc part), dismiss (id plus reason, when the transfer is no refund, finance), reopen (id). Refunds go onto the documents of the month the money came back, the original documents stay.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "description": "list (default), get, link, dismiss or reopen",
+       "type": "string",
+       "enum": [
+        "list",
+        "get",
+        "link",
+        "dismiss",
+        "reopen"
+       ]
+      },
+      "id": {
+       "description": "get, link, dismiss, reopen: the refund by id or 0x transaction hash",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 66
+      },
+      "payments": {
+       "description": "link: the payments the refund pays back",
+       "maxItems": 200,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "receipt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 66,
+          "description": "Receipt id or 0x transaction hash of the payment"
+         },
+         "usdc": {
+          "description": "The part of the refund for this payment, like \"0.002\". Default: what is left of the payment",
+          "type": "string",
+          "maxLength": 24
+         }
+        },
+        "required": [
+         "receipt"
+        ]
+       }
+      },
+      "reason": {
+       "description": "dismiss: why the transfer is no refund, 3 to 500 characters",
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 500
+      },
+      "month": {
+       "description": "list: refunds that came back in this month, like 2026-11",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "state": {
+       "description": "list: only refunds in this state, open ones need you",
+       "type": "string",
+       "enum": [
+        "open",
+        "allocated",
+        "dismissed"
+       ]
+      },
+      "limit": {
+       "description": "list: how many, 1 to 200",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200
+      },
+      "before": {
+       "description": "list: page, the smallest refund id of the previous page",
+       "type": "integer",
+       "exclusiveMinimum": 0,
+       "maximum": 9007199254740991
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "register.lookup",
+    "title": "Who is behind this wallet?",
+    "description": "Wallet in, seller out: the listing that owns a payTo address, its verification level, its paid endpoints and the last health check. Free, no account. Call it before you pay someone new.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "A payTo address on Base"
+      }
+     },
+     "required": [
+      "address"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.get",
+    "title": "Your company",
+    "description": "Legal data, VAT status, tier and level, what is missing for the next tier, its agents with this month's spending, its people and your role.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.update",
+    "title": "Fill in or change the company data",
+    "description": "Admins only. Your account starts as a company named after you. A company is ready for invoices (tier invoice_ready) once it has name, legal_form (or sole_proprietor), owner_name for a sole proprietor, address_line1, postal_code, city, country, a confirmed email and its VAT status with the number: in the EU a VAT id VIES confirms (checked at once), or the tax_number for small businesses and VAT-exempt companies. Until then it gets receipts and a preview of its monthly documents, and buying a plan waits. Any subset works, and the answer lists what is still missing (missing_for_company).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "name": {
+       "description": "Legal name of the company, without the legal form",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120
+      },
+      "legal_form": {
+       "description": "GmbH, UG, AG, e.K., Inc., ...",
+       "type": "string",
+       "maxLength": 40
+      },
+      "address_line1": {
+       "description": "Street and number of the registered address",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 120
+      },
+      "address_line2": {
+       "description": "Optional second line of the address",
+       "type": "string",
+       "maxLength": 120
+      },
+      "postal_code": {
+       "description": "Postal code of the registered address",
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 12
+      },
+      "city": {
+       "description": "City of the registered address",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      },
+      "address_state": {
+       "description": "State or province, written after the city in the USA, Canada and Australia (TX, ON, NSW)",
+       "type": "string",
+       "maxLength": 40
+      },
+      "owner_name": {
+       "description": "A sole proprietorship (Einzelunternehmen, e.K., sole trader ...): the first and last name of the owner. It stands on every document, never in the register or on a listing. Empty removes it",
+       "type": "string",
+       "maxLength": 120
+      },
+      "sole_proprietor": {
+       "description": "True for one person without a legal form of its own where the country has none to choose. Then owner_name is required",
+       "type": "boolean"
+      },
+      "country": {
+       "description": "ISO 3166 two-letter code, e.g. DE",
+       "type": "string"
+      },
+      "language": {
+       "description": "Language of documents and mails: en, de, fr, it, es, nl, pt, sv, da, fi or nb. Null takes the language of the country",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "vat_id": {
+       "description": "VAT id in the format of its country, like DE123456789 or ATU12345678 (GET /v1/countries). EU numbers are checked against VIES",
+       "type": "string",
+       "maxLength": 30
+      },
+      "tax_number": {
+       "description": "The national tax number, for vat_status tax_number or where the country asks for it",
+       "type": "string",
+       "maxLength": 30
+      },
+      "vat_status": {
+       "description": "How the company stands with VAT: vat_id, tax_number (registered, VAT id still to come), small_business (§ 19 UStG) exempt (only VAT-exempt sales) or not_registered (no VAT registration, the USA or another country without VAT). Decides the tax note on its documents",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "vat_id",
+          "tax_number",
+          "small_business",
+          "exempt",
+          "not_registered"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "skr": {
+       "description": "Chart of accounts for exports. OWN takes own_accounts",
+       "type": "string",
+       "enum": [
+        "SKR03",
+        "SKR04",
+        "OWN"
+       ]
+      },
+      "own_accounts": {
+       "description": "With skr OWN: the expense, clearing and USDC holding accounts of your chart, 4 to 8 digits, and optionally gift_cards for gift card purchases (the expense account otherwise)",
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "expense": {
+           "type": "string",
+           "pattern": "^\\d{4,8}$"
+          },
+          "clearing": {
+           "type": "string",
+           "pattern": "^\\d{4,8}$"
+          },
+          "usdc": {
+           "type": "string",
+           "pattern": "^\\d{4,8}$"
+          },
+          "gift_cards": {
+           "type": "string",
+           "pattern": "^\\d{4,8}$"
+          }
+         },
+         "required": [
+          "expense",
+          "clearing",
+          "usdc"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "currency": {
+       "description": "The currency amounts are shown in, next to USDC: EUR (default, the currency of the documents), USD, or any currency with an ECB reference rate",
+       "type": "string",
+       "pattern": "^[A-Za-z]{3}$"
+      },
+      "fx_method": {
+       "description": "How USDC becomes EUR on documents. Today only ecb_daily (ECB reference rate of the payment day)",
+       "type": "string",
+       "enum": [
+        "ecb_daily"
+       ]
+      },
+      "email": {
+       "description": "Where documents and notices go. A code confirms it",
+       "type": "string",
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.vat_check",
+    "title": "Re-check the VAT id",
+    "description": "Asks VIES again and updates the tier. Admins, owners and finance.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.email",
+    "title": "The company email",
+    "description": "Where documents and notices go. start sets the address and mails a 6-digit code, confirm checks it, remove clears it (only while the account has no company data). Admins only.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "start",
+        "confirm",
+        "remove"
+       ],
+       "description": "start sets the address and mails a six-digit code, confirm checks the code, remove clears the address"
+      },
+      "email": {
+       "description": "start: where documents and notices go",
+       "type": "string",
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+      },
+      "code": {
+       "description": "confirm: the six-digit code from the mail",
+       "type": "string",
+       "minLength": 6,
+       "maxLength": 6
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "action"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.invite",
+    "title": "Invite another agent",
+    "description": "Admins only. A code valid for seven days. A new agent signs up with lounge.signup {invite_code}, an agent with its own account calls company.join {code} and brings its wallets and receipts.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.join",
+    "title": "Join a company",
+    "description": "With an invite code. Works while your own account has no company data, no vouchers and no other agents: your wallets, receipts and reports move into that company and your own account goes away. You join as an agent, and an admin there can make you admin.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "code": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 12,
+       "description": "The invite code from company.invite"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "code"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.agents",
+    "title": "Agents of your company",
+    "description": "Every agent with its role, its wallets and what it paid this month (receipts, USDC, EUR).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.agent.update",
+    "title": "Rename an agent or change its role",
+    "description": "Admins change any agent, an agent may rename itself. role is admin or agent. The company always keeps an admin or an owner.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "agent_id": {
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+       "description": "The agent to change, from company.agents"
+      },
+      "name": {
+       "description": "The new name, 1 to 40 characters, unique in the company",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 40
+      },
+      "role": {
+       "description": "admin or agent",
+       "type": "string",
+       "enum": [
+        "admin",
+        "agent"
+       ]
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "agent_id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.agent.remove",
+    "title": "Remove an agent",
+    "description": "Admins only. Schedules the agent's deletion in 7 days. Its wallets stay with the company, unassigned, and its receipts stay in the books.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "agent_id": {
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+       "description": "The agent to remove, from company.agents"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "agent_id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.wallet.assign",
+    "title": "Move a wallet to another agent",
+    "description": "Admins only. agent_id null leaves the wallet unassigned. Receipts already written keep the agent that paid, new ones get the new agent. Sessions of the previous agent made with that wallet end.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "A wallet of your company"
+      },
+      "agent_id": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid",
+         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The agent that operates it from now on, from company.agents. null leaves the wallet unassigned"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "address",
+      "agent_id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.wallet.label",
+    "title": "Name a wallet",
+    "description": "A name for the company's own lists, e.g. \"Research budget\". Agents may name their own wallets, admins any. label null clears it.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "A wallet of your company"
+      },
+      "label": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 40
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "The name, up to 40 characters. null clears it"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "address",
+      "label"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.members",
+    "title": "People in your company",
+    "description": "list shows them. invite adds a person by email with a role: owner (everything), finance (documents, VAT check, plan), adviser (reads and exports, changes nothing, for a tax adviser), viewer (reads). They sign in by email link. An address that is in another company already keeps its login and gets this company next to the others. role changes a role, remove takes someone out. The plan sets how many people sign in, the ones invited included: Free 1, Books 2, Books for teams no limit (plan_limit with what \"people\" past it). Admins and owners only, except list.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "default": "list",
+       "description": "list (default) shows the people, invite adds one, role changes a role, remove takes someone out",
+       "type": "string",
+       "enum": [
+        "list",
+        "invite",
+        "role",
+        "remove"
+       ]
+      },
+      "email": {
+       "description": "invite: the person's email address",
+       "type": "string",
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+      },
+      "role": {
+       "description": "invite and role: owner, finance, adviser or viewer",
+       "type": "string",
+       "enum": [
+        "owner",
+        "finance",
+        "adviser",
+        "viewer"
+       ]
+      },
+      "member_id": {
+       "description": "role and remove: the person, from list",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.requests",
+    "title": "The board: requests between people and agents",
+    "description": "Where the tax adviser or the team ask for things, like a receipt that is missing or a purchase nobody described. list shows open ones (status: done or all for more), show one with its answers (request_id), ask writes one (title, body, optional month like 2026-10 and receipt_id), answer replies (request_id, body) and opens it again, done and reopen change its status, delete takes it back. A new request mails the people who keep the books, an answer everybody in the thread. Whoever reads the receipts may use it.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "default": "list",
+       "description": "list (default), show, ask, answer, done, reopen or delete",
+       "type": "string",
+       "enum": [
+        "list",
+        "show",
+        "ask",
+        "answer",
+        "done",
+        "reopen",
+        "delete"
+       ]
+      },
+      "status": {
+       "description": "list: open (default), done or all",
+       "type": "string",
+       "enum": [
+        "open",
+        "done",
+        "all"
+       ]
+      },
+      "request_id": {
+       "description": "show, answer, done, reopen and delete: the request, from list",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "title": {
+       "description": "ask: a short title",
+       "type": "string",
+       "maxLength": 200
+      },
+      "body": {
+       "description": "ask and answer: the text",
+       "type": "string",
+       "maxLength": 4000
+      },
+      "month": {
+       "description": "ask, optional: the month it is about, YYYY-MM",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "receipt_id": {
+       "description": "ask, optional: the receipt it is about, from receipts.list",
+       "type": "integer",
+       "exclusiveMinimum": 0,
+       "maximum": 9007199254740991
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "invoices.list",
+    "title": "Your company's documents",
+    "description": "Monthly vouchers per seller (and later invoices), newest first. Optional month like 2026-10.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "month": {
+       "description": "Optional: only the documents of this month, YYYY-MM",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "limit": {
+       "description": "How many documents, 1 to 200",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "invoices.get",
+    "title": "One document",
+    "description": "The full document as JSON, by id or number, with where its archived files lie and their sha256. The PDF is at /v1/invoices/{id}/pdf with your session token.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 4,
+       "maxLength": 64,
+       "description": "The document, by id or by its number"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "invoices.issue",
+    "title": "Issue the documents for a month",
+    "description": "Admins, owners and finance. Runs by itself every night for last month. Call it for an older finished month or after a cancellation. One document per seller: the monthly overview on Free, the voucher with the tax note on Books. Payments that arrive after a document get a supplement. Pairs with receipts that lack a EUR rate are skipped and listed. Needs the company data and a confirmed email (tier company).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "month": {
+       "description": "Finished month, default: last month",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "invoices.draft",
+    "title": "The month so far",
+    "description": "Drafts of the documents the month would get today, one per seller, with lines, totals and the tax case. Nothing is stored and there is no number. Default: the current month (Europe/Berlin). The PDF of a draft is at /v1/invoices/draft/pdf?month=&seller=.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "month": {
+       "description": "The month, YYYY-MM. Default: the current month (Europe/Berlin)",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "invoices.cancel",
+    "title": "Cancel a document",
+    "description": "Admins, owners and finance. Issues a cancellation for a document, with your reason. The original keeps its number and turns to cancelled. Its payments are open again, so invoices.issue for that month (or the nightly run for last month) puts them in a new document.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 4,
+       "maxLength": 64,
+       "description": "Id or number of the document"
+      },
+      "reason": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 500,
+       "description": "Why, 3 to 500 characters. It is written on the cancellation"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "id",
+      "reason"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "company.close",
+    "title": "Close the company",
+    "description": "Admin agents and the owner. Closes the company in 30 days: name confirms it with the company name. Until then everything can be read and the export works (GET /v1/company/export), calls that write are refused with company_closing. Then agents, people, sign-ins, sessions and wallets are removed. Receipts and issued documents stay locked until their retention period ends. cancel: true keeps the company. now: true with export_kept: true closes at once and deletes the receipts and documents too, after you downloaded the export. Documents in a seller's name stay with the seller.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "name": {
+       "description": "The company name, as confirmation",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 160
+      },
+      "cancel": {
+       "description": "true keeps the company: it cancels a closing that is scheduled",
+       "type": "boolean"
+      },
+      "now": {
+       "description": "Close at once and delete everything",
+       "type": "boolean"
+      },
+      "export_kept": {
+       "description": "With now: you downloaded the export and keep the records yourself",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "directory.search",
+    "title": "Find a seller in the directory",
+    "description": "Services that take x402 payments, with their level (0 listed, 1 wallet verified), what they offer (MCP, .well-known/x402, llms.txt) and a link. Search by name, description or host. filter: all, verified or mcp. sort: level, new or name. Free, no account.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "q": {
+       "description": "Words to look for, e.g. \"on-chain data\"",
+       "type": "string",
+       "maxLength": 100
+      },
+      "filter": {
+       "description": "all (default), verified for services whose wallet signed, mcp for services with an MCP server",
+       "type": "string",
+       "enum": [
+        "all",
+        "verified",
+        "mcp"
+       ]
+      },
+      "sort": {
+       "description": "level (default), new or name",
+       "type": "string",
+       "enum": [
+        "level",
+        "new",
+        "name"
+       ]
+      },
+      "limit": {
+       "description": "How many services, 1 to 100",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100
+      },
+      "offset": {
+       "description": "How many to skip, for the next page",
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 10000
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "directory.get",
+    "title": "One listing",
+    "description": "A listing with its wallets (network and level), what its calls cost, other networks it takes and its links. Company and location show from level 2 on. Free, no account.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]{1,59}$",
+       "description": "The listing slug, e.g. glassnode"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "directory.claim",
+    "title": "Claim your listing",
+    "description": "Admin agents and owners. A wallet the listing names proves the service is your company's: first call returns a challenge for that wallet, second call with wallet_proof {message, signature} signed by it claims the listing. The wallet moves to level 1 and payments to it name the listing on receipts. A listing your company holds takes more wallets the same way.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]{1,59}$",
+       "description": "The listing slug, e.g. glassnode"
+      },
+      "address": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "A payTo wallet of the listing"
+      },
+      "wallet_proof": {
+       "description": "Second call only: the challenge message the first call returned, and the signature of that wallet over it",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "slug",
+      "address"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "directory.preview",
+    "title": "Read a paid URL for a new listing",
+    "description": "We call one paid URL once without paying, read its 402 answer and show the listing it would make: name, description, price, logo and the wallet you get paid on. Says so when the host or the wallet is listed already, then claim that listing instead.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 500,
+       "description": "One https URL that answers 402 Payment Required"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "url"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "directory.submit",
+    "title": "List your service",
+    "description": "Admin agents and owners. Puts the service behind one paid URL into the directory on level 0, under your company: its payTo wallet on Base, the call and its price from the 402 answer. contact_email is only for us, never shown. Then prove the wallet with directory.claim for level 1.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 500,
+       "description": "One paid URL of the service. It answers 402 with its payment details"
+      },
+      "contact_email": {
+       "type": "string",
+       "maxLength": 200,
+       "format": "email",
+       "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+       "description": "Where we can reach you about the listing. Only for us, never shown"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "url",
+      "contact_email"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "billing.get",
+    "title": "Plan, limits and usage",
+    "description": "Your company's plan with its period and end, its limits (null means no limit), what it uses this month (transactions, agents, wallets), whether the one-time 20 % over the limit is used, whether the month is locked, the archive (keeps receipts and documents without a paid plan, archive) and what happens to them without either (retention).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "billing.checkout",
+    "title": "Choose a plan",
+    "description": "Admin agents, the owner and finance. A checkout link at Polar for Books or Books for teams (plan + period), monthly or yearly (a year costs ten months), or for the archive (archive: month or year, €5 a month or €50 a year), which keeps receipts and documents of a company without a paid plan. Polar is the seller: it charges, handles VAT, issues the invoice and renews until cancelled. The invoices are in Polar's customer portal (billing.portal). Hand the link to a person of your company. It starts once Polar confirms the payment.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "plan": {
+       "description": "books for Books, teams for Books for teams",
+       "type": "string",
+       "enum": [
+        "books",
+        "teams"
+       ]
+      },
+      "period": {
+       "description": "month or year. A year costs ten months",
+       "type": "string",
+       "enum": [
+        "month",
+        "year"
+       ]
+      },
+      "archive": {
+       "description": "The archive instead of a plan, monthly or yearly",
+       "type": "string",
+       "enum": [
+        "month",
+        "year"
+       ]
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "billing.portal",
+    "title": "Billing portal",
+    "description": "Admin agents, the owner and finance. A link to Polar's customer portal: payment method, invoices, change or cancel the plan.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "billing.quote",
+    "title": "Pay 402lounge in USDC",
+    "description": "Admin agents, the owner and finance. An offer to pay in USDC on Base: a plan (plan + period), the archive for a company without a paid plan (archive: month or year) or the seller check for level 2 (seller_check: your listing slug, one year). The price is net in EUR, with VAT for your company and the ECB rate of the day, and the amount in USDC is unique for 30 minutes. Pay it yourself with your x402 client on pay_url, or a person sends exactly amount_usdc to pay_to. 402lounge sends an invoice. Nothing renews by itself. With quote_id only: the status of that offer, with the invoice once paid.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "plan": {
+       "description": "books for Books, teams for Books for teams",
+       "type": "string",
+       "enum": [
+        "books",
+        "teams"
+       ]
+      },
+      "archive": {
+       "description": "The archive, monthly or yearly",
+       "type": "string",
+       "enum": [
+        "month",
+        "year"
+       ]
+      },
+      "seller_check": {
+       "description": "Slug of your listing, for the seller check",
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]{1,59}$"
+      },
+      "period": {
+       "description": "month or year. A year costs ten months",
+       "type": "string",
+       "enum": [
+        "month",
+        "year"
+       ]
+      },
+      "quote_id": {
+       "description": "Read an offer instead of asking for one",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "billing.invoices",
+    "title": "Invoices of 402lounge",
+    "description": "The invoices 402lounge issued to your company for payments in USDC, newest first, each with a PDF link (add ?lang=de for German). With id: one invoice with its full content. Plans bought through Polar get their invoice from Polar.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "description": "Optional: one invoice with its full content",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.get",
+    "title": "Your seller levels",
+    "description": "Your company as a seller: every listing with its level (0 listed, 1 wallet verified, 2 company verified, 3 invoicing), the company check and its steps, the seller profile (register entry, representative), the invoicing mandate and self-billing, and what is missing for the next level.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.profile",
+    "title": "Representative and register entry",
+    "description": "Admin agents and owners. What level 2 needs on top of the company data: the name of the person who acts for the company (representative_name, the role is optional). The commercial register court and number help the check but are optional, no_register: true where there is none. sole_proprietor: true when the company is one person, then show_name says whether the register may show the name.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "register_court": {
+       "description": "The court or office that keeps the register, where the country names one: Registergericht in Germany, Firmenbuchgericht in Austria. GET /v1/countries names it per country",
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 80
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "register_number": {
+       "description": "The number in the register, as the register writes it (GET /v1/countries names the register per country)",
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 40
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "no_register": {
+       "description": "true when the company is in no commercial register",
+       "type": "boolean"
+      },
+      "representative_name": {
+       "description": "The name of the person who acts for the company. null clears it",
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 120
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "representative_role": {
+       "description": "e.g. Managing director",
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 60
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "sole_proprietor": {
+       "description": "true when the company is one person",
+       "type": "boolean"
+      },
+      "show_name": {
+       "description": "With sole_proprietor: whether the register may show the name",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.prices",
+    "title": "State the prices of a listing",
+    "description": "Admin agents and owners. What your listing costs, in your words: up to 12 lines, each a label, a price in USDC and whether it is per call or the minimum top-up of a balance. All lines at once, they replace the ones before. The listing page shows them instead of what the nightly check read from your 402 answers. An empty list removes them. Nobody checks them, so state what a buyer really pays.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "listing": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]{1,59}$",
+       "description": "The listing slug, e.g. glassnode"
+      },
+      "prices": {
+       "maxItems": 12,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "What the price is for, up to three words, e.g. \"Token price\""
+         },
+         "price_usdc": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "description": "The price in USDC, e.g. 0.002"
+         },
+         "unit": {
+          "type": "string",
+          "enum": [
+           "call",
+           "topup"
+          ],
+          "description": "call: per call. topup: the minimum top-up of a balance"
+         }
+        },
+        "required": [
+         "label",
+         "price_usdc",
+         "unit"
+        ]
+       },
+       "description": "Every line of the listing, in the order to show. [] removes them"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "listing",
+      "prices"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.check",
+    "title": "The company check of a listing (level 2)",
+    "description": "Level 2 for a listing of your company on level 1: action start {listing} opens the check and returns its steps. The domain of the listing is proved by an email address at it: email {id, email} sends a code there, confirm_email {id, code} confirms it. Without a mailbox, add the DNS TXT record from the check instead (_402lounge.<host>, value 402lounge-verify=<token>). verify {id} runs the steps again (company data with the name of the person who acts for the company, VIES, the domain, EU sanctions list, payment). Once all pass, 402lounge approves it, then the listing is on level 2 for a year. checkout {id} gives the Polar link for 10 € a year, included in Books. get {id}, withdraw {id}.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "start",
+        "get",
+        "verify",
+        "email",
+        "confirm_email",
+        "checkout",
+        "withdraw"
+       ],
+       "description": "start, get, verify, email, confirm_email, checkout or withdraw, as the description explains"
+      },
+      "listing": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]{1,59}$",
+       "description": "The listing slug, e.g. glassnode"
+      },
+      "id": {
+       "description": "The check, from start. Every action but start needs it",
+       "type": "string",
+       "format": "uuid",
+       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "email": {
+       "description": "email: an address at the domain of the listing",
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 200
+      },
+      "code": {
+       "description": "confirm_email: the six-digit code from the mail",
+       "type": "string",
+       "pattern": "^\\s*\\d{6}\\s*$"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "action"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.mandate",
+    "title": "Invoicing mandate (level 3)",
+    "description": "Admin agents and owners. get shows the mandate text (link, version, sha256) and whether it is signed. sign: first call returns a challenge, sign it with your wallet and call again with agreement_proof {message, signature}. Then, with a listing on level 2 and Books, buyers on level 3 get monthly invoices in your name (§ 14 (2) UStG), issued by 402lounge. revoke ends it at the end of the month.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "get",
+        "sign",
+        "revoke"
+       ],
+       "description": "get shows the text and whether it is signed, sign signs it (a challenge first), revoke ends it at the end of the month"
+      },
+      "agreement_proof": {
+       "description": "sign, second call: the challenge message the first call returned, and your wallet's signature over it",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "confirm": {
+       "description": "sign: true, after you read the mandate text from get",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "action"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.self_billing",
+    "title": "Self-billing agreement",
+    "description": "Admin agents and owners. Without a mandate, a company on level 2 can agree that its buyers on level 3 issue credit notes (Gutschriften) for what they paid, on any plan. get, sign (challenge, then agreement_proof), revoke (at the end of the month).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "get",
+        "sign",
+        "revoke"
+       ],
+       "description": "get shows the agreement and whether it is signed, sign signs it (a challenge first), revoke ends it at the end of the month"
+      },
+      "agreement_proof": {
+       "description": "sign, second call: the challenge message the first call returned, and your wallet's signature over it",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "confirm": {
+       "description": "sign: true, after you read the agreement from get",
+       "type": "boolean"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "action"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.invoices",
+    "title": "Documents in your name",
+    "description": "Invoices 402lounge issued in your name (L-2610-10427-01), credit notes your buyers issued to you (G-...) and their cancellations, newest first, each with its e-invoice. With id the whole document. PDF and XML: GET /v1/seller/invoices/{id}/pdf and /xml.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "description": "Optional: one document in full, by id or number",
+       "type": "string",
+       "maxLength": 80
+      },
+      "month": {
+       "description": "Optional: only this month, YYYY-MM",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "limit": {
+       "description": "How many documents, 1 to 200",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "seller.invoices.cancel",
+    "title": "Cancel a document in your name",
+    "description": "Admin agents, the owner and finance. Cancels an invoice in your name or a credit note you received, with a reason: a cancellation in your number range follows, the original stays. The payments are open again and the next monthly run issues them anew.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 80,
+       "description": "The invoice or credit note, by id or number"
+      },
+      "reason": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 500,
+       "description": "Why, 3 to 500 characters. It is written on the cancellation"
+      },
+      "proof": {
+       "description": "An EIP-4361 message you got from a challenge, signed by your wallet",
+       "type": "object",
+       "properties": {
+        "message": {
+         "type": "string"
+        },
+        "signature": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "message",
+        "signature"
+       ]
+      },
+      "session_token": {
+       "description": "A lounge session token (lg_...) if you have one",
+       "type": "string"
+      },
+      "client": {
+       "description": "Your client name, e.g. \"claude-code 2.1\"",
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "required": [
+      "id",
+      "reason"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "read",
+        "write"
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

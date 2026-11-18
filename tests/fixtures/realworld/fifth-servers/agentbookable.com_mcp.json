@@ -1,0 +1,450 @@
+{
+ "url": "https://agentbookable.com/mcp",
+ "doc": {
+  "name": "agentbookable",
+  "version": "3.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "find_businesses",
+    "description": "Search the AgentBookable registry for businesses that accept AI bookings. Search by free text, category, city, service name or geo radius. ALWAYS start here — the results include capability flags and _links telling you the exact next endpoints.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Free text on name/category/description/services, e.g. 'hairdresser'"
+      },
+      "category": {
+       "type": "string"
+      },
+      "city": {
+       "type": "string",
+       "description": "e.g. 'Civray'"
+      },
+      "service": {
+       "type": "string",
+       "description": "Service name, e.g. 'Haircut'"
+      },
+      "latitude": {
+       "type": "number"
+      },
+      "longitude": {
+       "type": "number"
+      },
+      "radiusKm": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_business",
+    "description": "Get one business's record by id (ab_bus_*) or slug. Includes capabilities (availability/booking/reschedule/cancellation/payment) — NEVER promise an action whose flag is false — plus _links to the service list, availability endpoint and booking flow, and per-service bookingRequirements (e.g. whether customer phone is required).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "businessId": {
+       "type": "string",
+       "description": "ab_bus_* id or public slug, e.g. 'agentbookable-demo'"
+      }
+     },
+     "required": [
+      "businessId"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "list_services",
+    "description": "List the services a business has opened to AI booking. Each service has a durationMinutes and bookingRequirements telling you what customer details to collect (name/email/phone) BEFORE booking.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "businessId": {
+       "type": "string",
+       "description": "ab_bus_* id or slug"
+      }
+     },
+     "required": [
+      "businessId"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_availability",
+    "description": "Find LIVE availability for a service. Always call this immediately before create_booking — slots are temporary (~60s) and revalidated at booking. Pass an ISO-8601 window; use a slot id from the result when booking.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "businessId": {
+       "type": "string"
+      },
+      "serviceId": {
+       "type": "string"
+      },
+      "from": {
+       "type": "string",
+       "description": "ISO-8601 window start, e.g. 2026-09-01T00:00:00Z"
+      },
+      "to": {
+       "type": "string",
+       "description": "ISO-8601 window end"
+      }
+     },
+     "required": [
+      "businessId",
+      "serviceId",
+      "from",
+      "to"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "create_booking",
+    "description": "Create a REAL appointment. CONSEQUENCEFUL: only after the user has explicitly chosen a slot and authorized the booking in their own words. Flow: (1) check the service's bookingRequirements and collect any required customer details (e.g. phone); (2) create a mandate via the create_mandate tool with the user's exact instruction; (3) call this tool with the mandateRef. The mandate is single-use and expires in 15 minutes. On SLOT_NO_LONGER_AVAILABLE offer the returned alternatives — never rebook unilaterally.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "businessId": {
+       "type": "string"
+      },
+      "serviceId": {
+       "type": "string"
+      },
+      "slotId": {
+       "type": "string",
+       "description": "Slot id from get_availability (preferred)"
+      },
+      "slot": {
+       "type": "object",
+       "properties": {
+        "start": {
+         "type": "string"
+        },
+        "end": {
+         "type": "string"
+        },
+        "staffId": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "start",
+        "end"
+       ],
+       "additionalProperties": false
+      },
+      "customer": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string",
+         "description": "Required when the service's bookingRequirements.phone is 'required'"
+        },
+        "timezone": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "mandateRef": {
+       "type": "string",
+       "description": "From create_mandate (or create_mandate_for_draft) — records the user's authorization"
+      },
+      "draftId": {
+       "type": "string",
+       "description": "Booking draft the user consented to (from prepare_booking). When given, the request must match the draft exactly or booking fails with CONSENT_DRAFT_MISMATCH."
+      },
+      "idempotencyKey": {
+       "type": "string",
+       "description": "Stable key; safe retries return the original booking"
+      }
+     },
+     "required": [
+      "businessId",
+      "serviceId",
+      "customer",
+      "mandateRef"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "destructiveHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "prepare_booking",
+    "description": "Prepare a booking draft: the concrete proposal (business, service, time, customer) to show the user. Validates live availability and customer requirements — if requirements are missing you get MISSING_CUSTOMER_REQUIREMENT: ask the user for those details first, then call again. Show the returned draft to the user as the final proposal (business, service, duration, date/time), then obtain explicit affirmative consent. The draft expires after 30 minutes; consent binds to this exact proposal.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "businessId": {
+       "type": "string"
+      },
+      "serviceId": {
+       "type": "string"
+      },
+      "slotId": {
+       "type": "string",
+       "description": "Slot id from get_availability (preferred)"
+      },
+      "slot": {
+       "type": "object",
+       "properties": {
+        "start": {
+         "type": "string"
+        },
+        "end": {
+         "type": "string"
+        },
+        "staffId": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "start",
+        "end"
+       ],
+       "additionalProperties": false
+      },
+      "customer": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        },
+        "timezone": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "actorRef": {
+       "type": "string",
+       "description": "Your agent/session identifier for the audit trail"
+      }
+     },
+     "required": [
+      "businessId",
+      "serviceId",
+      "customer",
+      "actorRef"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "create_mandate_for_draft",
+    "description": "After the user explicitly agrees to the exact proposal in the draft (an affirmative reply such as 'yes, book it' — the user having already seen business, service, date and time), assert consent here to get a single-use mandate bound to that draft. consentObtained must be true; this assertion is audited. If anything consequential changes (different time, service or business), prepare a NEW draft and get fresh consent.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "actorRef": {
+       "type": "string",
+       "description": "Your agent/session identifier, recorded in the audit trail"
+      },
+      "draftId": {
+       "type": "string",
+       "description": "The draft the user consented to (from prepare_booking)"
+      },
+      "consent": {
+       "type": "object",
+       "properties": {
+        "consentObtained": {
+         "type": "boolean",
+         "const": true
+        },
+        "draftId": {
+         "type": "string"
+        },
+        "consentedBy": {
+         "type": "string",
+         "description": "Who consented, e.g. 'the customer'"
+        },
+        "consentMethod": {
+         "type": "string",
+         "description": "How, e.g. 'chat reply: yes, book it' or 'spoken yes'"
+        },
+        "instruction": {
+         "type": "string",
+         "description": "The user's exact consenting words, for the audit trail"
+        }
+       },
+       "required": [
+        "consentObtained",
+        "draftId"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "actorRef",
+      "draftId",
+      "consent"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_booking",
+    "description": "Retrieve a booking by its AgentBookable id (bb_bkg_*). Requires the mandateRef issued for that booking (from create_booking / create_mandate). Provider identity is never returned.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "bookingId": {
+       "type": "string"
+      },
+      "mandateRef": {
+       "type": "string",
+       "description": "Mandate ref returned when the booking was authorized/created"
+      }
+     },
+     "required": [
+      "bookingId",
+      "mandateRef"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "create_mandate",
+    "description": "Legacy: record the user's authorization WITHOUT a booking draft. Prefer the draft flow: prepare_booking → show proposal → user agrees → create_mandate_for_draft → create_booking with draftId. The draft flow binds consent to the exact appointment the user saw.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "actorRef": {
+       "type": "string",
+       "description": "Your agent/session identifier, recorded in the audit trail"
+      },
+      "action": {
+       "type": "string",
+       "enum": [
+        "create_booking",
+        "reschedule_booking",
+        "cancel_booking"
+       ]
+      },
+      "businessId": {
+       "type": "string",
+       "description": "Bind the mandate to this business"
+      },
+      "serviceId": {
+       "type": "string"
+      },
+      "instruction": {
+       "type": "string",
+       "description": "The user's exact words — never fabricate or paraphrase"
+      }
+     },
+     "required": [
+      "actorRef",
+      "action",
+      "businessId",
+      "instruction"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ]
+ }
+}
