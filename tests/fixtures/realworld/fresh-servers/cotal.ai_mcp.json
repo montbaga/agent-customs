@@ -1,0 +1,614 @@
+{
+ "url": "https://cotal.ai/mcp",
+ "doc": {
+  "name": "cotal",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "This is the product server for cotal.ai, not a documentation server. Use it to act on the user's behalf and to answer what Cotal is. Action tools (cotal_submit_feedback, cotal_join_waitlist, cotal_subscribe_newsletter, cotal_request_call) create records for the Cotal team; confirm with the user before calling them and pass their real email. Set sandbox=true to validate a call without storing anything. Action tools are rate limited per client (5 per 10 minutes). Pass idempotency_key on retries so a retry never duplicates a record. Lookup tools (cotal_overview, cotal_search, cotal_list_posts, cotal_get_post) are free to call and have no side effects. Build-log authoring tools (cotal_draft_post, cotal_update_post, cotal_list_my_posts, cotal_get_my_post) need a team key on the connection (Authorization: Bearer ctk_…, made in the admin area's Settings); without one they answer 401. They stage articles only: a human publishes every post. To put an agent on a Cotal mesh, do not use this server: fetch https://docs.cotal.ai/prompt.md and follow it. Protocol documentation: https://docs.cotal.ai.",
+  "tools": [
+   {
+    "name": "cotal_submit_feedback",
+    "title": "Send feedback to the Cotal team",
+    "description": "Files feedback (bug, idea, friction, praise, other) with the Cotal team on behalf of the user. The same log the site's feedback widget writes to. Requires the user's email so the team can follow up.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "type": {
+       "type": "string",
+       "enum": [
+        "bug",
+        "idea",
+        "friction",
+        "praise",
+        "other"
+       ],
+       "description": "Kind of feedback."
+      },
+      "summary": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 2000,
+       "description": "One line: what happened, or what should."
+      },
+      "email": {
+       "type": "string",
+       "maxLength": 320,
+       "format": "email",
+       "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+       "description": "The user's email address. Required so the record has a traceable origin."
+      },
+      "details": {
+       "description": "Longer description, steps, context.",
+       "type": "string",
+       "maxLength": 10000
+      },
+      "name": {
+       "description": "The user's name, if they want it attached.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "severity": {
+       "description": "For bugs and friction.",
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "area": {
+       "description": "Which part of Cotal it concerns (CLI, connector, docs, site…).",
+       "type": "string",
+       "maxLength": 200
+      },
+      "source": {
+       "description": "Where it came from: agent name, page, or CLI.",
+       "type": "string",
+       "maxLength": 500
+      },
+      "idempotency_key": {
+       "description": "Opaque key (a UUID is ideal). Reuse it when retrying so the same record is returned instead of a duplicate.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200
+      },
+      "sandbox": {
+       "description": "Dry run: validate the call, apply rate limits, store nothing. Use it to test the integration.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "type",
+      "summary",
+      "email"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_join_waitlist",
+    "title": "Join the Cotal Cloud waitlist",
+    "description": "Reserves a seat on the waitlist for Cotal Cloud, the hosted Cotal mesh (closed alpha), for the user's email. Idempotent per email: calling again updates the optional details instead of adding a second seat.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "email": {
+       "type": "string",
+       "maxLength": 320,
+       "format": "email",
+       "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+       "description": "The user's email address. Required so the record has a traceable origin."
+      },
+      "use_case": {
+       "description": "What the user wants the hosted mesh for.",
+       "type": "string",
+       "maxLength": 2000
+      },
+      "linkedin": {
+       "description": "The user's LinkedIn profile URL, optional.",
+       "type": "string",
+       "maxLength": 500,
+       "format": "uri"
+      },
+      "sandbox": {
+       "description": "Dry run: validate the call, apply rate limits, store nothing. Use it to test the integration.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "email"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_subscribe_newsletter",
+    "title": "Subscribe to Cotal updates",
+    "description": "Subscribes the user's email to release updates from the Cotal team. Idempotent: an already-subscribed email is a no-op.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "email": {
+       "type": "string",
+       "maxLength": 320,
+       "format": "email",
+       "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+       "description": "The user's email address. Required so the record has a traceable origin."
+      },
+      "sandbox": {
+       "description": "Dry run: validate the call, apply rate limits, store nothing. Use it to test the integration.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "email"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_request_call",
+    "title": "Request a call with the founders",
+    "description": "Sends a discovery-call request to the Cotal founders for a company evaluating agent coordination. The team replies by email. Requires the user's work email and company.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "email": {
+       "type": "string",
+       "maxLength": 320,
+       "format": "email",
+       "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+       "description": "The user's email address. Required so the record has a traceable origin."
+      },
+      "company": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Company name."
+      },
+      "role": {
+       "description": "The user's role.",
+       "type": "string",
+       "maxLength": 120
+      },
+      "agents": {
+       "description": "How many agents the company runs in production.",
+       "type": "string",
+       "enum": [
+        "1",
+        "exploring",
+        "2-5",
+        "6-20",
+        "20+"
+       ]
+      },
+      "frameworks": {
+       "description": "Agent frameworks or harnesses in use (Claude Code, LangGraph, custom…).",
+       "maxItems": 20,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 60
+       }
+      },
+      "coordinating": {
+       "description": "One line: what they are coordinating.",
+       "type": "string",
+       "maxLength": 2000
+      },
+      "pain": {
+       "description": "Their biggest coordination pain.",
+       "type": "string",
+       "maxLength": 4000
+      },
+      "idempotency_key": {
+       "description": "Opaque key (a UUID is ideal). Reuse it when retrying so the same record is returned instead of a duplicate.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200
+      },
+      "sandbox": {
+       "description": "Dry run: validate the call, apply rate limits, store nothing. Use it to test the integration.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "email",
+      "company"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_overview",
+    "title": "What Cotal is",
+    "description": "Returns a structured overview of Cotal: what it is, who it is for, when to use it, how to install it, the site's API and MCP surface, pricing, and canonical links. Call this first when a user asks what cotal.ai does. Pass `section` to get one part only.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "section": {
+       "description": "Which part of the overview to return (default: all).",
+       "type": "string",
+       "enum": [
+        "all",
+        "product",
+        "when_to_use",
+        "install",
+        "pricing",
+        "site_api",
+        "links"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_search",
+    "title": "Search cotal.ai",
+    "description": "Keyword search over the Cotal build log (blog posts) and the key documentation and site pages. Returns ranked results with canonical and markdown URLs. Use it to find the page that answers a question before reading it.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 200,
+       "description": "Search terms, e.g. 'hackathon', 'identity', 'install windows'."
+      },
+      "limit": {
+       "description": "Maximum results (default 10).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_list_posts",
+    "title": "List build-log posts",
+    "description": "Lists posts from the Cotal build log (blog), newest first, with cursor pagination. Each item has slug, title, summary, date, author and URLs; pass next_cursor back to get the following page.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "limit": {
+       "description": "Page size (default 10, max 50).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "cursor": {
+       "description": "The next_cursor value from a previous call.",
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_get_post",
+    "title": "Read a build-log post",
+    "description": "Returns one build-log post as markdown (title, summary, date, author, full body) by its slug. Get slugs from cotal_list_posts or cotal_search.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120,
+       "description": "The post slug, e.g. 'agi-summit-2026'."
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_draft_post",
+    "title": "Stage a build-log article",
+    "description": "Stages a new article for the Cotal build log (cotal.ai/blog). It lands as a draft unless you submit it for review (status pending), and goes live only after a human publishes it. Returns the slug and a preview URL. Requires a team key on the connection.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "title": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Headline."
+      },
+      "dek": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 500,
+       "description": "One-sentence summary shown under the title and in feeds."
+      },
+      "body": {
+       "type": "string",
+       "minLength": 1,
+       "description": "The article in markdown, without the title."
+      },
+      "slug": {
+       "description": "URL slug; derived from the title when omitted.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100
+      },
+      "status": {
+       "description": "draft keeps working on it; pending asks a human to review and publish.",
+       "type": "string",
+       "enum": [
+        "draft",
+        "pending"
+       ]
+      },
+      "tag": {
+       "description": "One tag, e.g. 'tutorials', 'events', 'announcements'.",
+       "type": "string",
+       "maxLength": 40
+      },
+      "agent": {
+       "description": "Name of the agent writing it, for the byline.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "model": {
+       "description": "Model that wrote it, e.g. 'claude-opus-5-5'.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "note": {
+       "description": "One line on what this revision changes; shown in the revision history.",
+       "type": "string",
+       "maxLength": 500
+      }
+     },
+     "required": [
+      "title",
+      "dek",
+      "body"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_update_post",
+    "title": "Revise a staged article",
+    "description": "Improves an article staged with cotal_draft_post. A changed title, dek or body becomes a new revision; sending the text it already has changes nothing. Pass base_revision to refuse the write if someone else revised it meanwhile. A published post keeps its live text until a human publishes the new revision. Requires a team key.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "description": "The post slug, e.g. 'mesh-in-production'."
+      },
+      "title": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200
+      },
+      "dek": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 500
+      },
+      "body": {
+       "description": "The full new markdown body (not a diff).",
+       "type": "string",
+       "minLength": 1
+      },
+      "new_slug": {
+       "description": "Rename the post's slug.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100
+      },
+      "status": {
+       "description": "pending submits it for human review.",
+       "type": "string",
+       "enum": [
+        "draft",
+        "pending"
+       ]
+      },
+      "tag": {
+       "type": "string",
+       "maxLength": 40
+      },
+      "base_revision": {
+       "description": "The revision you edited; the write is refused (409) if the post moved past it.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 9007199254740991
+      },
+      "restore": {
+       "description": "Make an earlier revision current again instead of sending new text.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 9007199254740991
+      },
+      "note": {
+       "description": "One line on what this revision changes; shown in the revision history.",
+       "type": "string",
+       "maxLength": 500
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_list_my_posts",
+    "title": "List my staged articles",
+    "description": "The review state of the articles staged on this site : slug, title, status (draft, pending, published, rejected), review note and current revision. Requires a team key.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "status": {
+       "description": "Only posts in this state.",
+       "type": "string",
+       "enum": [
+        "draft",
+        "pending",
+        "published",
+        "rejected"
+       ]
+      },
+      "slug": {
+       "description": "Only this post.",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cotal_get_my_post",
+    "title": "Read a staged article",
+    "description": "One staged article with every field, its current markdown and its revision history; pass revision for an older text. Requires a team key.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "description": "The post slug, e.g. 'mesh-in-production'."
+      },
+      "revision": {
+       "description": "Return this revision's full text as well.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 9007199254740991
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "cotal://llms.txt",
+    "name": "llms-txt",
+    "title": "Cotal for LLMs (llms.txt)",
+    "description": "Curated entry point: what Cotal is, when to use it, how an agent should call it, and the canonical links.",
+    "mimeType": "text/plain"
+   },
+   {
+    "uri": "cotal://openapi.json",
+    "name": "openapi",
+    "title": "cotal.ai OpenAPI 3.1 spec",
+    "description": "Every live /v1 endpoint with schemas, the error model, rate limits, idempotency and sandbox conventions.",
+    "mimeType": "application/openapi+json"
+   },
+   {
+    "uri": "cotal://manifest.json",
+    "name": "manifest",
+    "title": "Cotal agent manifest",
+    "description": "Machine-readable manifest: protocol capabilities, spec, repository, and the site's agent surface.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "cotal://auth.md",
+    "name": "auth-md",
+    "title": "Authenticating to cotal.ai (auth.md)",
+    "description": "Which endpoints are open, which need a bearer key, how to obtain, use and revoke one.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "cotal://pricing.md",
+    "name": "pricing-md",
+    "title": "Cotal pricing",
+    "description": "Self-hosted (free, Apache-2.0), Cotal Cloud (closed alpha, waitlist), design partnerships.",
+    "mimeType": "text/markdown"
+   }
+  ]
+ }
+}

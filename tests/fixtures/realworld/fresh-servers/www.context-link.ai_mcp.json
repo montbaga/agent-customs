@@ -1,0 +1,449 @@
+{
+ "url": "https://www.context-link.ai/mcp",
+ "doc": {
+  "name": "Context Link MCP Server",
+  "version": "0.0.7",
+  "protocolVersion": "2025-06-18",
+  "instructions": "\n                Context Link retrieves source-backed context from the user's connected workspaces, websites, files and email.\n\n                Get Context returns relevant snippets from those sources for a query.\n                Ask Question returns a concise answer with citations drawn from the same sources.\n\n                Save Memory stores a named reference document in the user's Context Link workspace; it does not modify connected sources.\n                If the user names the document (e.g. 'save {name}'), that name is its namespace.\n                Get Memory retrieves a stored document by its namespace.\n                To revise a stored document, retrieve it with Get Memory and save the updated content back under the same namespace.\n            ",
+  "tools": [
+   {
+    "name": "get_context",
+    "title": "Get Context",
+    "description": "Get context from the user's connected workspaces and websites. The attached widget displays only the list of sources consulted — it does not show the retrieved content, so use the returned context to answer the user directly.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string",
+       "description": "Optional mode to weight results (e.g. 'customer-support')"
+      },
+      "connection_type": {
+       "type": "string",
+       "description": "Optional comma-separated list of connection types to restrict retrieval to (e.g. \"site,email\"). Only content from those sources is considered. Valid types: basecamp, custom, email, files, google_doc, memory, monday, notion, one_drive, site, webmention, youtube."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object"
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "success",
+           "no_content",
+           "signup_required"
+          ]
+         },
+         "id": {
+          "type": "integer"
+         },
+         "title": {
+          "type": "string"
+         },
+         "post_titles": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "connection_type": {
+          "type": "string"
+         },
+         "chunks_count": {
+          "type": "integer"
+         },
+         "logo": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind"
+        ]
+       }
+      },
+      "context": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "sources",
+      "context"
+     ],
+     "additionalProperties": false,
+     "type": "object"
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "readOnlyHint": true,
+     "title": "Get Context"
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/context-sources.html",
+     "openai/toolInvocation/invoking": "Getting context",
+     "openai/toolInvocation/invoked": "Got context",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "context:read"
+       ]
+      }
+     ],
+     "ui": {
+      "resourceUri": "ui://widget/context-sources.html"
+     }
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "context:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "ask_question",
+    "title": "Ask Question",
+    "description": "Ask a question about the user's connected workspaces and websites and receive a concise answer with citations. The attached widget displays only the list of sources consulted — it does not show the answer, so always relay the answer text in your reply.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string",
+       "description": "Optional mode to weight results (e.g. 'customer-support')"
+      },
+      "connection_type": {
+       "type": "string",
+       "description": "Optional comma-separated list of connection types to restrict retrieval to (e.g. \"site,email\"). Only content from those sources is considered. Valid types: basecamp, custom, email, files, google_doc, memory, monday, notion, one_drive, site, webmention, youtube."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object"
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "answer": {
+       "type": "string",
+       "description": "Concise paragraph answer; empty string when success is false"
+      },
+      "citations": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "n": {
+          "type": "integer"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "n",
+         "title"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "success": {
+       "type": "boolean"
+      },
+      "reason": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "no_context",
+        "llm_error",
+        "empty_input",
+        "auth_required",
+        "signup_required",
+        "pro_required",
+        "allowance_exceeded",
+        "invalid_connection_type"
+       ]
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "success",
+           "no_content",
+           "signup_required"
+          ]
+         },
+         "id": {
+          "type": "integer"
+         },
+         "title": {
+          "type": "string"
+         },
+         "post_titles": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "connection_type": {
+          "type": "string"
+         },
+         "chunks_count": {
+          "type": "integer"
+         },
+         "logo": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "answer",
+      "citations",
+      "success",
+      "reason",
+      "sources"
+     ],
+     "additionalProperties": false,
+     "type": "object"
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "readOnlyHint": true,
+     "title": "Ask Question"
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/context-sources.html",
+     "openai/toolInvocation/invoking": "Asking Context Link",
+     "openai/toolInvocation/invoked": "Got answer",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "context:read"
+       ]
+      }
+     ],
+     "ui": {
+      "resourceUri": "ui://widget/context-sources.html"
+     }
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "context:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "save_memory",
+    "title": "Save Memory",
+    "description": "Save content to the user's memory for later retrieval. Use this when the user wants to save information, notes, or conversation content.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "content": {
+       "type": "string",
+       "description": "The content to save. Can be plain text, markdown, or structured content."
+      },
+      "namespace": {
+       "type": "string",
+       "description": "A name/label for this memory (use-dashes-for-spaces). If omitted, a timestamped name is generated."
+      }
+     },
+     "required": [
+      "content"
+     ],
+     "type": "object"
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "message": {
+       "type": "string"
+      },
+      "namespace": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "message",
+      "namespace"
+     ],
+     "additionalProperties": false,
+     "type": "object"
+    },
+    "annotations": {
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": false,
+     "readOnlyHint": false,
+     "title": "Save Memory"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Saving to memory",
+     "openai/toolInvocation/invoked": "Saved to memory",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "context:write"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "context:write"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_memory",
+    "title": "Get Memory",
+    "description": "Retrieve previously saved memory content by its namespace. Use this when the user wants to recall saved content.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "namespace": {
+       "type": "string",
+       "description": "The namespace/name of the saved memory to retrieve"
+      }
+     },
+     "required": [
+      "namespace"
+     ],
+     "type": "object"
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "content": {
+       "type": "string"
+      },
+      "namespace": {
+       "type": "string"
+      },
+      "found": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "content",
+      "namespace",
+      "found"
+     ],
+     "additionalProperties": false,
+     "type": "object"
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true,
+     "title": "Get Memory"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Retrieving memory",
+     "openai/toolInvocation/invoked": "Retrieved memory",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "context:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "context:read"
+      ]
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://widget/context-sources.html",
+    "name": "context-sources",
+    "title": "Context Sources widget",
+    "description": "Context Sources widget HTML",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "prefersBorder": true,
+      "csp": {
+       "connectDomains": [
+        "https://www.context-link.ai"
+       ],
+       "resourceDomains": [
+        "https://www.context-link.ai",
+        "https://www.google.com"
+       ]
+      },
+      "domain": "de4fcccd39d75091e9b1616e387a41e7.claudemcpcontent.com"
+     },
+     "openai/widgetDescription": "Shows only the list of sources Context Link consulted — it does not display the answer or retrieved content, so the assistant must still present those in its reply.",
+     "openai/widgetPrefersBorder": true,
+     "openai/widgetDomain": "https://www.context-link.ai",
+     "openai/widgetCSP": {
+      "connect_domains": [
+       "https://www.context-link.ai"
+      ],
+      "resource_domains": [
+       "https://www.context-link.ai",
+       "https://www.google.com"
+      ]
+     }
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,3995 @@
+{
+ "url": "https://councilof.ai/mcp/",
+ "doc": {
+  "name": "csoai-gspc-mcp",
+  "version": "1.4.4",
+  "protocolVersion": "2025-06-18",
+  "instructions": "GSPC MCP. 49 free read-only tools and 5 paid x402 tools. Call tools/list for the current definitions. Call a paid tool without x_payment for its payment challenge; payment comes from the caller's wallet. Payment travels as the x_payment ARGUMENT; each implementation sets the X-PAYMENT header itself. A 402 challenge is not settlement, delivery or revenue. Measurement, not certification; verification stays free. witness_hash is quarantined and not advertised. MCP Registry server.version identifies this Pages HTTP implementation; npm is a separately versioned implementation.",
+  "tools": [
+   {
+    "name": "board_totals",
+    "title": "Council of AI · MEOK companion",
+    "description": "Read the live GSPC board overview. Use this for declared, measured and unmeasured counts; use get_axis for one dimension and verify_card for one signed record. The default summary includes distinct count kinds, separation (TIE and UNTESTED are not wins) and source dates. detail=\"full\" adds count grammar, family totals and the full measured_on block, preserving the legacy full payload. Fetch failure is UNREACHABLE, never a cached live result. Measurement, not certification or authority to act.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "detail": {
+       "type": "string",
+       "enum": [
+        "summary",
+        "full"
+       ],
+       "default": "summary",
+       "description": "summary (default): counts, public_count, the separation line, dates and source. full: also count_grammar, by_family and the board's measured_on block."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE or UNREACHABLE"
+      },
+      "detail": {
+       "type": "string",
+       "description": "summary or full"
+      },
+      "counts": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "public_count": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "separation": {},
+      "count_grammar": {},
+      "by_family": {},
+      "as_of": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "Live GSPC board totals",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://council/live-panel/2"
+     },
+     "openai/ui": {
+      "entrypoints": [
+       {
+        "type": "global"
+       },
+       {
+        "type": "thread"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "get_axis",
+    "title": "One GSPC board axis",
+    "description": "Read one live board dimension by its axis id. Prefer this when a dimension is supplied or selected at runtime; axis_* tools select one fixed dimension with no arguments. Use board_totals for the overview. Returns applicable metrics, original evidence dates and links; a leader is named only when SEPARATED. UNMEASURED is not zero or pass/fail; BAD_INPUT, NOT_ON_BOARD and UNREACHABLE remain distinct. Check the referenced method before comparing results. Measurement, not certification or permission.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "axis": {
+       "type": "string",
+       "description": "The axis name as it appears on the board, e.g. governance, safety, jail, provenance-controls. Case-insensitive. An unknown name returns the list of names the board actually carries."
+      }
+     },
+     "required": [
+      "axis"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD, BAD_INPUT or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "resolved_from": {
+       "type": "string",
+       "description": "present when the caller named an alias (e.g. gov) that resolved to this board axis"
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "board_carries": {
+       "type": "array"
+      },
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "One GSPC board axis",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://council/live-panel/2"
+     }
+    }
+   },
+   {
+    "name": "verify_card",
+    "title": "Verify a signed measurement card (free)",
+    "description": "Verify a signed gspc.measurement-card under the published rule (https://councilof.ai/signed/HOW-TO-VERIFY.md): recompute the id from the canonical body bytes, then check the Ed25519 signature under a key PINNED in this verifier and published in the did:web:csoai.org DID document: #card-attestation-1 (the card key of the signed card index) or #card-attestation-2 (the card key added on rotation, 27 Sep 2026; a card names the key it was signed under), plus the board key for the cards it signed. pinned_key in the result names the key that matched. A card that carries its own key proves only that the file is self-consistent — anyone can alter a body and sign it with a key they just generated — so an inline key outside the pinned set is reported INVALID, and a DID key reference outside it UNCHECKABLE. Three verdicts, never two: VALID, INVALID (with the reason), or UNCHECKABLE when the check could not be completed — 'could not check' is a different claim from 'forged'. Accepts the card as a JSON object, a JSON string, a councilof.ai / csoai.org URL, or a 64-hex card id (the record id shown on the site and the card field of list_cards), which resolves to https://councilof.ai/signed/cards/{id}.json. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "card": {
+       "description": "The signed card: an object, a JSON string, a councilof.ai / csoai.org URL to one, or a 64-hex card id (resolved to https://councilof.ai/signed/cards/{id}.json).",
+       "anyOf": [
+        {
+         "type": "object"
+        },
+        {
+         "type": "string"
+        }
+       ]
+      }
+     },
+     "required": [
+      "card"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "VALID, INVALID or UNCHECKABLE"
+      },
+      "id": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "family": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "reasons": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "checks": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "check": {
+          "type": "string"
+         },
+         "ok": {
+          "type": [
+           "boolean",
+           "null"
+          ],
+          "description": "true = passed, false = failed, null = not applicable or not run (detail says UNCHECKED)"
+         },
+         "code": {
+          "type": "string"
+         },
+         "detail": {
+          "type": "string"
+         },
+         "advisory": {
+          "type": "boolean",
+          "description": "true = reported but never decides the verdict (the live did.json cross-check)"
+         }
+        }
+       }
+      },
+      "pinned_key": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "rule": {
+       "type": "string"
+      },
+      "note": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      },
+      "resolved_from": {
+       "type": "object",
+       "description": "Present when a 64-hex card id was passed: the id asked about and the URL fetched for it.",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "Verify a signed measurement card (free)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://council/live-panel/2"
+     }
+    }
+   },
+   {
+    "name": "list_cards",
+    "title": "List signed card index rows",
+    "description": "The published signed-card index (https://councilof.ai/signed/card_index.json): what the index declares (n_cards) and how many rows it actually carries, reported next to — never reconciled with — the count the card store endpoint (https://councilof.ai/api/cards) reports for itself. Two labelled numbers from two surfaces; if they disagree, this tool shows the disagreement rather than picking one. Optional filters return recent rows: axis, limit. Each row carries card_url, the signed body; pass it, or the row's 64-hex card id, to verify_card.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "axis": {
+       "type": "string",
+       "description": "Only list rows whose axis matches this name (case-insensitive)."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 150,
+       "description": "How many rows to include in the listing (newest first). Default 10. The two counts are always reported in full regardless of this limit."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "LIVE",
+        "UNREACHABLE"
+       ],
+       "description": "Read state of the signed card index on this call: LIVE (read now) or UNREACHABLE. Listing is not verification; verify_card checks a row."
+      },
+      "state_basis": {
+       "type": "string"
+      },
+      "index": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "card_store_count_endpoint": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "rows": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "items": {
+        "type": "object",
+        "properties": {
+         "card": {
+          "type": "string"
+         },
+         "card_url": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "The signed card body, https://councilof.ai/signed/cards/{id}.json. verify_card takes this URL or the bare card id."
+         },
+         "axis": {
+          "type": "string"
+         },
+         "ts": {},
+         "signed": {}
+        }
+       }
+      },
+      "axis_query": {
+       "type": "object",
+       "properties": {
+        "asked": {
+         "type": "string"
+        },
+        "canonical": {
+         "type": "string"
+        },
+        "spellings": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "index_names_matched": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "doctrine": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "title": "List signed card index rows",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_root",
+    "title": "Public Merkle root",
+    "description": "Read the published public-root metadata at https://councilof.ai/root.json. Returns merkle_root, card_count, as_of, kind and note. VALID means the JSON was retrieved; it does not verify a signature or a measurement. UNREACHABLE means the root response could not be read. Separate from GSPC measurement. Never a certificate.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "VALID: JSON retrieved, not cryptographically verified. UNREACHABLE: the root response could not be read."
+      },
+      "merkle_root": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "card_count": {},
+      "as_of": {},
+      "kind": {},
+      "source": {
+       "type": "string"
+      },
+      "not_gspc": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "Public Merkle root",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_card",
+    "title": "One public-root card-v0 leaf",
+    "description": "GET one public-root card-v0 leaf by sha256 (64 hex) from https://councilof.ai/cards/{sha16}.json. UNMEASURED cells stay visible. States: VALID (fetched); NOT_IN_THIS_CORPUS (the id is in the signed card index, not the public root, so use verify_card on it); INVALID (in neither the live root nor the signed card index); UNCHECKABLE (a source could not be read). Not a GSPC measurement-card.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "sha256": {
+       "type": "string",
+       "description": "64-char hex payload SHA-256 of the card-v0 leaf."
+      }
+     },
+     "required": [
+      "sha256"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "VALID, NOT_IN_THIS_CORPUS, INVALID or UNCHECKABLE"
+      },
+      "sha256": {
+       "type": "string"
+      },
+      "reason": {
+       "type": "string"
+      },
+      "source": {
+       "type": "string"
+      },
+      "surface": {},
+      "unmeasured": {},
+      "sig_ed25519": {},
+      "not_gspc": {
+       "type": "boolean"
+      },
+      "corpus": {
+       "type": "string",
+       "description": "With NOT_IN_THIS_CORPUS: the set the id belongs to (signed_card_index)."
+      },
+      "card_url": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "With NOT_IN_THIS_CORPUS: the signed card body to pass to verify_card."
+      },
+      "next": {
+       "type": "object",
+       "description": "With NOT_IN_THIS_CORPUS: the tool call that checks this id."
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "One public-root card-v0 leaf",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "verify_inclusion",
+    "title": "Merkle inclusion check",
+    "description": "Check a sha256 against the live public-root merkle via GET /api/proof?sha=. Three states only: VALID (included), INVALID (not a leaf), UNCHECKABLE (proof endpoint unreachable). Does not claim Ed25519 unless sig_ed25519 is present and checked separately. Never a grade.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "sha256": {
+       "type": "string",
+       "description": "64-char hex digest to test for inclusion."
+      }
+     },
+     "required": [
+      "sha256"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "VALID, INVALID or UNCHECKABLE"
+      },
+      "sha256": {
+       "type": "string"
+      },
+      "merkle_root": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "reason": {}
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "Merkle inclusion check",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "x402_trust",
+    "title": "x402 catalog trust snapshot",
+    "description": "GET the latest x402 catalog trust snapshot: counts of how many catalogued x402 resources open a correct 402 challenge vs how many are phantom on the wire. Counts only by doctrine — host details withheld; a 402 is NOT delivery; measurement, never certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "VALID or UNREACHABLE"
+      },
+      "counts": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "headline": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "as_of": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "kind": {},
+      "source": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "x402 catalog trust snapshot",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "mcp_trust",
+    "title": "MCP handshake census snapshot",
+    "description": "GET the latest MCP handshake trust snapshot (https://councilof.ai/interop/mcp-trust/latest.json): counts of how many internet-facing MCP servers answer a correct initialize handshake, how many respond with an auth challenge, and how many are unreachable. Counts only by doctrine — host details withheld by design. A partial round or a cap change is disclosed in the snapshot. Measurement, never certification. Three states: VALID (fetched), UNREACHABLE (could not fetch), UNCHECKABLE (body unreadable).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "VALID or UNREACHABLE"
+      },
+      "counts": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "as_of": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "partial": {
+       "type": "boolean",
+       "description": "true whenever the enumeration did not complete — a cap-limited read is partial"
+      },
+      "partial_reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "enumeration": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "diff": {},
+      "kind": {},
+      "source": {
+       "type": "string"
+      },
+      "headline": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "MCP handshake census snapshot",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "measurement_index",
+    "title": "Measurement-capsule index",
+    "description": "Read the latest signed measurement-capsule index published at https://councilof.ai/measurement-capsules/latest.json: the index root over every capsule, each batch (adapter, kind, capsule count, measurement states, batch Merkle root, record sha256, record signature and OpenTimestamps state), the index's own board signature re-verified here against the pinned did:web:csoai.org#board-attestation-1 key, and the anchor states published beside it (OpenTimestamps, Rekor, XRPL) — PENDING is never called attested. States only: measurement, not endorsement; no verdict, score or ranking. NOT_PUBLISHED when no index is served; UNREACHABLE when the source could not be fetched.",
+    "annotations": {
+     "title": "Measurement-capsule index",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "PUBLISHED",
+        "NOT_PUBLISHED",
+        "UNREACHABLE",
+        "UNCHECKABLE"
+       ]
+      },
+      "doctrine": {
+       "type": "string",
+       "const": "measurement, not endorsement"
+      },
+      "version": {
+       "type": "string"
+      },
+      "index_root": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "n_capsules_total": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "n_batches": {
+       "type": "integer"
+      },
+      "batches": {
+       "type": "array",
+       "items": {
+        "type": "object"
+       }
+      },
+      "signature": {
+       "type": "object"
+      },
+      "anchors": {
+       "type": "object"
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    }
+   },
+   {
+    "name": "verify_capsule",
+    "title": "Verify one measurement capsule",
+    "description": "Verify one measurement capsule. Pass capsule_json as the capsule's JSON TEXT (exact: number lexemes are kept) or as an object. Recomputes capsule_id (sha256 of the canonical JSON without capsule_id), picks the rule by the capsule's schema (csoai.measurement-capsule/0.2: RFC 6962 Merkle with 0x00/0x01 domain separation; the superseded v0.1 capsule schema: the v0.1 rule), finds the published batch of the same kind, recomputes that batch's root from its published leaves, and returns the audit path of this capsule against the root named by the signed index. States: INCLUDED, NOT_INCLUDED, ID_MISMATCH, UNCHECKABLE, NOT_PUBLISHED. Verifying is free forever. It proves the bytes were published and bound; what they measured is the capsule's own measurement_state and limitations — measurement, not endorsement.",
+    "annotations": {
+     "title": "Verify one measurement capsule",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "capsule_json": {
+       "description": "The capsule: its JSON text (preferred, byte-exact) or the parsed object.",
+       "type": [
+        "string",
+        "object"
+       ]
+      }
+     },
+     "required": [
+      "capsule_json"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "INCLUDED",
+        "NOT_INCLUDED",
+        "ID_MISMATCH",
+        "UNCHECKABLE",
+        "NOT_PUBLISHED",
+        "UNREACHABLE"
+       ]
+      },
+      "doctrine": {
+       "type": "string",
+       "const": "measurement, not endorsement"
+      },
+      "capsule_id": {
+       "type": "object"
+      },
+      "batch": {
+       "type": "object"
+      },
+      "inclusion": {
+       "type": "object"
+      },
+      "index_signature": {
+       "type": "object"
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    }
+   },
+   {
+    "name": "server_evidence",
+    "title": "Every published capsule about one endpoint",
+    "description": "Trust per server, not totals: every published measurement capsule about ONE endpoint URL across all batches — MCP contract-parity dimensions (AUTH, PAYMENT, PROTOCOL, TOOLS, VERSION), A2A card-signature state, self-parity cells for CSOAI's own doors, and any later adapter (e.g. tool drift) — each with its measurement_state, observed_at, correction_pointer, limitations, batch Merkle root and an inclusion pointer for independent verification. Read from a static per-endpoint shard keyed by sha256 of the normalised URL. An endpoint with no capsule answers NOT_MEASURED with an empty list — never an error and never a clean bill. No verdict, score or ranking: measurement, not endorsement.",
+    "annotations": {
+     "title": "Every published capsule about one endpoint",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "endpoint_url": {
+       "type": "string",
+       "format": "uri",
+       "pattern": "^https?://",
+       "maxLength": 2048,
+       "description": "Public HTTP(S) endpoint URL whose already-published measurement capsules should be read, e.g. https://example.com/mcp."
+      }
+     },
+     "required": [
+      "endpoint_url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "MEASURED",
+        "NOT_MEASURED",
+        "NOT_PUBLISHED",
+        "UNREACHABLE",
+        "UNCHECKABLE"
+       ]
+      },
+      "doctrine": {
+       "type": "string",
+       "const": "measurement, not endorsement"
+      },
+      "endpoint": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "n_capsules": {
+       "type": "integer"
+      },
+      "capsules": {
+       "type": "array",
+       "items": {
+        "type": "object"
+       }
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://council/live-panel/2"
+     }
+    }
+   },
+   {
+    "name": "evidence_bundle_preview",
+    "title": "Signed cards relevant to one obligation (free)",
+    "description": "For ONE obligation (article-50, article-53 GPAI transparency, dora or cra) and an optional subject: the obligation record, its counsel-gate status and the already-signed measurement cards that are relevant to it (count plus the first cards, each with its verify link), read live from https://councilof.ai/api/evidence-bundle. Relevant-to is never a determination: no answer says satisfied or not satisfied, and zero relevant cards is answered EMPTY, never as an error and never as a clean bill. Article 53 output is evidence for review, not a legal determination. Evidence for obligation work — not a conformity assessment, certification, audit opinion or compliance determination; grants no status. Measurement, not certification. Verification of any card is free at https://councilof.ai/gspc-verify.",
+    "annotations": {
+     "title": "Signed cards relevant to one obligation (free)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "obligation": {
+       "type": "string",
+       "enum": [
+        "article-50",
+        "article-53",
+        "dora",
+        "cra"
+       ],
+       "description": "article-50 (AI-generated content marking), article-53 (GPAI provider documentation), dora (ICT third-party oversight) or cra (Cyber Resilience Act)."
+      },
+      "subject": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Optional: a model id, vendor or instrument the cards must name. Omit for the obligation-wide selection."
+      }
+     },
+     "required": [
+      "obligation"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "RELEVANT_CARDS_FOUND",
+        "EMPTY",
+        "UNKNOWN_OBLIGATION",
+        "BAD_ARGUMENTS",
+        "UNREACHABLE"
+       ]
+      },
+      "obligation": {
+       "type": "object"
+      },
+      "subject": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "relevant_signed_cards": {
+       "type": "integer"
+      },
+      "cards": {
+       "type": "array",
+       "items": {
+        "type": "object"
+       }
+      },
+      "corpus": {},
+      "relation": {
+       "type": "string"
+      },
+      "counsel_confirmed": {
+       "type": "boolean"
+      },
+      "review_note": {
+       "type": "string"
+      },
+      "determination": {
+       "type": "string",
+       "const": "NONE"
+      },
+      "source": {
+       "type": "string"
+      },
+      "reason": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    }
+   },
+   {
+    "name": "route",
+    "title": "GSPC Route: decide a path under your policy (free, decide-only)",
+    "description": "GSPC Route (free, decide-only). Applies YOUR policy and the fixed GSPC floor to a candidate set and returns the chosen candidate, the basis of the choice and an unsigned route record (csoai.evidence-event/0.1, profile csoai.route-evidence/0.1). Candidates are the GSPC MCP tools by default, or ones you declare: your models, your local GPU, MCP tools, A2A agents, x402 resources. Policy is Cedar: presets read-only, local-only, eu-only, no-unmeasured, plus forbid_providers and allow_kinds; anything the router does not understand grants nothing. For the quality axis you name it reads the live board (https://councilof.ai/api/gspc). With no candidates declared, the GSPC tool whose purpose matches the task is chosen (basis task_match); when no tool's purpose matches, the answer is UNTESTED and nothing is chosen, never a pick by name. For candidates you declare, routing is not ranking: a choice is called a separated leader only when the board separated that comparison; otherwise it is TIE or UNTESTED and your tie_break decides. A candidate the board holds no number for is UNTESTED, never 0. Sponsor, bid and placement fields are ignored. The task text is hashed, never stored. Nothing is executed, called or charged; mode execute answers NOT_ENABLED. Measurement, not certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "maxLength": 20000,
+       "description": "The task. Hashed (sha256) and never stored or echoed."
+      },
+      "task_sha256": {
+       "type": "string",
+       "pattern": "^[0-9a-fA-F]{64}$",
+       "description": "Alternative to task: its sha256."
+      },
+      "data_class": {
+       "type": "string",
+       "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "pii"
+       ],
+       "description": "Default public. A non-public class is routed only to candidates that declare it in data_class_allowed."
+      },
+      "needs_write": {
+       "type": "boolean"
+      },
+      "candidates": {
+       "type": "array",
+       "maxItems": 32,
+       "description": "Omit to route among the GSPC MCP tools. A candidate field the router does not know makes that candidate UNCHECKABLE (never permitted); sponsor/bid/placement fields are ignored.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "model",
+           "mcp_tool",
+           "a2a_agent",
+           "x402_resource",
+           "local_gpu"
+          ]
+         },
+         "provider": {
+          "type": "string"
+         },
+         "model": {
+          "type": "string"
+         },
+         "region": {
+          "type": "string"
+         },
+         "endpoint": {
+          "type": "string",
+          "description": "https://public-host/... or local:<name> for an endpoint you run"
+         },
+         "cost_declared": {
+          "type": "number",
+          "minimum": 0
+         },
+         "latency_declared_ms": {
+          "type": "number",
+          "minimum": 0
+         },
+         "read_only": {
+          "type": "boolean"
+         },
+         "destructive": {
+          "type": "boolean"
+         },
+         "paid": {
+          "type": "boolean"
+         },
+         "data_class_allowed": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "enum": [
+            "public",
+            "internal",
+            "confidential",
+            "pii"
+           ]
+          }
+         }
+        },
+        "required": [
+         "id",
+         "kind"
+        ]
+       }
+      },
+      "policy": {
+       "type": "object",
+       "description": "presets [read-only, local-only, eu-only, no-unmeasured], forbid_providers [..], allow_kinds [..], confirm_destructive, caller_wallet. Unknown keys grant nothing.",
+       "properties": {
+        "presets": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "forbid_providers": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "allow_kinds": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "confirm_destructive": {
+         "type": "boolean"
+        },
+        "caller_wallet": {
+         "type": "boolean"
+        }
+       }
+      },
+      "objective": {
+       "type": "object",
+       "properties": {
+        "quality_axis": {
+         "type": "string",
+         "description": "A board axis id, e.g. governance"
+        },
+        "weights": {
+         "type": "object",
+         "properties": {
+          "quality": {
+           "type": "number"
+          },
+          "cost": {
+           "type": "number"
+          },
+          "latency": {
+           "type": "number"
+          }
+         }
+        },
+        "tie_break": {
+         "description": "cheapest_declared, local_first, lexical_id (default in that order)",
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         ]
+        }
+       }
+      },
+      "mode": {
+       "type": "string",
+       "enum": [
+        "decide",
+        "execute"
+       ],
+       "description": "decide (default). execute is not enabled and answers NOT_ENABLED."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "ROUTED",
+        "NO_PERMITTED_CANDIDATE",
+        "UNTESTED",
+        "BAD_ARGUMENTS",
+        "NOT_ENABLED"
+       ]
+      },
+      "mode": {
+       "type": "string"
+      },
+      "preview": {
+       "type": "boolean"
+      },
+      "signed": {
+       "type": "boolean"
+      },
+      "chosen": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "separation": {
+       "type": "string"
+      },
+      "label": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "considered": {
+       "type": "integer"
+      },
+      "permitted": {
+       "type": "integer"
+      },
+      "forbidden": {
+       "type": "array"
+      },
+      "record": {
+       "type": "object"
+      },
+      "note": {
+       "type": "string"
+      },
+      "errors": {
+       "type": "array"
+      },
+      "http_status": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "GSPC Route: decide a path under your policy (free, decide-only)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_governance",
+    "title": "governance axis (live GSPC board)",
+    "description": "The governance axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "governance axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_safety",
+    "title": "safety axis (live GSPC board)",
+    "description": "The safety axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "safety axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_provenance",
+    "title": "provenance axis (live GSPC board)",
+    "description": "The provenance axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "provenance axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_continuity",
+    "title": "continuity axis (live GSPC board)",
+    "description": "The continuity axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "continuity axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_conformance",
+    "title": "conformance axis (live GSPC board)",
+    "description": "The conformance axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "conformance axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_openness",
+    "title": "openness axis (live GSPC board)",
+    "description": "The openness axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "openness axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_machinery-conformity",
+    "title": "machinery-conformity axis (live GSPC board)",
+    "description": "The machinery-conformity axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "machinery-conformity axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_care",
+    "title": "care axis (live GSPC board)",
+    "description": "The care axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "care axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_cross-reality",
+    "title": "cross-reality axis (live GSPC board)",
+    "description": "The cross-reality axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "cross-reality axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_detector-interop",
+    "title": "detector-interop axis (live GSPC board)",
+    "description": "The detector-interop axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "detector-interop axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_art5-safeguard",
+    "title": "art5-safeguard axis (live GSPC board)",
+    "description": "The art5-safeguard axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "art5-safeguard axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_swarm",
+    "title": "swarm axis (live GSPC board)",
+    "description": "The swarm axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "swarm axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_affect",
+    "title": "affect axis (live GSPC board)",
+    "description": "The affect axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "affect axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_jail",
+    "title": "jail axis (live GSPC board)",
+    "description": "The jail axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "jail axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_effect-binding",
+    "title": "effect-binding axis (live GSPC board)",
+    "description": "The effect-binding axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "effect-binding axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_provenance-controls",
+    "title": "provenance-controls axis (live GSPC board)",
+    "description": "The provenance-controls axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "provenance-controls axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_reserve-attestation",
+    "title": "reserve-attestation axis (live GSPC board)",
+    "description": "The reserve-attestation axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "reserve-attestation axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_regulatory-framework",
+    "title": "regulatory-framework axis (live GSPC board)",
+    "description": "The regulatory-framework axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "regulatory-framework axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_distribution-integrity",
+    "title": "distribution-integrity axis (live GSPC board)",
+    "description": "The distribution-integrity axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "distribution-integrity axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_custody-disclosure",
+    "title": "custody-disclosure axis (live GSPC board)",
+    "description": "The custody-disclosure axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "custody-disclosure axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_ai-adoption-components",
+    "title": "ai-adoption-components axis (live GSPC board)",
+    "description": "The ai-adoption-components axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "ai-adoption-components axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_labour-components",
+    "title": "labour-components axis (live GSPC board)",
+    "description": "The labour-components axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "labour-components axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_humanoid-labour-index",
+    "title": "humanoid-labour-index axis (live GSPC board)",
+    "description": "The humanoid-labour-index axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "humanoid-labour-index axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_lab-practice",
+    "title": "lab-practice axis (live GSPC board)",
+    "description": "The lab-practice axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "lab-practice axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_company-practice",
+    "title": "company-practice axis (live GSPC board)",
+    "description": "The company-practice axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "company-practice axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_measurer-integrity",
+    "title": "measurer-integrity axis (live GSPC board)",
+    "description": "The measurer-integrity axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "measurer-integrity axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_harness-fidelity",
+    "title": "harness-fidelity axis (live GSPC board)",
+    "description": "The harness-fidelity axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "harness-fidelity axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_interop-conformance",
+    "title": "interop-conformance axis (live GSPC board)",
+    "description": "The interop-conformance axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "interop-conformance axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_humanoid-deployment",
+    "title": "humanoid-deployment axis (live GSPC board)",
+    "description": "The humanoid-deployment axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "humanoid-deployment axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_regulator-transparency",
+    "title": "regulator-transparency axis (live GSPC board)",
+    "description": "The regulator-transparency axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "regulator-transparency axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_interpretability-reproducibility",
+    "title": "interpretability-reproducibility axis (live GSPC board)",
+    "description": "The interpretability-reproducibility axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "interpretability-reproducibility axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_claim-maintenance",
+    "title": "claim-maintenance axis (live GSPC board)",
+    "description": "The claim-maintenance axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "claim-maintenance axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_serving-fidelity",
+    "title": "serving-fidelity axis (live GSPC board)",
+    "description": "The serving-fidelity axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "serving-fidelity axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "axis_watchdog-ingest",
+    "title": "watchdog-ingest axis (live GSPC board)",
+    "description": "The watchdog-ingest axis of the live GSPC board at https://councilof.ai/api/gspc — this tool IS the axis, so it takes no argument: n, accuracy, interval, MEASURED or UNMEASURED status, family, kind, the bank or run-artifact URL behind the row, and dates. An unmeasured axis is a first-class answer — a declared slot with no run behind it, published so the gap is visible — never an error and never a zero. Never a certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "LIVE, NOT_ON_BOARD or UNREACHABLE"
+      },
+      "axis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "status": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "measured": {
+       "type": "boolean"
+      },
+      "family": {},
+      "n": {},
+      "accuracy": {},
+      "interval": {},
+      "leader": {},
+      "dataset": {},
+      "source": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "watchdog-ingest axis (live GSPC board)",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "framework_readiness",
+    "title": "Framework readiness checklist",
+    "description": "A deterministic readiness checklist over one governance framework: eu-ai-act, dora, nis2, gdpr, iso-27001, nist-csf, soc2, pci-dss or cra. For each checklist item the tool returns the published provision it is keyed to (article or clause), a plain-words requirement summary, the evidence that would show readiness for it, and the question it opens for your own compliance function. Optional sector gives a pointer to which of the nine frameworks commonly bind that sector; optional role is echoed for your notes. There is no score, no pass or fail, and no status for the caller: a checklist lays out what evidence would be measured, it does not certify compliance, it is not legal advice, and it is not a conformity assessment. Runs no model, fetches nothing, stores nothing; the same arguments always return the same answer.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "framework": {
+       "type": "string",
+       "enum": [
+        "eu-ai-act",
+        "dora",
+        "nis2",
+        "gdpr",
+        "iso-27001",
+        "nist-csf",
+        "soc2",
+        "pci-dss",
+        "cra"
+       ],
+       "description": "The framework to check readiness against. Required."
+      },
+      "sector": {
+       "type": "string",
+       "description": "Optional sector word (e.g. finance, healthcare, energy). Adds a pointer to which frameworks commonly bind the sector; never a scope determination."
+      },
+      "role": {
+       "type": "string",
+       "description": "Optional free-text role (e.g. deployer, provider). Echoed for your notes; the tool does not determine which duties attach."
+      }
+     },
+     "required": [
+      "framework"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "OK or BAD_ARGUMENTS"
+      },
+      "framework": {
+       "type": "string"
+      },
+      "framework_label": {
+       "type": "string"
+      },
+      "what_this_is": {
+       "type": "string"
+      },
+      "header": {
+       "type": "string"
+      },
+      "not_a_certification": {
+       "type": "boolean"
+      },
+      "not_legal_advice": {
+       "type": "boolean"
+      },
+      "item_count": {
+       "type": "integer"
+      },
+      "items": {
+       "type": "array",
+       "description": "Checklist items: id, provision, requirement, evidence_suggested, opens_question"
+      },
+      "provenance": {
+       "type": "array",
+       "description": "Published sources a reader can check without an account"
+      },
+      "sector": {
+       "type": "string"
+      },
+      "sector_note": {
+       "type": "string"
+      },
+      "sector_frameworks": {
+       "type": "array"
+      },
+      "role": {
+       "type": "string"
+      },
+      "role_note": {
+       "type": "string"
+      },
+      "how_to_use": {
+       "type": "array"
+      },
+      "error": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "state"
+     ]
+    },
+    "annotations": {
+     "title": "Framework readiness checklist",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "commission_card",
+    "title": "Commission a measurement card (paid, x402)",
+    "annotations": {
+     "title": "Commission a measurement card (paid, x402)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "The wrapper's status fields. On PAYMENT_REQUIRED (isError:true) the route's x402 PaymentRequired object (x402Version, resource, accepts, extensions) is spread at the top level too, per the x402 MCP transport.",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "PAYMENT_REQUIRED, DELIVERED, NOT_DEPLOYED, UNREACHABLE, UNREADABLE_RESPONSE, BAD_ARGUMENTS or HTTP_<code>"
+      },
+      "tool": {
+       "type": "string"
+      },
+      "route": {
+       "type": "string"
+      },
+      "http_status": {
+       "type": "integer"
+      },
+      "payment_presented": {
+       "type": "boolean"
+      },
+      "delivery_state": {
+       "type": "string"
+      },
+      "settlement_state": {
+       "type": "string"
+      },
+      "x402Version": {
+       "type": "integer"
+      },
+      "accepts": {
+       "type": "array"
+      },
+      "resource": {
+       "type": "object"
+      },
+      "deliverable": {},
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "status"
+     ]
+    },
+    "description": "PAID (x402). Commission one signed card-v0 receipt (surface ras.commission) for a named subject on the frozen bank via https://councilof.ai/api/request-attestation. Re-serves every signed measurement card already on file for the subject; a payment never mints a MEASURED cell (fresh_run stays UNMEASURED until a published run exists). Without x_payment the tool returns the 402 challenge (accepts[] with asset, amount, payTo) plus a free preview of the cards already on file. Measurement, not certification — never a rank, a grade or a certificate. Verification stays free.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "subject": {
+       "type": "string",
+       "description": "Subject to commission: a model id, instrument id or card sha (1-120 chars of [A-Za-z0-9._:/@+-])."
+      },
+      "axis": {
+       "type": "string",
+       "description": "Optional axis slug; omit for the subject-level commission."
+      },
+      "x_payment": {
+       "type": "string",
+       "description": "The X-PAYMENT header value (base64 x402 payload) signed by your wallet against accepts[] from the previous 402. Omit to receive the challenge."
+      },
+      "purchase_action": {
+       "type": "string",
+       "enum": [
+        "history",
+        "recover",
+        "decisions",
+        "accept",
+        "reject",
+        "request_correction"
+       ],
+       "description": "Selfserve account-owned purchase action. Use Council bearer transport, omit x_payment; no new financial/provider action."
+      },
+      "purchase_transaction": {
+       "type": "string",
+       "maxLength": 256
+      },
+      "purchase_result_sha256": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$"
+      },
+      "purchase_result_version": {
+       "type": "string"
+      },
+      "purchase_request_id": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$",
+       "description": "Idempotency id for the same exact decision intent, or exact id lookup when reading decisions. Never change inputs on an unknown write."
+      },
+      "purchase_cursor": {
+       "type": "string",
+       "maxLength": 2048,
+       "description": "Owner-scoped history/decision page cursor; do not combine with exact decision id."
+      },
+      "purchase_reason": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     },
+     "additionalProperties": false,
+     "anyOf": [
+      {
+       "required": [
+        "subject"
+       ]
+      },
+      {
+       "required": [
+        "purchase_action"
+       ]
+      }
+     ]
+    },
+    "csoai": {
+     "paid": true,
+     "rail": "x402",
+     "route": "/api/request-attestation",
+     "sku": "request_attestation",
+     "sells": "issuance",
+     "free_preview": "the 402 body (csoai.preview)",
+     "deliverable": "one card-v0 leaf, surface ras.commission, Ed25519 when the Pages key is present"
+    }
+   },
+   {
+    "name": "art50_marking_evidence",
+    "title": "Article 50 marking evidence (paid, x402; preview free)",
+    "annotations": {
+     "title": "Article 50 marking evidence (paid, x402; preview free)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "The wrapper's status fields. On PAYMENT_REQUIRED (isError:true) the route's x402 PaymentRequired object (x402Version, resource, accepts, extensions) is spread at the top level too, per the x402 MCP transport.",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "PAYMENT_REQUIRED, DELIVERED, NOT_DEPLOYED, UNREACHABLE, UNREADABLE_RESPONSE, BAD_ARGUMENTS or HTTP_<code>"
+      },
+      "tool": {
+       "type": "string"
+      },
+      "route": {
+       "type": "string"
+      },
+      "http_status": {
+       "type": "integer"
+      },
+      "payment_presented": {
+       "type": "boolean"
+      },
+      "delivery_state": {
+       "type": "string"
+      },
+      "settlement_state": {
+       "type": "string"
+      },
+      "x402Version": {
+       "type": "integer"
+      },
+      "accepts": {
+       "type": "array"
+      },
+      "resource": {
+       "type": "object"
+      },
+      "deliverable": {},
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "status"
+     ]
+    },
+    "description": "PAID (x402 or CSOAI LTD invoice). Article 50 marking-evidence pack via https://councilof.ai/api/art50/marking-evidence: which machine-readable marks the named methods DETECT in these bytes right now. Scope: C2PA and IPTC metadata only (C2PA manifest store, assertion hashes, hard binding, claim signature; IPTC digitalSourceType); no watermark, fingerprint or other kind of mark is read. NOT_DETECTED is not unmarked: Article 50(2) is technology-neutral, so a mark this pack cannot read may be present, and metadata is often stripped on re-save. Disclosure: CSOAI is a member of the C2PA, whose specification is one of the two methods read. The pack carries the verbatim Art 50(2) text hash and the dates it turns on. Point-in-time detection — never a conformity opinion, never a compliance word of any kind. preview=true is free and returns the same measurement unsigned. Without x_payment the tool returns the 402 challenge. If the route is not deployed on this origin the tool says NOT_DEPLOYED rather than inventing a result.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri",
+       "pattern": "^https?://",
+       "maxLength": 2048,
+       "description": "Public HTTP(S) URL of the generative output to measure (≤20 MiB). The server fetches only this declared measurement subject."
+      },
+      "bytes_b64": {
+       "type": "string",
+       "description": "Alternatively the output bytes, base64 (≤20 MiB decoded)."
+      },
+      "manifest_b64": {
+       "type": "string",
+       "description": "Alternatively a detached C2PA manifest store, base64 (manifest-only mode)."
+      },
+      "preview": {
+       "type": "boolean",
+       "description": "true = free unsigned measurement (no card sha, no signature)."
+      },
+      "x_payment": {
+       "type": "string",
+       "description": "The X-PAYMENT header value signed against accepts[] from the previous 402. Omit to receive the challenge."
+      },
+      "purchase_action": {
+       "type": "string",
+       "enum": [
+        "history",
+        "recover",
+        "decisions",
+        "accept",
+        "reject",
+        "request_correction"
+       ],
+       "description": "Selfserve account-owned purchase action. Use Council bearer transport, omit x_payment; no new financial/provider action."
+      },
+      "purchase_transaction": {
+       "type": "string",
+       "maxLength": 256
+      },
+      "purchase_result_sha256": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$"
+      },
+      "purchase_result_version": {
+       "type": "string"
+      },
+      "purchase_request_id": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$",
+       "description": "Idempotency id for the same exact decision intent, or exact id lookup when reading decisions. Never change inputs on an unknown write."
+      },
+      "purchase_cursor": {
+       "type": "string",
+       "maxLength": 2048,
+       "description": "Owner-scoped history/decision page cursor; do not combine with exact decision id."
+      },
+      "purchase_reason": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     },
+     "additionalProperties": false
+    },
+    "csoai": {
+     "paid": true,
+     "rail": "x402-or-invoice",
+     "route": "/api/art50/marking-evidence",
+     "sku": "art50_marking_evidence",
+     "sells": "issuance",
+     "free_preview": "preview=true",
+     "deliverable": "one card-v0 leaf, surface art50.marking-evidence, kind csoai.art50.marking-evidence/0.1",
+     "deployed_by": "live on councilof.ai (verified 2026-09-03)"
+    }
+   },
+   {
+    "name": "rwa_evidence",
+    "title": "RWA asset evidence (paid, x402; preview free)",
+    "annotations": {
+     "title": "RWA asset evidence (paid, x402; preview free)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "The wrapper's status fields. On PAYMENT_REQUIRED (isError:true) the route's x402 PaymentRequired object (x402Version, resource, accepts, extensions) is spread at the top level too, per the x402 MCP transport.",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "PAYMENT_REQUIRED, DELIVERED, NOT_DEPLOYED, UNREACHABLE, UNREADABLE_RESPONSE, BAD_ARGUMENTS or HTTP_<code>"
+      },
+      "tool": {
+       "type": "string"
+      },
+      "route": {
+       "type": "string"
+      },
+      "http_status": {
+       "type": "integer"
+      },
+      "payment_presented": {
+       "type": "boolean"
+      },
+      "delivery_state": {
+       "type": "string"
+      },
+      "settlement_state": {
+       "type": "string"
+      },
+      "x402Version": {
+       "type": "integer"
+      },
+      "accepts": {
+       "type": "array"
+      },
+      "resource": {
+       "type": "object"
+      },
+      "deliverable": {},
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "status"
+     ]
+    },
+    "description": "PAID (x402). Per-request signed evidence card of ONE XRPL issued asset's deterministic on-ledger state via https://councilof.ai/api/rwa/evidence: AccountRoot lsf* flags, Domain, the two-way xrp-ledger.toml check (PASS / FAIL / UNCHECKABLE — unreachable is never FAIL), gateway_balances obligation, holders as the free reader has them, every raw fetch sha256'd. preview=true is free (unsigned state). Historical state at fetched_at — not a rating, not a guarantee, not a conformity mark; /api/xrpl and /root.json stay free. Without x_payment the tool returns the 402 challenge. If the route is not deployed on this origin the tool says NOT_DEPLOYED.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "asset": {
+       "type": "string",
+       "description": "Symbol (as listed by https://councilof.ai/api/xrpl) or issuer r-address."
+      },
+      "preview": {
+       "type": "boolean",
+       "description": "true = free unsigned state."
+      },
+      "x_payment": {
+       "type": "string",
+       "description": "The X-PAYMENT header value signed against accepts[] from the previous 402. Omit to receive the challenge."
+      },
+      "purchase_action": {
+       "type": "string",
+       "enum": [
+        "history",
+        "recover",
+        "decisions",
+        "accept",
+        "reject",
+        "request_correction"
+       ],
+       "description": "Selfserve account-owned purchase action. Use Council bearer transport, omit x_payment; no new financial/provider action."
+      },
+      "purchase_transaction": {
+       "type": "string",
+       "maxLength": 256
+      },
+      "purchase_result_sha256": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$"
+      },
+      "purchase_result_version": {
+       "type": "string"
+      },
+      "purchase_request_id": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$",
+       "description": "Idempotency id for the same exact decision intent, or exact id lookup when reading decisions. Never change inputs on an unknown write."
+      },
+      "purchase_cursor": {
+       "type": "string",
+       "maxLength": 2048,
+       "description": "Owner-scoped history/decision page cursor; do not combine with exact decision id."
+      },
+      "purchase_reason": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     },
+     "additionalProperties": false,
+     "anyOf": [
+      {
+       "required": [
+        "asset"
+       ]
+      },
+      {
+       "required": [
+        "purchase_action"
+       ]
+      }
+     ]
+    },
+    "csoai": {
+     "paid": true,
+     "rail": "x402",
+     "route": "/api/rwa/evidence",
+     "sku": "rwa_evidence",
+     "sells": "issuance",
+     "free_preview": "preview=true",
+     "deliverable": "one card-v0 leaf, surface public.notice, kind csoai.eater.xrpl-issuer/0.1",
+     "deployed_by": "live on councilof.ai (verified 2026-09-03)"
+    }
+   },
+   {
+    "name": "receipts_batch",
+    "title": "Receipts batch (paid, x402; preview free)",
+    "annotations": {
+     "title": "Receipts batch (paid, x402; preview free)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "The wrapper's status fields. On PAYMENT_REQUIRED (isError:true) the route's x402 PaymentRequired object (x402Version, resource, accepts, extensions) is spread at the top level too, per the x402 MCP transport.",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "PAYMENT_REQUIRED, DELIVERED, NOT_DEPLOYED, UNREACHABLE, UNREADABLE_RESPONSE, BAD_ARGUMENTS or HTTP_<code>"
+      },
+      "tool": {
+       "type": "string"
+      },
+      "route": {
+       "type": "string"
+      },
+      "http_status": {
+       "type": "integer"
+      },
+      "payment_presented": {
+       "type": "boolean"
+      },
+      "delivery_state": {
+       "type": "string"
+      },
+      "settlement_state": {
+       "type": "string"
+      },
+      "x402Version": {
+       "type": "integer"
+      },
+      "accepts": {
+       "type": "array"
+      },
+      "resource": {
+       "type": "object"
+      },
+      "deliverable": {},
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "status"
+     ]
+    },
+    "description": "PAID (x402 or CSOAI LTD invoice). A historical batch of the estate's measurement receipts via https://councilof.ai/api/receipts/batch: every signed card-v0 leaf whose as_of falls in [from,to] (≤200), each with its Merkle inclusion path and the public root(s) that carried it, plus the root index for the window and one manifest card citing the batch sha256. Manifest signing is conditional: a returned unsigned manifest declares manifest_card.sig_ed25519:null and unsigned_reason, with signature unmeasured. Manifest root inclusion remains unmeasured. If signing throws after settlement, the route returns PAID_NOT_DELIVERED with no batch or manifest delivered; preserve the settlement receipt and reconcile before reissue, without automatically retrying or paying again. preview=true is free and returns count, span, root count and the sha256 of the exact bytes the paid call returns. Recent leaves are free at /root.json, /cards/ and /api/proof?sha= — the batch sells assembly across history, never a conclusion. This tool returns historical measurement leaves, not payment receipts. /api/receipts/latest reports aggregate receipt-store state when available; its counts do not verify a particular payment, delivery or buyer acceptance. Without x_payment the tool returns the 402 challenge.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "description": "Window start, ISO-8601. Required."
+      },
+      "to": {
+       "type": "string",
+       "description": "Window end, ISO-8601. Defaults to now."
+      },
+      "preview": {
+       "type": "boolean",
+       "description": "true = free: count, span, roots and batch sha256 without the leaves."
+      },
+      "x_payment": {
+       "type": "string",
+       "description": "The X-PAYMENT header value signed against accepts[] from the previous 402. Omit to receive the challenge."
+      },
+      "purchase_action": {
+       "type": "string",
+       "enum": [
+        "history",
+        "recover",
+        "decisions",
+        "accept",
+        "reject",
+        "request_correction"
+       ],
+       "description": "Selfserve account-owned purchase action. Use Council bearer transport, omit x_payment; no new financial/provider action."
+      },
+      "purchase_transaction": {
+       "type": "string",
+       "maxLength": 256
+      },
+      "purchase_result_sha256": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$"
+      },
+      "purchase_result_version": {
+       "type": "string"
+      },
+      "purchase_request_id": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$",
+       "description": "Idempotency id for the same exact decision intent, or exact id lookup when reading decisions. Never change inputs on an unknown write."
+      },
+      "purchase_cursor": {
+       "type": "string",
+       "maxLength": 2048,
+       "description": "Owner-scoped history/decision page cursor; do not combine with exact decision id."
+      },
+      "purchase_reason": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     },
+     "additionalProperties": false,
+     "anyOf": [
+      {
+       "required": [
+        "from"
+       ]
+      },
+      {
+       "required": [
+        "purchase_action"
+       ]
+      }
+     ]
+    },
+    "csoai": {
+     "paid": true,
+     "rail": "x402-or-invoice",
+     "route": "/api/receipts/batch",
+     "sku": "receipts_batch",
+     "sells": "assembly",
+     "free_preview": "preview=true",
+     "deliverable": "on delivery, csoai.receipts.batch/0.1 + one manifest card-v0 (surface receipts.batch); a returned unsigned manifest declares manifest_card.sig_ed25519:null and unsigned_reason, with signature unmeasured; manifest root inclusion remains unmeasured; a thrown signing failure returns PAID_NOT_DELIVERED without a delivered batch or manifest; reconcile the settlement before reissue and do not automatically retry or pay again"
+    }
+   },
+   {
+    "name": "evidence_bundle",
+    "title": "Evidence bundle for one obligation (paid, x402; preview free)",
+    "annotations": {
+     "title": "Evidence bundle for one obligation (paid, x402; preview free)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "The wrapper's status fields. On PAYMENT_REQUIRED (isError:true) the route's x402 PaymentRequired object (x402Version, resource, accepts, extensions) is spread at the top level too, per the x402 MCP transport.",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "PAYMENT_REQUIRED, DELIVERED, NOT_DEPLOYED, UNREACHABLE, UNREADABLE_RESPONSE, BAD_ARGUMENTS or HTTP_<code>"
+      },
+      "tool": {
+       "type": "string"
+      },
+      "route": {
+       "type": "string"
+      },
+      "http_status": {
+       "type": "integer"
+      },
+      "payment_presented": {
+       "type": "boolean"
+      },
+      "delivery_state": {
+       "type": "string"
+      },
+      "settlement_state": {
+       "type": "string"
+      },
+      "x402Version": {
+       "type": "integer"
+      },
+      "accepts": {
+       "type": "array"
+      },
+      "resource": {
+       "type": "object"
+      },
+      "deliverable": {},
+      "not_a_certification": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "status"
+     ]
+    },
+    "description": "PAID (x402). For ONE obligation (article-50, article-53 GPAI transparency, dora or cra) and an optional subject via https://councilof.ai/api/evidence-bundle: selected existing card objects with signature fields and any retained inclusion proofs, an OSCAL assessment-results wrapper and an assembly manifest. Assembly does not verify input-card signatures. A returned unsigned manifest reports its signing status and unsigned reason. If signing throws after settlement, the route returns PAID_NOT_DELIVERED without a delivered bundle or manifest; preserve the settlement receipt and reconcile before reissue, without automatically retrying or paying again. Zero selected cards stays an empty bundle; preview=true here, or the free evidence_bundle_preview tool, shows the count first. No new measurement, full OSCAL conformance or conformity determination is established. Article 53 output is evidence for review, not a legal determination; grants no status. Without x_payment the tool returns the actual 402 challenge; read its terms for each request. Supported-card verification is free at https://councilof.ai/gspc-verify. Measurement, not certification.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "obligation": {
+       "type": "string",
+       "enum": [
+        "article-50",
+        "article-53",
+        "dora",
+        "cra"
+       ],
+       "description": "article-50, article-53, dora or cra."
+      },
+      "subject": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Optional: a model id, vendor or instrument the cards must name."
+      },
+      "preview": {
+       "type": "boolean",
+       "description": "true = the free preview (relevant-card count and first cards); nothing is charged."
+      },
+      "x_payment": {
+       "type": "string",
+       "description": "The X-PAYMENT header value signed against accepts[] from the previous 402. Omit to receive the challenge."
+      },
+      "purchase_action": {
+       "type": "string",
+       "enum": [
+        "history",
+        "recover",
+        "decisions",
+        "accept",
+        "reject",
+        "request_correction"
+       ],
+       "description": "Selfserve account-owned purchase action. Use Council bearer transport, omit x_payment; no new financial/provider action."
+      },
+      "purchase_transaction": {
+       "type": "string",
+       "maxLength": 256
+      },
+      "purchase_result_sha256": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$"
+      },
+      "purchase_result_version": {
+       "type": "string"
+      },
+      "purchase_request_id": {
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$",
+       "description": "Idempotency id for the same exact decision intent, or exact id lookup when reading decisions. Never change inputs on an unknown write."
+      },
+      "purchase_cursor": {
+       "type": "string",
+       "maxLength": 2048,
+       "description": "Owner-scoped history/decision page cursor; do not combine with exact decision id."
+      },
+      "purchase_reason": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     },
+     "additionalProperties": false,
+     "anyOf": [
+      {
+       "required": [
+        "obligation"
+       ]
+      },
+      {
+       "required": [
+        "purchase_action"
+       ]
+      }
+     ]
+    },
+    "csoai": {
+     "paid": true,
+     "rail": "x402",
+     "route": "/api/evidence-bundle",
+     "sku": "evidence_bundle",
+     "sells": "assembly",
+     "free_preview": "preview=true, or the free tool evidence_bundle_preview",
+     "deliverable": "selected existing card objects for this subject and obligation, the OSCAL assessment-results wrapper, and an assembly manifest; assembly does not verify input-card signatures; a delivered response reports manifest signing status and any unsigned reason; a thrown signing failure returns PAID_NOT_DELIVERED with no delivered bundle or manifest, requiring settlement reconciliation before reissue and no automatic retry or repayment; zero selected cards stays zero; any existing_pack link is separate; no new measurement or conformity determination",
+     "deployed_by": "live on councilof.ai (402 on ?obligation=article-53&bundle=1, read 2026-09-30)"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "working_group_review",
+    "title": "Prepare a working-group review",
+    "description": "Return an unsent blank review for one exact public document ID. Fill evidence and conflicts locally; this prompt never submits or approves it.",
+    "arguments": [
+     {
+      "name": "documentId",
+      "description": "Exact ID from the public register.",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "https://councilof.ai/working-groups/catalog.json",
+    "name": "working-group-register",
+    "title": "Council working-group document register",
+    "description": "Build-bound, dated public proposals. Forming groups; no accepted-member or live measurement claims.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "ui://council/live-panel/2",
+    "name": "council-live-panel",
+    "title": "Council of AI · MEOK companion",
+    "description": "Task-local activity and evidence. No platform-wide monitoring, private reasoning, autonomous repair or human authorization.",
+    "mimeType": "text/html;profile=mcp-app"
+   }
+  ]
+ }
+}

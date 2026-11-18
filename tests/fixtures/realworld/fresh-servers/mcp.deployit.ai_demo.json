@@ -1,0 +1,509 @@
+{
+ "url": "https://mcp.deployit.ai/demo",
+ "doc": {
+  "name": "DeployIt — DeployIt demo",
+  "version": "2.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "DeployIt answers questions about the code of DeployIt demo.\nCaller profile: public demo. Tools: server_info, ask_code, recent_changes.\nCall server_info first if you doubt the freshness of the code index or want the counters.\nThis server never shows code, file paths nor people's names.",
+  "tools": [
+   {
+    "name": "server_info",
+    "title": "Server information",
+    "description": "What this DeployIt server offers you: profile, plan, tools, repositories and their index freshness, counters.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "company": {
+       "type": "string"
+      },
+      "profile": {
+       "type": "string",
+       "enum": [
+        "everyone",
+        "developers",
+        "direction",
+        "data"
+       ]
+      },
+      "plan": {
+       "type": "string",
+       "enum": [
+        "free",
+        "trial",
+        "team",
+        "business",
+        "group",
+        "demo"
+       ]
+      },
+      "tools": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "repositories": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string",
+          "enum": [
+           "github",
+           "gitlab",
+           "bitbucket"
+          ]
+         },
+         "index": {
+          "type": "string",
+          "enum": [
+           "none",
+           "structure",
+           "content",
+           "error"
+          ]
+         },
+         "indexed_at": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "name",
+         "provider",
+         "index",
+         "indexed_at"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "branch_by_repository": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "string"
+       }
+      },
+      "quota": {
+       "type": "object",
+       "properties": {
+        "kind": {
+         "type": "string",
+         "const": "free_weekly"
+        },
+        "limit": {
+         "type": "number"
+        },
+        "used": {
+         "type": "number"
+        },
+        "resets_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "kind",
+        "limit",
+        "used",
+        "resets_at"
+       ],
+       "additionalProperties": false
+      },
+      "monthly": {
+       "type": "object",
+       "properties": {
+        "limit": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "used": {
+         "type": "number"
+        },
+        "resets_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "limit",
+        "used",
+        "resets_at"
+       ],
+       "additionalProperties": false
+      },
+      "member_monthly": {
+       "type": "object",
+       "properties": {
+        "limit": {
+         "type": "number"
+        },
+        "used": {
+         "type": "number"
+        },
+        "resets_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "limit",
+        "used",
+        "resets_at"
+       ],
+       "additionalProperties": false
+      },
+      "statistics": {
+       "type": "string",
+       "enum": [
+        "available",
+        "plan_required",
+        "not_in_profile"
+       ]
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "company",
+      "profile",
+      "plan",
+      "tools",
+      "repositories",
+      "statistics",
+      "notes"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "ask_code",
+    "title": "Ask about the code",
+    "description": "Ask a question about the company's code and get an answer verified against its live source code and git history: product behavior, features, settings, limits, error messages, recent changes.\n\nDURATION: a fresh investigation takes 20-60 seconds. Repeated questions without `context` are served from cache at once; the cache resets when the code changes.\n\nIF IT TIMES OUT: the investigation keeps running. Ask the IDENTICAL question again about a minute later.\n\nSTATUS (also in structuredContent.status): verified = confirmed in the code; backend_only = exists server-side without a visible UI path; not_found = searched, it does NOT exist; unknown = could not conclude, do not relay as fact.\n\nLIMITS: read-only. Some topics may be refused for your profile. On the free plan, 15 questions per week per company; cached answers never count.\n\nAnswers never contain code nor file paths.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 2000,
+       "description": "The question about the code, as specific as possible. Identical wording hits the cache: after a timeout, repeat it verbatim."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 4000,
+       "description": "Optional context from your conversation (symptoms, what was tried…). Never cached: omit it for generic questions."
+      },
+      "depth": {
+       "type": "string",
+       "enum": [
+        "quick",
+        "thorough"
+       ],
+       "description": "quick (default): up to about a minute. thorough: digs deeper; may be capped by the profile."
+      },
+      "repository": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Restrict to one repository of your access (\"owner/repo\" or its short name)."
+      }
+     },
+     "required": [
+      "question"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "answer": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "verified",
+        "backend_only",
+        "not_found",
+        "unknown"
+       ]
+      },
+      "sources": {
+       "type": "object",
+       "properties": {
+        "files_count": {
+         "type": "number"
+        },
+        "commits_count": {
+         "type": "number"
+        },
+        "files": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "repository": {
+            "type": "string"
+           },
+           "path": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "repository",
+           "path"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "commits": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "repository": {
+            "type": "string"
+           },
+           "sha": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "repository",
+           "sha"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "required": [
+        "files_count",
+        "commits_count"
+       ],
+       "additionalProperties": false
+      },
+      "repositories": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "served_from_cache": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "answer",
+      "status",
+      "sources",
+      "repositories",
+      "served_from_cache"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "recent_changes",
+    "title": "Recent changes",
+    "description": "What landed on the tracked branches over the last days (14 by default, 90 at most), grouped into deliveries (one per PR, else per day, module and type of change), most recent first. Facts only: no person is named.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "days": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 90,
+       "description": "1 to 90, default 14"
+      },
+      "repository": {
+       "type": "string",
+       "maxLength": 255,
+       "description": "repository name (org/repo), among the repositories of your access"
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "destructiveHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string"
+      },
+      "to": {
+       "type": "string"
+      },
+      "timezone": {
+       "type": "string"
+      },
+      "deliveries": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "date": {
+          "type": "string"
+         },
+         "type": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "modules": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "commits": {
+          "type": "number"
+         },
+         "hotfix": {
+          "type": "boolean"
+         },
+         "pr": {
+          "type": [
+           "number",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "date",
+         "type",
+         "title",
+         "modules",
+         "commits",
+         "hotfix",
+         "pr"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "totals": {
+       "type": "object",
+       "properties": {
+        "commits": {
+         "type": "number"
+        },
+        "prs": {
+         "type": "number"
+        },
+        "deliveries": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "commits",
+        "prs",
+        "deliveries"
+       ],
+       "additionalProperties": false
+      },
+      "truncated": {
+       "type": "boolean"
+      },
+      "computed_at": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "first_computation_in_progress": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "read_until": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "name",
+         "read_until"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "from",
+      "to",
+      "timezone",
+      "deliveries",
+      "totals",
+      "truncated",
+      "computed_at",
+      "first_computation_in_progress"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "what_changed",
+    "title": "Ce qui a changé",
+    "description": "What changed in the product over the last days (7 by default), from the tracked branches, without naming anyone.",
+    "arguments": [
+     {
+      "name": "days",
+      "description": "number of days, 7 by default",
+      "required": false
+     }
+    ]
+   }
+  ]
+ }
+}

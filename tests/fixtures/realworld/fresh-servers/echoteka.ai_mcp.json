@@ -1,0 +1,632 @@
+{
+ "url": "https://echoteka.ai/mcp",
+ "doc": {
+  "name": "Echoteka - audio mastering",
+  "version": "0.5.0 (app 1.6.0)",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Audio mastering tools. Analysis, AI artifact cleanup, preset previews and job status are free. 1 full master per day (UTC) is free without an account; extra masters use credits, which a human buys on the website - an agent cannot pay. Full rules: resource echoteka://playbook.",
+  "tools": [
+   {
+    "name": "get_service_info",
+    "title": "Service info",
+    "description": "What Echoteka does, what is free, what a credit buys, and where the rules live. Call once at the start of a session.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "Service manifest: endpoints, presets, live prices, limits, policies."
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_presets",
+    "title": "List mastering presets",
+    "description": "All mastering presets with their target loudness in LUFS. Call this to get the exact preset keys that master_track and batch_master accept. Use preview_styles instead when you want to HEAR 2-6 of them on the actual track before choosing, and get_service_info when you need the wider service manifest rather than the preset list. Free.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "presets": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "key": {
+          "type": "string"
+         },
+         "target_lufs": {
+          "type": "number"
+         }
+        }
+       }
+      },
+      "count": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "presets"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "check_limits",
+    "title": "Check quota and balance",
+    "description": "What this caller may do right now: free master left today and when it resets, credit balance, upload cap, whether advanced modules are available. Call before mastering.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "tokens_balance": {
+       "type": "integer"
+      },
+      "can_master_now": {
+       "type": "boolean"
+      },
+      "free": {
+       "type": "object"
+      },
+      "max_upload_mb": {
+       "type": "integer"
+      },
+      "max_upload_mb_via_mcp": {
+       "type": "integer",
+       "description": "effective per-file ceiling for THIS channel"
+      },
+      "max_batch_total_mb_via_mcp": {
+       "type": "integer"
+      },
+      "result_retention_days": {
+       "type": "integer"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "analyze_track",
+    "title": "Analyze a track",
+    "description": "Measure integrated LUFS, sample peak, duration, sample rate and stereo correlation without processing. Free, a couple of seconds. Run this before choosing a preset. Note: true peak and loudness range are NOT part of this fast pass — they are measured on the result and come back from get_job.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "audio_url": {
+       "type": "string",
+       "description": "Public https URL of the audio file (wav/mp3/flac/m4a). A share link to the page works too — Suno/Udio song pages, Google Drive and Dropbox links are resolved to the file automatically."
+      }
+     },
+     "required": [
+      "audio_url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "lufs": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "true_peak_db": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "null in the fast pass; see get_job for the measured value"
+      },
+      "peak_dbfs": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "duration_sec": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "sample_rate": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "channels": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "stereo_correlation": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "genre_suggestion": {}
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "clean_ai_trace",
+    "title": "Clean AI generator artifacts",
+    "description": "Remove the marks an AI generator leaves in the audio (narrow tones above 15 kHz, level jumps at block seams, fixed spectral peaks); loudness and tone stay as they are. It does not hide that a track is AI-made - disclose AI use wherever a platform asks. Free, never spends a credit. Returns a job id - poll get_job.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "audio_url": {
+       "type": "string",
+       "description": "Public https URL of the audio file (wav/mp3/flac/m4a). A share link to the page works too — Suno/Udio song pages, Google Drive and Dropbox links are resolved to the file automatically."
+      },
+      "sensitivity": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1,
+       "description": "0-1, default server-side."
+      },
+      "out_format": {
+       "type": "string",
+       "enum": [
+        "wav",
+        "wav24",
+        "mp3",
+        "flac",
+        "opus",
+        "aac"
+       ]
+      }
+     },
+     "required": [
+      "audio_url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "job_id": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "preview_styles",
+    "title": "Compare presets on 24 seconds",
+    "description": "Master the middle 24 s of the track in 2-6 presets at once and get each one's loudness plus a listen link. FREE (6 per day). Use this instead of guessing a preset, and instead of spending a credit to 'try' one.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "audio_url": {
+       "type": "string",
+       "description": "Public https URL of the audio file (wav/mp3/flac/m4a). A share link to the page works too — Suno/Udio song pages, Google Drive and Dropbox links are resolved to the file automatically."
+      },
+      "styles": {
+       "type": "array",
+       "minItems": 2,
+       "maxItems": 6,
+       "items": {
+        "type": "string"
+       },
+       "description": "Preset keys from list_presets. Default: edm, pop, rnb, standard."
+      }
+     },
+     "required": [
+      "audio_url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "job_id": {
+       "type": "string"
+      },
+      "styles": {
+       "type": "array"
+      },
+      "poll_with": {
+       "type": "string"
+      },
+      "preview_url_template": {
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "master_track",
+    "title": "Master a track",
+    "description": "Master one track. Uses 1 CREDIT when the account has a balance; otherwise it runs on the free quota (1 free master per day (UTC), without advanced modules). Returns a job id immediately - poll get_job (typical 20-60 s, up to 10 min with restoration). The source is fetched by this server, so the ceiling here is 100 MB per file. Pass dry_run=true first if you want to see what would be used and the effective settings before anything is spent.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "audio_url": {
+       "type": "string",
+       "description": "Public https URL of the audio file (wav/mp3/flac/m4a). A share link to the page works too — Suno/Udio song pages, Google Drive and Dropbox links are resolved to the file automatically."
+      },
+      "style": {
+       "type": "string",
+       "description": "Preset key from list_presets, e.g. edm, hiphop, podcast, unlimiter. Default standard."
+      },
+      "target_lufs": {
+       "type": "number",
+       "description": "Override the preset target, e.g. -14 for Spotify."
+      },
+      "out_format": {
+       "type": "string",
+       "enum": [
+        "wav",
+        "wav24",
+        "mp3",
+        "flac",
+        "opus",
+        "aac"
+       ]
+      },
+      "bitrate": {
+       "type": "integer",
+       "description": "MP3: 128/192/256/320; OPUS: 128/192."
+      },
+      "remove_watermark": {
+       "type": "boolean",
+       "description": "Also run AI artifact cleanup first. Free."
+      },
+      "webhook_url": {
+       "type": "string",
+       "description": "Public https URL to POST the result to instead of polling."
+      },
+      "restore_dynamics": {
+       "type": "boolean",
+       "description": "Open up a brickwalled source before mastering (pairs with style unlimiter)."
+      },
+      "intensity": {
+       "type": "number",
+       "minimum": 0.5,
+       "maximum": 1.5,
+       "description": "Multiplier on the preset's multiband compression: 1.0 as designed, 0.5 gentler, 1.5 denser. Values outside 0.5-1.5 are clamped."
+      },
+      "denoise_strength": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1,
+       "description": "Noise reduction, 0-1. 0 disables."
+      },
+      "dither_type": {
+       "type": "string",
+       "enum": [
+        "tpdf",
+        "ns_e",
+        "ns_itu"
+       ],
+       "description": "Dither for 16-bit WAV output: tpdf (default), ns_e or ns_itu (noise-shaped)."
+      },
+      "dry_run": {
+       "type": "boolean",
+       "description": "Do not master: report what this call would use and what settings would apply. Nothing is charged, the file is not even downloaded."
+      }
+     },
+     "required": [
+      "audio_url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "job_id": {
+       "type": "string"
+      },
+      "poll_with": {
+       "type": "string"
+      },
+      "dry_run": {
+       "type": "boolean"
+      },
+      "would_charge": {
+       "type": "string"
+      },
+      "tokens_balance": {
+       "type": "integer"
+      },
+      "nothing_was_charged": {
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "batch_master",
+    "title": "Master an album or a batch",
+    "description": "Master up to 10 tracks in one call with the same settings. Needs N CREDITS for N tracks, or N free runs - not one. album_mode (default true) levels the tracks RELATIVE to each other: the loudest hits the target exactly, the others keep their offsets, so a quiet interlude is not inflated to single level. Limits: 10 tracks, 100 MB per file and 300 MB per call (this server's own caps, for memory). A big album takes minutes - send fewer, longer tracks per call rather than all at once. Returns one job id per track - poll each with get_job. Pass dry_run=true to see what would be used and the settings before anything is spent.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "audio_urls": {
+       "type": "array",
+       "minItems": 1,
+       "maxItems": 10,
+       "items": {
+        "type": "string"
+       },
+       "description": "Public https URLs, in album order."
+      },
+      "style": {
+       "type": "string",
+       "description": "Preset key from list_presets."
+      },
+      "target_lufs": {
+       "type": "number",
+       "description": "Target for the LOUDEST track in album mode."
+      },
+      "out_format": {
+       "type": "string",
+       "enum": [
+        "wav",
+        "wav24",
+        "mp3",
+        "flac",
+        "opus",
+        "aac"
+       ]
+      },
+      "bitrate": {
+       "type": "integer",
+       "description": "MP3: 128/192/256/320; OPUS: 128/192."
+      },
+      "remove_watermark": {
+       "type": "boolean",
+       "description": "Also run AI artifact cleanup first. Free."
+      },
+      "album_mode": {
+       "type": "boolean",
+       "description": "Keep relative loudness between tracks. Default true. Set false for unrelated singles."
+      },
+      "dry_run": {
+       "type": "boolean",
+       "description": "Report what would be used and the settings without mastering and without downloading anything."
+      }
+     },
+     "required": [
+      "audio_urls"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "jobs": {
+       "type": "array"
+      },
+      "job_ids": {
+       "type": "array"
+      },
+      "tracks": {
+       "type": "array",
+       "description": "job_id, filename, source_url, target_lufs and album_lufs_offset as APPLIED by the server"
+      },
+      "album_mode_requested": {
+       "type": "boolean"
+      },
+      "album_offsets_applied": {
+       "type": "boolean"
+      },
+      "poll_with": {
+       "type": "string"
+      },
+      "dry_run": {
+       "type": "boolean"
+      },
+      "would_charge": {
+       "type": "string"
+      },
+      "enough_capacity": {
+       "type": "boolean"
+      },
+      "nothing_was_charged": {
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_job",
+    "title": "Get job status",
+    "description": "Status, progress and result metrics (after_lufs, true_peak_db, lra, platform_ready) for a mastering, cleanup or preview job. For previews it returns each style with its loudness and a listen link. When a master is done it also returns download_url - a signed link that works without credentials for about an hour. Free.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "job_id": {
+       "type": "string",
+       "description": "Job id returned by master_track, clean_ai_trace or preview_styles; batch_master returns one per track in job_ids. Not a URL or a filename: 1-64 chars of A-Z a-z 0-9 _ -",
+       "minLength": 1,
+       "maxLength": 64,
+       "pattern": "^[A-Za-z0-9_-]{1,64}$"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string"
+      },
+      "progress": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "after_lufs": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "true_peak_db": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "lra": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "platform_ready": {},
+      "result_url": {
+       "type": "string"
+      },
+      "download_url": {
+       "type": "string",
+       "description": "signed, ~1 h, works without credentials"
+      },
+      "download_url_expires_in": {
+       "type": "integer"
+      },
+      "error": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://echoteka/mastering-passport",
+      "visibility": [
+       "model",
+       "app"
+      ]
+     }
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "master_for_platform",
+    "title": "Master for a streaming platform",
+    "description": "Analyze the track, pick the preset and the platform target, master it, and report LUFS / true peak back.",
+    "arguments": [
+     {
+      "name": "audio_url",
+      "description": "Public https URL of the track, or a share link to its page.",
+      "required": true
+     },
+     {
+      "name": "platform",
+      "description": "Destination: spotify, youtube, apple, podcast, audiobook, club.",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "fix_ai_track",
+    "title": "Clean and master a Suno track",
+    "description": "Clean the AI generator artifacts first, then master with the unlimiter preset if the source is brickwalled.",
+    "arguments": [
+     {
+      "name": "audio_url",
+      "description": "Public https URL of the track, or a share link to its page.",
+      "required": true
+     },
+     {
+      "name": "platform",
+      "description": "Destination for the final master, e.g. spotify.",
+      "required": false
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://echoteka/mastering-passport",
+    "name": "Mastering passport",
+    "mimeType": "text/html;profile=mcp-app",
+    "description": "Interactive result card: loudness before/after, true peak, range, target deviation and the download link."
+   },
+   {
+    "uri": "echoteka://playbook",
+    "name": "Agent playbook",
+    "mimeType": "text/markdown",
+    "description": "Rules for agents using the service."
+   },
+   {
+    "uri": "echoteka://manifest",
+    "name": "Service manifest",
+    "mimeType": "application/json",
+    "description": "Endpoints, presets, free allowance, policies."
+   },
+   {
+    "uri": "echoteka://terms",
+    "name": "Terms",
+    "mimeType": "text/plain",
+    "description": "Terms summary and rights."
+   }
+  ]
+ }
+}

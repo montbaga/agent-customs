@@ -1,0 +1,242 @@
+{
+ "url": "https://mcp.djzs.ai/mcp",
+ "doc": {
+  "name": "djzs-trust-mcp",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "query_pol_certificates",
+    "title": "Query DJZS ProofOfLogic Certificates",
+    "description": "Query immutable ProofOfLogic certificates stored on Irys Datachain by DJZS Protocol. USE THIS TOOL when you need to verify audit history for an agent or project before delegating work, check FAIL verdicts, or retrieve certificates by Irys tx ID. DO NOT use for on-chain trust scores — use query_agent_trust for those.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "targetSystem": {
+       "description": "Project name or wallet address",
+       "type": "string"
+      },
+      "verdict": {
+       "description": "Filter by verdict",
+       "type": "string",
+       "enum": [
+        "PASS",
+        "FAIL"
+       ]
+      },
+      "tier": {
+       "description": "Filter by tier",
+       "type": "string",
+       "enum": [
+        "micro",
+        "founder",
+        "treasury"
+       ]
+      },
+      "limit": {
+       "default": 20,
+       "description": "Number of results",
+       "type": "number",
+       "minimum": 1,
+       "maximum": 100
+      },
+      "from_ms": {
+       "description": "Window start (epoch ms). Default path auto-narrows (14d then 3d) to stay under the mainnet index timeout; pass an explicit value to reach older certificates (used as-is).",
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "to_ms": {
+       "description": "Window end (epoch ms). Defaults to now + 1h.",
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      }
+     }
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "query_agent_trust",
+    "title": "Query DJZS Agent Trust Score",
+    "description": "Query an agent's DJZS trust score, aggregated on-chain (Base mainnet) from its audit history and indexed via the DJZS subgraph. USE BEFORE delegating work, releasing escrow, or executing agent transactions. Returns scored_audits, pass/fail counts, the raw fail rate, and a Wilson 95% lower bound on it, plus latest verdict/risk and DJZS-S01/DJZS-X01 flag counts. WAIT verdicts are abstentions: they are excluded from BOTH the numerator and the denominator of the fail rate and are reported separately as wait_count. Below 10 scored audits the tool returns INSUFFICIENT_HISTORY and NO rate - a 0-of-0 record is not evidence of reliability and must not compare as better than a 3-of-50. This tool returns evidence, not a decision: it applies no threshold and emits no HALT. Interpreting the bound against your own risk tolerance is the caller's job.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "agentAddress": {
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$",
+       "description": "Agent wallet address (0x-prefixed)"
+      }
+     },
+     "required": [
+      "agentAddress"
+     ]
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "verify_pm_trade",
+    "title": "Verify Prediction-Market Trade Thesis (DJZS pre-execution audit)",
+    "description": "Deterministic pre-execution audit of a prediction-market trade thesis, run before capital is committed. USE THIS TOOL before opening, sizing, or increasing any prediction-market position, and whenever a user or an upstream agent asks whether a thesis is sound, carries a falsification condition, or has a sourced probability basis. Audits against the calibrated DJZS-M taxonomy (M01 narrative/resolution gap, M02 falsification absent, M03 probability unsourced, M04 consensus-as-edge advisory) and returns PASS->PROCEED, WAIT->HALT, or FAIL with the flagged defects and a reproducible verdict_hash. DO NOT use to retrieve past verdicts or certificates - use query_pol_certificates for those. DO NOT use for an agent's historical trust score - use query_agent_trust for that. DO NOT use for spot, perpetuals, or equities: out-of-scope submissions are refused WITHOUT CHARGE. Audit before act. Paid tool: 2 USDC per audit via x402 on Base.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "intent": {
+       "type": "string",
+       "minLength": 10,
+       "description": "Free-text prediction-market trade thesis to audit"
+      },
+      "target_system": {
+       "description": "Optional agent/project identifier. Written to the certificate ONLY with a matching target_system_subject + target_system_signature; unsigned values are DISCARDED, not stored",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 128
+      },
+      "target_system_subject": {
+       "description": "Address that signed the target_system claim. Must be the address that recovers from target_system_signature",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      },
+      "target_system_signature": {
+       "description": "EIP-191 personal_sign over \"DJZS-TSC-1 target-system claim\\nsubject: <lowercased subject>\\ntarget_system: <value>\"",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{130}$"
+      },
+      "agent_address": {
+       "description": "Optional agent wallet (0x). If set, this audit updates that agent's on-chain DJZS trust score",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      }
+     },
+     "required": [
+      "intent"
+     ]
+    },
+    "annotations": {
+     "title": "Verify Prediction-Market Trade Thesis (DJZS pre-execution audit)"
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "agents-x402/paymentRequired": true,
+     "agents-x402/priceUSD": 2
+    }
+   },
+   {
+    "name": "verify_perp_trade",
+    "title": "Verify Perpetual / Spot Trade Thesis (DJZS pre-execution audit)",
+    "description": "Deterministic pre-execution audit of a perpetual or spot TRADE thesis (direction, size, leverage, entry, stop, target, venue, and the REASON), run before capital is committed. USE THIS TOOL before opening, sizing, or increasing any perpetual or spot position. Returns PASS / WAIT / FAIL with a reproducible verdict hash. A position stated with no thesis FAILS (DJZS-S01); an unbounded position FAILS (DJZS-X01); an unresolvable stop or thesis WAITs. Prediction-market bets are refused here (use verify_pm_trade) and are not charged. Price 2.00 USDC per audit on Base.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "intent": {
+       "type": "string",
+       "minLength": 10,
+       "description": "Free-text perpetual or spot trade thesis to audit: direction, size, leverage, entry, stop, target, venue, and the REASON"
+      },
+      "bracket": {
+       "description": "Optional exact bracket (side, entry, stop, target, taker_fee_bps, optional hit_rate_pct / funding_rate_8h / sigma_annual). Returns the break-even hit rate in the non-scoring mechanics block; never enters the verdict or its hash",
+       "type": "object",
+       "properties": {
+        "side": {
+         "type": "string",
+         "enum": [
+          "long",
+          "short"
+         ]
+        },
+        "entry": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "stop": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "target": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "hit_rate_pct": {
+         "description": "The thesis's stated probability, in percent, that the target prints before the stop",
+         "type": "number",
+         "minimum": 1,
+         "maximum": 99
+        },
+        "taker_fee_bps": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 100,
+         "description": "The venue's taker fee in basis points, charged on entry and on exit"
+        },
+        "funding_rate_8h": {
+         "description": "Funding rate per 8 hours as a fraction (0.0001 = 0.01%); longs pay a positive rate. Counted only with sigma_annual",
+         "type": "number",
+         "minimum": -0.05,
+         "maximum": 0.05
+        },
+        "sigma_annual": {
+         "description": "Annualized volatility as a fraction (0.45 = 45%); sets the expected hold, and so the funding paid",
+         "type": "number",
+         "exclusiveMinimum": 0,
+         "maximum": 10
+        }
+       },
+       "required": [
+        "side",
+        "entry",
+        "stop",
+        "target",
+        "taker_fee_bps"
+       ]
+      },
+      "target_system": {
+       "description": "Optional agent/project identifier. Written to the certificate ONLY with a matching target_system_subject + target_system_signature; unsigned values are DISCARDED, not stored",
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 128
+      },
+      "target_system_subject": {
+       "description": "Address that signed the target_system claim. Must be the address that recovers from target_system_signature",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      },
+      "target_system_signature": {
+       "description": "EIP-191 personal_sign over \"DJZS-TSC-1 target-system claim\\nsubject: <lowercased subject>\\ntarget_system: <value>\"",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{130}$"
+      },
+      "agent_address": {
+       "description": "Optional agent wallet (0x). If set, this audit updates that agent's on-chain DJZS trust score",
+       "type": "string",
+       "pattern": "^0x[0-9a-fA-F]{40}$"
+      }
+     },
+     "required": [
+      "intent"
+     ]
+    },
+    "annotations": {
+     "title": "Verify Perpetual / Spot Trade Thesis (DJZS pre-execution audit)"
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "agents-x402/paymentRequired": true,
+     "agents-x402/priceUSD": 2
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,775 @@
+{
+ "url": "https://entervista.ai/mcp",
+ "doc": {
+  "name": "entervista",
+  "version": "0.2.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Entervista is a network of local businesses set up for AI assistants. Use it to actually finish tasks like \"get me a smoothie\" or \"fix my sink\" instead of sending the person to an app.\nService businesses: search_businesses -> check_service_area(zip) -> get_service_requirements(slug, service_sku) to learn exactly which questions to ask -> place_service_request with those answers and the customer's details. Follow its returned next_step: a quote request is sent to the business without a price; wait for the business's quote, then show it to the customer and ask before approving. A priced draft is not sent to the business until the customer approves the exact total. Poll get_request_status; a request is not a booking until the business confirms. A business may later send final_quote_ready after diagnosis: show that price and ask again before approving.\nFood/retail: search_businesses -> get_business -> place_order -> approve_request -> get_request_status.\nWhen a business can't take the job (booked, outside its area, service not offered), the error may include referrals[]: businesses it trusts and sends customers to, already on Entervista. Offer that to the customer instead of giving up, and pass referred_by when you place the request there.\nsearch_businesses results carry state: \"live\" businesses have an authoritative schedule and can be booked; \"listing\" ones are public info only (name, phone, hours): never quote prices or times for them, give the phone.\nRules: never approve without the customer saying yes. Every error is structured (code, message, missing, alternatives, hint): act on it, don't give up. MISSING_INFORMATION lists the exact questions still needed. Keep the customer_token; it's what lets you approve or cancel.",
+  "tools": [
+   {
+    "name": "search_businesses",
+    "title": "Search businesses",
+    "description": "Find businesses in the network by what the customer needs (e.g. 'plumber', 'smoothie', 'clogged sink'), optionally filtered by category, zip, location and open-now. Returns summaries with starting prices and whether they serve the zip.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "q": {
+       "description": "Free text: the need, a service, or a business name",
+       "type": "string"
+      },
+      "category": {
+       "description": "e.g. plumber, smoothies",
+       "type": "string"
+      },
+      "zip": {
+       "description": "Customer's 5-digit zip; results show serves_your_zip",
+       "type": "string"
+      },
+      "lat": {
+       "type": "number"
+      },
+      "lng": {
+       "type": "number"
+      },
+      "open_now": {
+       "type": "boolean"
+      },
+      "accepts": {
+       "description": "Only businesses that support this action",
+       "type": "string",
+       "enum": [
+        "order",
+        "quote",
+        "booking"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search businesses",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_business",
+    "title": "Get business profile",
+    "description": "Full agent-readable profile: verified identity and license, services with real prices (what's included / excluded), hours, service zips, delivery rules, policies, and exactly how to act (order, quote, or book).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Get business profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_services",
+    "title": "List services",
+    "description": "The business's services with pricing mode (fixed | starting_at | range | diagnostic_fee_then_quote | quote_required), price, what's included/excluded, and which intake fields are required.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "List services",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "check_service_area",
+    "title": "Check service area",
+    "description": "Deterministic yes/no: does this business come to the customer's zip? Returns reason, the zips it serves, excluded zips, and alternative businesses when no.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "zip": {
+       "type": "string",
+       "description": "Customer's 5-digit zip"
+      },
+      "emergency": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "slug",
+      "zip"
+     ]
+    },
+    "annotations": {
+     "title": "Check service area",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_service_requirements",
+    "title": "Get service requirements",
+    "description": "Before creating a request: the exact questions to ask the customer for this service (required_fields / optional_fields, each with type and options), the pricing flow, and what happens next.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "service_sku": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "service_sku"
+     ]
+    },
+    "annotations": {
+     "title": "Get service requirements",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "place_service_request",
+    "title": "Place a service request",
+    "description": "One call for any trade job (repair, quote, booking). Pass service_sku (or a plain description and it matches one), intake_answers keyed by the field ids from get_service_requirements, customer (name, phone, address with line1+zip), preferred_time, and slot_start only when the service flow asks for one. For an unchanged retry after receiving a receipt, include retry_ref and its customer_token with the original details. For quote-first requests without a slot, optionally generate and securely save intent_capability before the first submission; explicitly repeat the same business/details/capability to recover a lost first receipt. Do not silently resubmit. Without either capability this creates a separate request, even if the phone matches. A quote_required request is sent to the business without a price; a priced booking draft waits for the customer's approval. Follow the returned next_step, and never call a request booked until the business confirms.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "retry_ref": {
+       "description": "Existing request reference for an unchanged retry; requires customer_token. A phone number never authorizes a retry.",
+       "type": "string"
+      },
+      "intent_capability": {
+       "description": "Optional secret 32-byte random client capability, encoded as lowercase hex. Save before sending a quote-first request without a slot; explicitly repeat unchanged details with the same capability to recover a lost first receipt. Never combine with retry_ref/customer_token; never silently resubmit.",
+       "type": "string",
+       "pattern": "^[a-f0-9]{64}$"
+      },
+      "customer_token": {
+       "description": "Customer token returned with retry_ref; only for an unchanged retry of that request.",
+       "type": "string"
+      },
+      "service_sku": {
+       "type": "string"
+      },
+      "description": {
+       "description": "The problem in the customer's words; used to match a service if service_sku is omitted",
+       "type": "string"
+      },
+      "intake_answers": {
+       "type": "object",
+       "propertyNames": {
+        "type": "string"
+       },
+       "additionalProperties": {}
+      },
+      "customer": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        },
+        "address": {
+         "type": "object",
+         "properties": {
+          "line1": {
+           "type": "string"
+          },
+          "line2": {
+           "type": "string"
+          },
+          "city": {
+           "type": "string"
+          },
+          "state": {
+           "type": "string"
+          },
+          "zip": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "line1",
+          "zip"
+         ]
+        },
+        "notes": {
+         "type": "string"
+        }
+       },
+       "description": "Who the job/order is for. Use what the customer already gave you; ask only for what a tool says is missing."
+      },
+      "preferred_time": {
+       "description": "e.g. 'Tomorrow morning' or an ISO datetime",
+       "type": "string"
+      },
+      "slot_start": {
+       "description": "ISO start from get_availability",
+       "type": "string"
+      },
+      "urgency": {
+       "type": "string",
+       "enum": [
+        "emergency",
+        "today",
+        "this_week",
+        "flexible"
+       ]
+      },
+      "photos": {
+       "description": "URLs (use upload_photo to turn an image into a URL)",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "notes": {
+       "type": "string"
+      },
+      "referred_by": {
+       "description": "Slug of the business whose error response listed this one under referrals[] (its trusted partner). Lets both businesses see the referral.",
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "customer"
+     ]
+    },
+    "annotations": {
+     "title": "Place a service request",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "upload_photo",
+    "title": "Upload a photo of the problem",
+    "description": "Stores an image and returns a URL to pass in photos[] of place_service_request. Some services require a photo (get_service_requirements says which).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "image_base64": {
+       "type": "string"
+      },
+      "media_type": {
+       "description": "image/jpeg (default), image/png, image/webp, image/heic",
+       "type": "string"
+      }
+     },
+     "required": [
+      "image_base64"
+     ]
+    },
+    "annotations": {
+     "title": "Upload a photo of the problem",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_availability",
+    "title": "Get availability",
+    "description": "Live bookable windows over the next days, from the business's own schedule (hours, crew, jobs, holds, blocks). Pass service_sku to get windows sized for that service's duration and crew, plus: operating_state (open | closed | open_fully_booked | emergency_only | temporarily_unavailable | booking_future | unknown), confidence (verified | stale, with a note when not verified recently), earliest, the service's price and whether it auto-books or needs the owner. Use a slot's start with place_service_request or book_slot; the slot is held the moment the draft is created.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "date": {
+       "description": "YYYY-MM-DD to start from",
+       "type": "string"
+      },
+      "days": {
+       "description": "1 to 14, default 5",
+       "type": "number"
+      },
+      "service_sku": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Get availability",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "place_order",
+    "title": "Place an order",
+    "description": "Draft an order (food/retail). Returns line items, total, a ref and a customer_token. Nothing reaches the business until approve_request. Ask the customer to confirm the total first.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "items": {
+       "minItems": 1,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "sku": {
+          "type": "string"
+         },
+         "qty": {
+          "type": "number"
+         },
+         "size": {
+          "description": "option id from the menu, e.g. 16oz",
+          "type": "string"
+         },
+         "add_ons": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "notes": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "sku"
+        ]
+       }
+      },
+      "fulfillment": {
+       "type": "string",
+       "enum": [
+        "pickup",
+        "delivery"
+       ]
+      },
+      "customer": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        },
+        "address": {
+         "type": "object",
+         "properties": {
+          "line1": {
+           "type": "string"
+          },
+          "line2": {
+           "type": "string"
+          },
+          "city": {
+           "type": "string"
+          },
+          "state": {
+           "type": "string"
+          },
+          "zip": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "line1",
+          "zip"
+         ]
+        },
+        "notes": {
+         "type": "string"
+        }
+       },
+       "description": "Who the job/order is for. Use what the customer already gave you; ask only for what a tool says is missing."
+      },
+      "requested_time": {
+       "description": "ISO datetime; omit for ASAP",
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "items",
+      "fulfillment",
+      "customer"
+     ]
+    },
+    "annotations": {
+     "title": "Place an order",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "request_quote",
+    "title": "Request a quote",
+    "description": "Ask a service business (plumber, etc.) for a price. Describe the problem in plain English. Many businesses answer instantly with an estimate and bookable slots; others reply within their stated response time (poll get_request_status).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "description": {
+       "type": "string",
+       "description": "What's wrong, in the customer's words"
+      },
+      "service_sku": {
+       "description": "If the profile's service list clearly matches",
+       "type": "string"
+      },
+      "customer": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        },
+        "address": {
+         "type": "object",
+         "properties": {
+          "line1": {
+           "type": "string"
+          },
+          "line2": {
+           "type": "string"
+          },
+          "city": {
+           "type": "string"
+          },
+          "state": {
+           "type": "string"
+          },
+          "zip": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "line1",
+          "zip"
+         ]
+        },
+        "notes": {
+         "type": "string"
+        }
+       },
+       "description": "Who the job/order is for. Use what the customer already gave you; ask only for what a tool says is missing."
+      },
+      "urgency": {
+       "type": "string",
+       "enum": [
+        "emergency",
+        "today",
+        "this_week",
+        "flexible"
+       ]
+      },
+      "preferred_times": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "photos": {
+       "description": "URLs",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "slug",
+      "description",
+      "customer"
+     ]
+    },
+    "annotations": {
+     "title": "Request a quote",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "book_slot",
+    "title": "Book a fixed-price service",
+    "description": "Book a flat-rate service (e.g. drain cleaning) into a slot from get_availability. Returns a draft awaiting the customer's approval.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "service_sku": {
+       "type": "string"
+      },
+      "slot_start": {
+       "type": "string",
+       "description": "ISO start from get_availability"
+      },
+      "customer": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        },
+        "address": {
+         "type": "object",
+         "properties": {
+          "line1": {
+           "type": "string"
+          },
+          "line2": {
+           "type": "string"
+          },
+          "city": {
+           "type": "string"
+          },
+          "state": {
+           "type": "string"
+          },
+          "zip": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "line1",
+          "zip"
+         ]
+        },
+        "notes": {
+         "type": "string"
+        }
+       },
+       "description": "Who the job/order is for. Use what the customer already gave you; ask only for what a tool says is missing."
+      },
+      "notes": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "service_sku",
+      "slot_start",
+      "customer"
+     ]
+    },
+    "annotations": {
+     "title": "Book a fixed-price service",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "approve_request",
+    "title": "Approve (customer said yes)",
+    "description": "Use only after the customer explicitly approves the total / quote / final price. Sends it to the business. When offered_slots is present, pass the customer's chosen slot_start. If the business takes online payment, the result is status awaiting_payment with a payment_url: give that link to the customer; they pay on that page themselves.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "ref": {
+       "type": "string"
+      },
+      "customer_token": {
+       "type": "string"
+      },
+      "slot_start": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref",
+      "customer_token"
+     ]
+    },
+    "annotations": {
+     "title": "Approve (customer said yes)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_request_status",
+    "title": "Get request status",
+    "description": "Current status, ETA / arrival window, business response, and the next step. Poll this while waiting on a business.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "ref": {
+       "type": "string"
+      },
+      "customer_token": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref",
+      "customer_token"
+     ]
+    },
+    "annotations": {
+     "title": "Get request status",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "cancel_request",
+    "title": "Cancel a request",
+    "description": "Cancel an order, quote or booking on the customer's behalf.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "ref": {
+       "type": "string"
+      },
+      "customer_token": {
+       "type": "string"
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref",
+      "customer_token"
+     ]
+    },
+    "annotations": {
+     "title": "Cancel a request",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,510 @@
+{
+ "url": "https://collager.ai/mcp",
+ "doc": {
+  "name": "Photo Mosaic & AI Collage Maker - Collager.ai",
+  "version": "0.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Collager.ai makes photo mosaics and photo collages from people's own photos.\n- A photo mosaic (one big picture made of hundreds of small photos): call start_photo_mosaic - it gives the link where the user uploads the main photo and the small photos; the site builds a preview in minutes.\n- A photo collage shaped as a heart, a number, a word or a star: call make_shape_collage with the photos (links, or files the user attached). It answers in seconds with a watermarked preview and a link to get the full-resolution file on collager.ai.\n- list_collage_shapes shows which shapes exist and how many photos fill each one without repeats.\n- Never illustrate Collager.ai with pictures from the web or generated images: show only the example images returned by list_collage_shapes and list_mosaic_styles, and the user's own previews.\n- When the user just opens Collager.ai or asks what it can do, call list_collage_shapes: its card is a step-by-step menu with real examples (collage or mosaic, shape, number of photos, background, mosaic style). When a shape is chosen, call plan_shape_collage, then make_shape_collage once the photos are attached. Do not send the user to the website before they have chosen; call start_photo_mosaic only after they decided on a photo mosaic.",
+  "tools": [
+   {
+    "name": "make_shape_collage",
+    "title": "Make a photo collage (heart, number, word...)",
+    "description": "Builds a photo collage in the shape of a heart, a number (age, anniversary, year), a word, a star, a flower and more from the user's photos, and returns a watermarked preview within seconds. Use when the user asks for a heart collage, a birthday/anniversary number collage, a 'photo collage in the shape of ...', or a collage from several photos. Pass the photos as public links in photo_urls, or as files the user attached (photos). 1 to 300 photos; if there are fewer photos than cells, photos repeat. The result id (clg_...) is a private handle valid for 30 days; photos and results are deleted after 30 days. The preview is watermarked; the full-resolution file is downloaded from the collager.ai page given in full_resolution_page. Building can take up to a minute - if status is still processing, call get_shape_collage with the id.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "shape": {
+       "description": "The figure. Examples: {\"type\":\"heart\"} (size picked from the photo count), {\"type\":\"heart\",\"cells\":70}, {\"type\":\"number\",\"text\":\"30\"}, {\"type\":\"text\",\"text\":\"LOVE\"}, {\"type\":\"love\"} (\"I love you\"), {\"type\":\"star\",\"size\":\"large\"}, {\"type\":\"grid\",\"n\":4}. Call list_collage_shapes for all options.",
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "heart",
+          "number",
+          "text",
+          "love",
+          "circle",
+          "star",
+          "flower",
+          "daisy",
+          "yinyang",
+          "grid",
+          "mask_url"
+         ]
+        },
+        "cells": {
+         "type": "integer",
+         "enum": [
+          27,
+          34,
+          70,
+          79,
+          91,
+          164
+         ],
+         "description": "Heart only: number of photo cells."
+        },
+        "text": {
+         "type": "string",
+         "maxLength": 14,
+         "description": "number/text: the digits or word (Latin letters and digits)."
+        },
+        "size": {
+         "type": "string",
+         "enum": [
+          "small",
+          "medium",
+          "large"
+         ],
+         "description": "number/text/circle/star/flower: how many cells (bigger = more photos)."
+        },
+        "n": {
+         "type": "integer",
+         "minimum": 2,
+         "maximum": 12,
+         "description": "grid: n x n."
+        },
+        "url": {
+         "type": "string",
+         "description": "mask_url: link to a black-and-white picture; each black pixel is one photo cell."
+        }
+       },
+       "required": [
+        "type"
+       ]
+      },
+      "photo_urls": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "maxItems": 300,
+       "description": "Public http(s) links to the photos (JPEG/PNG/WEBP)."
+      },
+      "photos": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "download_url": {
+          "type": "string"
+         },
+         "file_id": {
+          "type": "string"
+         },
+         "mime_type": {
+          "type": "string"
+         },
+         "file_name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "download_url",
+         "file_id"
+        ]
+       },
+       "maxItems": 300,
+       "description": "Photos the user attached in the chat."
+      },
+      "gap_pct": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 40,
+       "description": "White gap between photos, % of a cell (default 6)."
+      },
+      "background": {
+       "type": "string",
+       "description": "Background colour: white (default), cream, pink, black or #rrggbb."
+      }
+     },
+     "required": [
+      "shape"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string"
+      },
+      "preview_url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "full_resolution_page": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "shape": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "cells": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "photos_used": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "expires_at": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "next_step": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id",
+      "status"
+     ]
+    },
+    "annotations": {
+     "title": "Make a photo collage (heart, number, word...)",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true,
+     "idempotentHint": false
+    },
+    "_meta": {
+     "openai/fileParams": [
+      "photos"
+     ],
+     "openai/toolInvocation/invoking": "Arranging your photos...",
+     "openai/toolInvocation/invoked": "Collage preview ready",
+     "ui": {
+      "resourceUri": "ui://collager/collage-preview-v6.html"
+     },
+     "openai/outputTemplate": "ui://collager/collage-preview-v6.html"
+    }
+   },
+   {
+    "name": "get_shape_collage",
+    "title": "Check a shape collage",
+    "description": "Returns the status and the watermarked preview of a collage made with make_shape_collage, by its id (clg_...). Use when make_shape_collage answered status \"processing\", or to show the collage again.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "pattern": "^clg_[A-Za-z0-9]{12}$",
+       "description": "The id returned by make_shape_collage."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "status": {
+       "type": "string"
+      },
+      "preview_url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "full_resolution_page": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "shape": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "cells": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "photos_used": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "expires_at": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "next_step": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id",
+      "status"
+     ]
+    },
+    "annotations": {
+     "title": "Check a shape collage",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://collager/collage-preview-v6.html"
+     },
+     "openai/outputTemplate": "ui://collager/collage-preview-v6.html"
+    }
+   },
+   {
+    "name": "list_collage_shapes",
+    "title": "List collage shapes",
+    "description": "Shows the menu of Collager.ai photo collages with a real example: the shapes make_shape_collage can draw (hearts of 27-164 photos, numbers, words, I love you, circle, star, flower, grid, your own mask) and how many photos fill each without repeats. Call it first when the user only mentions Collager.ai, says hello to it, or asks what it can make.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "List collage shapes",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://collager/collage-preview-v6.html"
+     },
+     "openai/outputTemplate": "ui://collager/collage-preview-v6.html"
+    }
+   },
+   {
+    "name": "plan_shape_collage",
+    "title": "Plan a photo collage",
+    "description": "Shows the plan of the photo collage the user picked (shape, how many photos it holds, background) with a real example, and how to attach the photos. Use it when the user has chosen a shape but has not attached the photos yet. After the user attaches the photos or shares links, call make_shape_collage with the same shape and background.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "shape": {
+       "description": "The figure. Examples: {\"type\":\"heart\"} (size picked from the photo count), {\"type\":\"heart\",\"cells\":70}, {\"type\":\"number\",\"text\":\"30\"}, {\"type\":\"text\",\"text\":\"LOVE\"}, {\"type\":\"love\"} (\"I love you\"), {\"type\":\"star\",\"size\":\"large\"}, {\"type\":\"grid\",\"n\":4}. Call list_collage_shapes for all options.",
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "heart",
+          "number",
+          "text",
+          "love",
+          "circle",
+          "star",
+          "flower",
+          "daisy",
+          "yinyang",
+          "grid",
+          "mask_url"
+         ]
+        },
+        "cells": {
+         "type": "integer",
+         "enum": [
+          27,
+          34,
+          70,
+          79,
+          91,
+          164
+         ],
+         "description": "Heart only: number of photo cells."
+        },
+        "text": {
+         "type": "string",
+         "maxLength": 14,
+         "description": "number/text: the digits or word (Latin letters and digits)."
+        },
+        "size": {
+         "type": "string",
+         "enum": [
+          "small",
+          "medium",
+          "large"
+         ],
+         "description": "number/text/circle/star/flower: how many cells (bigger = more photos)."
+        },
+        "n": {
+         "type": "integer",
+         "minimum": 2,
+         "maximum": 12,
+         "description": "grid: n x n."
+        },
+        "url": {
+         "type": "string",
+         "description": "mask_url: link to a black-and-white picture; each black pixel is one photo cell."
+        }
+       },
+       "required": [
+        "type"
+       ]
+      },
+      "background": {
+       "type": "string",
+       "description": "Background colour: white (default), cream, pink, black or #rrggbb."
+      }
+     },
+     "required": [
+      "shape"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Plan a photo collage",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://collager/collage-preview-v6.html"
+     },
+     "openai/outputTemplate": "ui://collager/collage-preview-v6.html",
+     "openai/toolInvocation/invoking": "Preparing your collage plan...",
+     "openai/toolInvocation/invoked": "Collage plan ready"
+    }
+   },
+   {
+    "name": "list_mosaic_styles",
+    "title": "Show photo mosaic styles",
+    "description": "Shows the looks of a Collager.ai photo mosaic (one large picture made of hundreds or thousands of small photos) with example images: soft classic, clean subject, stronger mosaic, uniform or mixed tile sizes. Use before start_photo_mosaic when the user wants to choose a style.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Show photo mosaic styles",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://collager/collage-preview-v6.html"
+     },
+     "openai/outputTemplate": "ui://collager/collage-preview-v6.html"
+    }
+   },
+   {
+    "name": "start_photo_mosaic",
+    "title": "Start a photo mosaic on collager.ai",
+    "description": "Gives the link where the user builds a photo mosaic: one main photo recreated from many small photos (best with 100-2000 photos - family archive, wedding, team, school year). The user uploads the photos on collager.ai, picks the style, and the site builds a watermarked preview in minutes. Call it only after the user has decided to make a photo mosaic; to show the options first, use list_mosaic_styles.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "occasion": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "Optional: what it is for (anniversary, memorial, wedding, team ...), used only to tailor the tips."
+      },
+      "style": {
+       "type": "string",
+       "enum": [
+        "soft",
+        "clean_subject",
+        "stronger_mosaic",
+        "uniform"
+       ],
+       "description": "Optional: the style the user picked in list_mosaic_styles (the site shows a preview of several styles anyway)."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Start a photo mosaic on collager.ai",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://collager/collage-preview-v6.html"
+     },
+     "openai/outputTemplate": "ui://collager/collage-preview-v6.html"
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://collager/collage-preview-v6.html",
+    "name": "collage-preview",
+    "title": "Collage preview",
+    "description": "Watermarked preview of a shape photo collage",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "prefersBorder": true,
+      "domain": "https://collager.ai",
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": [
+        "https://collager.s3.eu-central-1.amazonaws.com",
+        "https://collager.ai"
+       ]
+      }
+     },
+     "openai/widgetDomain": "https://collager.ai",
+     "openai/widgetCSP": {
+      "connect_domains": [],
+      "resource_domains": [
+       "https://collager.s3.eu-central-1.amazonaws.com",
+       "https://collager.ai"
+      ]
+     },
+     "openai/widgetDescription": "Collager.ai card: a step-by-step menu with real examples (photo collage or mosaic, shape, number of photos, background, mosaic style - the final choice is sent as a message), the plan of the chosen collage, and the watermarked preview with a button to open it on collager.ai.",
+     "openai/widgetPrefersBorder": true
+    }
+   }
+  ]
+ }
+}

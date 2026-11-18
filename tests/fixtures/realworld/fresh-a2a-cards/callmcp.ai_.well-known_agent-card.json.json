@@ -1,0 +1,199 @@
+{
+ "url": "https://callmcp.ai/.well-known/agent-card.json",
+ "doc": {
+  "name": "CallMCP",
+  "description": "The agent communications interface on the KaiCalls stack: a real phone line for AI agents (calls in and out, SMS, meetings, approved email campaigns, webhooks) behind one MCP endpoint, with owner approval, consent, disclosure, idempotency and audit rails. A2A is in beta: per-business message/send only (text in and out, public business inquiries), no streaming, no task lifecycle. Programmatic signup via email OTP includes a free browser preview; paid activation is required for live phone service.",
+  "url": "https://callmcp.ai",
+  "version": "1.0",
+  "protocolVersion": "0.3.0",
+  "provider": {
+   "organization": "KaiCalls",
+   "url": "https://www.kaicalls.com"
+  },
+  "documentationUrl": "https://callmcp.ai/agent-communications",
+  "preferredTransport": "JSONRPC",
+  "additionalInterfaces": [
+   {
+    "url": "https://www.kaicalls.com/api/mcp",
+    "transport": "JSONRPC"
+   }
+  ],
+  "supportedInterfaces": [
+   {
+    "url": "https://www.kaicalls.com/api/mcp",
+    "transport": "JSONRPC"
+   }
+  ],
+  "capabilities": {
+   "streaming": false,
+   "pushNotifications": false
+  },
+  "authentication": {
+   "schemes": [
+    "bearer"
+   ],
+   "description": "API key returned after verified signup provisioning, not the initial OTP challenge. Pass as Authorization: Bearer <api_key>."
+  },
+  "skills": [
+   {
+    "id": "phone-answering",
+    "name": "AI Phone Answering",
+    "description": "Answer inbound calls 24/7 with a customizable AI voice agent. Captures leads, books appointments, and transfers to humans when needed."
+   },
+   {
+    "id": "lead-intake",
+    "name": "Lead Intake & Qualification",
+    "description": "Collect caller information, qualify leads by case type or service need, and push to CRM."
+   },
+   {
+    "id": "appointment-booking",
+    "name": "Appointment Booking",
+    "description": "Book appointments via Google Calendar integration during calls."
+   },
+   {
+    "id": "outbound-calls",
+    "name": "Outbound Calling",
+    "description": "Place outbound calls to leads with TCPA-compliant scheduling and follow-ups."
+   },
+   {
+    "id": "sms-followup",
+    "name": "SMS Follow-Up",
+    "description": "Send automated SMS follow-ups after calls or missed calls."
+   }
+  ],
+  "endpoints": {
+   "signup": {
+    "url": "https://www.kaicalls.com/api/v1/signup",
+    "method": "POST",
+    "description": "Default activation_mode=otp: first send an email verification code (HTTP 200, status=otp_sent), then submit otp_code and challenge_id with the same signup fields to create an account and browser-only assistant preview. No phone number, forwarding, inbound calls, or outbound calls are activated until the first subscription payment succeeds. activation_mode=payment creates a Stripe Checkout hand-off; x402 may authorize API access but does not replace the paid recurring phone plan. Inspect response state and setup_status; HTTP 200 alone does not prove a working line, owner-phone setup, or verified forwarding.",
+    "contentType": "application/json",
+    "body": {
+     "business_name": {
+      "type": "string",
+      "required": true
+     },
+     "email": {
+      "type": "string",
+      "required": true
+     },
+     "business_type": {
+      "type": "string",
+      "required": false
+     },
+     "website": {
+      "type": "string",
+      "required": false
+     },
+     "phone_forward_to": {
+      "type": "string",
+      "required": false
+     },
+     "activation_mode": {
+      "type": "string",
+      "required": false,
+      "default": "otp",
+      "enum": [
+       "otp",
+       "payment"
+      ]
+     },
+     "otp_code": {
+      "type": "string",
+      "required": false,
+      "description": "Email verification code for OTP step 2."
+     },
+     "challenge_id": {
+      "type": "string",
+      "required": false,
+      "description": "Challenge returned by OTP step 1."
+     },
+     "plan_id": {
+      "type": "string",
+      "required": false,
+      "default": "backup",
+      "description": "Payment-mode plan selection for paid carrier activation."
+     }
+    },
+    "returns": {
+     "challenge_id": "string (OTP step 1 only)",
+     "expires_in_seconds": "number (OTP step 1 only)",
+     "api_key": "string (after account provisioning; absent from OTP step 1)",
+     "business_id": "string (after account provisioning)",
+     "agent_id": "string | null",
+     "phone_number": "string | null",
+     "dashboard_url": "string",
+     "trial_ends_at": "null for new signups",
+     "provisioning_deferred": "boolean",
+     "trial_minutes_included": "number (0 for new signups)",
+     "setup_status": "object (component provisioning and remaining setup checks)",
+     "payment_capture": "required_for_carrier_activation | stripe_checkout | manual",
+     "checkout_url": "string (present when Stripe Checkout is created)",
+     "dashboard_magic_link": "string (one-time owner login link for dashboard access)",
+     "password_setup_link": "string (where the owner sets a password after using the one-time link)",
+     "status": "'otp_sent' with HTTP 200 awaits email verification. 'preview_ready' means the browser preview is available but carrier activation remains deferred. 'provisioning_failed' with HTTP 503 indicates incomplete account or preview setup. Payment-mode HTTP 200 is provisioning_deferred; no HTTP status alone proves completed carrier activation."
+    }
+   },
+   "business_agent_card": {
+    "url": "https://www.kaicalls.com/api/v1/business/agent-card?handle={handle}",
+    "method": "GET",
+    "description": "Per-business A2A-style capability card (this document's per-business analogue) — resolvable for any KaiCalls-served business via the same {handle}. Advertises that business's skills, live availability, and its business_profile endpoint. This is the discovery entry point for an agent that already knows a specific business is on KaiCalls and wants its structured endpoint. {handle} may also be the business's booking page address; when the business takes online bookings, the card lists public endpoints to read services, check open times, and book."
+   },
+   "business_a2a": {
+    "url": "https://www.kaicalls.com/api/a2a?handle={handle}",
+    "method": "POST",
+    "description": "A2A JSON-RPC 2.0 endpoint for ONE KaiCalls business's Kai (message/send, text in and out). Any agent can message a business this way; send the returned contextId back to continue the conversation. GET the same URL for that business's agent card."
+   },
+   "business_profile": {
+    "url": "https://www.kaicalls.com/api/v1/business/profile?handle={handle}",
+    "method": "GET",
+    "description": "Public, unauthenticated structured-answer endpoint for ONE KaiCalls-served business: services, hours, pricing, service area, live availability, and FAQ — the same information its voice agent gives any caller. {handle} is that business's business_id (UUID) or public phone number."
+   },
+   "directory_search": {
+    "url": "https://www.kaicalls.com/api/v1/directory-search?q={query}&category={category}&city={city}&state={state}",
+    "method": "GET",
+    "description": "Public, unauthenticated search of businesses listed in the KaiCalls phone book. Each result has the public phone number, open-now status, and a booking_url when the business takes online bookings."
+   }
+  },
+  "pricing": {
+   "model": "subscription",
+   "currency": "USD",
+   "plans": [
+    {
+     "name": "Kai Backup",
+     "price": 10,
+     "unit": "month",
+     "minutes": 48,
+     "answeredCalls": 20,
+     "phoneNumbers": 1,
+     "custom": false
+    },
+    {
+     "name": "Kai Line",
+     "price": 79,
+     "unit": "month",
+     "minutes": 408,
+     "answeredCalls": 170,
+     "phoneNumbers": 1,
+     "custom": false
+    },
+    {
+     "name": "Kai Office",
+     "price": 349,
+     "unit": "month",
+     "minutes": 1920,
+     "answeredCalls": 800,
+     "phoneNumbers": 1,
+     "custom": false
+    }
+   ],
+   "overage": "There are no per-minute overage charges. Your plan includes an expected monthly call allowance. If your call volume stays higher, we recommend the next plan and notify you before anything changes. You can choose to keep your current plan, and we move you back down if volume drops.",
+   "preview": {
+    "channel": "browser",
+    "requiresPayment": false,
+    "verification": "email OTP",
+    "carrierAccess": false,
+    "activation": "A successful first subscription payment is required before a dedicated number, inbound calls, forwarding, SMS, or outbound calls are enabled."
+   }
+  }
+ }
+}
