@@ -597,12 +597,17 @@ function renderPins() {
     return;
   }
   for (const p of pins) {
+    const isMcp = p.kind === "mcp-tools" || String(p.url || "").startsWith("mcp:");
+    const rawTarget = isMcp ? String(p.url || "").replace(/^mcp:/, "") : p.url;
+    const summary = isMcp
+      ? `${p.short || p.hash?.slice(7, 19) || "pinned"} · ${p.count ?? "?"} MCP tool(s) · pinned ${fmtDate(p.pinnedAt)}`
+      : `${p.short} · ${p.verdict} · approved ${fmtDate(p.pinnedAt)}${p.how === "first-use" ? " by the guard on first use" : p.how === "reviewed" ? " after review" : ""}`;
     list.append(h("li", null,
-      h("span", { class: "ptitle" }, p.brand || p.network || p.host),
-      h("span", { class: "pmeta" }, p.url),
-      h("span", { class: "pmeta" }, `${p.short} · ${p.verdict} · approved ${fmtDate(p.pinnedAt)}${p.how === "first-use" ? " by the guard on first use" : p.how === "reviewed" ? " after review" : ""}`),
+      h("span", { class: "ptitle" }, p.brand || p.network || p.host || rawTarget),
+      h("span", { class: "pmeta" }, rawTarget),
+      h("span", { class: "pmeta" }, summary),
       h("div", { class: "pactions" },
-        h("button", { type: "button", class: "ghost small", onclick: () => runInspect(p.url) }, "Check for changes"),
+        h("button", { type: "button", class: "ghost small", onclick: () => runInspect(rawTarget) }, "Check for changes"),
         h("button", { type: "button", class: "danger small", onclick: () => desk.unpin(p.url) }, "Forget"))));
   }
 }
@@ -1031,7 +1036,7 @@ async function wireBenchStrip() {
     const ac = bench.agentCustoms;
     const baseline = bench.naiveRegexBaseline;
     const items = [
-      [`${bench.hostileTotal} attack vectors + ${bench.benignTotal} benign`, `Round 1 ${ac.round1Caught}/${ac.round1Total} · Round 2 ${ac.round2Caught}/${ac.round2Total} · ${bench.selfTestPassed}/${bench.selfTestTotal} lock/cert checks`],
+      [`${bench.hostileTotal} attack vectors + ${bench.benignTotal} benign`, `R1 ${ac.round1Caught}/${ac.round1Total} · R2 ${ac.round2Caught}/${ac.round2Total} · R3 ${ac.round3Caught}/${ac.round3Total} · Held-out ${ac.heldoutCaught}/${ac.heldoutTotal} · ${bench.selfTestPassed}/${bench.selfTestTotal} lock/cert checks`],
       [`${ac.catchRate}% attacks blocked/held`, `${ac.flaggedRate}% flagged incl. conditions · vs. ${baseline.catchRate}% normalized regex`],
       [`${ac.falsePositiveRate}% benign false blocks`, `${ac.benignCleared}/${bench.benignTotal} clean cleared · vs. ${baseline.falsePositiveRate}% normalized regex`],
       [`~${ac.medianDetectionMs} ms median check`, `${ac.llmTokenCost} · reproducible via npm run bench`],
