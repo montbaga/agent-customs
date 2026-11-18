@@ -161,14 +161,17 @@ export function showLockNotice({ lock = 1, kind, where, reason = "" }) {
   box.dataset.lock = kind;
   box.setAttribute("role", "status");
   const isReplyBlock = lock === 2;
-  box.setAttribute("aria-label", isReplyBlock ? `Agent Customs blocked an ${kind}` : `Agent Customs kept a ${kind} back`);
+  const isCanaryTrip = lock === 3;
+  box.setAttribute("aria-label", isCanaryTrip ? `Agent Customs tripped a ${kind}` : isReplyBlock ? `Agent Customs blocked an ${kind}` : `Agent Customs kept a ${kind} back`);
   const head = el("div", "", "display:flex;align-items:center;justify-content:space-between;gap:10px");
   head.append(el("span", "Agent Customs", `font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${ink}`),
-    el("span", isReplyBlock ? "Blocked" : "Kept safe", `flex:none;font:700 11px/1 ui-monospace,"Geist Mono",Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:${ink};border:2px double ${tone};border-radius:6px;padding:4px 7px;transform:rotate(-3deg)`));
-  const titleText = isReplyBlock ? `Blocked ${kind} in ${where}` : `Kept a ${kind} out of ${where}`;
-  const detailText = isReplyBlock
-    ? `${reason ? `${reason}. ` : ""}Nothing from that reply reached the assistant or the page.`
-    : "Card numbers, bank account numbers, keys and passwords never go to a partner's assistant, an outside tool or a website action a partner could have prompted. Nothing was sent.";
+    el("span", isCanaryTrip ? "Canary tripped" : isReplyBlock ? "Blocked" : "Kept safe", `flex:none;font:700 11px/1 ui-monospace,"Geist Mono",Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:${ink};border:2px double ${tone};border-radius:6px;padding:4px 7px;transform:rotate(-3deg)`));
+  const titleText = isCanaryTrip ? `Tripped ${kind} in ${where}` : isReplyBlock ? `Blocked ${kind} in ${where}` : `Kept a ${kind} out of ${where}`;
+  const detailText = isCanaryTrip
+    ? `${reason ? `${reason}. ` : ""}Protected host context tried to leave its boundary, so execution stopped and involved partner approvals were removed.`
+    : isReplyBlock
+      ? `${reason ? `${reason}. ` : ""}Nothing from that reply reached the assistant or the page.`
+      : "Card numbers, bank account numbers, keys and passwords never go to a partner's assistant, an outside tool or a website action a partner could have prompted. Nothing was sent.";
   box.append(head, el("p", titleText, "margin:6px 0 4px;font-size:15px;font-weight:600"),
     el("p", detailText, "margin:0 0 4px;opacity:.88"),
     el("div", "", "display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px"));

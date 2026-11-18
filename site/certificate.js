@@ -1,7 +1,9 @@
-// certificate.js: builds a standalone SVG Border Clearance Certificate or Security Advisory
+// certificate.js: builds and parses standalone SVG Border Clearance Certificates & Advisories
 // styled after archival cotton-parchment diplomatic visas, with a bound passport spine,
 // guilloche filigree, circular cancellation stamp, deterministic SHA-256 visual glyph,
 // and an ICAO-style machine-readable zone. Zero DOM dependencies and zero network calls.
+
+import { verifyReceipt } from "./customs/receipts.js";
 
 const DEFAULT_THEME = {
   spine: "#0c1d18",
@@ -333,11 +335,12 @@ export function certificateFilename(report, ext = "png") {
  *
  * :param report: Full report returned by inspectNetworkUrl / desk.latest.
  * :param options.receiptCheck: Optional result from verifyReceipt().
+ * :param options.signedReceipt: Optional full signed receipt object embedded in SVG metadata.
  * :param options.verifyUrl: Re-check permalink shown on the certificate.
  * :param options.theme: Optional palette overrides (bgMid tints the bound spine).
  * :return: Complete SVG XML markup string.
  */
-export function certificateSvg(report, { receiptCheck = null, verifyUrl = "", theme = null } = {}) {
+export function certificateSvg(report, { receiptCheck = null, signedReceipt = null, verifyUrl = "", theme = null } = {}) {
   const t = resolveTheme(theme);
   const meta = certificateMeta(report, receiptCheck);
   const pair = tonePair(t, meta.toneKey);
@@ -382,8 +385,24 @@ export function certificateSvg(report, { receiptCheck = null, verifyUrl = "", th
   const rosette = buildGuillocheRosette(1164, 244, 126, 52, 20);
   const crestSvg = buildFingerprintCrest(fullHash, 1184, 558, 15, pair.ink, t.rule);
   const advisoryLines = wrapLines(meta.advisoryNote, 58, 2);
+  const certMetadata = {
+    type: "agent-customs-certificate",
+    version: 1,
+    serial: meta.serial,
+    url,
+    brand: title,
+    verdict: meta.code,
+    stamp: report?.verdict?.stamp || meta.stampLabel,
+    fingerprint: report?.identity?.hash || "",
+    shortFingerprint: report?.identity?.short || "",
+    inspectedAt: report?.inspectedAt || "",
+    protocol: report?.protocol || "open-agentic-web",
+    profile,
+    signedReceipt: signedReceipt || null,
+  };
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 940" width="1400" height="940" role="img" aria-label="${escapeXml(meta.documentTitle)} — ${escapeXml(title)}">
+  <metadata id="agent-customs-cert">${escapeXml(JSON.stringify(certMetadata))}</metadata>
   <defs>
     <linearGradient id="paperBg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="${escapeXml(t.paperTop)}"/>
@@ -522,4 +541,404 @@ export function certificateSvg(report, { receiptCheck = null, verifyUrl = "", th
   <text x="210" y="849" class="mono" font-size="18" font-weight="600" letter-spacing="2.8" fill="${escapeXml(t.ink)}">${escapeXml(mrz1)}</text>
   <text x="210" y="876" class="mono" font-size="18" font-weight="600" letter-spacing="2.8" fill="${escapeXml(pair.ink)}">${escapeXml(mrz2)}</text>
 </svg>`;
+}
+
+/**
+ * Wrap a rendered certificate SVG in a printable HTML document.
+ */
+export function certificateHtml(svg, title = "Agent Customs Certificate") {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeXml(title)}</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #0c1d18; }
+  svg { width: min(100%, 1120px); height: auto; border-radius: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+  @media print { body { background: #fff; padding: 0; } svg { width: 100%; box-shadow: none; } }
+</style>
+</head>
+<body>
+${svg}
+</body>
+</html>`;
+}
+
+function unescapeXml(value) {
+  return String(value ?? "")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+const MRZ_VERDICT_MAP = {
+  CLEARED: "CLEARED",
+  CONDITIONS: "CONDITIONS",
+  HOLD: "HOLD",
+  DENIED: "DENIED",
+  INVALID: "INVALID",
+  UNREAD: "UNREADABLE",
+};
+
+/**
+ * Parse an Agent Customs SVG, HTML, ES256 signed JSON receipt, or exported JSON report.
+ *
+ * :param text: Raw file text dropped or selected by a user.
+ * :return: Normalized metadata descriptor, or null when unrecognized.
+ */
+export function parseVerificationFile(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return null;
+
+  if (raw.startsWith("{")) {
+    try {
+      const doc = JSON.parse(raw);
+      if (doc?.type === "agent-customs-receipt" || (doc?.receipt?.type === "agent-customs-receipt" && doc?.signature)) {
+        const signed = doc.receipt ? doc : { receipt: doc, signature: null };
+        const r = signed.receipt;
+        return {
+          kind: "receipt",
+          url: r.network || "",
+          brand: "",
+          verdict: r.verdict || "",
+          stamp: r.stamp || r.verdict || "",
+          fingerprint: r.fingerprint || "",
+          shortFingerprint: r.fingerprint ? String(r.fingerprint).replace(/^sha256:/, "").slice(0, 12) : "",
+          inspectedAt: r.inspectedAt || "",
+          expiresAt: r.expiresAt || "",
+          protocol: "open-agentic-web",
+          profile: "",
+          signedReceipt: signed.signature ? signed : null,
+        };
+      }
+      if (doc?.type === "agent-customs-certificate" && doc?.url) {
+        return { kind: "certificate", ...doc };
+      }
+      if (doc?.tool === "Agent Customs" && doc?.target?.url) {
+        return {
+          kind: "snapshot",
+          url: doc.target.url,
+          brand: doc.identity?.brand || "",
+          verdict: doc.verdict?.code || "",
+          stamp: doc.verdict?.stamp || "",
+          fingerprint: doc.identity?.hash || "",
+          shortFingerprint: doc.identity?.short || "",
+          inspectedAt: doc.inspectedAt || "",
+          expiresAt: "",
+          protocol: doc.protocol || "open-agentic-web",
+          profile: doc.profile || "",
+          signedReceipt: null,
+        };
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  // HTML export or page embedding either JSON metadata or the certificate SVG.
+  if (/<!doctype\s+html|<html\b/i.test(raw)) {
+    const scriptMatch = raw.match(/<script[^>]+id=["']agent-customs-cert["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (scriptMatch) {
+      const fromScript = parseVerificationFile(scriptMatch[1]);
+      if (fromScript) return { ...fromScript, kind: "html" };
+    }
+    const svgStart = raw.search(/<svg\b/i);
+    const svgEnd = raw.toLowerCase().lastIndexOf("</svg>");
+    if (svgStart >= 0 && svgEnd > svgStart) {
+      const fromSvg = parseVerificationFile(raw.slice(svgStart, svgEnd + 6));
+      if (fromSvg) return { ...fromSvg, kind: "html" };
+    }
+  }
+
+  if (!/<svg\b/i.test(raw)) return null;
+
+  const metaMatch = raw.match(/<metadata\s+id=["']agent-customs-cert["'][^>]*>([\s\S]*?)<\/metadata>/i);
+  if (metaMatch) {
+    try {
+      const parsed = JSON.parse(unescapeXml(metaMatch[1]));
+      if (parsed?.type === "agent-customs-certificate") {
+        return {
+          kind: "certificate",
+          url: parsed.url || "",
+          brand: parsed.brand || "",
+          verdict: parsed.verdict || "",
+          stamp: parsed.stamp || parsed.verdict || "",
+          fingerprint: parsed.fingerprint || "",
+          shortFingerprint: parsed.shortFingerprint || "",
+          inspectedAt: parsed.inspectedAt || "",
+          expiresAt: parsed.signedReceipt?.receipt?.expiresAt || "",
+          protocol: parsed.protocol || "",
+          profile: parsed.profile || "",
+          signedReceipt: parsed.signedReceipt || null,
+        };
+      }
+    } catch { /* fall through to text extraction for edited metadata */ }
+  }
+
+  // Fallback parser for certificates without <metadata>.
+  let url = "";
+  const hrefMatch = raw.match(/<a[^>]+href=["']([^"']+\?inspect=[^"']+)["']/i);
+  if (hrefMatch) {
+    try {
+      const parsedUrl = new URL(unescapeXml(hrefMatch[1]));
+      url = parsedUrl.searchParams.get("inspect") || "";
+    } catch { /* ignore malformed fallback link */ }
+  }
+  const hashMatch = raw.match(/sha256:[0-9a-f]{64}/i);
+  const fingerprint = hashMatch ? hashMatch[0].toLowerCase() : "";
+  const mrzMatch = raw.match(/P&lt;AGTCUSTOMS&lt;&lt;([A-Z]+)&lt;&lt;/);
+  const verdict = mrzMatch ? (MRZ_VERDICT_MAP[mrzMatch[1]] || "") : "";
+  const issuedMatch = raw.match(/ISSUED\s+([0-9]{2}\s+[A-Z]{3}\s+[0-9]{4})/);
+  if (!url && !fingerprint && !verdict) return null;
+
+  return {
+    kind: "certificate",
+    legacy: true,
+    url,
+    brand: "",
+    verdict,
+    stamp: verdict,
+    fingerprint,
+    shortFingerprint: fingerprint ? fingerprint.replace(/^sha256:/, "").slice(0, 12) : "",
+    inspectedAt: issuedMatch ? issuedMatch[1] : "",
+    expiresAt: "",
+    protocol: "",
+    profile: "",
+    signedReceipt: null,
+  };
+}
+
+async function inflatePdfStream(slice) {
+  if (typeof DecompressionStream !== "function") return "";
+  for (const format of ["deflate", "deflate-raw"]) {
+    try {
+      const stream = new Blob([slice]).stream().pipeThrough(new DecompressionStream(format));
+      const buf = await new Response(stream).arrayBuffer();
+      if (buf.byteLength > 4 * 1024 * 1024) continue;
+      return new TextDecoder("latin1").decode(buf);
+    } catch { /* try fallback format or skip non-zlib stream */ }
+  }
+  return "";
+}
+
+/**
+ * Extract verification links or SHA-256 hashes from a PDF byte buffer.
+ * Browser Print-to-PDF preserves link annotations (/URI) even when text is outlined as glyphs.
+ */
+async function parsePdfVerification(bytes) {
+  const latin1 = new TextDecoder("latin1").decode(bytes);
+  const chunks = [latin1];
+
+  // Collect FlateDecode streams safely (bounded count & size).
+  const streamRe = /stream\r?\n/g;
+  let count = 0;
+  let m;
+  while ((m = streamRe.exec(latin1)) !== null && count < 24) {
+    const headerSlice = latin1.slice(Math.max(0, m.index - 400), m.index);
+    const start = m.index + m[0].length;
+    const end = latin1.indexOf("endstream", start);
+    if (end < 0) break;
+    if (/\/FlateDecode\b/.test(headerSlice)) {
+      let streamEnd = end;
+      while (streamEnd > start && (latin1[streamEnd - 1] === "\n" || latin1[streamEnd - 1] === "\r")) streamEnd -= 1;
+      if (streamEnd > start && streamEnd - start < 2 * 1024 * 1024) {
+        const text = await inflatePdfStream(bytes.subarray(start, streamEnd));
+        if (text) chunks.push(text);
+        count += 1;
+      }
+    }
+    streamRe.lastIndex = end + 9;
+  }
+
+  const combined = chunks.join("\n");
+  // Extract /URI (...) annotations first, which Chromium preserves reliably on Print -> Save as PDF.
+  let url = "";
+  const uriRe = /\/URI\s*\(([^)]{6,2048})\)/g;
+  while ((m = uriRe.exec(combined)) !== null) {
+    const unescaped = m[1].replace(/\\([\\()])/g, "$1");
+    if (/[?&]inspect=/.test(unescaped)) {
+      try {
+        url = new URL(unescaped).searchParams.get("inspect") || "";
+        if (url) break;
+      } catch { /* keep searching */ }
+    }
+  }
+  if (!url) {
+    const inspectMatch = combined.match(/https?:\/\/[^\s)"'<>]+\?inspect=([^\s)"'<>]+)/);
+    if (inspectMatch) {
+      try { url = decodeURIComponent(inspectMatch[1]); } catch { url = inspectMatch[1]; }
+    }
+  }
+
+  const hashMatch = combined.match(/sha256:[0-9a-f]{64}/i);
+  const fingerprint = hashMatch ? hashMatch[0].toLowerCase() : "";
+  const mrzMatch = combined.match(/P<AGTCUSTOMS<<([A-Z]+)<</);
+  const verdict = mrzMatch ? (MRZ_VERDICT_MAP[mrzMatch[1]] || "") : "";
+
+  if (!url && !fingerprint) return { ok: false, pdfUnsupported: true };
+
+  return {
+    ok: true,
+    kind: "pdf",
+    pdfExtracted: true,
+    url,
+    brand: "",
+    verdict,
+    stamp: verdict,
+    fingerprint,
+    shortFingerprint: fingerprint ? fingerprint.replace(/^sha256:/, "").slice(0, 12) : "",
+    inspectedAt: "",
+    expiresAt: "",
+    protocol: "",
+    profile: "",
+    signedReceipt: null,
+  };
+}
+
+/**
+ * Parse .svg, .json, .html, or .pdf verification inputs.
+ */
+export async function parseAnyVerificationFile(input, fileName = "") {
+  if (typeof input === "string") {
+    if (input.startsWith("%PDF-")) return parsePdfVerification(new TextEncoder().encode(input));
+    return parseVerificationFile(input);
+  }
+  let bytes = null;
+  let name = fileName;
+  if (typeof Blob !== "undefined" && input instanceof Blob) {
+    name = name || input.name || "";
+    bytes = new Uint8Array(await input.arrayBuffer());
+  } else if (input instanceof Uint8Array) {
+    bytes = input;
+  } else if (input instanceof ArrayBuffer) {
+    bytes = new Uint8Array(input);
+  } else if (input?.bytes instanceof Uint8Array) {
+    bytes = input.bytes;
+    name = name || input.name || "";
+  }
+  if (!bytes) return null;
+
+  const isPdf = /\.pdf$/i.test(name) || new TextDecoder("latin1").decode(bytes.subarray(0, 5)) === "%PDF-";
+  if (isPdf) return parsePdfVerification(bytes);
+  return parseVerificationFile(new TextDecoder("utf-8").decode(bytes));
+}
+
+/**
+ * Cryptographically verify a parsed certificate/receipt and compare it with a live report.
+ *
+ * :param input: Raw string, File/Blob, ArrayBuffer, or Uint8Array (.svg, .json, .html, .pdf).
+ * :param options.fileName: Optional filename hint for binary inputs.
+ * :param options.publicJwk: Agent Customs' ES256 public JWK for signature verification.
+ * :param options.lookupSignedReceipt: Optional async (url) => signedReceipt fallback.
+ * :param options.now: Reference date for expiry checks.
+ * :param options.liveReport: Optional live report from inspectNetworkUrl for drift checking.
+ * :return: Structured verification result.
+ */
+export async function verifyDroppedArtifact(input, { fileName = "", publicJwk = null, lookupSignedReceipt = null, now = new Date(), liveReport = null } = {}) {
+  const parsed = await parseAnyVerificationFile(input, fileName);
+  if (!parsed || parsed.pdfUnsupported) {
+    return {
+      ok: false,
+      status: "invalid",
+      reason: parsed?.pdfUnsupported
+        ? "No readable verification link or receipt found in this PDF. Browser 'Save as PDF' outlines text as vector shapes and drops cryptographic signatures — use .svg, .json, or .html for signature verification."
+        : "Unrecognized file. Choose an Agent Customs .svg certificate, .json receipt, .html export, or .pdf print.",
+    };
+  }
+
+  let signedCandidate = parsed.signedReceipt || null;
+  let signedSource = parsed.signedReceipt ? "embedded" : null;
+  // Never promote a PDF (which drops signatures/hashes on print) to "verified" via remote receipt lookup.
+  if (!signedCandidate && !parsed.pdfExtracted && parsed.fingerprint && typeof lookupSignedReceipt === "function" && parsed.url) {
+    try {
+      const published = await lookupSignedReceipt(parsed.url);
+      if (published) {
+        signedCandidate = published;
+        signedSource = "published";
+      }
+    } catch { /* leave unsigned */ }
+  }
+
+  let sigCheck = null;
+  let tampered = false;
+  if (signedCandidate && publicJwk) {
+    sigCheck = await verifyReceipt(signedCandidate, publicJwk, { now, fingerprint: parsed.fingerprint || null });
+    if (!sigCheck.valid) tampered = true;
+    // Detect if certificate fields were altered while keeping an authentic receipt block.
+    if (sigCheck.valid && signedSource === "embedded" && sigCheck.receipt) {
+      const r = sigCheck.receipt;
+      const hashMismatch = parsed.fingerprint && r.fingerprint && parsed.fingerprint !== r.fingerprint;
+      const urlMismatch = parsed.url && r.network && parsed.url !== r.network;
+      const verdictMismatch = parsed.verdict && r.verdict && parsed.verdict !== r.verdict;
+      if (hashMismatch || urlMismatch || verdictMismatch) {
+        tampered = true;
+        sigCheck = { ...sigCheck, valid: false, reason: "Certificate fields were modified after the receipt was signed." };
+      }
+    }
+  }
+
+  let liveStatus = "unchecked";
+  let liveSummary = "";
+  if (liveReport) {
+    if (liveReport.failure) {
+      liveStatus = "unreadable";
+      liveSummary = liveReport.verdict?.summary || "Could not reach the live endpoint.";
+    } else if (parsed.fingerprint && liveReport.identity?.hash) {
+      const same = parsed.fingerprint === liveReport.identity.hash;
+      liveStatus = same ? "match" : "changed";
+      liveSummary = same
+        ? `Live endpoint matches exact SHA-256 fingerprint (${liveReport.identity.short}).`
+        : `Live endpoint changed: certificate locked ${parsed.shortFingerprint || parsed.fingerprint.slice(0, 12)}, live now ${liveReport.identity.short} (${liveReport.verdict?.stamp}).`;
+    } else if (parsed.url) {
+      liveStatus = "live-checked";
+      liveSummary = parsed.pdfExtracted
+        ? `Live site returned ${liveReport.verdict?.stamp} (${liveReport.identity?.short || "no hash"}) — printed PDF has no SHA-256 hash to match offline.`
+        : `Live inspection returned ${liveReport.verdict?.stamp} (${liveReport.identity?.short || "no hash"}).`;
+    }
+  }
+
+  let status = "unsigned";
+  let headline = parsed.pdfExtracted
+    ? "PDF has no ES256 signature (extracted link)"
+    : "Unsigned browser snapshot";
+  let detail = parsed.pdfExtracted
+    ? "Browser Print-to-PDF drops ES256 signatures. Extracted the re-verify target from the PDF — check the live result below, or use .svg / .json / .html for offline signature proof."
+    : "This file contains no ES256 cryptographic signature, only the inspection metadata recorded at export.";
+
+  if (tampered) {
+    status = "tampered";
+    headline = "Signature check failed";
+    detail = sigCheck?.reason || "This certificate or receipt was altered after signing.";
+  } else if (liveStatus === "changed") {
+    status = "changed";
+    headline = "Website changed since issued";
+    detail = liveSummary;
+  } else if (sigCheck?.valid && sigCheck.expired) {
+    status = "expired";
+    headline = "Valid signature, but stamp expired";
+    detail = `Signed by Agent Customs on ${String(sigCheck.receipt.inspectedAt).slice(0, 10)}, expired on ${String(sigCheck.receipt.expiresAt).slice(0, 10)}. Re-inspect live to refresh.`;
+  } else if (sigCheck?.valid) {
+    status = "verified";
+    headline = signedSource === "published" ? "Verified against published ES256 receipt" : "Verified ES256 signature";
+    detail = liveStatus === "match"
+      ? "Cryptographically signed by Agent Customs and confirmed unchanged against live endpoint."
+      : `Cryptographically signed by Agent Customs (valid until ${String(sigCheck.receipt.expiresAt).slice(0, 10)}).`;
+  }
+
+  return {
+    ok: true,
+    status,
+    headline,
+    detail,
+    artifact: parsed,
+    signature: sigCheck,
+    signedSource,
+    liveStatus,
+    liveSummary,
+    liveReport,
+  };
 }

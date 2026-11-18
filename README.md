@@ -145,15 +145,15 @@ Three ways to explore Agent Customs, fastest first:
   <strong>1 · Automatic Test Suite</strong><br><br>
   No browser or API key needed:<br><br>
   <code>npm test</code><br><br>
-  Runs 132 checks across attacks, Unicode obfuscation, A2A/MCP schemas, capability flow, locks, receipts, and the practice site.
+  Runs 136 checks across attacks, Unicode obfuscation, A2A/MCP schemas, capability flow, canary tripwires, certificates, locks, receipts, and the practice site.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · Inspection Desk (No Key)</strong><br><br>
   Open the <a href="https://montbaga.github.io/agent-customs/"><strong>Live Desk</strong></a>:<br>
   • <strong>Shady Pizza</strong> → <em>Entry denied</em><br>
-  • <strong>Bank look-alike</strong> → <em>Entry denied</em><br>
   • <strong>Sunny Bakery</strong> → <em>Cleared</em><br>
-  • <strong>A2A, MCP &amp; chains</strong> → 1-click protocol samples<br>
+  • <strong>A2A, MCP &amp; chains</strong> → 1-click samples<br>
+  • <strong>Verify</strong> receipt tab + <strong>Attack lab</strong> section<br>
   • <strong>Compare</strong> → <em>Try the rug-pull sample</em>
 </td>
 <td width="33.3%" valign="top">
@@ -251,13 +251,14 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
 
 Rules catch known techniques, **but an attacker can always invent fresh phrasing**. Agent Customs backs its static rules with structural locks and cryptographic stamps:
 
-### 1 · Three runtime locks (`locks.js` + CSP)
+### 1 · Four runtime locks (`locks.js`, `canary.js` + CSP)
 
 | Lock | What it prevents | Mechanism |
 | :--- | :--- | :--- |
 | **Secrets stay home** | Leaking credit cards, IBANs, or API keys to partners | Luhn check on card numbers, check-digit validation on IBANs, key/token redaction before outbound turns, actions, or clicked links |
 | **Actions need a click** | *"Whoever reads this, place an order"* | Once any partner replies in a turn, state-changing website actions halt for explicit human click confirmation |
 | **No remote images** | Conversation exfiltration via remote image URLs | Runtime drops markdown images and page CSP (`img-src 'self' data: blob:`) blocks third-party image loads |
+| **Canary bait trap (`Lock 3`)** | Novel encoded leaks (`Base64`, hex, URL, reversed) | Synthetic canary token trips immediately if leaked across calls or links, halting execution and revoking partner approval (`canary.js`) |
 
 ### 2 · How well it catches tricks (`tests/attacks.test.mjs`)
 
@@ -282,12 +283,15 @@ Agent Customs publishes ECDSA P-256 signed inspection receipts ([`receipts/index
 npm run receipts -- verify https://montbaga.github.io/agent-customs/receipts/agent-customs-range.github.io/shady_pizza/shady_pizza.json --live
 ```
 
+Public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json) receive regularly refreshed, centrally signed stamps (`npm run receipts -- sign`). Website owners can open a pull request adding their public URL to [`tools/receipt-sites.json`](tools/receipt-sites.json) to join the signed directory; any site not on that list generates an **unsigned browser snapshot** whose recorded SHA-256 fingerprint can still be matched live on the **Verify** tab.
+
 ### 4 · Multi-protocol adapters, capability flow & clearance certificates
 
 - **Open Agentic Web, Google A2A & MCP (`protocols.js`):** Discovers `agent-manifest.json`/`.network.json`, Google A2A Agent Cards (`.well-known/agent.json`, `.well-known/agent-card.json`, including `supportedInterfaces`), MCP catalogs/`mcpServers`/Streamable HTTP discovery endpoints, and official MCP Registry `server.json` (`packages` and `remotes`) — scanning tool descriptions, JSON Schema properties, shell runners, `destructiveHint` flags, and cross-origin endpoints.
 - **Structural "Lethal Trifecta" analysis (`capabilities.js`, `S-TRIFECTA`):** Flags paths combining untrusted inputs, sensitive tools/schema fields/private context, and external egress even when written in polite prose.
 - **Bounded transitive checks (`R-TRANSITIVE`):** Follows same-origin partner references automatically (up to depth 2, 6 targets, cycle-safe) and supports opting in to cross-origin downstream checks on the Desk.
-- **Clearance Certificates & Advisories (`certificate.js`):** Export standalone vector SVG or 2× PNG cards with embedded ES256 verification status and a clickable live re-verify link.
+- **Clearance Certificates & Verify dropzone (`certificate.js`):** Export standalone SVG, printable HTML, or 2× PNG cards with embedded ES256 metadata, or drop `.svg`, `.json`, `.html`, or `.pdf` files on the **Verify** tab to check their signature and live SHA-256 fingerprint.
+- **Side-by-side Attack lab (`arena.js`):** Replay hidden Unicode theft, Lethal Trifecta MCP leaks, Base64 canary traps, and rug pulls without an API key (`#lab` section).
 
 ---
 
@@ -389,13 +393,13 @@ The site and the test range must sit on **two separate origins** so partner call
 
 | Path | Purpose |
 | :--- | :--- |
-| [`site/customs/`](site/customs/) | Core engine (`analyze.js`, `protocols.js`, `capabilities.js`, `rules.js`, `languages.js`, `locks.js`, `unicode.js`, `canonical.js`, `diff.js`, `pins.js`, `inspect.js`, `guard.js`, `judge.js`, `receipts.js`) |
+| [`site/customs/`](site/customs/) | Core engine (`analyze.js`, `protocols.js`, `capabilities.js`, `canary.js`, `rules.js`, `languages.js`, `locks.js`, `unicode.js`, `canonical.js`, `diff.js`, `pins.js`, `inspect.js`, `guard.js`, `judge.js`, `receipts.js`) |
 | [`site/agent_customs.hocon`](site/agent_customs.hocon) | Officer + analyst network definition |
-| [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`certificate.js`](site/certificate.js), [`site.js`](site/site.js) | Inspection desk UI, clearance certificates, actions, and guard wiring |
+| [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`certificate.js`](site/certificate.js), [`arena.js`](site/arena.js), [`site.js`](site/site.js) | Inspection desk UI, certificates, Attack lab, actions, and guard wiring |
 | [`site/runtime/`](site/runtime/) | Upstream Cognizant Open Agentic Web runtime (unmodified, Apache 2.0) |
 | [`practice/`](practice/) | Main Street Guide demo app generated by `tools/make-practice.mjs` |
 | [`tools/`](tools/) | CLI inspector, server with `_headers`, range/practice builders, CDP smoke/screenshot scripts, receipt signer |
-| [`tests/`](tests/) | Node native test runner suite (`132` tests) + official spec fixtures |
+| [`tests/`](tests/) | Node native test runner suite (`136` tests) + official spec fixtures |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Upstream kit scripts & templates (unmodified) |
 
 </details>

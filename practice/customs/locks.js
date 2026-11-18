@@ -9,10 +9,14 @@
 //           the chat resets. Every partner/MCP/coded-tool reply is also inspected, stripped
 //           of widgets/images/HTML/foreign links, quarantined if unsafe, and marked as
 //           untrusted data before the calling assistant sees it.
+//   Lock 3, canary tripwire: checks outbound requests, tool calls, actions, and links
+//           for a synthetic host canary token across raw and encoded forms, halting the turn
+//           and revoking involved partner approvals if leaked.
 //
 // Like the guard, these locks wrap this engine instance only, and uninstall() undoes them.
-// Lock 3, no remote images, is the page's own CSP policy.
+// Remote image blocking is enforced by the page's CSP policy alongside Lock 2 reply quarantine.
 
+import { detectCanaryLeak, generateCanaryToken } from "./canary.js";
 import { scanText } from "./rules.js";
 import { scanHidden, stripHiddenChars } from "./unicode.js";
 
@@ -420,11 +424,20 @@ function isThirdPartyUrl(ref, baseOrigin) {
  *   requires declarative facts-only partner replies).
  * :param options.isForeignPartner: (base, networkName) => boolean, true when the partner was
  *   already approved with a non-English notice.
+ * :param options.canary: Enable synthetic canary tripwire (Lock 3, default true).
+ * :param options.canaryToken: Optional deterministic token for testing or interactive demos.
+ * :param options.onCanaryTrip: Called with {encoding, where, partners, token} on canary leak.
  * :param options.notify: (event) => void, with {lock, kind, where}, whenever a lock blocks something.
- * :return: {state, uninstall()}
+ * :return: {state, canary, uninstall()}
  */
-export function installLocks(engine, { trustedActions = [], strict = false, aiJudge = null, isForeignPartner = () => false, notify = () => {} } = {}) {
+export function installLocks(engine, { trustedActions = [], strict = false, aiJudge = null, canary = true, canaryToken = null, onCanaryTrip = null, isForeignPartner = () => false, notify = () => {} } = {}) {
   const state = { active: true, inTurn: false, outsideAnswered: false, outsideTainted: false };
+  const canaryState = {
+    enabled: canary !== false,
+    token: canaryToken || generateCanaryToken(),
+    tripped: false,
+    partnersInTurn: new Set(),
+  };
   const trusted = new Set(strict ? [] : trustedActions);
   const undo = [];
   const swap = (target, key, make) => {
@@ -438,12 +451,28 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
     try { notify({ lock, kind, where, reason }); } catch { /* a notice never changes a decision */ }
     return keptOut(kind, where);
   };
+  const checkCanary = (value, where) => {
+    if (!state.active || !canaryState.enabled || !canaryState.token) return null;
+    const leak = detectCanaryLeak(value, canaryState.token);
+    if (!leak) return null;
+    canaryState.tripped = true;
+    const partners = [...canaryState.partnersInTurn];
+    const reason = `Protected canary token appeared in ${leak.encoding} form`;
+    try { onCanaryTrip?.({ encoding: leak.encoding, where, partners, token: canaryState.token }); } catch { /* listener error stays local */ }
+    try { notify({ lock: 3, kind: `canary trap (${leak.encoding})`, where, reason, partners }); } catch { /* notice stays local */ }
+    return {
+      encoding: leak.encoding,
+      message: `Agent Customs stopped ${where}: a protected canary trap token appeared (${leak.encoding} encoding). Nothing was sent and involved partner approvals were revoked. Tell the visitor a suspected leak was blocked.`,
+    };
+  };
 
   // Start a turn with per-turn flag clear, while outsideTainted persists across turns
   // in the same conversation until resetHistory().
   swap(engine, "runTurn", (original) => async function lockedTurn(userText, opts) {
     state.inTurn = true;
     state.outsideAnswered = false;
+    canaryState.partnersInTurn.clear();
+    if (opts?.canaryToken) canaryState.token = opts.canaryToken;
     let safeText = userText;
     let safeOpts = opts;
     if (state.active) {
@@ -470,10 +499,11 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
   swap(engine, "resetHistory", (original) => function lockedReset(...args) {
     state.outsideAnswered = false;
     state.outsideTainted = false;
+    canaryState.partnersInTurn.clear();
     return original.apply(this, args);
   });
 
-  // Lock 1 outbound + Runtime Reply Quarantine inbound at every partner network.
+  // Lock 1 outbound + Lock 3 canary trap + Runtime Reply Quarantine at every partner network.
   swap(engine, "resolveRemote", (original) => async function lockedRemote(...args) {
     const session = await original.apply(this, args);
     if (session && !session.__customsLocks) {
@@ -481,6 +511,12 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
       session.invoke = async function lockedInvoke(request, opts) {
         if (!state.active) return invoke.call(this, request, opts);
         const host = hostOf(session.base);
+        const partnerUrl = session.base && session.network?.name
+          ? `${String(session.base).replace(/\/$/, "")}/${session.network.name}`
+          : "";
+        if (partnerUrl) canaryState.partnersInTurn.add(partnerUrl);
+        const tripReq = checkCanary([request?.user_message?.text, request?.sly_data], `this request to ${host}`);
+        if (tripReq) return tripReq.message;
         const reqKind = checkOutboundRequest(request?.user_message?.text || "", { strict });
         if (reqKind) return block(reqKind, `this request to ${host}`);
         if (request?.sly_data && findSensitiveData(request.sly_data, { includeExplicitSecrets: true, checkKeys: true }).length) {
@@ -495,6 +531,8 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
             if (state.inTurn) state.outsideAnswered = true;
           }
         }
+        const tripReply = checkCanary(result, `answer from ${host}`);
+        if (tripReply) return wrapSafeBlock(result, host, `Canary trap triggered (${tripReply.encoding} encoding)`);
         const allowLanguage = isForeignPartner(session.base, session.network?.name);
         const checked = await checkReplyWithJudge(result, { host, partnerBase: session.base, allowLanguage, strict }, aiJudge, "reply");
         if (!checked.ok) {
@@ -553,7 +591,10 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
       }
 
       client.callTool = async function lockedCall(name, toolArgs, parentSpan) {
+        if (client.url) canaryState.partnersInTurn.add(client.url);
         if (state.active && (thirdParty || after())) {
+          const tripMcp = checkCanary({ name, toolArgs }, `a call to ${host}`);
+          if (tripMcp) throw new Error(tripMcp.message);
           const found = findSensitiveData(toolArgs ?? {}, { includeExplicitSecrets: true, checkKeys: true });
           if (found.length) throw new Error(block(found[0].kind, `a call to ${host}`));
         }
@@ -567,6 +608,8 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
           }
         }
         if (state.active && (thirdParty || after())) {
+          const tripRes = checkCanary(result, `tool result from ${host}`);
+          if (tripRes) return wrapSafeBlock(result, host, `Canary trap triggered (${tripRes.encoding} encoding)`);
           const checked = await checkReplyWithJudge(result, { host, partnerBase: client.url, allowLanguage: false, strict }, aiJudge, "mcp_result");
           if (!checked.ok) {
             try { notify({ lock: 2, kind: "unsafe tool reply", where: `tool result from ${host}`, reason: checked.reason }); } catch {}
@@ -592,6 +635,8 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
       const topHost = hostOf(engine.top?.base || engine.originUrl);
       const isPartner = state.active && params?.origin && topHost && params.origin !== topHost;
       if (isPartner) {
+        const tripBox = checkCanary([params.args, params.permittedSly], `a coded tool from ${params.origin}`);
+        if (tripBox) throw new Error(tripBox.message);
         const found = findSensitiveData([params.args, params.permittedSly], { includeExplicitSecrets: true, checkKeys: true });
         if (found.length) throw new Error(block(found[0].kind, `a coded tool from ${params.origin}`));
       }
@@ -605,6 +650,8 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
         }
       }
       if (isPartner && res) {
+        const tripBoxRes = checkCanary(res.result, `code from ${params.origin}`);
+        if (tripBoxRes) return { ...res, result: wrapSafeBlock(res.result, params.origin, `Canary trap triggered (${tripBoxRes.encoding} encoding)`), slyData: {} };
         const checked = await checkReplyWithJudge(res.result, { host: params.origin, partnerBase: `https://${params.origin}`, allowLanguage: false, strict }, aiJudge, "coded_tool_result");
         if (!checked.ok) {
           try { notify({ lock: 2, kind: "unsafe coded-tool reply", where: `code from ${params.origin}`, reason: checked.reason }); } catch {}
@@ -618,6 +665,10 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
 
   // Lock 2, and Lock 1 for website actions, once an outside answer is in this conversation.
   swap(engine.actions, "execute", (original) => async function lockedExecute(plan, confirm, invocationId) {
+    if (state.active && (state.inTurn || after())) {
+      const tripAct = checkCanary((plan || []).map(({ entry, args }) => ({ name: entry?.name, args })), "a website action");
+      if (tripAct) throw new Error(tripAct.message);
+    }
     if (!after()) return original.call(this, plan, confirm, invocationId);
     const found = findSensitiveData((plan || []).map(({ args }) => args), { includeExplicitSecrets: true });
     if (found.length) throw new Error(block(found[0].kind, "a website action"));
@@ -632,13 +683,15 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
   // Also check CRUSE form action submissions before actions.execute runs.
   swap(engine, "submitActions", (original) => async function lockedSubmit(submission) {
     if (state.active && submission?.values) {
+      const tripForm = checkCanary(submission.values, "a submitted form");
+      if (tripForm) throw new Error(tripForm.message);
       const found = findSensitiveData(submission.values, { includeExplicitSecrets: false });
       if (found.length) throw new Error(block(found[0].kind, "a submitted form"));
     }
     return original.call(this, submission);
   });
 
-  // Lock 1 for links: the page never follows a link that carries a secret or script URL.
+  // Lock 1 + Lock 3 for links: the page never follows a link that carries a secret, script URL, or canary trap.
   if (typeof document !== "undefined" && document.addEventListener) {
     const onClick = (event) => {
       if (!state.active) return;
@@ -649,6 +702,12 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
         event.preventDefault();
         event.stopPropagation();
         block("script link", "a link on the page");
+        return;
+      }
+      const tripLink = checkCanary(link.href, `a link to ${hostOf(link.href)}`);
+      if (tripLink) {
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       let href = link.href;
@@ -667,6 +726,16 @@ export function installLocks(engine, { trustedActions = [], strict = false, aiJu
 
   return {
     state,
+    canary: {
+      get token() { return canaryState.token; },
+      get tripped() { return canaryState.tripped; },
+      rotate() {
+        canaryState.token = generateCanaryToken();
+        canaryState.tripped = false;
+        return canaryState.token;
+      },
+      injectContext(target = {}) { return { ...target, _customs_canary: canaryState.token }; },
+    },
     uninstall() {
       state.active = false;
       while (undo.length) undo.pop()();
