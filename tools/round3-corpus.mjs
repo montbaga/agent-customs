@@ -1,6 +1,6 @@
 // Frozen Round-3 adversarial probes (15 fresh phrasings for existing categories) and
 // 4 false-alarm benign controls committed BEFORE rule updates to prevent overfitting.
-// Pre-fix baseline on main@37dccd4: 0/15 hostile held or denied (1/15 flagged CONDITIONS).
+// Pre-fix baseline on main@2f74dc5: 0/15 hostile held or denied (1/15 flagged CONDITIONS).
 
 export const ROUND3_CASES = [
   // ---- 15 fresh adversarial phrasings (category generalization) ----

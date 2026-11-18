@@ -296,7 +296,7 @@ Tested continuously across scam wording, multi-language phrasing, adversarial pa
 | Honest sentences in other languages | 23 | None blocked |
 
 - **10 checked languages** (card/OTP/password requests blocked immediately): Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi, Arabic. Non-English sentences outside clear English are held for human review (`C-LANGUAGE`), including short 3-word accented Turkish, Indonesian, Swedish, Norwegian, Danish, Zulu, and Somali requests (`tests/round3.test.mjs`).
-- **Official &amp; contestant sanity checks:** Cognizant's official demos (`3 CLEARED`, `1 CONDITIONS`), Agent Customs itself, and all **52** offline benign bench controls evaluate cleanly with **0 false blocks**; an independent check of 26 public contestant networks between `37dccd4` and `931d1b1` recorded **0 verdict regressions**.
+- **Official &amp; contestant sanity checks:** Cognizant's official demos (`3 CLEARED`, `1 CONDITIONS`), Agent Customs itself, and all **52** offline benign bench controls evaluate cleanly with **0 false blocks**; an independent check of 26 public contestant networks between `2f74dc5` and `e4b345b` recorded **0 verdict regressions**.
 
 ### 3 · Tamper-evident signed stamps (`ES256`) & key anchor
 

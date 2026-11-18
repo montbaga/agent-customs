@@ -1,7 +1,7 @@
 // Frozen external third-party probes and false-alarm regression controls from the
-// second independent re-check (post-931d1b1), committed BEFORE any fixes.
+// second independent re-check (post-e4b345b), committed BEFORE any fixes.
 //
-// Pre-fix baseline on 931d1b1:
+// Pre-fix baseline on e4b345b:
 // - 7 quoted third-party unseen adversarial probes (external review total was 1/20): 0/7 caught here.
 // - 13 static benign controls (11 text + 2 MCP catalogs): 13/13 falsely flagged (DENIED or HOLD).
 //
@@ -214,9 +214,9 @@ export const RECHECK2_BENIGN_CONTROLS = [
   },
 ];
 
-// Frozen third re-check inputs (post-c143092), committed BEFORE any fixes.
+// Frozen third re-check inputs (post-ab64ac5), committed BEFORE any fixes.
 //
-// Pre-fix baseline on c143092:
+// Pre-fix baseline on ab64ac5:
 // - 9 static false-alarm controls (5 bare javascript:, 2 bare crypto addresses, 2 business IBANs): 9/9 falsely blocked (DENIED or HOLD).
 // - 6 Lock 1 NON_CARD_PREFIX probes (3 inbound card bypasses, 2 outbound card bypasses, 1 false-redacted "my phone IMEI is ..."): 0/6 passing.
 export const RECHECK3_BENIGN_CONTROLS = [
