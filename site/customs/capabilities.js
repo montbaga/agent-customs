@@ -18,9 +18,10 @@ function splitWords(value) {
 const UNTRUSTED_TOOL = /\b(?:fetch|scrape|browse|crawl|search web|web search|read emails?|read mails?|get emails?|read pages?|fetch url|webhook listen|receive webhook)\b/i;
 const SENSITIVE_TOOL = /\b(?:read files?|list files?|read env|get env|get config|read config|dump config|env(?:ironment)? settings?|env(?:ironment)? variables?|secrets?|credentials?|wallet|bank accounts?|payment methods?|credit cards?|order history|inbox|messages?|db query|sql query|private data)\b/i;
 const SENSITIVE_PARAM = /\b(?:token|secret|password|passwd|cookie|session|auth(?:orization)?|auth header|credential|api key|private key|ssh key|ssn|iban)\b/i;
-const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|credentials?|private files?|secret keys?|ssh keys?|access tokens?)\b/i;
+const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|access tokens?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|config(?:uration)?\s+files?|private\s+data))\b/i;
 const EGRESS_TOOL = /\b(?:http post|send email|send message|post message|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|send telemetry)\b/i;
-const EGRESS_DESC = /\b(?:send webhook|telemetry payload|send telemetry|external webhook|post to external|exfiltrate|notify team)\b/i;
+const EGRESS_PARAM = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|destination(?:\s*url)?|endpoint(?:\s*url)?|upload(?:\s*url)?|exfil(?:\s*url)?|forward(?:\s*to)?|recipient(?:\s*url)?)\b/i;
+const EGRESS_DESC = /\b(?:send|sends|post|posts|upload|uploads|transmit|transmits|forward|forwards|push|pushes|stream|streams|relay|relays|export|exports|ship|ships|submit|submits|deliver|delivers|exfiltrate|exfiltrates)\b[^.!?\n]{0,45}\b(?:webhook|callback|external\s+(?:url|endpoint|server|host|api)|remote\s+(?:url|endpoint|server|host)|https?:\/\/|url\s+you\s+(?:give|provide|pass|specify)|destination\s+url|configured\s+address|team|channel)\b|\b(?:telemetry\s+payload|notify\s+team|send\s+telemetry|webhook\s+url)\b/i;
 
 /**
  * Analyze declared input, sensitivity, and egress capabilities across agents/tools.
@@ -78,11 +79,16 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
     // name/description/URL/REST egress findings when a server lies about readOnlyHint/openWorldHint.
     const hintRaisesEgress = ann.destructiveHint === true || (ann.openWorldHint === true && ann.readOnlyHint === false);
     const toolExternalUrl = toolOffOriginUrl(agent, targetOrigin);
-    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl) {
+    const egressParams = schemaInfo.keys.filter((k) => EGRESS_PARAM.test(splitWords(k)));
+    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length) {
       externalEgress.push({
-        sink: toolExternalUrl || name,
-        kind: toolExternalUrl ? "external_endpoint" : ann.destructiveHint === true ? "destructive_action" : "outbound_tool",
-        detail: toolExternalUrl ? `"${name}" sends tool requests off-origin (${toolExternalUrl})` : `"${name}" performs external or state-changing egress`,
+        sink: toolExternalUrl || (egressParams.length ? `${name}(${egressParams[0]})` : name),
+        kind: toolExternalUrl ? "external_endpoint" : egressParams.length ? "egress_param" : ann.destructiveHint === true ? "destructive_action" : "outbound_tool",
+        detail: toolExternalUrl
+          ? `"${name}" sends tool requests off-origin (${toolExternalUrl})`
+          : egressParams.length
+            ? `"${name}" accepts external destination parameter(s) (${egressParams.slice(0, 3).join(", ")})`
+            : `"${name}" performs external or state-changing egress`,
       });
     }
 
@@ -136,7 +142,7 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
   const concreteSensitive = secrets.filter((s) => s.kind === "private_context" || s.kind === "sensitive_tool" || s.kind === "sensitive_param");
   const concreteEgress = egress.filter((e) => e.kind !== "code_bundle");
 
-  const crossOriginEgress = concreteEgress.some((e) => externalStops.some((s) => e.sink === s.host) || e.kind === "rest_toolbox" || e.kind === "outbound_tool" || e.kind === "external_endpoint");
+  const crossOriginEgress = concreteEgress.some((e) => externalStops.some((s) => e.sink === s.host) || e.kind === "rest_toolbox" || e.kind === "outbound_tool" || e.kind === "external_endpoint" || e.kind === "egress_param");
   const trifecta = inputs.length > 0 && concreteSensitive.length > 0 && concreteEgress.length > 0 && (crossOriginEgress || protocol === "mcp");
 
   const paths = [];

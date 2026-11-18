@@ -290,17 +290,17 @@ const LATIN_LANGUAGES = {
   German: "der die das und ist nicht ein eine einen einem einer dem den des zu mit für auf sie ihr ihre ihren ihnen sich auch wie wenn oder aber bitte nach von bei dass daß werden wird kein keine sein seine seiner seinen ich wir uns unser unsere nur noch schon immer jeder jede jedes alle sind haben kann können soll sollen muss müssen im vom zum zur um dir dich mir mich du es nie niemals hier wo warum weil",
   Dutch: "het een en van niet dat die voor met zijn op te je uw hij zij ze maar ook als bij naar om er wat wordt worden kan moet deze dit onze ons geen nooit altijd alle de mijn jouw hun hier waar waarom omdat",
   Polish: "nie się że jest jak po co tak za od przez jego jej ich czy lub oraz dla ta te tylko już bardzo może są być aby który która które jeśli gdy proszę wszystkie zawsze nigdy na nas je potem teraz też także jeszcze twój twoja twoje pan pani bez przy przed pod albo",
-  Turkish: "ve bir bu için ile değil çok ne ama gibi daha sonra olarak mı mi şu lütfen ya veya kadar sizin bizim onun bunu şey da de ki hiç asla ziyaretçi ziyaretçiye ziyaretçiden müşteri kullanıcı sor sorun sorunun isteyin verin şifre güvenlik kredi kart kartı numara numarasını kodu",
-  Indonesian: "dan yang di ke dari untuk dengan tidak ini itu adalah akan pada juga atau saya anda kami mereka kita sudah bisa harus tolong mohon jika kalau karena oleh sebagai ada telah jangan minta nomor kartu kredit pengunjung tamu kirim bagikan masukkan kata sandi kode keamanan",
+  Turkish: "ve bir bu için ile değil çok ne ama gibi daha sonra olarak mı mi şu lütfen ya veya kadar sizin bizim onun bunu şey da de ki hiç asla ziyaretçi ziyaretçiye ziyaretçiden müşteri müşteriden müşteriye kullanıcı sor sorun sorunun iste isteyin verin şifre şifresi şifresini şifrenizi güvenlik kredi kart kartı kartını numara numarasını kod kodu kodunu pin atm hesap hesabı onay gönder",
+  Indonesian: "dan yang di ke dari untuk dengan tidak ini itu adalah akan pada juga atau saya anda kami mereka kita sudah bisa harus tolong mohon jika kalau karena oleh sebagai ada telah jangan minta tanya tanyakan sebelum memesan pesan nomor kartu kredit pengunjung tamu kirim kirimkan berikan bagikan masukkan kata sandi kode keamanan pin atm rekening rahasia verifikasi tagihan",
   Swahili: "na ya wa kwa ni za katika hii kama lakini sana hapa hiyo wako yako wewe sisi tafadhali pia au kwamba",
   Tagalog: "ang ng sa mga ay hindi ko mo niya siya para ito iyan kayo tayo namin natin po ba lang din rin kung pag huwag",
   Vietnamese: "và của là không có được cho một những các này với người bạn trong khi đã sẽ đó để thì nếu hãy vui lòng",
   Romanian: "și în cu pe nu un este să din pentru sau dar mai ce acest această vă al ale lui ei sunt fi niciodată",
   Czech: "se na je že jako pro nebo jsou být který která které jeho její jejich prosím také není nikdy",
   Slovak: "sa na je že ako pre alebo sú byť ktorý ktorá ktoré jeho jej ich prosím aj nie nikdy",
-  Swedish: "och att det som en på är av med den har inte om ett jag du vi ni kan ska eller från vid vår er din ditt sin sitt aldrig alltid",
-  Danish: "og det som en på er af med til den har ikke om et jeg du vi kan skal eller fra ved vores deres din dit sin sit hvis når aldrig altid",
-  Norwegian: "og det som en på er av med til den har ikke om et jeg du vi kan skal eller fra ved vår deres din ditt sin sitt hvis når aldri alltid",
+  Swedish: "och att det som en på är av med den har inte om ett jag du vi ni kan ska eller från vid vår er din ditt sin sitt aldrig alltid be fråga gäst gästen besökare besökaren kund kunden kort kortet kortnummer kortnumret kreditkort lösenord säkerhetskod nummer snälla",
+  Danish: "og det som en på er af med til den har ikke om et jeg du vi kan skal eller fra ved vores deres din dit sin sit hvis når aldrig altid bed spørg gæst gæsten besøgende kunde kunden kort kortet kortnummer kreditkort adgangskode sikkerhedskode nummer venligst",
+  Norwegian: "og det som en på er av med til den har ikke om et jeg du vi kan skal eller fra ved vår deres din ditt sin sitt hvis når aldrig altid spør be gjest gjesten besøgende kunde kunden kort kortet kortnummer kredittkort passord sikkerhetskode nummer vennligst",
   Finnish: "ja ei se että oli mutta kun niin jos kuin tai myös ole olla sinun teidän meidän hänen heidän tämä tuo nämä joka mikä kaikki vain nyt koskaan aina",
   Hungarian: "az és hogy nem egy meg csak mint el ez azt ezt vagy kell már még sem nagyon minden kérem kérjük ön önt soha mindig",
   Croatian: "je da se na za od su ne sa kao ali ili što koji koja koje vas vaš vaša molimo može mora nije biti nikada uvijek",
@@ -309,7 +309,8 @@ const LATIN_LANGUAGES = {
   Afrikaans: "die en van het nie wat op te vir met sy hy ons julle jou maar ook kan sal moet nooit altyd",
   Estonian: "ja ei et oli aga kui siis kas või ka teie meie tema nende kõik ainult mitte kunagi alati",
   Hausa: "da ba na ya ta ga cikin wannan kuma amma don shi ita su ku mu ne ce kada",
-  Zulu: "futhi ukuthi kodwa uma noma ngoba wena thina bona",
+  Zulu: "futhi ukuthi kodwa uma noma ngoba wena thina bona ngicela cela isivakashi ikhasimende amakhasimende inombolo ikhadi yekhadi lasebhange ebhange iphasiwedi ikhodi iphinikhodi ye le ne",
+  Somali: "iyo waan waa in uu ay ku ka la ma ahay tahay yahay si aad uga waxaa waxa weydii martida lambarka kaarka bangiga sirta furaha lacagta fadlan",
   Latvian: "un ir uz par ar kas ka lai bet vai jā nē es tu viņš viņa mēs jūs viņi šis tas tā kā arī pie līdz pēc savu mūsu jūsu lūdzu nav būs bija var ja kad tikai vēl jau ļoti visi kur",
   Lithuanian: "ir kad bet su į iš ne tai kaip jo jos jūs mes aš tu šis ta tas ar prašome prašau apie nuo už kas kur labai dar jau yra buvo bus savo mūsų jūsų jei kai tik visi",
   // Hindi and Urdu as many people type them, in Latin letters ("card ka number poochho").
@@ -380,13 +381,25 @@ export function otherLanguageOf(sentence) {
   // Japanese mixes kana with Chinese characters: any kana makes it Japanese.
   if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
   if (best && best.units >= 3 && best.units >= latin.length) return best.name;
-  if (latin.length < 4) return null;
   const english = latin.filter((w) => STRONG_ENGLISH.has(w)).length;
   let top = null;
   for (const [name, set] of LATIN_WORDS) {
     const count = latin.filter((w) => set.has(w)).length;
     if (!top || count > top.count) top = { name, count };
   }
+  const hasAccents = /[^\x00-\x7f]/.test(latin.join(""));
+  // Even a 3-word sentence with non-ASCII letters and zero English words (e.g. short Turkish)
+  // cannot be verified by English rules and must be held for review unless it's a list/proper name.
+  if (latin.length === 3) {
+    if (english === 0 && !looksLikeList(text) && hasAccents) {
+      const judged3 = tokens.filter((word, i) => !(i > 0 && /^\p{Lu}/u.test(word)) && !/^\p{Lu}{2,}$/u.test(word))
+        .map((w) => w.toLowerCase());
+      const known3 = judged3.filter((w) => ENGLISH.has(w) || isEnglishWord(w)).length;
+      if (judged3.length >= 2 && known3 === 0) return top.count >= 1 ? top.name : UNRECOGNISED;
+    }
+    return null;
+  }
+  if (latin.length < 4) return null;
   const minCount = latin.length < 12 ? 2 : 3;
   const minRatio = latin.length < 12 ? 0.3 : 0.2;
   if (top.count >= minCount && top.count >= minRatio * latin.length && top.count > 2 * english) return top.name;
@@ -398,8 +411,7 @@ export function otherLanguageOf(sentence) {
   const known = judged.filter((word) => ENGLISH.has(word) || isEnglishWord(word)).length;
   if (known >= 0.5 * judged.length) return null;
   const realKnown = judged.filter((word) => word.length > 1 && (ENGLISH.has(word) || isEnglishWord(word))).length;
-  const hasAccents = /[^\x00-\x7f]/.test(judged.join(""));
-  const foreignSign = hasAccents || top.count >= 2 || (judged.length >= 6 && (top.count >= 1 || realKnown === 0));
+  const foreignSign = hasAccents || top.count >= 2 || (realKnown === 0 && judged.length >= 4);
   if (!foreignSign) return null;
   if (judged.length < 6 && realKnown > 0) return null;
   return top.count >= 2 ? top.name : UNRECOGNISED;
