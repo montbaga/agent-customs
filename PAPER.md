@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+<a href="README.md"><img src="docs/images/tab-readme-off.svg" alt="README" height="46"></a><a href="ARCHITECTURE.md"><img src="docs/images/tab-architecture-off.svg" alt="Architecture" height="46"></a><a href="PAPER.md"><img src="docs/images/tab-paper-on.svg" alt="Paper (this page)" height="46"></a><a href="LICENSE.md"><img src="docs/images/tab-license-off.svg" alt="License" height="46"></a>
+</p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/page-banner-paper-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/page-banner-paper-light.svg">
@@ -8,12 +12,9 @@
 
 <br><br>
 
-[**README**](README.md) &nbsp;·&nbsp;
-[**How it works**](ARCHITECTURE.md) &nbsp;·&nbsp;
 [**Results**](#5--results) &nbsp;·&nbsp;
 [**Limits**](#6--limits) &nbsp;·&nbsp;
-[**Reproduce**](#7--reproduce-the-numbers) &nbsp;·&nbsp;
-[**License**](LICENSE.md)
+[**Reproduce**](#7--reproduce-the-numbers)
 
 <br>
 

@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+<a href="README.md"><img src="docs/images/tab-readme-off.svg" alt="README" height="46"></a><a href="ARCHITECTURE.md"><img src="docs/images/tab-architecture-off.svg" alt="Architecture" height="46"></a><a href="PAPER.md"><img src="docs/images/tab-paper-off.svg" alt="Paper" height="46"></a><a href="LICENSE.md"><img src="docs/images/tab-license-on.svg" alt="License (this page)" height="46"></a>
+</p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/page-banner-license-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/page-banner-license-light.svg">
@@ -8,9 +12,6 @@
 
 <br><br>
 
-[**README**](README.md) &nbsp;·&nbsp;
-[**How it works**](ARCHITECTURE.md) &nbsp;·&nbsp;
-[**Paper**](PAPER.md) &nbsp;·&nbsp;
 [**Full license text**](#the-full-license-text) &nbsp;·&nbsp;
 [**Contact**](README.md#lets-talk)
 
@@ -26,7 +27,7 @@
 
 > **In one sentence:** you can use, change, share and sell Agent Customs, as long as you keep the license and the copyright notice, say which files you changed, and accept that it comes with no warranty.
 >
-> This page is a plain-words guide. The legal text further down, which is also in the [`LICENSE`](LICENSE) file, is what counts.
+> This page is a plain-words guide. The legal text further down is what counts.
 
 <br>
 
@@ -115,7 +116,7 @@ If you change the file, add a line such as `Changed by <your name>, <year>: <wha
 
 ## The full license text
 
-The text below is the same as the [`LICENSE`](LICENSE) file in the root of the repository.
+The text below is the Apache License, Version 2.0, word for word.
 
 <details open>
 <summary><b>Apache License, Version 2.0</b></summary>

@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+<a href="README.md"><img src="docs/images/tab-readme-off.svg" alt="README" height="46"></a><a href="ARCHITECTURE.md"><img src="docs/images/tab-architecture-on.svg" alt="Architecture (this page)" height="46"></a><a href="PAPER.md"><img src="docs/images/tab-paper-off.svg" alt="Paper" height="46"></a><a href="LICENSE.md"><img src="docs/images/tab-license-off.svg" alt="License" height="46"></a>
+</p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/page-banner-architecture-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/page-banner-architecture-light.svg">
@@ -8,9 +12,6 @@
 
 <br><br>
 
-[**README**](README.md) &nbsp;·&nbsp;
-[**Paper**](PAPER.md) &nbsp;·&nbsp;
-[**License**](LICENSE.md) &nbsp;·&nbsp;
 [**Live desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
 [**Contact**](README.md#lets-talk)
 
