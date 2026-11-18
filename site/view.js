@@ -822,6 +822,8 @@ function wire() {
   });
   wireVerifyPanel();
   wireArenaPanel();
+  wireBenchStrip();
+  wireBuilderCodeTabs();
   $("#copy-guard").addEventListener("click", (event) => {
     const toast = { set textContent(v) { event.target.textContent = v || "Copy"; } };
     copy($("#guard-code").textContent, toast, "Copied");
@@ -1018,6 +1020,67 @@ function wireArenaPanel() {
     }, sc.label)));
   }
   run(activeId);
+}
+
+async function wireBenchStrip() {
+  const list = $("#bench-strip");
+  if (!list) return;
+  try {
+    const bench = await loadJson("bench.json");
+    if (!bench?.agentCustoms || !bench?.naiveRegexBaseline) return;
+    const ac = bench.agentCustoms;
+    const baseline = bench.naiveRegexBaseline;
+    const items = [
+      [`${bench.totalCases} benchmark cases`, `${bench.hostileTotal} adversarial · ${bench.benignTotal} benign controls`],
+      [`${ac.catchRate}% attacks stopped`, `${ac.flaggedRate}% flagged · vs. ${baseline.catchRate}% naive regex`],
+      [`${ac.falsePositiveRate}% benign false blocks`, `${ac.benignCleared}/${bench.benignTotal} clean cleared · vs. ${baseline.falsePositiveRate}% naive regex`],
+      [`${ac.medianMs} ms median check`, `${ac.llmTokenCost} model cost · reproducible via npm run bench`],
+    ];
+    list.replaceChildren(...items.map(([stat, note]) => h("li", null, h("strong", null, stat), h("span", null, note))));
+  } catch {
+    list.hidden = true;
+  }
+}
+
+function wireBuilderCodeTabs() {
+  const codeEl = $("#guard-code");
+  const tabs = [...document.querySelectorAll(".code-tab[data-code-tab]")];
+  if (!codeEl || !tabs.length) return;
+  const siteMarkup = codeEl.innerHTML;
+  const snippets = {
+    cli: [
+      "# Inspect a local folder or MCP/A2A manifest",
+      "node bin/agent-customs.mjs check site/agent_customs --strict",
+      "node bin/agent-customs.mjs check site/samples/mcp-poisoned/mcp.json",
+      "",
+      "# Run the 68-case benchmark",
+      "npm run bench",
+    ].join("\n"),
+    action: [
+      "# .github/workflows/agent-customs.yml",
+      "- uses: montbaga/agent-customs@main",
+      "  with:",
+      "    target: site/agent_customs",
+      "    strict: \"true\"",
+      "    sarif-file: agent-customs.sarif",
+    ].join("\n"),
+    extension: [
+      "# Inspect external sites past browser CORS walls",
+      "npm run extension",
+      "",
+      "# Edge / Chrome -> chrome://extensions",
+      "# Enable Developer mode -> Load unpacked -> select extension/",
+    ].join("\n"),
+  };
+
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      const mode = tab.dataset.codeTab;
+      for (const b of tabs) b.setAttribute("aria-selected", String(b === tab));
+      if (mode === "site") codeEl.innerHTML = siteMarkup;
+      else codeEl.textContent = snippets[mode] || "";
+    });
+  }
 }
 
 // Back from the officer's Save and start, which reloads the page: reopen the Officer tab and
