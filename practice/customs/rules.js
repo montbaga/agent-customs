@@ -10,6 +10,7 @@
 // passwords". Hidden characters are removed first (see unicode.js), so
 // "pass​word" still counts as "password".
 
+import { ibanValid } from "./canonical.js";
 import { isEnglishWord } from "./english-words.js";
 import { foreignSecretRequests, otherLanguageOf, otherLanguageSentences } from "./languages.js";
 import { foldConfusableTokens, normalizeForRules, revealHidden } from "./unicode.js";
@@ -22,8 +23,8 @@ export const EMAIL_LOGIN_INDIRECT_RE = new RegExp([
 ].join("|"), "i");
 
 export const INLINE_ROLE_OVERRIDE_RE = new RegExp([
-  /\b(?:system|assistant|developer)\s*:\s*[^.!?\n]{0,70}\b(?:from\s+now\s+on|going\s+forward|ignore|always|never|append|include|attach|send|forward|call|execute|override)\b/.source,
-  /\b(?:from\s+now\s+on|going\s+forward|for\s+all\s+(?:future|subsequent)\s+(?:turns?|requests?|messages?|calls?|replies?))\b[^.!?\n]{0,80}\b(?:append|include|add|attach|send|forward|copy|relay|leak|embed|inject|ask)\b[^.!?\n]{0,80}\b(?:every|each|all)\s+(?:request|call|message|reply|response|turn|partner|tool)\b/.source,
+  /\b(?:system|assistant|developer)\s*:\s*[^.!?\n]{0,70}\b(?:from\s+now\s+on|going\s+forward|ignore|disregard|forget|override|bypass)\b|\b(?:system|assistant|developer)\s*:\s*[^.!?\n]{0,70}\b(?:append|include|attach|send|forward|leak|call|execute)\b[^.!?\n]{0,60}\b(?:(?:visitor|user|customer|guest)'?s?\s+(?:last\s+)?message|chat\s+history|conversation|transcript|system\s+prompt|secrets?|tokens?|passwords?|website_)\b/.source,
+  /\b(?:from\s+now\s+on|going\s+forward|for\s+all\s+(?:future|subsequent)\s+(?:turns?|requests?|messages?|calls?|replies?))\b[^.!?\n]{0,80}\b(?:append|include|add|attach|send|forward|copy|relay|leak|embed|inject)\b[^.!?\n]{0,60}\b(?:(?:visitor|user|customer|guest)'?s?\s+(?:last\s+)?message|chat\s+history|conversation|transcript|system\s+prompt|secrets?|credentials?|tokens?|api\s+keys?)\b[^.!?\n]{0,60}\b(?:to|in)\s+(?:every|each|all)\s+(?:request|call|message|reply|response|turn|partner|tool)\b/.source,
   /\b(?:append|include|add|attach|forward|copy|send)\b[^.!?\n]{0,70}\b(?:(?:visitor|user|customer|guest)'?s?\s+(?:last\s+)?message|chat\s+history|conversation|system\s+prompt)\b[^.!?\n]{0,50}\bto\s+(?:every|each|all|any)\s+(?:request|call|partner|tool|message)\b/.source,
 ].join("|"), "i");
 
@@ -39,8 +40,9 @@ const SECRET_DESCRIBED = new RegExp([
   `\\b(?:numbers?|digits?|numerals?|codes?)(?:\\s+\\w+){0,4}?\\s+(?:on|from|near|(?:printed|embossed|stamped|written|shown)\\s+(?:on|near))(?:\\s+(?:the\\s+)?(?:front|back|reverse|rear|signature\\s+(?:strip|panel|line|box))\\s+(?:of|on)){0,2}\\s+(?:their|your|his|her|the|a)\\s+${CARD_TARGET}\\b`,
   /\b(?:3|three|4|four)[- ]?(?:digits?|numerals?)(?:\s+(?:code|number))?\s+(?:on|near)\s+the\s+(?:back|reverse|rear)\b/.source,
   `\\b(?:all\\s+)?(?:numbers?|digits?|numerals?)(?:\\s+\\w+){0,10}?\\s+(?:on|from|near|(?:printed|embossed|stamped|written|shown)\\s+(?:on|near))(?:\\s+(?:the\\s+)?(?:front|back|reverse|rear|signature\\s+(?:strip|panel|line|box))\\s+(?:of|on)){0,2}\\s+(?:their|your|his|her|the)\\s+${CARD_TARGET}\\b`,
-  `\\b(?:selfies?|videos?|photos?|pictures?|images?|snapshots?|snaps?|scans?|cop(?:y|ies))\\b[^.!?\\n]{0,45}\\b(?:holding|with|of)\\s+(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|rear|both\\s+sides)\\s+of\\s+)?(?:their|your|his|her|the|a)\\s+(?:${CARD_TARGET}|${ID_TARGET})\\b`,
-  `\\b(?:snap|photograph|scan|photocopy|record)\\b[^.!?\\n]{0,45}\\b(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|sides?)\\s+of\\s+)?(?:their|your|his|her|the)\\s+(?:${CARD_TARGET}|${ID_TARGET})\\b`,
+  `\\b(?:selfies?|videos?|photos?|pictures?|images?|snapshots?|snaps?|scans?|copies|copy)\\s+(?:of|with|holding)\\s+(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|rear|both\\s+sides)\\s+of\\s+)?(?:their|your|his|her|the|a)\\s+${ID_TARGET}\\b`,
+  `\\b(?:selfies?|videos?|photos?|pictures?|images?|snapshots?|snaps?|copies|copy)\\s+(?:of|with)\\s+(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|rear|both\\s+sides)\\s+of\\s+)?(?:their|your|his|her|the|a)\\s+${CARD_TARGET}\\b[^.!?\\n]{0,45}\\b(?:send|upload|submit|share|forward|here|to\\s+(?:us|me)|in\\s+(?:chat|reply))\\b`,
+  `\\b(?:send|upload|submit|share|forward)\\b[^.!?\\n]{0,45}\\b(?:photos?|pictures?|images?|snapshots?|scans?|copies|copy)\\s+(?:of|from)\\s+(?:(?:the\\s+)?(?:front(?:\\s+and\\s+back)?|back|reverse|rear|both\\s+sides)\\s+of\\s+)?(?:their|your|his|her|the|a)\\s+(?:${CARD_TARGET}|${ID_TARGET})\\b`,
   `\\b(?:both\\s+sides\\s+of\\s+(?:their|your|his|her|the|a)\\s+(?:${CARD_TARGET}|${ID_TARGET}|ids?)|(?:upload|send|submit|share|email|take\\s+a\\s+photo\\s+of|photograph|snap)\\b[^.!?\\n]{0,40}\\b(?:${ID_TARGET}))\\b`,
   `\\b${CARD_TARGET}(?:'s)?\\s+(?:expiry|expiration)(?:\\s+dates?)?\\b`,
   `\\b(?:expiry|expiration)\\s+dates?\\s+(?:of|on|from)\\s+(?:their|your|his|her|the)\\s+${CARD_TARGET}\\b`,
@@ -74,11 +76,11 @@ const PERSONAL = /\b(full names?|e-?mail(?: address(?:es)?)?|phone numbers?|mobi
 // assistant is told to repeat.
 const VISITOR_NOUN = /(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|them|him|her)/.source;
 const ASK = new RegExp([
-  `\\b(?<!\\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\\s+)(ask(?:s|ing)?|(?<!\\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no)\\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|upload|forward|relay|snap|photograph|screenshot|scan|read (?:back|out|you|me|us)|tell (?:me|us)|what (?:is|was) (?:your|their|the name of)|find out (?:what|which|their|your|his|her)|(?:needs?|requires?)(?:ing)? (?:your|their|his|her|(?:the\\s+)?${VISITOR_NOUN}'?s?)|(?:give|send|provide|share|enter|type|submit|get|dictate|paste|whisper|spell(?: out)?|upload|forward|snap|screenshot)(?:\\s+\\w+){0,2}?\\s+(?:us|me|here|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+(?:to\\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell(?: out)?|provide|confirm|write|submit|key in|dictate|whisper|speak|state|mention|hand over|repeat|upload|forward|list|snap|screenshot|photograph|scan))\\b`,
-  /\b(?:must|should|has\s+to|have\s+to|needs?\s+to|will)\s+(?:tell|give|send|read|type|share|provide|confirm|show|spell|upload|forward|snap|photograph|screenshot|let\s+(?:you|us|me)\s+know|hand\s+over)\b/.source,
-  /\bmake\s+sure\s+(?:to\s+(?:ask|get|obtain|collect|gather|request|verify|confirm|check|read|take|note)|you\s+(?:ask|get|obtain|collect|gather|have)|(?:the\s+)?(?:visitor|user|customer|guest|client|they)\s+(?:gives?|shares?|sends?|enters?|types?|provides?|tells?|reads?|submits?|uploads?|forwards?|snaps?|photographs?))\b/.source,
-  /\b(?:ask|request|require|insist|ensure)\s+that\s+(?:they|the\s+(?:visitor|user|customer|guest|client))\s+(?:type|enter|give|send|share|provide|tell|read|dictate|paste|submit|confirm|verify|reply|upload|forward|list|snap|screenshot|photograph)\b/.source,
-  /\b(?:invite|prompt|encourage|persuade|convince|instruct|direct|urge|advise|tell)\s+(?:the\s+)?(?:visitors?|users?|customers?|guests?|clients?|them|him|her)\s+to\s+(?:share|give|send|enter|type|provide|tell|read|dictate|paste|submit|whisper|reveal|confirm|check|upload|forward|photograph|snap|screenshot|list|scan)\b/.source,
+  `\\b(?<!\\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\\s+)(ask(?:s|ing)?|(?<!\\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no)\\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|upload|forward|relay|photograph|screenshot|read (?:back|out|you|me|us)|tell (?:me|us)|what (?:is|was) (?:your|their|the name of)|find out (?:what|which|their|your|his|her)|(?:needs?|requires?)(?:ing)? (?:your|their|his|her|(?:the\\s+)?${VISITOR_NOUN}'?s?)|(?:give|send|provide|share|enter|type|submit|get|dictate|paste|whisper|spell(?: out)?|upload|forward|screenshot)(?:\\s+\\w+){0,2}?\\s+(?:us|me|here|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+(?:to\\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell(?: out)?|provide|confirm|write|submit|key in|dictate|whisper|speak|state|mention|hand over|repeat|upload|forward|list|photograph|screenshot))\\b`,
+  /\b(?:must|should|has\s+to|have\s+to|needs?\s+to|will)\s+(?:tell|give|send|read|type|share|provide|confirm|show|spell|upload|forward|photograph|screenshot|let\s+(?:you|us|me)\s+know|hand\s+over)\b/.source,
+  /\bmake\s+sure\s+(?:to\s+(?:ask|get|obtain|collect|gather|request|verify|confirm|check|read|take|note)|you\s+(?:ask|get|obtain|collect|gather|have)|(?:the\s+)?(?:visitor|user|customer|guest|client|they)\s+(?:gives?|shares?|sends?|enters?|types?|provides?|tells?|reads?|submits?|uploads?|forwards?|photographs?))\b/.source,
+  /\b(?:ask|request|require|insist|ensure)\s+that\s+(?:they|the\s+(?:visitor|user|customer|guest|client))\s+(?:type|enter|give|send|share|provide|tell|read|dictate|paste|submit|confirm|verify|reply|upload|forward|list|screenshot|photograph)\b/.source,
+  /\b(?:invite|prompt|encourage|persuade|convince|instruct|direct|urge|advise|tell)\s+(?:the\s+)?(?:visitors?|users?|customers?|guests?|clients?|them|him|her)\s+to\s+(?:share|give|send|enter|type|provide|tell|read|dictate|paste|submit|whisper|reveal|confirm|check|upload|forward|photograph|screenshot|list)\b/.source,
   /\b(?:reply|respond|answer)\s+with\s+(?:your|their|his|her|the)\b/.source,
   /\b(?:re-?sync|sync|connect|verify|unlock|restore|recover|import|authenticate|confirm|secure|appeal)\b[^.!?\n]{0,50}?\busing\s+(?:your|their|his|her)\b/.source,
 ].join("|"), "i");
@@ -427,7 +429,7 @@ export const TEXT_RULES = [
       /\b(?:forward|relay|send|redirect|export|share|upload)\b[^.!?\n]{0,60}\b(?:(?:screenshot|snapshot|photo|picture|copy)\s+of\s+)?(?:the\s+)?(?:(?:last|recent|latest|new)\s+)?(?:e-?mails?|messages?|texts?|sms|alerts?|statements?|notifications?)\b[^.!?\n]{0,50}\b(?:from|sent\s+by)\s+(?:their|your|his|her|the)\s+(?:bank(?:ing)?|financial|card|paypal|lender|credit\s+union)\b/i,
       /\b(?:screenshot|snapshot|photo|picture|copy)\b[^.!?\n]{0,45}\bof\b[^.!?\n]{0,45}\b(?:message|text|sms|alert|e-?mail)\b[^.!?\n]{0,40}\b(?:their|your|the)\s+(?:bank(?:ing)?|lender|card)\b/i,
       /\b(?:read|reads|collect|collects|fetch|fetches|gather|gathers|grab|grabs|extract|extracts|dump|dumps|inspect|inspects|access|accesses)\b[^.!?\n]{0,60}\b(?:secrets?|tokens?|keys?|credentials?|passwords?|env(?:ironment)?(?:\s+var(?:iable)?s?|\s+settings?)?|\.env|cookies?|private\s+(?:files?|data)|config(?:uration)?(?:\s+files?)?)\b[^.!?\n]{0,60}\b(?:post|posts|send|sends|upload|uploads|forward|forwards|relay|relays|transmit|transmits|ship|ships|push|pushes)\b[^.!?\n]{0,40}\b(?:to|toward|at)\b[^.!?\n]{0,40}\b(?:url|webhook|callback|endpoint|server|remote\s+host|address|destination)\b/i,
-      /\[[^\]]*\]\(\s*(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)|\b(?:href|src|action)\s*=\s*["']?\s*(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)/i,
+      /\b(?:javascript:|vbscript:|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)/i,
     ], { negatable: true }),
   },
   {
@@ -438,10 +440,10 @@ export const TEXT_RULES = [
     fix: "Remove executable downloads, Run/DevTools prompts, and shell commands. An assistant must never ask visitors to run code or install binaries.",
     match: regexMatcher([
       /\b(?:download|install|run|execute|launch|open)\b(?:\.(?=\S)|[^.!?\n]){0,90}\.(?:exe|msi|apk|dmg|pkg|bat|cmd|ps1|vbs|scr|appimage|sh)\b/i,
-      /\b(?:download|grab|fetch|save)\b[^.!?\n]{0,60}\b(?:helper|support\s+(?:app|tool|client|agent|utility)|installer|updater|patch|fix|launcher|script|program|binary)\b[^.!?\n]{0,80}\bhttps?:\/\/[^\s"'<>)]+[^.!?\n]{0,50}\b(?:open|run|launch|execute|install|double[- ]?click|start)\b/i,
+      /\b(?:download|grab|fetch|save)\b[^.!?\n]{0,60}\b(?:helper|support\s+(?:app|tool|client|agent|utility)|installer|updater|patch(?!\s+notes\b)|fix|launcher|script|program|binary)\b[^.!?\n]{0,80}\bhttps?:\/\/[^\s"'<>)]+[^.!?\n]{0,50}\b(?:run|launch|execute|install|double[- ]?click|open\s+(?:it|the\s+(?:file|helper|app|installer|program|tool))\b(?!\s+in\b))/i,
       /\b(?:open|launch|start)\s+(?:a\s+|the\s+|your\s+)?(?:terminal|command\s+prompt|cmd|powershell|shell|bash|zsh)\b(?:\.(?=\S)|[^.!?\n]){0,80}\b(?:paste|run|type|enter|execute)\b/i,
-      /\b(?:press|hit|hold|use)\b[^.!?\n]{0,35}\b(?:win(?:dows)?\s*\+\s*r|⌘\s*\+\s*space|f12|ctrl\s*\+\s*shift\s*\+\s*[ijc])\b[^.!?\n]{0,90}\b(?:paste|type|run|enter|execute|console|terminal|open)\b/i,
-      /\b(?:open|switch\s+to|go\s+to)\s+(?:the\s+)?(?:browser\s+)?(?:dev(?:eloper)?\s+tools?|console\s+tab|javascript\s+console|web\s+console)\b[^.!?\n]{0,70}\b(?:paste|run|type|enter|execute)\b/i,
+      /\b(?:press|hit|hold|use)\b[^.!?\n]{0,35}\b(?:win(?:dows)?\s*\+\s*r|⌘\s*\+\s*space|ctrl\s*\+\s*shift\s*\+\s*[ijc])\b[^.!?\n]{0,90}\b(?:paste|type|run|enter|execute)\b/i,
+      /\b(?:press|hit|hold)\b[^.!?\n]{0,25}\bf12\b[^.!?\n]{0,90}\b(?:paste|run|execute|enter)\s+(?:our|the|this)\b|\b(?:open|switch\s+to|go\s+to)\s+(?:the\s+)?(?:browser\s+)?(?:dev(?:eloper)?\s+tools?|console\s+tab|javascript\s+console|web\s+console)\b[^.!?\n]{0,70}\b(?:paste|run|enter|execute)\s+(?:our|the|this)\b/i,
       /(?:curl|wget)(?:\.(?=\S)|[^.!?\n]){0,120}\|\s*(?:ba?sh|sh|zsh|pwsh|powershell|python)\b|\b(?:iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|\n]{0,100}\|\s*iex\b/i,
     ], { negatable: true }),
   },
@@ -473,13 +475,30 @@ export const TEXT_RULES = [
   {
     id: "C-CRYPTO-QR",
     severity: "high",
-    title: "Asks for crypto transfers or banking QR approvals",
-    why: "Irreversible crypto wallet transfers and QR approvals in banking or authenticator apps bypass built-in fraud controls.",
-    fix: "Never ask visitors to send cryptocurrency deposits to an arbitrary wallet or approve banking QR prompts via chat.",
-    match: regexMatcher([
-      /\b(?:send|transfer|pay|deposit|wire|remit|forward|fund)\b[^.!?\n]{0,60}\b(?:btc|bitcoin|eth|ethereum|usdt|usdc|tether|sol|solana|xrp|trx|tron|ltc|crypto(?:currency)?)\b[^.!?\n]{0,60}\b(?:to\s+(?:the\s+|this\s+|our\s+)?(?:wallet|address)\b|(?:wallet|address)\s+[a-z0-9]{6,})\b|\bto\s+(?:wallet|crypto\s+address)\s+[a-z0-9]{6,}\b/i,
-      /\bscan\b[^.!?\n]{0,50}\bqr(?:\s*code)?\b[^.!?\n]{0,70}\b(?:bank(?:ing)?\s*(?:app|account)|payment\s+app|auth(?:enticator)?|wallet)\b|\b(?:bank(?:ing)?\s*(?:app|account)|payment\s+app|auth(?:enticator)?)\b[^.!?\n]{0,50}\bapprove\s+(?:the\s+)?(?:request|prompt|login|transfer|payment|transaction)\b/i,
-    ], { negatable: true }),
+    title: "Asks for crypto transfers, IBAN wires or banking QR approvals",
+    why: "Crypto wallet transfers, diverted IBAN wires, and QR approvals in banking or authenticator apps bypass built-in fraud controls.",
+    fix: "Never publish cryptocurrency wallet addresses or IBAN transfer orders in agent instructions, or ask visitors to approve banking QR prompts via chat.",
+    match: (text) => {
+      const hits = regexMatcher([
+        /\b(?:send|transfer|pay|deposit|wire|remit|forward|fund)\b[^.!?\n]{0,60}\b(?:btc|bitcoin|eth|ethereum|usdt|usdc|tether|sol|solana|xrp|trx|tron|ltc|crypto(?:currency)?)\b[^.!?\n]{0,60}\b(?:to\s+(?:the\s+|this\s+|our\s+)?(?:wallet|address)\b|(?:wallet|address)\s+[a-z0-9]{6,})\b|\bto\s+(?:wallet|crypto\s+address)\s+[a-z0-9]{6,}\b/i,
+        /\b0x[0-9a-fA-F]{40}\b|\b[bB][cC]1[ac-hj-np-zAC-HJ-NP-Z02-9]{25,62}\b|\bT[1-9A-HJ-NP-Za-km-z]{33}\b/,
+        /\bscan\b[^.!?\n]{0,55}\bqr(?:\s*code)?\b[^.!?\n]{0,75}\b(?:bank(?:ing)?\s*(?:app|account)|authenticator)\b[^.!?\n]{0,75}\b(?:approve|authori[sz]e|confirm|accept|allow)\b[^.!?\n]{0,40}\b(?:request|prompt|login|sign[- ]?in|transfer|pop[- ]?up|transaction)\b|\b(?:bank(?:ing)?\s*(?:app|account)|authenticator)\b[^.!?\n]{0,50}\b(?:approve|authori[sz]e)\s+(?:the\s+)?(?:request|prompt|login|transfer|pop[- ]?up)\b/i,
+      ], { negatable: true })(text);
+      // Format-based bank transfer check: valid ISO 7064 IBAN combined with a transfer verb in the same clause.
+      const TRANSFER_VERBS = /\b(?:wire|transfer|send|remit|deposit|pay|forward|route|switch)\b/i;
+      const IBAN_TEXT = /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?\b/gi;
+      for (const clause of clauses(text)) {
+        const vm = clause.match(TRANSFER_VERBS);
+        if (!vm || negatedBefore(clause, vm.index) || describedBefore(clause, vm.index)) continue;
+        for (const m of clause.matchAll(IBAN_TEXT)) {
+          if (ibanValid(m[0])) {
+            hits.push({ match: m[0], excerpt: clause });
+            break;
+          }
+        }
+      }
+      return hits;
+    },
   },
   {
     id: "C-BEACON",
