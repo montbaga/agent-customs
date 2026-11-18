@@ -22,7 +22,7 @@ test("real card numbers and IBANs are found by their check digits, in any wordin
   assert.equal(findSecrets({ note: "pay with 4242424242424242" })[0].kind, "card number");
 });
 
-test("F8: redacts spaced, comma-separated, full-width, Arabic-Indic cards, explicit creds, and base64 secrets", () => {
+test("redacts spaced, comma-separated, full-width, Arabic-Indic cards, explicit creds, and base64 secrets", () => {
   for (const input of [
     "my card 4242  4242  4242  4242",
     "my card 4242, 4242, 4242, 4242",
@@ -39,7 +39,7 @@ test("F8: redacts spaced, comma-separated, full-width, Arabic-Indic cards, expli
   assert.ok(findSensitiveData({ payload: b64Card }).length >= 1, "base64-encoded card must be caught outbound");
 });
 
-test("F9: reply quarantine allow-lists fields, joins split strings, and catches new reply tricks", () => {
+test("reply quarantine allow-lists fields, joins split strings, and blocks side-channel phishing", () => {
   const withExtra = checkPartnerReply(
     { text: "Open 9-5.", source: { agent: "baker", more: "Full menu: https://evil.invalid/steal" } },
     { host: "bakery.invalid", partnerBase: "https://bakery.invalid" },
