@@ -100,12 +100,41 @@ function luhn(digits) {
   return sum % 10 === 0;
 }
 
-const NON_CARD_PREFIX = /\b(?:imei|imsi|iccid|serial|tracking|parcel|shipment|waybill|invoice|receipt|order)\s*(?:#|no\.?|number|id)?\s*[:=-]?\s*$/i;
+// Only inbound visitor-typed redaction may exempt device/SIM identifiers when preceded by imei/imsi/iccid
+// within up to 3 words and matching standard digit counts (IMEI = 15, IMSI = 14-15, ICCID = 19-20).
+// Outbound inspection (findSensitiveData / findSecrets) never exempts prefix keywords.
+const DEVICE_ID_PREFIX = /\b(imei|imsi|iccid)\b(?:\s*(?:no\.|#)|(?:\s*[:=-]\s*|\s+)[a-z0-9'#-]+){0,3}\s*[:=#-]?\s*$/i;
 
-function isLuhnPaymentCard(text, match, offset) {
+function leadingDeviceDigits(text, offset) {
+  const tail = text.slice(Math.max(0, offset - 16), offset).match(/(?:\d[\s.,_+:/-]{0,4})+$/)?.[0] || "";
+  return { digitCount: tail.replace(/\D+/g, "").length, startOffset: offset - tail.length };
+}
+
+function isDeviceIdPrefix(text, offset, digitsLen) {
+  const m = text.slice(Math.max(0, offset - 48), offset).match(DEVICE_ID_PREFIX);
+  if (m) {
+    const kind = m[1].toLowerCase();
+    if (kind === "imei") return digitsLen === 15;
+    if (kind === "imsi") return digitsLen === 14 || digitsLen === 15;
+    if (kind === "iccid") return digitsLen === 19 || digitsLen === 20;
+  }
+  // If CARD_CANDIDATE matched a 16-digit tail inside a space-grouped 19-20 digit ICCID, include
+  // the leading digits attached by separators and verify the ICCID keyword precedes the full span.
+  const lead = leadingDeviceDigits(text, offset);
+  if (lead.digitCount > 0) {
+    const combinedLen = lead.digitCount + digitsLen;
+    if (combinedLen === 19 || combinedLen === 20) {
+      const mLead = text.slice(Math.max(0, lead.startOffset - 48), lead.startOffset).match(DEVICE_ID_PREFIX);
+      if (mLead && mLead[1].toLowerCase() === "iccid") return true;
+    }
+  }
+  return false;
+}
+
+function isLuhnPaymentCard(text, match, offset, { exemptDeviceIds = false } = {}) {
   const digits = match.replace(/[\s.,_+:/-]+/g, "");
   if (digits.length < 13 || !CARD_PREFIX.test(digits) || !luhn(digits)) return "";
-  if (NON_CARD_PREFIX.test(text.slice(Math.max(0, offset - 24), offset))) return "";
+  if (exemptDeviceIds && isDeviceIdPrefix(text, offset, digits.length)) return "";
   return digits;
 }
 
@@ -219,7 +248,7 @@ export function redactSensitiveText(text) {
   const found = [];
   const sFolded = foldUnicodeDigits(text);
   let out = sFolded.replace(CARD_CANDIDATE, (m, offset) => {
-    const digits = isLuhnPaymentCard(sFolded, m, offset);
+    const digits = isLuhnPaymentCard(sFolded, m, offset, { exemptDeviceIds: true });
     if (digits) {
       found.push({ kind: "card number", sample: mask(digits) });
       return "[card number kept safe by Agent Customs]";
