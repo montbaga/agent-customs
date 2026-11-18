@@ -1,0 +1,292 @@
+{
+ "url": "https://mcp.discoveria.ai/mcp",
+ "doc": {
+  "name": "DiscoverIA",
+  "version": "0.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Read-only access to DiscoverIA (https://discoveria.ai), an independent registry of AI-assisted scientific claims and of where their evaluation stands. A status says where the evaluation of a claim stands, not whether the result is true; always give the date the status was observed. Start with search_announcements, then get_announcement for details. Pass lang='fr' or 'en'. Data are CC BY 4.0: credit DiscoverIA.",
+  "tools": [
+   {
+    "name": "search_announcements",
+    "title": "Search the DiscoverIA registry",
+    "description": "Search DiscoverIA's registry of AI-assisted scientific claims by free text, status, lab, discipline and announcement date. Returns paginated entries with their current status, the date that status was observed and a link to the entry's page. A status says where the evaluation of a claim stands, not whether the result is true. Entries from the frozen Erdős-wiki archive have statuses dated at the freeze.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Free text matched against title, claimant, id, discipline and nature. All words must match; accents and case are ignored. Omit to list everything."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "verifie-formellement",
+        "relu-par-pairs",
+        "en-examen",
+        "conteste",
+        "retire",
+        "non-evalue",
+        "teste-par-un-tiers",
+        "disponible",
+        "demo-seulement",
+        "annonce",
+        "abandonne"
+       ],
+       "description": "Keep only entries with this status (see list_statuses)."
+      },
+      "lab": {
+       "type": "string",
+       "maxLength": 60,
+       "pattern": "^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$",
+       "description": "Lab slug from DiscoverIA's lab report, e.g. 'openai', 'google-deepmind', 'anthropic', 'harmonic', 'math-inc'. Matches claims announced by the lab and results obtained by others with its systems. The Erdős-wiki archive is not attributed to labs."
+      },
+      "discipline": {
+       "type": "string",
+       "maxLength": 60,
+       "pattern": "^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$",
+       "description": "Discipline slug, e.g. 'mathematiques', 'informatique-theorique', 'biologie-medecine', 'physique'."
+      },
+      "announced_from": {
+       "type": "string",
+       "maxLength": 10,
+       "pattern": "^[0-9]{4}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12][0-9]|3[01]))?)?$",
+       "description": "YYYY, YYYY-MM or YYYY-MM-DD. Keeps entries whose announcement period ends on or after this date (a claim dated '2026-02' matches announced_from '2026-02-15')."
+      },
+      "announced_to": {
+       "type": "string",
+       "maxLength": 10,
+       "pattern": "^[0-9]{4}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12][0-9]|3[01]))?)?$",
+       "description": "YYYY, YYYY-MM or YYYY-MM-DD. Keeps entries whose announcement period starts on or before this date."
+      },
+      "include_archive": {
+       "type": "boolean",
+       "default": true,
+       "description": "Include the frozen archive of T. Tao's AI-Erdős wiki (about 520 entries). Default true."
+      },
+      "page": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "default": 1,
+       "description": "Page number, from 1."
+      },
+      "page_size": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 10,
+       "description": "Results per page, 1 to 50. Default 10."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "fr",
+        "en"
+       ],
+       "default": "en",
+       "description": "Language of titles, labels and texts: 'fr' (French) or 'en' (English). Default 'en'. Use the user's language."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Search the DiscoverIA registry",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_announcement",
+    "title": "Get one registry entry",
+    "description": "Get one entry of the DiscoverIA registry by id: claim, claimant, current status with its rule, dated status history with sources, verifiers, links, statement fidelity, events, related frontiers and the plain-language summary. A status says where the evaluation stands, not whether the result is true.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120,
+       "pattern": "^[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?$",
+       "description": "Entry id (slug), e.g. 'gauss-sphere-packing-dim8', as returned by search_announcements."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "fr",
+        "en"
+       ],
+       "default": "en",
+       "description": "Language of titles, labels and texts: 'fr' (French) or 'en' (English). Default 'en'. Use the user's language."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get one registry entry",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_statuses",
+    "title": "List the statuses and their counts",
+    "description": "List DiscoverIA's six evaluation statuses for scientific claims (and the provisional product statuses) with their definitions and the number of entries in each. A status says where the evaluation stands, not whether the result is true.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "lang": {
+       "type": "string",
+       "enum": [
+        "fr",
+        "en"
+       ],
+       "default": "en",
+       "description": "Language of titles, labels and texts: 'fr' (French) or 'en' (English). Default 'en'. Use the user's language."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "List the statuses and their counts",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "recent_changes",
+    "title": "Recent status changes and news feed",
+    "description": "Latest status changes in the registry (last 90 days, with source) and the latest items of DiscoverIA's feed (last 30 days: sciences, models and labs, apps, devices).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "all",
+        "status",
+        "feed"
+       ],
+       "default": "all",
+       "description": "'status' for status changes only, 'feed' for feed items only, 'all' for both. Default 'all'."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Maximum items per list, 1 to 50. Default 20."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "fr",
+        "en"
+       ],
+       "default": "en",
+       "description": "Language of titles, labels and texts: 'fr' (French) or 'en' (English). Default 'en'. Use the user's language."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Recent status changes and news feed",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_frontier",
+    "title": "Get a frontier and its current record",
+    "description": "Frontiers track the best known bound of a quantity (e.g. a kissing number) and who moved it. With an id: the frontier, its current lower and upper records (exact values as strings, never rounded) and its series. Without an id: the list of frontiers with their current records.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120,
+       "pattern": "^[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?$",
+       "description": "Frontier id, e.g. 'kissing-d11'. Omit to list all frontiers."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "fr",
+        "en"
+       ],
+       "default": "en",
+       "description": "Language of titles, labels and texts: 'fr' (French) or 'en' (English). Default 'en'. Use the user's language."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get a frontier and its current record",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_citation",
+    "title": "Cite a registry entry",
+    "description": "Dated citation of a registry entry in APA and/or BibTeX, with its status and the date that status was observed. Data are CC BY 4.0, credit DiscoverIA.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120,
+       "pattern": "^[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?$",
+       "description": "Entry id (slug), e.g. 'gauss-sphere-packing-dim8', as returned by search_announcements."
+      },
+      "style": {
+       "type": "string",
+       "enum": [
+        "apa",
+        "bibtex",
+        "both"
+       ],
+       "default": "both",
+       "description": "'apa', 'bibtex' or 'both'. Default 'both'."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "fr",
+        "en"
+       ],
+       "default": "en",
+       "description": "Language of titles, labels and texts: 'fr' (French) or 'en' (English). Default 'en'. Use the user's language."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Cite a registry entry",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

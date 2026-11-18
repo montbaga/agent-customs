@@ -1,0 +1,656 @@
+{
+ "url": "https://certifikit.ai/mcp",
+ "doc": {
+  "name": "CertifiKit COI tools",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "CertifiKit certificate of insurance (COI) tools for contractors, property managers and HOAs. build_insurance_requirements recommends the limits and endorsements to require of a subcontractor or vendor and writes the contract exhibit. check_certificate checks an ACORD 25 against those requirements: you read the certificate and pass its values, and a deterministic rules engine returns pass, fail or needs_review with a reason per requirement. find_coi_guides links plain-English guides to cite. Decision support, not insurance or legal advice.",
+  "tools": [
+   {
+    "name": "build_insurance_requirements",
+    "title": "Build contract insurance requirements",
+    "description": "Recommends the insurance a general contractor should require of a subcontractor, or a property manager or HOA of a vendor: general liability, auto, umbrella and workers' comp limits, additional insured, waiver of subrogation and primary/non-contributory wording, scaled to the trade's risk and the contract size. Returns the reasoning for each limit, contract-ready exhibit text, and a requirements object that check_certificate accepts.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "context": {
+       "type": "string",
+       "enum": [
+        "gc",
+        "property"
+       ],
+       "description": "\"gc\" = a contractor hiring a subcontractor; \"property\" = a property manager or HOA hiring a service vendor."
+      },
+      "trade": {
+       "type": "string",
+       "enum": [
+        "general",
+        "carpentry",
+        "concrete",
+        "drywall",
+        "painting",
+        "electrical",
+        "mechanical",
+        "glazing",
+        "roofing",
+        "demolition",
+        "steel",
+        "excavation",
+        "scaffolding",
+        "abatement",
+        "designbuild",
+        "landscaping",
+        "janitorial",
+        "pool",
+        "pest",
+        "snow",
+        "tree",
+        "elevator",
+        "security",
+        "pm"
+       ],
+       "description": "The vendor's trade, and the contexts it is offered in: \"general\" = General / multi-trade (gc); \"carpentry\" = Carpentry / framing (gc); \"concrete\" = Concrete / masonry (gc); \"drywall\" = Drywall / plaster (gc); \"painting\" = Painting / finishes (gc/property); \"electrical\" = Electrical (gc/property); \"mechanical\" = Plumbing / HVAC (gc/property); \"glazing\" = Glazing / curtain wall (gc); \"roofing\" = Roofing (gc/property); \"demolition\" = Demolition (gc); \"steel\" = Structural steel / crane work (gc); \"excavation\" = Excavation / earthwork (gc); \"scaffolding\" = Scaffolding / shoring (gc); \"abatement\" = Asbestos / lead abatement (gc); \"designbuild\" = Design-build / engineering (gc); \"landscaping\" = Landscaping / grounds (property/gc); \"janitorial\" = Janitorial / cleaning (property); \"pool\" = Pool maintenance (property); \"pest\" = Pest control (property); \"snow\" = Snow & ice removal (property); \"tree\" = Tree removal / arborist (property); \"elevator\" = Elevator maintenance (property); \"security\" = Security services (property); \"pm\" = Property management services (property)."
+      },
+      "contractSize": {
+       "type": "string",
+       "enum": [
+        "under-50k",
+        "50k-250k",
+        "250k-1m",
+        "over-1m",
+        "under-10k",
+        "10k-50k",
+        "over-250k"
+       ],
+       "description": "Contract value band. For \"gc\": under-50k, 50k-250k, 250k-1m, over-1m. For \"property\": under-10k, 10k-50k, 50k-250k, over-250k. A band from the other context is mapped to the smallest valid one."
+      },
+      "hasEmployees": {
+       "type": "boolean",
+       "default": true,
+       "description": "false for a sole proprietor with no employees: workers' comp is replaced by a signed exemption declaration."
+      },
+      "usesVehicles": {
+       "type": "boolean",
+       "default": true,
+       "description": "Drives to or around the site. false drops commercial auto."
+      },
+      "cancellationNoticeDays": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 365,
+       "default": 30,
+       "description": "Days of written notice before cancellation. 0 = as the policy provides."
+      },
+      "overrides": {
+       "type": "object",
+       "description": "Optional dollar limits that replace the recommended ones, for lines that are already required.",
+       "properties": {
+        "glEachOccurrence": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "glAggregate": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "autoEachOccurrence": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "umbrellaEachOccurrence": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        "wcEachOccurrence": {
+         "type": "number",
+         "exclusiveMinimum": 0
+        }
+       },
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "context",
+      "trade",
+      "contractSize"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Build contract insurance requirements",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "check_certificate",
+    "title": "Check a certificate of insurance",
+    "description": "Checks a certificate of insurance (ACORD 25) against insurance requirements with CertifiKit's deterministic rules engine: coverage present, limits at or above the minimums, policies not expired or expiring too soon, and the required endorsements. Read the certificate yourself and pass what it shows; the verdict (pass, fail or needs_review) and a plain-English reason per requirement come from fixed rules, not a model. Anything unreported, unreadable or below 0.7 confidence is routed to needs_review, never silently passed. Use preset or the requirements object from build_insurance_requirements.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "preset": {
+       "type": "string",
+       "enum": [
+        "standard-subcontractor",
+        "property-vendor"
+       ],
+       "description": "\"standard-subcontractor\" = Typical GC requirements for a trade sub: GL $1M/$2M, auto $1M, workers' comp $1M, additional insured + waiver of subrogation. \"property-vendor\" = Common requirements for service vendors at managed properties: GL $1M/$2M, workers' comp $500K, additional insured."
+      },
+      "requirements": {
+       "type": "object",
+       "description": "Custom requirements, e.g. the requirements object returned by build_insurance_requirements. Takes precedence over preset.",
+       "properties": {
+        "name": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 100
+        },
+        "generalLiability": {
+         "type": "object",
+         "properties": {
+          "required": {
+           "type": "boolean"
+          },
+          "minEachOccurrence": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          },
+          "minAggregate": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          }
+         },
+         "required": [
+          "required"
+         ]
+        },
+        "autoLiability": {
+         "type": "object",
+         "properties": {
+          "required": {
+           "type": "boolean"
+          },
+          "minEachOccurrence": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          },
+          "minAggregate": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          }
+         },
+         "required": [
+          "required"
+         ]
+        },
+        "umbrella": {
+         "type": "object",
+         "properties": {
+          "required": {
+           "type": "boolean"
+          },
+          "minEachOccurrence": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          },
+          "minAggregate": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          }
+         },
+         "required": [
+          "required"
+         ]
+        },
+        "workersComp": {
+         "type": "object",
+         "properties": {
+          "required": {
+           "type": "boolean"
+          },
+          "minEachOccurrence": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          },
+          "minAggregate": {
+           "type": "number",
+           "exclusiveMinimum": 0
+          }
+         },
+         "required": [
+          "required"
+         ]
+        },
+        "requireAdditionalInsured": {
+         "type": "boolean"
+        },
+        "requireWaiverOfSubrogation": {
+         "type": "boolean"
+        },
+        "requirePrimaryNonContributory": {
+         "type": "boolean"
+        },
+        "minDaysUntilExpiry": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 365,
+         "description": "Fail policies expiring within this many days. 0 = fail only expired ones."
+        }
+       },
+       "required": [
+        "name",
+        "generalLiability",
+        "autoLiability",
+        "umbrella",
+        "workersComp",
+        "requireAdditionalInsured",
+        "requireWaiverOfSubrogation",
+        "requirePrimaryNonContributory",
+        "minDaysUntilExpiry"
+       ]
+      },
+      "certificate": {
+       "type": "object",
+       "description": "What the certificate shows. Report only what is printed; do not infer. Leave out rows the certificate does not have.",
+       "properties": {
+        "insuredName": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "producer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "The issuing agent or broker."
+        },
+        "certificateHolder": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "generalLiability": {
+         "type": "object",
+         "description": "The Commercial General Liability row of the ACORD 25. Omit it if the certificate has no such row.",
+         "properties": {
+          "present": {
+           "type": "boolean",
+           "description": "true only if the row has a policy number or limits filled in."
+          },
+          "policyNumber": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "effectiveDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy effective date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "expirationDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy expiration date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "eachOccurrence": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "Each occurrence limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "aggregate": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "General aggregate limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "autoLiability": {
+         "type": "object",
+         "description": "The Automobile Liability row of the ACORD 25. Omit it if the certificate has no such row.",
+         "properties": {
+          "present": {
+           "type": "boolean",
+           "description": "true only if the row has a policy number or limits filled in."
+          },
+          "policyNumber": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "effectiveDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy effective date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "expirationDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy expiration date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "eachOccurrence": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "Combined single limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "aggregate": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "General aggregate limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "umbrella": {
+         "type": "object",
+         "description": "The Umbrella / Excess Liability row of the ACORD 25. Omit it if the certificate has no such row.",
+         "properties": {
+          "present": {
+           "type": "boolean",
+           "description": "true only if the row has a policy number or limits filled in."
+          },
+          "policyNumber": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "effectiveDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy effective date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "expirationDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy expiration date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "eachOccurrence": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "Each occurrence limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "aggregate": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "General aggregate limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "workersComp": {
+         "type": "object",
+         "description": "The Workers' Compensation and Employers' Liability row of the ACORD 25. Omit it if the certificate has no such row.",
+         "properties": {
+          "present": {
+           "type": "boolean",
+           "description": "true only if the row has a policy number or limits filled in."
+          },
+          "policyNumber": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "effectiveDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy effective date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "expirationDate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+           "description": "Policy expiration date, yyyy-mm-dd. null if blank or unreadable."
+          },
+          "eachOccurrence": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "Employers' liability each accident limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "aggregate": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "minimum": 0,
+           "description": "General aggregate limit in whole dollars as printed (1000000 for $1,000,000). null if blank or unreadable."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "additionalInsured": {
+         "type": "object",
+         "description": "Additional insured: from the ADDL INSD / SUBR WVD boxes, the description of operations, or an attached endorsement form.",
+         "properties": {
+          "present": {
+           "type": "boolean"
+          },
+          "formNumber": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Endorsement form number if printed, e.g. CG 20 10."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "waiverOfSubrogation": {
+         "type": "object",
+         "description": "Waiver of subrogation: from the ADDL INSD / SUBR WVD boxes, the description of operations, or an attached endorsement form.",
+         "properties": {
+          "present": {
+           "type": "boolean"
+          },
+          "formNumber": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Endorsement form number if printed, e.g. CG 20 10."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "primaryNonContributory": {
+         "type": "object",
+         "description": "Primary and non-contributory wording: from the ADDL INSD / SUBR WVD boxes, the description of operations, or an attached endorsement form.",
+         "properties": {
+          "present": {
+           "type": "boolean"
+          },
+          "formNumber": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Endorsement form number if printed, e.g. CG 20 10."
+          },
+          "confidence": {
+           "type": "number",
+           "minimum": 0,
+           "maximum": 1,
+           "description": "How sure you are of this row, 0-1. Defaults to 1. Set it below 0.7 if the row was hard to read, so it is routed to needs_review instead of pass or fail."
+          }
+         },
+         "required": [
+          "present"
+         ]
+        },
+        "overallConfidence": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 1,
+         "description": "How legible and complete the whole document was, 0-1. Defaults to 1. Below 0.7, a pass becomes needs_review."
+        }
+       }
+      },
+      "asOf": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Date to check expiry against, yyyy-mm-dd. Defaults to today."
+      }
+     },
+     "required": [
+      "certificate"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Check a certificate of insurance",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_requirement_presets",
+    "title": "List requirement presets",
+    "description": "The ready-made insurance requirement sets check_certificate accepts as preset: a standard construction subcontractor and a property / HOA vendor, with every limit and endorsement spelled out.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "List requirement presets",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "find_coi_guides",
+    "title": "Find certificate of insurance guides",
+    "description": "Searches CertifiKit's plain-English guides on certificates of insurance: reading an ACORD 25, additional insured endorsements (CG 20 10), waiver of subrogation, subcontractor and HOA vendor insurance requirements, COI tracking. Returns titles, summaries and links to cite. Leave query empty to list the newest.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Topic or question."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "default": 5
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Find certificate of insurance guides",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

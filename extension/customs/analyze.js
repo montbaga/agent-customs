@@ -258,24 +258,47 @@ export async function analyzeNetwork(input) {
   const ruleHits = new Map();
   const agentRuleSeen = new Set();
   for (const field of textFields) {
-    const fieldHits = field.schemaSecret && C_SECRETS_RULE
-      ? [{
+    let fieldHits;
+    if (field.schemaSecret && C_SECRETS_RULE) {
+      fieldHits = [{
+        rule: C_SECRETS_RULE,
+        ruleIdOverride: field.schemaSecret.lowNote ? "I-AUTH-DOC" : undefined,
+        severity: field.schemaSecret.lowNote ? "low" : undefined,
+        title: field.schemaSecret.lowNote ? "Authentication documented" : undefined,
+        match: field.schemaSecret.key,
+        excerpt: field.schemaSecret.path
+          ? `${field.schemaSecret.path} (parameter "${field.schemaSecret.key}")`
+          : `parameter "${field.schemaSecret.key}"${field.schemaSecret.description ? ` — ${clip(field.schemaSecret.description, 120)}` : ""}`,
+        detail: field.schemaSecret.lowNote
+          ? `Signup/configuration field "${field.schemaSecret.key}" documents service authentication.`
+          : `Schema parameter "${field.schemaSecret.key}" asks for sensitive credentials or secrets.`,
+      }];
+    } else if (field.svgInspect) {
+      fieldHits = scanText(field.text, { skipLanguage: Boolean(field.skipLanguage), targetHost: target.host });
+      if (!fieldHits.length && field.svgInnerText && field.svgInnerText.split(/\s+/).filter((w) => /\p{L}{2,}/u.test(w)).length >= 3 && C_SECRETS_RULE) {
+        fieldHits = [{
           rule: C_SECRETS_RULE,
-          match: field.schemaSecret.key,
-          excerpt: field.schemaSecret.path
-            ? `${field.schemaSecret.path} (parameter "${field.schemaSecret.key}")`
-            : `parameter "${field.schemaSecret.key}"${field.schemaSecret.description ? ` — ${clip(field.schemaSecret.description, 120)}` : ""}`,
-          detail: `Schema parameter "${field.schemaSecret.key}" asks for sensitive credentials or secrets.`,
-        }]
-      : scanText(field.text, { skipLanguage: Boolean(field.skipLanguage), targetHost: target.host });
+          ruleIdOverride: "I-SVG-TEXT",
+          severity: "medium",
+          title: "SVG image contains readable text instructions",
+          match: field.svgInnerText.slice(0, 60),
+          excerpt: clip(field.svgInnerText, 220),
+          detail: "Inline SVG data URI contains readable text; verify it is a harmless label rather than instructions aimed at the model.",
+        }];
+      }
+    } else {
+      fieldHits = scanText(field.text, { skipLanguage: Boolean(field.skipLanguage), targetHost: target.host });
+    }
     for (const hit of fieldHits) {
-      if (field.crossField && agentRuleSeen.has(`${hit.rule.id}|${field.agent || ""}`)) continue;
-      const key = `${hit.rule.id}|${field.agent || ""}|${field.field}`;
+      if (!hit) continue;
+      const ruleKey = hit.ruleIdOverride || hit.rule.id;
+      if (field.crossField && agentRuleSeen.has(`${ruleKey}|${field.agent || ""}`)) continue;
+      const key = `${ruleKey}|${field.agent || ""}|${field.field}`;
       const prev = ruleHits.get(key);
       if (prev) { prev.count += 1; continue; }
       ruleHits.set(key, { hit, field, count: 1 });
       if (field.agent && (field.field === "instructions" || field.field === "command")) {
-        agentRuleSeen.add(`${hit.rule.id}|${field.agent}`);
+        agentRuleSeen.add(`${ruleKey}|${field.agent}`);
       }
     }
   }
@@ -286,6 +309,9 @@ export async function analyzeNetwork(input) {
     return /no website_\*? ?tools[\s\S]{0,400}?\b(do not|don'?t|never)\s+ask\s+for\s+(names|emails|personal)/i.test(text);
   };
   for (const { hit, field, count } of ruleHits.values()) {
+    if (!hit) continue;
+    const isInstructionField = /instructions|command/i.test(field.field || "");
+    const effectiveRule = hit.ruleIdOverride || hit.rule.id;
     let severity = hit.severity || hit.rule.severity;
     const title = hit.title || hit.rule.title;
     const what = hit.detail || `Matched "${clip(hit.match, 60)}"${hit.language ? ` (${hit.language})` : ""}.`;
@@ -293,22 +319,25 @@ export async function analyzeNetwork(input) {
     if (hit.rule.id === "C-PERSONAL" && field.agent && peerGuarded(field.agent)) {
       severity = "low";
       detail += " It asks on its own site; its peer rule stops this when another site runs it.";
-    } else if (hit.rule.id === "C-EXEC" && !/instructions|command/i.test(field.field || "")) {
+    } else if (hit.rule.id === "C-EXEC" && !isInstructionField) {
       const directsVisitor = /\b(?:ask|tell|have|get|instruct|direct|urge)\s+(?:the\s+)?(?:visitor|user|guest|customer|client|them)\b|\b(?:visitor|user|guest|customer)\s+(?:should|must|needs?\s+to|has\s+to)\b/i.test(hit.excerpt || "");
       if (!directsVisitor) {
         severity = "medium";
         detail += " Found in tool/schema documentation rather than assistant instructions; verify it is reference docs rather than user coercion.";
       }
-    } else if (hit.rule.id === "C-EXFIL" && !/instructions|command/i.test(field.field || "")) {
+    } else if (hit.rule.id === "C-EXFIL" && !isInstructionField) {
       const ex = hit.excerpt || "";
       const hardLeak = /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex);
       if (!hardLeak) {
         severity = "medium";
         detail += " Found in a tool description referencing a configured deployment server without an embedded external URL.";
       }
+    } else if (hit.rule.id === "C-LANGUAGE" && !isInstructionField) {
+      severity = "medium";
+      detail += " Found in tool/schema documentation rather than server instructions.";
     }
-    add({ rule: hit.rule.id, category: "contraband", severity, title,
-      detail, evidence: hit.excerpt, where: { agent: field.agent, field: field.field }, why: hit.rule.why, fix: hit.rule.fix });
+    add({ rule: effectiveRule, category: "contraband", severity, title,
+      detail, evidence: hit.excerpt, where: { agent: field.agent, field: field.field }, why: hit.whyOverride || hit.rule.why, fix: hit.fixOverride || hit.rule.fix });
   }
 
   // Website tools the network names but does not publish: when it runs as a partner,
@@ -827,12 +856,31 @@ function splitIdentifier(key) {
     .trim();
 }
 
-const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|credit ?cards?|debit ?cards?|cvv2?|cvc|csc|passwords?|passcodes?|passphrases?|otp|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
+const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|credit ?cards?|debit ?cards?|cvv2?|cvc|csc|passwords?(?!\s+(?:setup|reset|change|recovery|policy)(?:\s+(?:link|url|page|token))?\b)|passcodes?|passphrases?|otp(?:\s*code)?|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
+const PASSWORD_GATE_PARAM_RE = /\b(?:password[- ]?gat(?:e|ing)|pass\s+(?:an?\s+)?empty\s+string\s+to\s+remove|optional\s+password\s+to\s+(?:protect|lock|gate)|(?:set|add|apply|enable|remove|clear)\s+(?:a|an|the|optional)?\s*password\b[^.]{0,40}\b(?:site|page|link|url|share|room|file|doc|document|pdf))\b/i;
+const LOGIN_TOOL_NAME_RE = /^(?:login|sign_?in|auth(?:enticate)?|verify_password)/i;
+const SIGNUP_FLOW_RE = /\b(?:signup|sign[- ]?up|register|onboarding|invite|verify[-_ ]?email)\b/i;
+const SENSITIVE_ACCOUNT_CONTEXT_RE = /\b(?:bank|card|atm|login|account\s+takeover|transfer|wallet|seed)\b/i;
+
+function schemaSecretMode(key, description = "", pathStr = "", contextText = "", toolName = "") {
+  const splitKey = splitIdentifier(key);
+  if (!VISITOR_SECRET_PARAM.test(splitKey)) return null;
+  if (/\breturns\b/i.test(pathStr) && /\bpasswords?\s*(?:setup|reset)?\s*(?:link|url|page)\b/i.test(splitKey)) return null;
+  const combinedDesc = `${description || ""} ${contextText || ""}`;
+  if (/\bpasswords?\b/i.test(splitKey) && PASSWORD_GATE_PARAM_RE.test(combinedDesc) && !LOGIN_TOOL_NAME_RE.test(toolName || "")) {
+    return { lowNote: true };
+  }
+  if (/\botp(?:\s*code)?\b/i.test(splitKey) && (SIGNUP_FLOW_RE.test(pathStr) || SIGNUP_FLOW_RE.test(combinedDesc)) && !SENSITIVE_ACCOUNT_CONTEXT_RE.test(combinedDesc)) {
+    return { lowNote: true };
+  }
+  return { lowNote: false };
+}
 
 const RASTER_DATA_URI_RE = /^data:image\/(?:png|jpeg|jpg|gif|webp|avif|bmp|ico|x-icon);base64,([A-Za-z0-9+/=\s]+)$/i;
 const SVG_DATA_URI_RE = /^data:image\/svg\+xml(;base64)?,([\s\S]+)$/i;
+const JWS_HEADER_KEYS = new Set(["alg", "typ", "cty", "crit", "kid", "jku", "jwk", "x5u", "x5c", "x5t", "x5t#S256"]);
 
-function isBenignImageDataUri(text) {
+function classifyImageDataUri(text) {
   const raster = text.match(RASTER_DATA_URI_RE);
   if (raster) {
     const b64 = raster[1].replace(/\s+/g, "");
@@ -840,23 +888,47 @@ function isBenignImageDataUri(text) {
       const head = typeof atob === "function"
         ? atob(b64.slice(0, 64))
         : Buffer.from(b64.slice(0, 64), "base64").toString("binary");
-      return /^\x89PNG|^\xff\xd8\xff|^GIF8|^RIFF.{4}WEBP|^BM|^\x00\x00\x01\x00/.test(head);
-    } catch {
-      return false;
-    }
+      if (/^\x89PNG|^\xff\xd8\xff|^GIF8|^RIFF.{4}WEBP|^BM|^\x00\x00\x01\x00/.test(head)) {
+        return { action: "skip" };
+      }
+    } catch { /* fall through and inspect */ }
+    return null;
   }
   const svgMatch = text.match(SVG_DATA_URI_RE);
-  if (!svgMatch) return false;
+  if (!svgMatch) return null;
   let svg = svgMatch[2].trim();
   try {
     svg = svgMatch[1]
       ? (typeof atob === "function" ? atob(svg) : Buffer.from(svg, "base64").toString("utf8"))
       : decodeURIComponent(svg);
   } catch { /* inspect raw text if malformed */ }
-  if (/<script\b|\bon[a-z]+\s*=|(?:javascript|vbscript):|foreignObject|https?:\/\/(?!www\.w3\.org\/(?:2000\/svg|1999\/xlink)\b)|font-size\s*[:=]\s*["']?0(?:px|pt|em|rem)?\b|display\s*:\s*none|visibility\s*:\s*hidden/i.test(svg)) {
+  const activeOrExternal = /<script\b|\bon[a-z]+\s*=|(?:javascript|vbscript):|foreignObject|https?:\/\/(?!www\.w3\.org\/(?:2000\/svg|1999\/xlink)\b)|font-size\s*[:=]\s*["']?0(?:px|pt|em|rem)?\b|display\s*:\s*none|visibility\s*:\s*hidden/i.test(svg);
+  const innerText = svg.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const textWords = innerText.split(/\s+/).filter((w) => /\p{L}{2,}/u.test(w)).length;
+  if (!activeOrExternal && textWords === 0 && /<svg\b/i.test(svg)) {
+    return { action: "skip" };
+  }
+  return { action: "inspectSvg", text: `${svg}\n${innerText}`, innerText };
+}
+
+function isValidJwsSignatureField(pathParts, value) {
+  const cleaned = pathParts.map((s) => cleanPathKey(s));
+  const last = cleaned[cleaned.length - 1];
+  const inSignatures = cleaned.includes("signatures") && (last === "protected" || last === "signature");
+  if (!inSignatures) return false;
+  if (!/^[A-Za-z0-9_-]{16,}={0,2}$/.test(value)) return false;
+  if (last === "signature") return true;
+  try {
+    const std = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = std + "=".repeat((4 - (std.length % 4)) % 4);
+    const json = typeof atob === "function" ? atob(padded) : Buffer.from(padded, "base64").toString("utf8");
+    const header = JSON.parse(json);
+    if (!header || typeof header !== "object" || Array.isArray(header)) return false;
+    const keys = Object.keys(header);
+    return keys.length > 0 && keys.every((k) => JWS_HEADER_KEYS.has(k) && typeof header[k] === "string");
+  } catch {
     return false;
   }
-  return /<svg\b/i.test(svg);
 }
 
 function collectSchemaProperties(node, emit, emitSecret) {
@@ -932,6 +1004,23 @@ function cleanPathKey(seg) {
   return String(seg || "").replace(/^key:/, "");
 }
 
+function getRawContextForKey(rawDoc, path, key) {
+  let cur = rawDoc;
+  let parentDesc = "";
+  let toolName = "";
+  for (let i = 0; i < path.length - 1; i += 1) {
+    if (!cur || typeof cur !== "object") return { desc: "", parentDesc, toolName };
+    cur = cur[path[i]];
+    if (cur && typeof cur === "object") {
+      if (typeof cur.name === "string") toolName = cur.name;
+      if (typeof cur.description === "string") parentDesc = cur.description;
+    }
+  }
+  const spec = cur && typeof cur === "object" ? cur[key] : null;
+  const desc = spec && typeof spec === "object" && typeof spec.description === "string" ? spec.description : "";
+  return { desc, parentDesc, toolName };
+}
+
 function collectTextFields(manifest, config, rawDoc = null) {
   const out = [];
   const seenExact = new Set();
@@ -939,9 +1028,18 @@ function collectTextFields(manifest, config, rawDoc = null) {
     if (typeof text !== "string") return;
     const trimmed = text.trim();
     if (!trimmed) return;
-    if (!extra.schemaSecret && isBenignImageDataUri(trimmed)) return;
+    let payloadText = text;
+    let svgExtra = {};
+    if (!extra.schemaSecret) {
+      const img = classifyImageDataUri(trimmed);
+      if (img?.action === "skip") return;
+      if (img?.action === "inspectSvg") {
+        payloadText = img.text;
+        svgExtra = { svgInspect: true, svgInnerText: img.innerText, skipLanguage: true };
+      }
+    }
     const autoSkipLang = !/\n/.test(trimmed) && (TAG_LINE_RE.test(trimmed) || isPipeTagList(trimmed));
-    out.push({ text, field, agent, ...extra, skipLanguage: Boolean(extra.skipLanguage || autoSkipLang) });
+    out.push({ text: payloadText, field, agent, ...extra, ...svgExtra, skipLanguage: Boolean(extra.skipLanguage || svgExtra.skipLanguage || autoSkipLang) });
     if (!extra.crossField) seenExact.add(trimmed);
   };
   const pushSchemaWalk = (root, fieldName, agentName) => {
@@ -972,14 +1070,26 @@ function collectTextFields(manifest, config, rawDoc = null) {
     collectSchemaProperties(
       agent.function?.parameters,
       (text) => push(text, "parameters", agent.name, { crossField: true, skipLanguage: true }),
-      (key, description) => push(key, "parameters", agent.name, { crossField: true, skipLanguage: true, schemaSecret: { key, description } }),
+      (key, description) => {
+        const mode = schemaSecretMode(key, description, "parameters", agent.function?.description || "", agent.name);
+        if (!mode) return;
+        push(key, "parameters", agent.name, {
+          crossField: true,
+          skipLanguage: true,
+          schemaSecret: { key, description, lowNote: mode.lowNote },
+        });
+      },
     );
     if (agent.outputSchema && typeof agent.outputSchema === "object") {
       pushSchemaWalk(agent.outputSchema, "outputSchema", agent.name);
       collectSchemaProperties(
         agent.outputSchema,
         (text) => push(text, "outputSchema", agent.name, { crossField: true, skipLanguage: true }),
-        (key, description) => push(key, "outputSchema", agent.name, { crossField: true, skipLanguage: true, schemaSecret: { key, description } }),
+        (key, description) => {
+          const mode = schemaSecretMode(key, description, "outputSchema", agent.function?.description || "", agent.name);
+          if (!mode || mode.lowNote) return;
+          push(key, "outputSchema", agent.name, { crossField: true, skipLanguage: true, schemaSecret: { key, description } });
+        },
       );
     }
   }
@@ -997,13 +1107,17 @@ function collectTextFields(manifest, config, rawDoc = null) {
       const rawPath = path.map(cleanPathKey).join(".");
       if (typeof last === "string" && last.startsWith("key:")) {
         if (VISITOR_SECRET_PARAM.test(splitIdentifier(text))) {
-          push(text, rawPath, null, { skipLanguage: true, schemaSecret: { key: text, path: rawPath } });
+          const ctx = getRawContextForKey(rawDoc, path, text);
+          const mode = schemaSecretMode(text, ctx.desc, rawPath, ctx.parentDesc, ctx.toolName);
+          if (!mode) return;
+          push(text, rawPath, null, { skipLanguage: true, schemaSecret: { key: text, path: rawPath, lowNote: mode.lowNote } });
         }
         return;
       }
       if (RAW_SKIP_KEYS.has(String(last || ""))) return;
       const trimmed = String(text || "").trim();
       if (!trimmed || /^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(trimmed) || seenExact.has(trimmed)) return;
+      if (isValidJwsSignatureField(path, trimmed)) return;
       const skipLanguage = path.some((seg) => RAW_LANG_SKIP_KEYS.has(cleanPathKey(seg)));
       push(trimmed, `rawDoc.${rawPath}`, null, { skipLanguage });
     });

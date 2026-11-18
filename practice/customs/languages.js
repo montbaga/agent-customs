@@ -377,6 +377,26 @@ function looksLikeList(sentence) {
   return separators >= 2 && items.every((item) => item.split(/\s+/).length <= 4);
 }
 
+function extractProse(sentence) {
+  // "I'm", "don't", "we're": the ending is part of an English word, not a word of its own.
+  const cleaned = sentence.replace(NOT_WORDS, " ").replace(/'(?:m|s|t|re|ve|ll|d)\b/gi, "");
+  const prose = cleaned.split(/\s+/).map((c) => c.replace(OUTER_PUNCT, "")).filter((c) => c && !CODE_CHUNK.test(c)).join(" ");
+  const tokens = [...prose.matchAll(LATIN_WORD)].map((m) => m[0]);
+  return { cleaned, tokens, latin: tokens.map((w) => w.toLowerCase()) };
+}
+
+function stripInlineExamples(sentence) {
+  let out = sentence.replace(/\([^()\n]{1,60}\)/g, (m) => {
+    const words = m.slice(1, -1).trim().split(/\s+/).filter(Boolean);
+    return words.length <= 5 ? " " : m;
+  });
+  out = out.replace(/"[^"\n]{1,40}"|'[^'\n]{1,40}'|«[^»\n]{1,40}»/g, (m) => {
+    const words = [...m.slice(1, -1).matchAll(LATIN_WORD)];
+    return words.length <= 2 ? " " : m;
+  });
+  return out;
+}
+
 /**
  * The language a sentence is written in, when it is not clearly English.
  *
@@ -395,11 +415,7 @@ function looksLikeList(sentence) {
  * :return: The language's name, or null for English or too little text to tell.
  */
 export function otherLanguageOf(sentence) {
-  // "I'm", "don't", "we're": the ending is part of an English word, not a word of its own.
-  const text = sentence.replace(NOT_WORDS, " ").replace(/'(?:m|s|t|re|ve|ll|d)\b/gi, "");
-  const prose = text.split(/\s+/).map((c) => c.replace(OUTER_PUNCT, "")).filter((c) => c && !CODE_CHUNK.test(c)).join(" ");
-  const tokens = [...prose.matchAll(LATIN_WORD)].map((m) => m[0]);
-  const latin = tokens.map((w) => w.toLowerCase());
+  let { cleaned: text, tokens, latin } = extractProse(sentence);
   let best = null;
   for (const script of SCRIPTS) {
     const letters = (sentence.match(script.re) || []).length;
@@ -410,6 +426,22 @@ export function otherLanguageOf(sentence) {
   // Japanese mixes kana with Chinese characters: any kana makes it Japanese.
   if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
   if (best && best.units >= 3) return best.name;
+
+  // If short parenthetical glosses (<= 5 words) or short quoted examples (<= 2 words) sit
+  // inside a clearly ASCII English phrase, judge the outer English sentence rather than its glosses.
+  const withoutExamples = stripInlineExamples(sentence);
+  if (withoutExamples !== sentence) {
+    const outer = extractProse(withoutExamples);
+    const outerLatinStr = outer.latin.join("");
+    if (outer.latin.length >= 3 && !/[^\x00-\x7f]/.test(outerLatinStr)) {
+      const outerEngKnown = outer.latin.filter((w) => ENGLISH.has(w) || isEnglishWord(w)).length;
+      const outerCandidates = [...new Set(outer.tokens.filter((w) => !/^\p{Lu}{2,}$/u.test(w)).map((w) => w.toLowerCase()))];
+      const maxOuterForeign = LATIN_WORDS.reduce((m, [, set]) => Math.max(m, outerCandidates.filter((w) => set.has(w)).length), 0);
+      if (outerEngKnown >= 1 && maxOuterForeign < 2) {
+        ({ cleaned: text, tokens, latin } = outer);
+      }
+    }
+  }
   const english = latin.filter((w) => STRONG_ENGLISH.has(w)).length;
   const candidateWords = [...new Set(tokens.filter((w) => !/^\p{Lu}{2,}$/u.test(w)).map((w) => w.toLowerCase()))];
   let top = null;

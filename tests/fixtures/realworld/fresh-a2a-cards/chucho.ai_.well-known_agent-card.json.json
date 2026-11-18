@@ -1,0 +1,88 @@
+{
+ "url": "https://chucho.ai/.well-known/agent-card.json",
+ "doc": {
+  "name": "Chucho property discovery",
+  "description": "Chucho helps travelers find where to stay and book directly with the host. Find published vacation rentals by describing the trip (semantic vibe search) or with structured filters, and read host-approved facts. Public host stay quotes; no bookings or private guest data.",
+  "supportedInterfaces": [
+   {
+    "url": "https://chucho.ai/api/public/v1/a2a",
+    "protocolBinding": "JSONRPC",
+    "protocolVersion": "1.0"
+   }
+  ],
+  "version": "1.0.0",
+  "documentationUrl": "https://chucho.ai/agents.md",
+  "provider": {
+   "organization": "Chucho",
+   "url": "https://chucho.ai"
+  },
+  "capabilities": {
+   "streaming": false,
+   "pushNotifications": false,
+   "extendedAgentCard": false
+  },
+  "defaultInputModes": [
+   "application/json"
+  ],
+  "defaultOutputModes": [
+   "application/json"
+  ],
+  "skills": [
+   {
+    "id": "get_stay_estimate",
+    "name": "Find a price for flexible dates",
+    "description": "Find a dated price example for a published home when travel dates are flexible and the traveler supplied windowStart/windowEnd, nights and guests. Ask for missing details before requesting or showing any price; never substitute a default party or stay. Use the returned stayQuote.estimate to join a pending sample search. Checks at most four stays inside windowStart/windowEnd, through supported public readers only; narrow windows try weekly samples and broad windows try upcoming months. Preserve any requested flexible month or range. Nights, guests and currency stay fixed. Returns the actual selected request and quote; a sample never proves availability for other dates or the lowest price. If no suitable stay is found, quote is null and overall availability is unknown; diagnostics retain the attempted-stay count and last observed reason. Do not retry a completed unsupported host or upstream failure unchanged. When price is requested, finish checks for at most three promising shortlisted homes; do not check every card. Explicit travel dates must use get_stay_quote instead. Optional startingNightlyPrice is an advertised nightly starting rate only, with no confirmed dates, guest basis, fees or taxes; never multiply it into a stay total. No booking, payment or guest contact details.",
+    "tags": [
+     "properties",
+     "quotes",
+     "flexible-dates"
+    ]
+   },
+   {
+    "id": "get_stay_quote",
+    "name": "Check stay dates and pricing",
+    "description": "Check dates and total pricing on a published property's public host website. Send its property id, arrival/departure (YYYY-MM-DD) and guests; no guest contact or card details. Availability may be unknown even when a price is returned. Optional startingNightlyPrice is an advertised starting nightly rate, separate from price.total; never multiply it into a stay total or infer dates, party, fees or tax coverage. partyBasis:all_adults means every occupant was priced as an adult; disclose that assumption, since no reader prices child ages yet (children/childAges are retained only). Optional terms carry only the cancellation/payment details the host booking system returned, with provenance; an absent terms object or field is unknown, never free cancellation or no deposit, so tell the traveler to confirm terms with the host. Inspect reason, price.completeness, actual currency, checkedAt and expiresAt. Optional execution:browser requests the experimental selected-home browser agent on reviewed Stays sites and may take up to two minutes including source discovery; omit it for fast automatic execution. Search never starts this agent. Recent matching quotes may be reused until expiry; a pending search check is joined rather than repeated. The host may create an expiring anonymous price draft. A quote never reserves or confirms a booking; held is always false. Unsupported/protected sites return unknown. No host integration or credentials are required.",
+    "tags": [
+     "properties",
+     "quotes"
+    ]
+   },
+   {
+    "id": "get_filters",
+    "name": "Discover filters",
+    "description": "Discover public organization names/slugs, geographic area hierarchy with available ISO countries and counts, live place keys, feature keys and amenity counts for currently published properties.",
+    "tags": [
+     "properties",
+     "filters"
+    ],
+    "examples": [
+     "{\"action\":\"get_filters\"}"
+    ]
+   },
+   {
+    "id": "search_properties",
+    "name": "Search properties",
+    "description": "Search currently published properties. Use geographicArea for continents/subregions returned by get_filters(kind:geography), countries for an explicit ISO country union, and country/region/city for specific destinations. Filters combine with AND; unknown or hidden facts never satisfy a filter. Use organization with a returned organization.slug for its entire portfolio, or relatedTo with a published property ID for other homes from that organization, same locality first. Optional quoteMode:exact with arrival, departure and guests adds host availability/prices; quoteMode:estimate with explicit flexible bounds, nights and guests adds a labeled sample stay found across up to four near-term/future-month windows (explicit window, nights and guests required). Quote enrichment waits at most 2.5 seconds, may be pending/not_checked/limited, and does not filter or rank homes by availability. Use get_stay_estimate with stayQuote.estimate to finish a flexible sample, or get_stay_quote with stayQuote.request for exact dates. Unknown is not available; a sample is not availability for the traveler's actual dates. Inspect actual currency, completeness, checkedAt and expiresAt. Quotes reserve nothing. Omit quoteMode for pure catalog discovery.Price requests require a supplied party size and stay context. Exact dates use arrival/departure/guests. Flexible travel uses quoteMode:estimate with explicit estimateWindowStart/estimateWindowEnd, estimateNights and guests; resolve a supplied month into bounds and ask only for missing details before requesting or displaying any price. A brief clarification may come before catalog search; budget is optional in the same question. With sufficient inputs, complete bounded shortlisted checks without asking permission. Without these inputs, discover homes without quoteMode; a returned rateEstimate may still be mentioned as a labelled rough nightly estimate (for a supplied month, that month's nightlyTypical; otherwise from the lowest), never as a stay total, a quote, availability or a confirmed budget match. Never invent dates, stay length or party size. When price is requested, first inspect already-ready quotes on the displayed cards (render_properties prices its cards when searchContext carries quoteMode; displayedPropertyIds identifies inline search cards when supplied). Join pending checks for promising displayed homes before starting not_checked homes or off-screen alternatives, using the returned request or estimate. Make at most three follow-up checks in total; never check every card. A pending search quote can finish independently in the cards, so resolve selected pending checks before giving a budget conclusion. Compare confirmed available, complete stay totals in the requested currency against the budget; do not reject a supported match. When a supported budget match is found, recommend it with any material qualification; omit failed or unchecked alternatives unless a comparison is requested. If no match is confirmed and selected checks remain unresolved, say that briefly rather than claiming no home fits the budget or is available. Make status claims per returned quote evidence; never blanket-label other cards unchecked or unavailable, since they update separately. Inspect terminal ready failures and sample diagnostics internally; briefly state only material unknown price or availability, and stop unchanged retries. Catalog totals count matching published homes, never confirmed available or affordable homes. Sample diagnostic reasons describe attempted stays only, never the whole window.",
+    "tags": [
+     "properties",
+     "search"
+    ],
+    "examples": [
+     "{\"action\":\"search_properties\",\"filters\":{\"guests\":6,\"pool\":\"private\"}}"
+    ]
+   },
+   {
+    "id": "get_property",
+    "name": "Read property facts",
+    "description": "Read a currently published property's approved facts and host booking link. Unpublished properties return 404 immediately. This compact record does not include every retained source used by semantic search; a missing detail field does not contradict a source-cited assessment. When semantic search is available, reassess source- or photo-based trip fit by calling search_properties with semantic and reassessPropertyIds, preserving the current needs. Source claims remain attributed interpretations, not independently verified facts.",
+    "tags": [
+     "properties",
+     "facts"
+    ],
+    "examples": [
+     "{\"action\":\"get_property\",\"id\":\"an-id-returned-by-search\"}"
+    ]
+   }
+  ]
+ }
+}
