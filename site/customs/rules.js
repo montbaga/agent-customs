@@ -29,7 +29,7 @@ export const INLINE_ROLE_OVERRIDE_RE = new RegExp([
 ].join("|"), "i");
 
 // "Password reset" or "password manager" is not the password itself.
-const SECRET = /\b(passwords?(?![- ]?(?:reset|recovery|manager|managers|policy|policies|requirements?|rules?|strength|tips?|hints?|change|changes|page|link|links|form|field|guide|help|expired?|expiry|protected)\b)|pass ?codes?|pass ?phrases?|one[- ]time (?:pass)?codes?|otps?|(?:2fa|two[- ]factor|mfa)(?:\s+backup)? codes?|(?:backup|recovery|verification) codes?|security (?:codes?|digits?|answers?|questions?)|secret (?:questions?|answers?|codes?|pins?|phrases?|words?)|mother'?s maiden name|maiden name|first pet(?:'?s)? name|childhood street|first school|card ?numbers?|(?:credit|debit|payment|bank) ?card (?:numbers?|digits?|numerals?|details|info(?:rmation)?)|card (?:digits?|numerals?|details|info(?:rmation)?)|card\s*#|cc\s*#|card no\.?|payment (?:details|info(?:rmation)?)|billing (?:details|info(?:rmation)?)|cvv2?|cvc|csc|social security(?: numbers?)?|ssn|seed phrases?|recovery phrases?|mnemonic phrases?|(?:12|twelve|15|fifteen|18|eighteen|21|twenty[- ]?one|24|twenty[- ]?four)[- ]+(?:secret|recovery|seed|backup|mnemonic|wallet|pass)\s+words\b|(?:wallet|seed|mnemonic|recovery|backup)\s+(?:backup|recovery)\s+(?:cards?|words?|phrases?|codes?)|private keys?|api keys?|(?:access|auth(?:entication)?|session|bearer|refresh|verification|security|secret) tokens?|secret keys?|login (?:details|credentials|secrets?|info(?:rmation)?)|sign-?in (?:details|credentials|secrets?|info(?:rmation)?)|(?:online|internet|mobile|web)?\s*bank(?:ing)? (?:login|log-?in|details|credentials|passphrases?|passcodes?|passwords?|secrets?|info(?:rmation)?|usernames?)|session cookies?)\b|\bcc#/i;
+const SECRET = /\b(passwords?(?![- ]?(?:reset|recovery|manager|managers|policy|policies|requirements?|rules?|strength|tips?|hints?|change|changes|page|link|links|form|field|guide|help|expired?|expiry|protected)\b)|pass ?codes?|pass ?phrases?|one[- ]time (?:pass)?codes?|otps?|(?:2fa|two[- ]factor|mfa)(?:\s+backup)? codes?|(?:backup|recovery|verification) codes?|security (?:codes?|digits?|answers?|questions?)|secret (?:questions?|answers?|codes?|pins?|phrases?|words?)|mother'?s maiden name|maiden name|first pet(?:'?s)? name|childhood street|first school|card ?numbers?|(?:credit|debit|payment|bank) ?card (?:numbers?|digits?|numerals?|details|info(?:rmation)?)|card (?:digits?|numerals?|details|info(?:rmation)?)|(?:credit|debit|payment|bank)\s+card\s*#|card\s*#(?!\s*[a-z]+-)|cc\s*#|card no\.?|payment (?:details|info(?:rmation)?)|billing (?:details|info(?:rmation)?)|cvv2?|cvc|csc|social security(?: numbers?)?|ssn|seed phrases?|recovery phrases?|mnemonic phrases?|(?:12|twelve|15|fifteen|18|eighteen|21|twenty[- ]?one|24|twenty[- ]?four)[- ]+(?:secret|recovery|seed|backup|mnemonic|wallet|pass)\s+words\b|(?:wallet|seed|mnemonic|recovery|backup)\s+(?:backup|recovery)\s+(?:cards?|words?|phrases?|codes?)|private keys?|api keys?|(?:access|auth(?:entication)?|oauth|personal\s+access|session|bearer|refresh|verification|security|secret|api|github|gitlab|slack|stripe|discord|openai|anthropic|aws|google|azure) tokens?|secret keys?|login (?:details|credentials|secrets?|info(?:rmation)?)|sign-?in (?:details|credentials|secrets?|info(?:rmation)?)|(?:online|internet|mobile|web)?\s*bank(?:ing)? (?:login|log-?in|details|credentials|passphrases?|passcodes?|passwords?|secrets?|info(?:rmation)?|usernames?)|session cookies?)\b|\bcc#/i;
 // Card and bank details described rather than named: "the 16 digits on the front of
 // their card", "the login they use for online banking", "the long number embossed on their Visa".
 const CARD_TARGET = /(?:(?:credit|debit|bank|payment)\s+)?(?:card|visa|mastercard|amex|american\s+express|discover|maestro|unionpay|plastic)/.source;
@@ -76,7 +76,7 @@ const PERSONAL = /\b(full names?|e-?mail(?: address(?:es)?)?|phone numbers?|mobi
 // assistant is told to repeat.
 const VISITOR_NOUN = /(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|them|him|her)/.source;
 const ASK = new RegExp([
-  `\\b(?<!\\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\\s+)(ask(?:s|ing)?|(?<!\\b(?:a|an|the|each|every|any|your|their|this|that|his|her|our|its|no|mcp|api|http|https|rpc|json|network|web|tool|pull|support|get|post|put|patch|delete|inbound|outbound|incoming|outgoing|initial|next|first|second|same|single|follow-?up)\\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|upload|forward|relay|photograph|screenshot|read (?:back|out|you|me|us)|tell (?:me|us)|what (?:is|was) (?:your|their|the name of)|find out (?:what|which|their|your|his|her)|(?:needs?|requires?)(?:ing)? (?:your|their|his|her|(?:the\\s+)?${VISITOR_NOUN}'?s?)|(?:give|send|provide|share|enter|type|submit|get|dictate|paste|whisper|spell(?: out)?|upload|forward|screenshot)(?:\\s+\\w+){0,2}?\\s+(?:us|me|here|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+(?:to\\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell(?: out)?|provide|confirm|write|submit|key in|dictate|whisper|speak|state|mention|hand over|repeat|upload|forward|list|photograph|screenshot))\\b`,
+  `\\b(?<!\\b(?:visitors?|users?|customers?|guests?|callers?|clients?|people|person|someone|somebody|anyone|anybody|everyone|they|he|she|who|is|are|was|were)\\s+)(ask(?:s|ing)?|(?<!\\b(?:by|on|upon|a|an|the|each|every|any|your|their|this|that|his|her|our|its|no|mcp|api|http|https|rpc|json|network|web|tool|pull|support|get|post|put|patch|delete|inbound|outbound|incoming|outgoing|initial|next|first|second|same|single|follow-?up)\\s+)request(?:s|ing)?|collect(?:s|ing)?|obtain(?:s|ing)?|gather(?:s|ing)?|capture|confirm|verify|upload|forward|relay|photograph|screenshot|read (?:back|out|you|me|us)|tell (?:me|us)|what (?:is|was) (?:your|their|the name of)|find out (?:what|which|their|your|his|her)|(?:needs?|requires?)(?:ing)? (?:your|their|his|her|(?:the\\s+)?${VISITOR_NOUN}'?s?)|(?:give|send|provide|share|enter|type|submit|get|dictate|paste|whisper|spell(?: out)?|upload|forward|screenshot)(?:\\s+\\w+){0,2}?\\s+(?:us|me|here|your|their|his|her)|(?:have|having|get|getting|make|making|let|letting)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+(?:to\\s+)?(?:read|type|enter|say|tell|give|send|share|paste|spell(?: out)?|provide|confirm|write|submit|key in|dictate|whisper|speak|state|mention|hand over|repeat|upload|forward|list|photograph|screenshot))\\b`,
   /\b(?:must|should|has\s+to|have\s+to|needs?\s+to|will)\s+(?:tell|give|send|read|type|share|provide|confirm|show|spell|upload|forward|photograph|screenshot|let\s+(?:you|us|me)\s+know|hand\s+over)\b/.source,
   /\bmake\s+sure\s+(?:to\s+(?:ask|get|obtain|collect|gather|request|verify|confirm|check|read|take|note)|you\s+(?:ask|get|obtain|collect|gather|have)|(?:the\s+)?(?:visitor|user|customer|guest|client|they)\s+(?:gives?|shares?|sends?|enters?|types?|provides?|tells?|reads?|submits?|uploads?|forwards?|photographs?))\b/.source,
   /\b(?:ask|request|require|insist|ensure)\s+that\s+(?:they|the\s+(?:visitor|user|customer|guest|client))\s+(?:type|enter|give|send|share|provide|tell|read|dictate|paste|submit|confirm|verify|reply|upload|forward|list|screenshot|photograph)\b/.source,
@@ -91,6 +91,7 @@ const ASK_SECRET_DIRECT = new RegExp([
   /\b(?<!\b(?:tries?|trying|try|want|wants|asked|asks|how|used|use)\s+to\s+)(?:enter|type|input|key\s+in|paste|dictate|spell(?:\s+out)?|read\s+(?:out|back)|submit)\s+(?:all\s+(?:of\s+)?)?the\b/.source,
   `\\bcheck\\s+(?:the\\s+|your\\s+|their\\s+|his\\s+|her\\s+)(?:(?:${VISITOR_NOUN}'?s?)\\s+)?`,
   `\\b(?:output|print|dump|reveal|expose|extract|repeat|echo)\\s+(?:all\\s+(?:of\\s+)?)?(?:(?:the|your|their|${VISITOR_NOUN}'?s?|currently|logged[- ]?in|active|saved|stored)\\s+){1,4}`,
+  `\\b(?:send|pass|forward|relay|attach|include|upload|share|give|transmit)\\s+(?:all\\s+(?:of\\s+)?)?(?:(?:the|their|your)\\s+)?${VISITOR_NOUN}(?:'s?|s')\\s+`,
   `\\b(?:tell|instruct|ask|have|get|direct|urge)\\s+(?:the\\s+)?${VISITOR_NOUN}\\s+to\\s+(?:\\w+\\s+){1,3}(?:your|their|his|her|the)\\b`,
   /\b(?:enter|type|input|key\s+in|paste|dictate|submit)\s+(?=(?:cvv2?|cvc|csc|otp|pin|passwords?|passcodes?|passphrases?|ssn|iban)\b)/.source,
 ].join("|"), "i");
@@ -98,7 +99,7 @@ const ASK_SECRET_DIRECT = new RegExp([
 // the back of their card", "Note down their PIN". It counts only when the secret follows
 // within a few words, so "Take care never to ask for passwords" does not.
 const TAKE = /^\s*(?:(?:please|now|then|also|first|next|just)\s+)?(?:get|grab|take|note\s+down|write\s+down|copy\s+down|copy|record|fetch|find\s+out)\s+/i;
-const NEGATION = /\b(never|not|no|don'?t|do not|must not|mustn'?t|cannot|can'?t|won'?t|refuse to|avoid|without)\b(?!\s+(?:forget|fail|neglect|hesitate|only|matter|later than))/i;
+const NEGATION = /\b(never|not|no|don'?t|do not|must not|mustn'?t|cannot|can'?t|won'?t|refuse to|avoid|without)\b(?!\s+(?:forget|fail|neglect|hesitate|only|matter|later than))|\b(?:nobody|no\s+one)(?=\s+(?:can|could|may|might|will|shall|would|should|is\s+(?:able|allowed|permitted)|ever|else)\b)/i;
 
 // Split into clauses: sentences, and the halves of "..., but ..." or "...; then ..."
 // or conditional exceptions ("... unless ..., in which case ...").
@@ -188,9 +189,11 @@ const PRIVATE_SLOT = "[a-z_ ]*(?:conversation|chat|history|messages?|transcript|
 
 const OUR_PERSONAL_INFO = /\b(?:our|the\s+(?:store|shop|bakery|company|business|restaurant|office|hotel|support|service|site)(?:'s)?)\s+(?:\w+\s+){0,2}$/i;
 
-const HTTP_AUTH_HEADER_DOC_RE = /\b(?:authorization\s*:\s*bearer|cookie\s+header|header\s+on\s+(?:the\s+|each\s+|an?\s+)?(?:mcp|http|https|api)\s+request|bearer\s+(?:header|token)\s+(?:in|as)\s+(?:the\s+)?authorization)\b/i;
-const HUMAN_OR_CHAT_LEAK_RE = /\b(?:visitors?|customers?|guests?|chat\s+history|conversation|transcript|system\s+prompt|(?:user|visitor|customer|guest)'?s?\s+(?:last\s+)?messages?|sly_data|\.ssh|id_rsa|credit\s*card|card\s*number|cvv2?|cvc|passwords?|passcodes?|passphrases?|pins?|otps?|seed\s+phrases?|(?:user|visitor|customer|guest)'?s?\s+(?:session|cookie|token|key|credential|secret|data))\b/i;
-const HEADER_CREDENTIAL_TERM_RE = /\b(?:api keys?|(?:access|auth(?:entication)?|session|bearer|refresh)\s+tokens?|session cookies?|secret keys?)\b/i;
+const HTTP_AUTH_HEADER_DOC_RE = /\b(?:authorization\s*:\s*bearer|x-api-key(?:\s+header)?|cookie\s+header|header\s+on\s+(?:the\s+|each\s+|an?\s+)?(?:mcp|http|https|api)\s+request|bearer\s+(?:header|token)\s+(?:in|as)\s+(?:the\s+)?authorization|api[- ]?keys?\s+(?:in|via|as)\s+(?:the\s+)?['"`]?[a-z0-9_-]{3,}['"`]?\s+header|pass\s+(?:your|the|an?)\s+(?:api[- ]?key|token)\s+(?:in|via|as)\s+(?:the\s+)?['"`]?[a-z0-9_-]{3,}['"`]?\s+header)\b/i;
+const HUMAN_OR_CHAT_LEAK_RE = /\b(?:(?:user|visitor|customer|guest|human)'(?:s)?\b|visitors?|customers?|guests?|chat\s+history|conversation|transcript|system\s+prompt|sly_data|\.ssh|id_rsa|credit\s*card|card\s*number|cvv2?|cvc|passwords?|passcodes?|passphrases?|pins?|otps?|seed\s+phrases?|other[- ]site|third[- ]party|bank(?:ing)?|financial|github|gitlab|twitter|gmail|aws|azure|stripe|paypal|callrail|slack|discord|openai|anthropic|shopify|salesforce)\b/i;
+const HEADER_CREDENTIAL_TERM_RE = /\b(?:api keys?|(?:access|auth(?:entication)?|oauth|personal\s+access|session|bearer|refresh)\s+tokens?|session cookies?|secret keys?)\b/i;
+const OWN_EMAIL_CODE_DOC_RE = /\b(?:(?:action|step|mode)\s+['"]?(?:signup|register|confirm|verify|request|invite|link_or_create|reveal_key)['"]?[^.!?\n]{0,70}\b(?:e-?mails?|sends?|code|otp|confirm)\b|when\s+step\s*=\s*confirm\b|(?:sends?|e-?mails?|delivers?)\s+(?:(?:the\s+|an?\s+)?(?:owner|member|recipient|invited(?:\s+address)?|applicant|registrant)\s+)?(?:one\s+)?e-?mail\s+with\s+(?:an?\s+)?(?:\d+[- ]digit\s+|emailed\s+)?(?:verification\s+|confirmation\s+)?(?:code|otp)\b|creates?\s+(?:a\s+)?(?:fresh|new)\s+(?:tenant|account|workspace)[^.!?\n]{0,40}\b(?:otp|code)\b|(?:e-?mails?|sends?)\s+(?:an?\s+)?(?:\d+[- ]digit\s+)?(?:verification\s+|confirmation\s+)?(?:code|otp)\s+to\s+(?:the\s+)?(?:invited|owner|registrant)\s+(?:e-?mail|address)\b|(?:confirm|verify)\s+(?:step|action)\s+(?:with|after|using)\s+(?:that|the)\s+(?:code|otp)\b|(?:send|request)\s+otp\s+e-?mail\b|otp\s+confirmation\s+step\b|verify\s+by\s+emailed\s+otp\b)/i;
+const EMAIL_CODE_PHISH_RE = /\b(?:visitors?|guests?|callers?|customers?|bank(?:ing)?|credit\s*card|debit\s*card|card\s*number|cvv|payment|transfer|wire|whatsapp|telegram|signal|sms|text\s+message|phone|passwords?|passcodes?|passphrases?|pins?|ssn|login|sign-?in|read\s+(?:it\s+)?back|tell\s+(?:me|us)|ask\s+(?:the\s+)?(?:user|visitor))\b/i;
 const VISITOR_LEAK_SLOT_RE = /\b(?:conversation|chat(?:\s+history|\s+log|\s+so\s+far)?|message\s+history|previous\s+messages|(?:user|visitor|customer|guest)'?s?\s+messages|transcript|system\s+prompt|hidden\s+instructions|sly_data|private\s+context|credit\s*cards?|card\s*numbers?|cvv2?|cvc|passwords?|passcodes?|passphrases?|otps?|pins?|ssn|iban|seed\s+phrases?|recovery\s+phrases?|cookies?|api[_ ]keys?|access[_ ]tokens?|session[_ ]tokens?|auth[_ ]tokens?|secret[_ ]keys?|private[_ ]keys?|(?:user|visitor|personal)[_ ](?:data|details|info))\b/i;
 
 function hasOffOriginUrl(text, targetHost = "") {
@@ -228,6 +231,13 @@ function isHttpHeaderAuthDoc(clause, targetHost = "") {
   return !hasOffOriginUrl(clause, targetHost);
 }
 
+function isOwnServiceEmailCodeFlow(clause, term) {
+  const isApiKeyWithOtp = /^api keys?$/i.test(term) && /(?:verify\s+by\s+emailed\s+otp|bound\s+session|email=\s*\+\s*code=)/i.test(clause);
+  const isCodeTerm = /(?:otps?|(?:\d+|six|eight|four)[- ]digit\s+(?:code|pin)|(?:verification|confirmation|one[- ]time|backup)\s+codes?)/i.test(term);
+  if (!isApiKeyWithOtp && !isCodeTerm) return false;
+  return OWN_EMAIL_CODE_DOC_RE.test(clause) && !EMAIL_CODE_PHISH_RE.test(clause);
+}
+
 function askMatcher(...termRes) {
   const allowDirectSecret = termRes.includes(SECRET);
   const checkOurInfo = termRes.includes(PERSONAL);
@@ -238,17 +248,30 @@ function askMatcher(...termRes) {
       if (!term) continue;
       if (checkOurInfo && OUR_PERSONAL_INFO.test(clause.slice(0, term.index))) continue;
       if (allowDirectSecret && HEADER_CREDENTIAL_TERM_RE.test(term[0]) && isHttpHeaderAuthDoc(clause, targetHost)) continue;
+      const emitHit = () => {
+        if (allowDirectSecret && isOwnServiceEmailCodeFlow(clause, term[0])) {
+          hits.push({
+            ruleIdOverride: "I-AUTH-DOC",
+            severity: "low",
+            title: "Authentication documented",
+            match: term[0],
+            excerpt: clause,
+          });
+          return;
+        }
+        hits.push({ match: term[0], excerpt: clause });
+      };
       const verb = governingVerb(clause, term.index, allowDirectSecret ? ASK_SECRET_DIRECT : null);
       if (verb) {
         if (negatedBefore(clause, verb.index) || describedBefore(clause, verb.index)) continue;
         if (negatedBetween(clause, verb.index + verb[0].length, term.index)) continue;
-        hits.push({ match: term[0], excerpt: clause });
+        emitHit();
         continue;
       }
       const take = clause.match(TAKE);
       const gap = take ? clause.slice(take[0].length, term.index) : "";
       if (take && term.index >= take[0].length && gap.length <= 40 && !NEGATION.test(gap)) {
-        hits.push({ match: term[0], excerpt: clause });
+        emitHit();
       }
     }
     return hits;
@@ -379,7 +402,7 @@ export const TEXT_RULES = [
         // "Place the order without bothering them with confirmation." Approval from someone
         // else ("book rooms without approval") does not count, and neither does "without
         // asking the visitor for a deposit", which is about the deposit.
-        /\b(?:place|make|submit|complete|confirm|finali[sz]e|process|buy|purchase|order|pay|book|transfer|subscribe|renew|upgrade|check\s*out|checkout)\b[^.!?\n]{0,80}?\bwithout\s+(?:(?:any\s+)?(?:confirmation|confirming|consent)\b(?!\s+(?:e-?mails?|messages?|numbers?|codes?|pages?|screens?|letters?|texts?)\b)|(?:their|his|her|the\s+(?:user|visitor|customer|buyer|person)'?s?)\s+(?:confirmation|consent|permission|approval|ok|okay|say-so|agreement|knowledge)\b|(?:\w+\s+)?(?:asking|checking\s+with|bothering|telling|consulting|troubling|informing|notifying)\s+(?:them|him|her|the\s+(?:user|visitor|customer|person|human|buyer))\b(?!\s+(?:for|about)\b))/i,
+        /\b(?:place|make|submit|complete|confirm\s+(?:\w+\s+){0,2}?(?:order|purchase|payment|booking|reservation|checkout|transaction|transfer|wire|subscription|renewal|upgrade)|finali[sz]e|process|buy|purchase|order|pay|book|transfer|subscribe|renew|upgrade|check\s*out|checkout)\b[^.!?\n]{0,80}?\bwithout\s+(?:(?:any\s+)?(?:confirmation|confirming|consent)\b(?!\s+(?:e-?mails?|messages?|numbers?|codes?|pages?|screens?|letters?|texts?)\b)|(?:their|his|her|the\s+(?:user|visitor|customer|buyer|person)'?s?)\s+(?:confirmation|consent|permission|approval|ok|okay|say-so|agreement|knowledge)\b|(?:\w+\s+)?(?:asking|checking\s+with|bothering|telling|consulting|troubling|informing|notifying)\s+(?:them|him|her|the\s+(?:user|visitor|customer|person|human|buyer))\b(?!\s+(?:for|about)\b))/i,
         /\b(?:proceed\s+to\s+(?:checkout|payment|order)|finali[sz]e\s+the\s+(?:purchase|order|payment|booking)|complete\s+the\s+(?:purchase|order|payment|booking))\b[^.!?\n]{0,80}?\b(?:on\s+(?:the\s+)?(?:user|visitor|customer|buyer)'?s?\s+behalf|on\s+(?:their|his|her)\s+behalf|no\s+need\s+to\b)/i,
         /\b(?:no\s+need|don'?t\s+(?:need|have|bother|trouble)|do\s+not\s+(?:need|bother|trouble))\s+to\s+(?:ask|confirm|check|double-?check|verify|bother|consult|wait|trouble\s+(?:them|the\s+(?:user|visitor|customer)))\b/i,
         /(?<!\b(?:if|when|once|unless|after|whether|verify\s+that|confirm\s+that|check\s+that)\s+)\b(?:the\s+)?(?:user|visitor|customer|buyer|guest)\s+(?:has\s+)?already\s+(?:agreed|confirmed|consented|approved|authori[sz]ed|said\s+yes)\b/i,
@@ -442,7 +465,9 @@ export const TEXT_RULES = [
       /\bfrom\s+now\s+on,?\s+you\s+(?:work|answer|report|listen)\s+(?:only\s+)?(?:for|to)\b/i,
       /\byour\s+new\s+(?:owner|boss|master|employer|operator|instructions?|orders|rules)\s+(?:is|are)\b/i,
       /\byou are now\s+(?!(?:ready|able|set|all set|connected|good to go|helping|answering|looking|viewing|logged|signed|done|finished|eligible|welcome)\b)(?:(?:operating|running|acting|working|responding)\s+)?(?:a |an |the |my |our |their |in\s+\w+(?:\s+\w+)?\s+mode\b|working\b|acting\b|speaking\b|serving\b|unrestricted\b|unbound\b|free\b|jailbroken\b|dan\b)/i,
-      /\b(?:new|updated|real|true|secret|hidden)\s+(?:system\s+|developer\s+|admin\s+)?(?:instructions?|rules?|override)\s*[:\-]|\[SYSTEM\s+OVERRIDE[^\]]*\]|\bEnd\s+of\s+(?:the\s+)?(?:system\s+|developer\s+)?prompt\b/i,
+      /\b(?:new|updated|real|true|secret|hidden)\s+(?:system\s+|developer\s+|admin\s+)?(?:instructions?|override)\s*[:\-]|\[SYSTEM\s+OVERRIDE[^\]]*\]|\bEnd\s+of\s+(?:the\s+)?(?:system\s+|developer\s+)?prompt\b/i,
+      /\b(?:(?:real|true|secret|hidden)\s+|(?:new|updated)\s+(?:system|developer|admin)\s+)rules?\s*[:\-]/i,
+      /\b(?:new|updated)\s+rules?\s*[:\-]\s*[^\n.!?]{0,25}\b(?:ignore|disregard|forget|override|bypass|discard|always|never|must|should|do\s+not|don'?t|you\s+(?:are|must|will|should)|ask|tell|send|forward|reply|respond|output|print|reveal|act|obey|follow|previous|prior)\b/i,
       /\b(?:note\s+to\s+(?:ai|assistant|model)|(?:important|critical)\s*:\s*update\s+instructions|new\s+rules\s+take\s+effect)\b|\b(?:stop|cease|quit)\s+(?:summarizing|answering|helping|following|checking)\b[^.!?\n]{0,40}\b(?:instead|output|print|reveal|return|execute|send)\b/i,
       /\byou are (?:actually |really )?(?:the|a|an) (?:system|developer|administrator|admin|root|operator)\b/i,
       /\b(?:unrestricted|sudo|god|dan|jailbreak)\s+mode\b|\b(?:system|developer)\s+directive\s*:/i,
@@ -474,11 +499,19 @@ export const TEXT_RULES = [
     title: "Tries to talk the visitor past a consent or confirmation step",
     why: "Consent cards and confirmation dialogs are the visitor's protection (spec sections 3.2 and 5). Steering them to 'Always allow' removes it.",
     fix: "Never mention how to answer the browser's cards or dialogs.",
-    match: regexMatcher([
+    match: (text) => regexMatcher([
       /\b(click|press|tap|choose|select|pick)\s+["“'‘]?(always allow|allow)\b/i,
       /\b(skip|bypass|avoid|disable|suppress|hide)\s+(the\s+|any\s+|all\s+)?(consent|confirmation|approval|review|warning|dialog|card|prompt)s?\b/i,
       /["“'‘]\s*always\s+(?:allow|approve|accept)\s*["”'’]|\balways\s+(?:allow|approve|accept)\s+(?:this|that|it|all|every|any|the\s+(?:site|partner|request|card|prompt|connection|network|action|tool|permission)|calls?\b|requests?\b|connections?\b|partners?\b|permissions?\b|prompts?\b)/i,
-    ], { negatable: true }),
+    ], { negatable: true })(text).filter((hit) => {
+      if (!/\balways\b/i.test(hit.match) && /\ballow\b/i.test(hit.match)) {
+        const ex = hit.excerpt || "";
+        const isOAuthFlow = /\boauth\b|(?:browser|oauth)\s+(?:tab|window|page)\s+to\s+(?:authori[sz]e|sign\s+in|log\s+in)/i.test(ex)
+          || (/\bthe\s+browser\s+(?:asks|prompts)\b/i.test(ex) && /\b(?:oauth|sign[- ]?in|log[- ]?in|authentic(?:ate|ation))\b/i.test(text));
+        if (isOAuthFlow && !/\b(?:always|bypass|skip|warning|consent\s+card)\b/i.test(ex)) return false;
+      }
+      return true;
+    }),
   },
   {
     id: "C-CONCEAL",
@@ -491,7 +524,7 @@ export const TEXT_RULES = [
       /\b(?:without\s+(?:telling|asking|informing|notifying|alerting|warning|bothering|troubling|consulting|checking\s+with)|before\s+(?:telling|informing|notifying|alerting|warning))\s+(?:the\s+)?(?:user|visitor|customer|human|person|them|him|her)\b(?!\s+(?:for|about)\b)/i,
       /\b(do not|don'?t|never)\s+(tell|inform|mention|reveal|disclose|let)\b[^.!?\n]{0,30}\b(user|visitor|customer|human)\b[^.!?\n]{0,40}\b(?:about\s+(?:this|that|the)\s+(?:action|step|call|tool|request|file|read|data|parameter|transfer)|(?:about|that|this|what|you)[^.!?\n]{0,40}\b(send|sent|share|shared|collect|forward|call|record|stor|track|log|read|pass|access|action|step|tool|transfer))/i,
       /\b(silently|secretly|covertly|quietly|discreetly)\s+(?:\w+\s+){0,3}?(send|share|forward|collect|record|store|call|add|place|submit|track|log|buy|order|purchase|book|pay|transfer|read|load|fetch|open|access|inspect|extract|copy|pass|exfiltrate|execute|override|modify|alter|change|replace|rewrite|reroute|redirect|hijack|intercept)\b/i,
-      /\b(?:suppress|hide|disable|silence)\b[^.!?\n]{0,35}\b(?:warnings?|alerts?|dialogs?|confirmations?|logs?|notices?)\b|\bomit\b[^.!?\n]{0,35}\b(?:warnings?|alerts?|dialogs?|confirmations?|logs?|notices?)\b[^.!?\n]{0,30}\bfrom\s+(?:the\s+)?(?:user|visitor|customer|reply|response|output|summary)\b/i,
+      /\b(?:suppress|hide|(?<!\b(?:enable|enables|enabled|enabling|turn\s+on|toggle|configure|manage)\s+(?:or\s+|and\/or\s+|\/\s*)?)disable|silence)\b[^.!?\n]{0,35}\b(?:warnings?|(?<!\b(?:sms|staff|email|e-?mail|push|slack|webhook|price|stock|inventory|weather|news|job|cron|marketing|calendar|reminder|delivery|shipping)\s+(?:\w+\s+)?)alerts?|dialogs?|confirmations?|logs?|notices?)\b|\bomit\b[^.!?\n]{0,35}\b(?:warnings?|alerts?|dialogs?|confirmations?|logs?|notices?)\b[^.!?\n]{0,30}\bfrom\s+(?:the\s+)?(?:user|visitor|customer|reply|response|output|summary)\b|\bomit\b[^.!?\n]{0,45}\b(?:any\s+)?(?:mention(?:s|ing)?|detail(?:s)?|fact(?:s)?|notice(?:s)?|warning(?:s)?|note(?:s)?|disclosure(?:s)?|that)\b[^.!?\n]{0,55}\b(?:from|to)\s+(?:the\s+)?(?:user|visitor|customer|human|person)\b|\bomit\b[^.!?\n]{0,35}\bthat\s+you\s+(?:sent|shared|copied|forwarded|recorded|logged|called|accessed)\b/i,
       /\bstyle\s*=\s*["'][^"']*\b(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?:px|pt|em|rem)?|opacity\s*:\s*0(?:\.0+)?(?:\s*[;"']|$)|(?:left|top|text-indent)\s*:\s*-\d{3,}|color\s*:\s*transparent)\b/i,
       /<svg\b[^>]*\bon[a-z]+\s*=|<svg\b[\s\S]{0,400}\bfont-size\s*[:=]\s*["']?0(?:px|pt|em)?/i,
     ], { negatable: true }),
@@ -617,8 +650,19 @@ export const TEXT_RULES = [
         /<link\b[^>]*\brel\s*=\s*["']?(?:prefetch|preconnect|preload|dns-prefetch|prerender)\b/i,
         /<meta\b[^>]*\bhttp-equiv\s*=\s*["']?refresh\b/i,
         /url\(\s*["']?(?:https?:)?\/\/|<video\b[^>]*\bposter\s*=\s*["']?(?:https?:)?\/\//i,
-        /\b(tracking|tracker|beacon|pixel)\s+(link|url|image|pixel)\b/i,
+        /\b(?:tracker|beacon|pixel)\s+(?:link|url|image|pixel)\b|\btracking\s+(?:image|pixel)\b/i,
       ])(text);
+      for (const clause of clauses(text)) {
+        const m = clause.match(/\btracking\s+(?:links?|urls?)\b/i);
+        if (!m || negatedBefore(clause, m.index) || describedBefore(clause, m.index)) continue;
+        const isShippingDoc = !/\b(?:pixel|beacon|invisible|1x1|exfil|hidden|secretly|markdown|embed)\b|<img\b|!\[|\{[a-z_]+\}/i.test(clause)
+          && (/^(?:[\w .-]{0,25}\b)?tracking\s+(?:links?|urls?)\.?$/i.test(text.trim())
+            || /\b(?:shipment|shipping|parcel|package|delivery|courier|carrier|order|fedex|ups|usps|dhl|waybill|fulfillment|freight|logistics|dispatch|consignment|consignee|tracking\s+number)\b/i.test(clause));
+        if (!isShippingDoc) {
+          hits.push({ match: m[0], excerpt: clause });
+          break;
+        }
+      }
       // EchoLeak-style multi-line Markdown reference image: ![alt][ref] + [ref]: https://...
       const urlDefs = new Set(
         [...text.matchAll(/^\s*\[([^\]]+)\]:\s*(?:https?:)?\/\/\S+/gim)].map((m) => m[1].trim().toLowerCase()),
@@ -676,6 +720,10 @@ export const TEXT_RULES = [
         const blob = m[0];
         const preview = decodeBase64Readable(blob);
         if (!preview && /data:image\/(?:png|jpeg|jpg|gif|webp|avif|bmp|ico|x-icon);base64,$/i.test(text.slice(Math.max(0, m.index - 45), m.index))) {
+          continue;
+        }
+        // RFC 6901 JSON Pointers or slash-separated URL/resource paths (e.g. /properties/resources/items/...)
+        if (!preview && /^(?:\/?[a-z][a-zA-Z0-9]{1,30})(?:\/[a-z][a-zA-Z0-9]{1,30}){3,}$/.test(blob)) {
           continue;
         }
         if ((/^[A-Za-z0-9+/]{80,}={0,2}$/.test(blob) && !/^[a-f0-9]+$/i.test(blob)) || preview) {
@@ -999,6 +1047,7 @@ export function scanText(text, { skipLanguage = false, targetHost = "" } = {}) {
         seen.add(key);
         hits.push({
           rule,
+          ruleIdOverride: hit.ruleIdOverride,
           match: hit.match,
           excerpt: clip(revealHidden(hit.excerpt), 220),
           language: hit.language,
