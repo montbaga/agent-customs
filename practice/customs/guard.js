@@ -61,6 +61,9 @@ export const STRICT_POLICY = Object.freeze({
  * :param options.openReport: (url) => void. Shows the full report on this page instead.
  * :param options.locks: false turns off the runtime locks and reply quarantine (locks.js).
  *   They are on by default.
+ * :param options.canary: false disables the synthetic Lock 3 canary tripwire (on by default).
+ * :param options.canaryToken: Optional fixed canary token for tests or interactive demos.
+ * :param options.onCanaryTrip: Called with {encoding, where, partners, revoked} when tripped.
  * :param options.trustedActions: Names of website actions that only change harmless things
  *   on the page, or ask the visitor themselves, so the action lock lets them run.
  * :param options.onLock: Called with {lock, kind, where, reason} whenever a lock blocks
@@ -159,6 +162,21 @@ export function installCustomsGuard(engine, options = {}) {
     trustedActions: options.trustedActions || [],
     strict,
     aiJudge,
+    canary: options.canary,
+    canaryToken: options.canaryToken,
+    onCanaryTrip: (event) => {
+      const revoked = [];
+      for (const url of event.partners || []) {
+        if (store.delete(url)) revoked.push(url);
+      }
+      for (const r of log) {
+        if (r?.target?.url && (event.partners || []).includes(r.target.url)) {
+          r.guard.canaryTripped = true;
+          if (revoked.includes(r.target.url)) r.guard.pinned = false;
+        }
+      }
+      options.onCanaryTrip?.({ ...event, revoked });
+    },
     isForeignPartner: (base, name) => Boolean(partnerInfo.get(`${String(base).replace(/\/$/, "")}/${name || ""}`)?.allowLanguage),
     notify: (event) => {
       options.onLock?.(event);
@@ -167,7 +185,7 @@ export function installCustomsGuard(engine, options = {}) {
   });
 
   const guard = {
-    store, log, policy, locks,
+    store, log, policy, locks, canary: locks?.canary || null,
     uninstall() {
       engine._compile = original;
       locks?.uninstall();
