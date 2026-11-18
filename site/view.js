@@ -1051,7 +1051,7 @@ function wireBuilderCodeTabs() {
     cli: [
       "# Inspect a local folder or MCP/A2A manifest",
       "node bin/agent-customs.mjs check site/agent_customs --strict",
-      "node bin/agent-customs.mjs check site/samples/mcp-poisoned/mcp.json",
+      "node bin/agent-customs.mjs check site/samples/mcp-poisoned",
       "",
       "# Run the 68-case benchmark",
       "npm run bench",

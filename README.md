@@ -236,6 +236,24 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
   </tr>
 </table>
 
+### Phase 1–3 Showcase
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/images/phase1-mcp-trifecta.jpg" alt="Phase 1 MCP Lethal Trifecta held for review report"><br><sub><b>Phase 1 — MCP &amp; Lethal Trifecta:</b> Inspects <code>mcp.json</code> manifests, traces capability paths across private data + untrusted inputs + external sinks, and grades <code>Papers 3/7 pass</code>.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase2-verify.jpg" alt="Phase 2 ES256 Customs Certificate signature verification"><br><sub><b>Phase 2 — Signed Receipt Verification:</b> Verifies ES256 signatures on exported Customs Certificates locally and compares against the live endpoint fingerprint.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Phase 2 and 3 Attack Lab simulation paired with the 68-case benchmark scorecard"><br><sub><b>Phase 2 &amp; 3 — Attack Lab &amp; Benchmark:</b> Side-by-side without/with Agent Customs simulation paired with the 68-case benchmark scorecard.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Phase 3 Builders panel showing CLI, Action, and Extension tabs"><br><sub><b>Phase 3 — For Builders (CLI, Action &amp; Extension):</b> Copy-ready integration tabs covering <code>site.js</code>, Node CLI, SARIF GitHub Action, and the browser extension.</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/images/phase3-extension.jpg" alt="Phase 3 Chrome/Edge browser extension inspecting io.github.microsoft/playwright-mcp" width="72%">
+  <br><sub><b>Phase 3 — Browser Extension:</b> One-click MV3 popup inspection on live registry manifests (shown inspecting <code>io.github.microsoft/playwright-mcp</code>).</sub>
+</p>
+
 <details>
 <summary><b>Mobile views (Inspection Desk & Practice Site)</b></summary>
 
