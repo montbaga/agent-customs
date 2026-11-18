@@ -1,0 +1,1150 @@
+{
+ "url": "https://agentcv.ai/mcp",
+ "doc": {
+  "name": "AgentCV",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "AgentCV (agentcv.ai) is a public registry of AI agent teams: who runs each team, its agents and roles, what it handles, and the evidence, with every profile labelled real (registered by its owner), curated (documented by AgentCV from cited public sources) or illustrative (demo). Use search_teams and get_team to find teams and read their public profiles, and list_platforms and list_use_cases for the hubs. When you present teams to a person, include each team's url, its AgentCV page, and its label (real, curated or illustrative), so they can open it and never mistake an illustrative demo for a working team. To help someone register a team: get_registration_schema, write an agentcv.team.v1 profile from what you know of the team (null for anything unknown, no secrets), check it with validate_team_profile, then give the person the finishUrl it returns, exactly as returned (or, when it has none, the finishRegistrationUrl to import the file); they open it, sign in, review every field and submit. This server is read-only: it stores nothing and cannot register, edit or publish anything. Setup and limits: https://agentcv.ai/mcp-server",
+  "tools": [
+   {
+    "name": "search_teams",
+    "title": "Search AgentCV teams",
+    "description": "Search the public AgentCV registry of AI agent teams. Returns public teams only, in the site’s default order: operated teams first, then reference designs (designs documented from papers, framework docs or vendor material that no one is known to run), then clearly labelled illustrative demos. Each team has its layer (real = registered by its owner, curated = documented by AgentCV from cited public sources, illustrative = demo), size wording, platform, topology, trust tier and page URL. All filters are optional and combine with AND. Pages of up to 20; pass nextCursor back as cursor for the next page. Read-only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Text to find in a team’s name, tagline or description (case-insensitive substring), as the search box on agentcv.ai/teams."
+      },
+      "platform": {
+       "type": "string",
+       "enum": [
+        "grok-bot",
+        "hermes-agent",
+        "claude",
+        "openai-codex",
+        "openclaw",
+        "crewai",
+        "langgraph",
+        "autogen",
+        "n8n"
+       ],
+       "description": "A platform hub slug (see list_platforms): teams whose own platform or any listed member’s platform belongs to that hub."
+      },
+      "topology": {
+       "type": "string",
+       "enum": [
+        "orchestrator_worker",
+        "supervisor",
+        "swarm",
+        "pipeline",
+        "router",
+        "solo_plus_tools",
+        "other"
+       ],
+       "description": "The team’s declared topology type."
+      },
+      "use_case": {
+       "type": "string",
+       "enum": [
+        "code-review",
+        "software-delivery",
+        "bug-fixing",
+        "testing-qa",
+        "code-migration",
+        "research-analysis",
+        "customer-support",
+        "data-sql",
+        "ops-sre",
+        "marketing-content",
+        "general-assistant"
+       ],
+       "description": "A use-case hub slug (see list_use_cases)."
+      },
+      "layer": {
+       "type": "string",
+       "enum": [
+        "real",
+        "curated",
+        "illustrative"
+       ],
+       "description": "real = registered by its owner; curated = documented by AgentCV from cited public sources; illustrative = clearly labelled demo."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "description": "Teams per page, 1–20 (default 10)."
+      },
+      "cursor": {
+       "type": "string",
+       "pattern": "^o[0-9]{1,6}$",
+       "description": "nextCursor from the previous page; omit for the first page."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Search AgentCV teams",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "teams": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "tagline": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "layer": {
+          "type": "string",
+          "enum": [
+           "real",
+           "curated",
+           "illustrative"
+          ]
+         },
+         "class": {
+          "type": "string",
+          "enum": [
+           "operated",
+           "reference_design",
+           "illustrative"
+          ]
+         },
+         "referenceDesign": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Set when the profile is a reference design: a design documented from a paper, framework docs or vendor material that no one is known to operate. null for every other team.",
+          "properties": {
+           "label": {
+            "type": "string"
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "research",
+             "framework",
+             "vendor_claim"
+            ]
+           },
+           "summary": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "label",
+           "kind",
+           "summary",
+           "note"
+          ]
+         },
+         "size": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Team size as the site words it: kind \"total\" is the stated size (\"5 agents\"); kind \"listed\" is a curated team whose sources state no total (\"3 listed members\"). null when no size is stated.",
+          "properties": {
+           "kind": {
+            "type": "string",
+            "enum": [
+             "total",
+             "listed"
+            ]
+           },
+           "count": {
+            "type": "integer"
+           },
+           "text": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "kind",
+           "count",
+           "text"
+          ]
+         },
+         "platform": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "topology": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "properties": {
+           "type": {
+            "type": "string"
+           },
+           "label": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "type",
+           "label"
+          ]
+         },
+         "trust": {
+          "type": "object",
+          "description": "The trust tier AgentCV computes from the evidence on record (never self-assigned), with the label the page shows.",
+          "properties": {
+           "tier": {
+            "type": "string"
+           },
+           "label": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "tier",
+           "label"
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "tagline",
+         "url",
+         "layer",
+         "class",
+         "referenceDesign",
+         "size",
+         "platform",
+         "topology",
+         "trust"
+        ]
+       }
+      },
+      "total": {
+       "type": "integer",
+       "description": "Teams matching the filters, across all pages."
+      },
+      "returned": {
+       "type": "integer"
+      },
+      "nextCursor": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "order": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "teams",
+      "total",
+      "returned",
+      "nextCursor",
+      "order"
+     ]
+    }
+   },
+   {
+    "name": "get_team",
+    "title": "Get an AgentCV team profile",
+    "description": "The public profile of one AgentCV team, as its page shows it: layer and its notice (curated teams are documented by AgentCV from public sources and are not endorsed by the team), the reference-design label, owner, trust tier, topology, size, roster (name, role and the model where stated), how it is built and overseen, evidence entries with their links and titles, cited sources, and — for an unclaimed curated team — the links where its operator can claim it or ask for its removal. Only public fields. Read-only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]*$",
+       "maxLength": 120,
+       "description": "The team’s slug, as search_teams returns it (e.g. \"ari-collective\")."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get an AgentCV team profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "name": {
+       "type": "string"
+      },
+      "tagline": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "layer": {
+       "type": "string",
+       "enum": [
+        "real",
+        "curated",
+        "illustrative"
+       ]
+      },
+      "class": {
+       "type": "string",
+       "enum": [
+        "operated",
+        "reference_design",
+        "illustrative"
+       ]
+      },
+      "notice": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "referenceDesign": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Set when the profile is a reference design: a design documented from a paper, framework docs or vendor material that no one is known to operate. null for every other team.",
+       "properties": {
+        "label": {
+         "type": "string"
+        },
+        "kind": {
+         "type": "string",
+         "enum": [
+          "research",
+          "framework",
+          "vendor_claim"
+         ]
+        },
+        "summary": {
+         "type": "string"
+        },
+        "note": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "label",
+        "kind",
+        "summary",
+        "note"
+       ]
+      },
+      "status": {
+       "type": "string"
+      },
+      "operatingSince": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "operatingSinceLabel": {
+       "type": "string"
+      },
+      "owner": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "handle": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "claimed": {
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "name",
+        "handle",
+        "url",
+        "claimed"
+       ]
+      },
+      "trust": {
+       "type": "object",
+       "properties": {
+        "tier": {
+         "type": "string"
+        },
+        "label": {
+         "type": "string"
+        },
+        "evidenceLinkedEntries": {
+         "type": "integer"
+        },
+        "evidenceThreshold": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "tier",
+        "label",
+        "evidenceLinkedEntries",
+        "evidenceThreshold"
+       ]
+      },
+      "topology": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "type": {
+         "type": "string"
+        },
+        "label": {
+         "type": "string"
+        },
+        "description": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "size": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Team size as the site words it: kind \"total\" is the stated size (\"5 agents\"); kind \"listed\" is a curated team whose sources state no total (\"3 listed members\"). null when no size is stated.",
+       "properties": {
+        "kind": {
+         "type": "string",
+         "enum": [
+          "total",
+          "listed"
+         ]
+        },
+        "count": {
+         "type": "integer"
+        },
+        "text": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "kind",
+        "count",
+        "text"
+       ]
+      },
+      "platform": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "industries": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "taskKinds": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "roster": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "role": {
+          "type": "string"
+         },
+         "model": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "modelVersion": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "platform": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "platformVersion": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "illustrative": {
+          "type": "boolean"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "name",
+         "role",
+         "model",
+         "platform",
+         "illustrative",
+         "url"
+        ]
+       }
+      },
+      "blueprint": {
+       "type": "object",
+       "properties": {
+        "whyItWorks": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "howItWasBuilt": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "oversight": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "automationStory": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "evidence": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "date": {
+          "type": "string"
+         },
+         "type": {
+          "type": "string"
+         },
+         "provenance": {
+          "type": "string"
+         },
+         "illustrative": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "title",
+         "url",
+         "date",
+         "type",
+         "illustrative"
+        ]
+       }
+      },
+      "evidenceTotal": {
+       "type": "integer"
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "url": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "url",
+         "label"
+        ]
+       }
+      },
+      "claimUrl": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "removalUrl": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "requestUrl": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "name",
+      "tagline",
+      "url",
+      "layer",
+      "class",
+      "notice",
+      "referenceDesign",
+      "status",
+      "owner",
+      "trust",
+      "roster",
+      "blueprint",
+      "evidence",
+      "sources",
+      "claimUrl",
+      "removalUrl"
+     ]
+    }
+   },
+   {
+    "name": "list_use_cases",
+    "title": "List AgentCV use-case hubs",
+    "description": "The use-case hubs of agentcv.ai/use-cases (code review, testing and QA, research and analysis, …) with how many public teams each holds, by layer (real, curated, illustrative) and by class (operated, reference design, illustrative). Read-only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "List AgentCV use-case hubs",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "useCases": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "teams": {
+          "type": "object",
+          "properties": {
+           "total": {
+            "type": "integer"
+           },
+           "byLayer": {
+            "type": "object",
+            "properties": {
+             "real": {
+              "type": "integer"
+             },
+             "curated": {
+              "type": "integer"
+             },
+             "illustrative": {
+              "type": "integer"
+             }
+            },
+            "required": [
+             "real",
+             "curated",
+             "illustrative"
+            ]
+           },
+           "byClass": {
+            "type": "object",
+            "properties": {
+             "operated": {
+              "type": "integer"
+             },
+             "reference_design": {
+              "type": "integer"
+             },
+             "illustrative": {
+              "type": "integer"
+             }
+            },
+            "required": [
+             "operated",
+             "reference_design",
+             "illustrative"
+            ]
+           }
+          },
+          "required": [
+           "total",
+           "byLayer",
+           "byClass"
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "description",
+         "url",
+         "teams"
+        ]
+       }
+      },
+      "note": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "useCases",
+      "note"
+     ]
+    }
+   },
+   {
+    "name": "list_platforms",
+    "title": "List AgentCV platform hubs",
+    "description": "The platform hubs of agentcv.ai/platforms (Claude, OpenAI Codex, OpenClaw, CrewAI, LangGraph, …) with the platform names each covers and how many public teams each holds, by layer and by class. AgentCV is independent and not affiliated with any platform. Read-only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "List AgentCV platform hubs",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "platforms": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "covers": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "url": {
+          "type": "string"
+         },
+         "teams": {
+          "type": "object",
+          "properties": {
+           "total": {
+            "type": "integer"
+           },
+           "byLayer": {
+            "type": "object",
+            "properties": {
+             "real": {
+              "type": "integer"
+             },
+             "curated": {
+              "type": "integer"
+             },
+             "illustrative": {
+              "type": "integer"
+             }
+            },
+            "required": [
+             "real",
+             "curated",
+             "illustrative"
+            ]
+           },
+           "byClass": {
+            "type": "object",
+            "properties": {
+             "operated": {
+              "type": "integer"
+             },
+             "reference_design": {
+              "type": "integer"
+             },
+             "illustrative": {
+              "type": "integer"
+             }
+            },
+            "required": [
+             "operated",
+             "reference_design",
+             "illustrative"
+            ]
+           }
+          },
+          "required": [
+           "total",
+           "byLayer",
+           "byClass"
+          ]
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "covers",
+         "url",
+         "teams"
+        ]
+       }
+      },
+      "note": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "platforms",
+      "note"
+     ]
+    }
+   },
+   {
+    "name": "get_registration_schema",
+    "title": "Get the AgentCV team-profile format",
+    "description": "The agentcv.team.v1 format for registering a team: the JSON Schema (as an object, and as the exact text agentcv.ai/agentcv-team.schema.json serves) and the self-contained prompt from agentcv.ai/register/with-agent that tells an agent how to write the profile. Registration itself is done by a person on agentcv.ai; this server cannot submit anything. Read-only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get the AgentCV team-profile format",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "format": {
+       "type": "string"
+      },
+      "schemaUrl": {
+       "type": "string"
+      },
+      "schema": {
+       "type": "object"
+      },
+      "schemaJson": {
+       "type": "string"
+      },
+      "prompt": {
+       "type": "string"
+      },
+      "promptPageUrl": {
+       "type": "string"
+      },
+      "finishRegistrationUrl": {
+       "type": "string"
+      },
+      "howToRegister": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "format",
+      "schemaUrl",
+      "schema",
+      "schemaJson",
+      "prompt",
+      "promptPageUrl",
+      "finishRegistrationUrl",
+      "howToRegister"
+     ]
+    }
+   },
+   {
+    "name": "validate_team_profile",
+    "title": "Check an AgentCV team profile",
+    "description": "Check an agentcv.team.v1 team profile with the same validator the registration page’s import panel uses (the same field rules the server enforces), and with AgentCV’s secret and personal-data detectors. Returns the errors, the warnings (example values left in, values over the form’s limit, ignored keys) and the fields that look like an API key, token, password or personal data (named by path, never repeated), plus the URL where a person signs in, imports the file, reviews it and submits. When the profile is ready, it also returns finishUrl: the registration form’s link with the profile in its # fragment, at most 16 KB, for the person to open, review and submit. Browsers do not send the fragment in HTTP requests, but it is not encrypted: anyone with the link can read it. No link is returned while a value, as written or once percent-, base64- or hex-decoded, looks like a secret, personal data, a local path or a private or credential-bearing link; detection is best effort, and the person’s review before Submit is the final check. This server receives the profile to check it; it neither stores nor logs it, and submits nothing. Read-only.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "profile": {
+       "anyOf": [
+        {
+         "type": "object",
+         "description": "The agentcv.team.v1 JSON object."
+        },
+        {
+         "type": "string",
+         "description": "Its JSON text, exactly as it would be pasted into the import panel."
+        }
+       ],
+       "description": "The profile: the agentcv.team.v1 JSON object, or its JSON text exactly as it would be pasted into the import panel (at most 64 KB)."
+      }
+     },
+     "required": [
+      "profile"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Check an AgentCV team profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "valid": {
+       "type": "boolean"
+      },
+      "readyToImport": {
+       "type": "boolean"
+      },
+      "errors": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string"
+         },
+         "message": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "field",
+         "message"
+        ]
+       }
+      },
+      "warnings": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "placeholder",
+           "over_form_limit",
+           "ignored",
+           "notice"
+          ]
+         },
+         "field": {
+          "type": "string"
+         },
+         "message": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind",
+         "field",
+         "message"
+        ]
+       }
+      },
+      "withheld": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string"
+         },
+         "reason": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "field",
+         "reason"
+        ]
+       }
+      },
+      "redacted": {
+       "type": "integer"
+      },
+      "truncated": {
+       "type": "object",
+       "properties": {
+        "errors": {
+         "type": "integer"
+        },
+        "warnings": {
+         "type": "integer"
+        },
+        "withheld": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "errors",
+        "warnings",
+        "withheld"
+       ]
+      },
+      "stored": {
+       "type": "boolean",
+       "const": false
+      },
+      "finishRegistrationUrl": {
+       "type": "string"
+      },
+      "finishUrl": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "finishLink": {
+       "type": "object",
+       "properties": {
+        "status": {
+         "type": "string",
+         "enum": [
+          "ready",
+          "not_valid",
+          "withheld",
+          "too_large"
+         ]
+        },
+        "length": {
+         "type": "integer"
+        },
+        "maxLength": {
+         "type": "integer"
+        },
+        "withheld": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "field": {
+            "type": "string"
+           },
+           "reason": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "field",
+           "reason"
+          ]
+         }
+        }
+       },
+       "required": [
+        "status",
+        "length",
+        "maxLength",
+        "withheld"
+       ]
+      },
+      "nextSteps": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "valid",
+      "readyToImport",
+      "errors",
+      "warnings",
+      "withheld",
+      "redacted",
+      "truncated",
+      "stored",
+      "finishRegistrationUrl",
+      "finishUrl",
+      "finishLink",
+      "nextSteps"
+     ]
+    }
+   }
+  ]
+ }
+}
