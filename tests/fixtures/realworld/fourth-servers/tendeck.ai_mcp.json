@@ -1,0 +1,353 @@
+{
+ "url": "https://tendeck.ai/mcp",
+ "doc": {
+  "name": "tendeck",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Tendeck is a free, focused CRM for real estate agents (and managing brokers recruiting agents). You, the user's AI, are the main interface: anything they can click, you can do with a tool. Work like a calm, sharp assistant: (1) Start the day with p2_today (brokers: p1_today) and help them act on the ten people, one at a time. (2) If they have no goals yet, offer a 3-minute goal interview (goals_interview, then goal_set) and refer back to their goals when you suggest who to call. (3) Tell them once, naturally, that you can rearrange Tendeck for them: fewer buttons (app_layout_set), custom fields, message templates, drip campaigns, imports from Follow Up Boss or GoHighLevel. (4) Never send anything without the human: drafts are text you show them; texts go out only after they tap Approve on the link p2_request_text returns. Respect Do Not Contact. (5) You are the user's tech support: they will rarely contact us. When something isn't working, call tendeck_diagnose first (one read-only call: what's wrong and the exact fix), and tendeck_help for how-to questions. If they mention a tool they use (dotloop, SkySlope, Zillow, kvCORE, Canva...), check connectors_catalog, give the honest status and today's workaround, and record it with connector_request. If a Tendeck tool fails or behaves wrongly, call support_report (keep the ticket and status_token, check support_status later): the Tendeck engineers read it and fix it, so the user never has to. (6) Results may include assistant_tips: weave at most one into the conversation when it fits, never as a list, and call assistant_tip_dismiss if they decline. Keep answers short; the goal is focused work.",
+  "tools": [
+   {
+    "name": "describe_product",
+    "description": "Plain-language description of the two Nuvidian products (P1 brokerage recruiting CRM, P2 agent CRM), what is free, and what the product never does.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string",
+       "enum": [
+        "p1",
+        "p2"
+       ],
+       "description": "Optional: return only this product."
+      }
+     },
+     "required": []
+    }
+   },
+   {
+    "name": "get_free_limits",
+    "description": "What each product includes for free, in plain numbers (P1: full pond + pipeline, 3 recruiters; P2: unlimited people/deals, no AI quotas because Tendeck runs no AI of its own, 1 farm list).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": []
+    }
+   },
+   {
+    "name": "list_addons",
+    "description": "Optional paid add-ons with their unit and price in cents. Prices only — no costs, no margins.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string",
+       "enum": [
+        "p1",
+        "p2",
+        "both"
+       ],
+       "description": "Optional: only add-ons for this product."
+      }
+     },
+     "required": []
+    }
+   },
+   {
+    "name": "start_workspace",
+    "description": "Sign up for free: create a pending workspace and send a 6-digit code to the user's email (preferred) or US phone. Ask the user for the code, then call verify_phone. Idempotent on idem_key. FIRST show the human the Terms of Service (https://tendeck.ai/terms) and Privacy Notice (https://tendeck.ai/privacy), ask whether they accept, and pass accept_terms: true only if they say yes.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "accept_terms": {
+       "type": "boolean",
+       "description": "true only after the human read the links above and accepted."
+      },
+      "product": {
+       "type": "string",
+       "enum": [
+        "p1",
+        "p2"
+       ],
+       "description": "p1 = brokerage recruiting, p2 = agent CRM."
+      },
+      "email": {
+       "type": "string",
+       "description": "The user's email; the code is emailed here. Give email OR phone."
+      },
+      "phone": {
+       "type": "string",
+       "description": "US phone number (code by text). Give email OR phone."
+      },
+      "idem_key": {
+       "type": "string",
+       "description": "Your own retry key; repeat it to retry safely."
+      },
+      "business_name": {
+       "type": "string",
+       "description": "Optional business or team name."
+      }
+     },
+     "required": [
+      "product",
+      "idem_key",
+      "accept_terms"
+     ]
+    }
+   },
+   {
+    "name": "verify_phone",
+    "description": "Finish signup: check the 6-digit code the user received by email (or text), activate the workspace and return a session token.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "tenant_id": {
+       "type": "string",
+       "description": "Workspace id returned by start_workspace."
+      },
+      "code": {
+       "type": "string",
+       "description": "The 6-digit code from the email or text."
+      }
+     },
+     "required": [
+      "tenant_id",
+      "code"
+     ]
+    }
+   },
+   {
+    "name": "p1_practice_deck",
+    "description": "Show a sample of Nuvidian P1's 'Today's 10' deck built from fictional Florida agents, so a human can see what the product does before signing up. Call it when someone asks 'what is P1?' or 'show me'. The cards are unmistakably fake (555-01xx phones, @example.com emails, brokerages ending in  ' (demo)'), scored and sorted like a real deck. Show the cards in order with score and the plain-English 'why' line, then read out the note: it says this is a public sample and how to start a free workspace. Nothing is written and nobody is contacted.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "n": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "description": "How many sample cards to show (1-20, default 10)."
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/broker-deck.html",
+     "openai/toolInvocation/invoking": "Dealing a practice recruiting deck…",
+     "openai/toolInvocation/invoked": "Practice deck ready",
+     "openai/widgetAccessible": true,
+     "ui": {
+      "resourceUri": "ui://app/broker-deck.html"
+     }
+    }
+   },
+   {
+    "name": "p2_practice_today",
+    "description": "Show a sample of Nuvidian P2's Today's 10 built from fictional people, so a human can see what the product does before signing up. Call it when someone asks 'what is P2?' or 'show me'. Each card is a fictional person with a plain-English reason to reach out today (overdue follow-up, a deal with no next step, a home anniversary, a new lead nobody has called, a stalled deal, a past client you have left alone). Read the cards out in order with their 'why' line, then read the note: it says the people are fake and how to start a free workspace. Nothing is written and nobody is contacted.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "_meta": {
+     "openai/outputTemplate": "ui://widget/today10.html",
+     "openai/toolInvocation/invoking": "Dealing a practice deck…",
+     "openai/toolInvocation/invoked": "Practice deck ready",
+     "openai/widgetAccessible": true,
+     "ui": {
+      "resourceUri": "ui://app/today10.html"
+     }
+    }
+   },
+   {
+    "name": "order_catalog",
+    "description": "Use this before taking an order: it lists the products you can sell right now, the price of each, and which payment apps are available. It also explains how payment works. Show the human the product name and exact price before calling order_create.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string",
+       "description": "Optional product filter, usually p1 or p2."
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "dbpr_preview",
+    "description": "Free look at the Florida licensed-agent market in one county, from the public DBPR licence file: how many agents were licensed in the last 3 years, how many got a new licence in the last 30 days, how many changed brokerage in the last 90 days, which offices are losing agents, and three sample profiles with the last name hidden. Call it when a broker asks 'how many agents are in Hillsborough?', 'who is moving in Miami-Dade?' or before they buy. Read the numbers back to the human and offer the paid list; the free version never shows a full name.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "county": {
+       "type": "string",
+       "description": "Florida county name, e.g. 'Hillsborough', 'Miami-Dade', 'St. Johns'."
+      }
+     },
+     "required": [
+      "county"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "support_report",
+    "description": "Report a problem with Tendeck to the Tendeck engineers. Use it when a Tendeck tool fails, returns something that looks wrong, or the user is stuck (sign-in, payment, a missing delivery). Include what you were trying to do, the tool name and the exact error text. Do not include passwords or payment details. Returns a ticket and a status_token: keep both and call support_status later for the reply. Tell the user the team has it.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "summary": {
+       "type": "string",
+       "description": "One line: what went wrong, in plain words."
+      },
+      "detail": {
+       "type": "string",
+       "description": "What happened, in order. No passwords or payment details."
+      },
+      "tool": {
+       "type": "string",
+       "description": "Name of the Tendeck tool that failed, if a tool failed."
+      },
+      "error": {
+       "type": "string",
+       "description": "The exact error text the tool returned."
+      },
+      "steps": {
+       "type": "string",
+       "description": "What you and the user did just before it broke."
+      },
+      "contact": {
+       "type": "string",
+       "description": "optional: how a person can reach the user, only if the user agrees"
+      },
+      "product": {
+       "type": "string",
+       "enum": [
+        "p1",
+        "p2",
+        "other"
+       ],
+       "description": "Which Tendeck product: p1 brokerage recruiting, p2 agent CRM, or other."
+      }
+     },
+     "required": [
+      "summary"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "support_status",
+    "description": "Check a support ticket you filed earlier and read the Tendeck team's reply or fix. Call it with the ticket and the status_token that support_report returned; when you are signed in to the same workspace you can pass the ticket alone. Tell the user plainly what the reply says and whether they need to do anything.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "ticket": {
+       "type": "string",
+       "description": "The ticket code, like SUP-7KQ4M2."
+      },
+      "status_token": {
+       "type": "string",
+       "description": "The status_token support_report returned (not needed when signed in)."
+      }
+     },
+     "required": [
+      "ticket"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "tendeck_help",
+    "description": "Answer any how-to or support question about Tendeck (sign-in, password, billing, connecting ChatGPT/Claude, importing, texting, privacy). Call this BEFORE telling the user you don't know.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "topic": {
+       "type": "string",
+       "description": "What the human asked, in their words, e.g. 'how do I sign in' or 'connect Claude'."
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "connectors_catalog",
+    "description": "What Tendeck plugs into: live connectors, the next ones being built, and what is planned, each with what it gives the agent and how to connect. Use it when they ask 'does Tendeck work with X?' or name a tool they use (dotloop, SkySlope, Zillow, kvCORE, Canva...). If X is not live, tell them honestly, give the 'today' workaround, and record their interest with connector_request.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "category": {
+       "type": "string",
+       "enum": [
+        "ai",
+        "leads",
+        "crm",
+        "transactions",
+        "messaging",
+        "marketing",
+        "data",
+        "recruiting"
+       ]
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "live",
+        "next",
+        "planned",
+        "researching"
+       ]
+      }
+     },
+     "required": []
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://widget/broker-deck.html",
+    "name": "Tendeck broker-deck card",
+    "mimeType": "text/html+skybridge"
+   },
+   {
+    "uri": "ui://app/broker-deck.html",
+    "name": "Tendeck broker-deck card",
+    "mimeType": "text/html;profile=mcp-app"
+   },
+   {
+    "uri": "ui://widget/person.html",
+    "name": "Tendeck person card",
+    "mimeType": "text/html+skybridge"
+   },
+   {
+    "uri": "ui://app/person.html",
+    "name": "Tendeck person card",
+    "mimeType": "text/html;profile=mcp-app"
+   },
+   {
+    "uri": "ui://widget/pipeline.html",
+    "name": "Tendeck pipeline card",
+    "mimeType": "text/html+skybridge"
+   },
+   {
+    "uri": "ui://app/pipeline.html",
+    "name": "Tendeck pipeline card",
+    "mimeType": "text/html;profile=mcp-app"
+   },
+   {
+    "uri": "ui://widget/today10.html",
+    "name": "Tendeck today10 card",
+    "mimeType": "text/html+skybridge"
+   },
+   {
+    "uri": "ui://app/today10.html",
+    "name": "Tendeck today10 card",
+    "mimeType": "text/html;profile=mcp-app"
+   }
+  ]
+ }
+}

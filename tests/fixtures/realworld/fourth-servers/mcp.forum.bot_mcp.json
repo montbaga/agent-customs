@@ -1,0 +1,514 @@
+{
+ "url": "https://mcp.forum.bot/mcp",
+ "doc": {
+  "name": "The Bot Forum",
+  "version": "0.3.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "The Bot Forum sells data feeds to AI agents by the call. list_products, get_product and sign_up need no string. sign_up returns two strings: the secret, which runs the account, and a data key, which fetches data. fetch_data uses the data key your client configuration sends as Authorization: Bearer <data key>, or the data_key argument right after sign_up; account_status and get_topup_link take the secret as the secret argument. Signing up grants no credits: a product may give its own daily credits, spendable on that product alone and replaced every night, and list_products says which does; 1 credit = $0.001; only successful data responses are billed; account_status reads the credits the account bought. Every refusal is the platform's own error envelope, unchanged: branch on its code and next_action; on fetch_data, payment_required means the key cannot pay for that product and invalid_key means it is authorized for no product right now — a human checks the account at the action_url and tops up. No tool pays, and this server stores nothing.",
+  "tools": [
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Lists every data product the Forum serves, as the platform's own catalogue answer: slug, title, lifecycle state, price in credits per call (1 credit = $0.001; the quoted price is the charged price), licence and attribution text, and the address of the product's route specification. Needs no key and charges nothing. Call get_product next for a product's routes and required parameters.",
+    "inputSchema": {
+     "properties": {},
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "list_products",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "request_id": {
+       "type": "string"
+      },
+      "upstream": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "key_source": {
+       "type": "string",
+       "enum": [
+        "header",
+        "argument",
+        "none"
+       ]
+      },
+      "headers": {
+       "type": "object"
+      },
+      "body": {},
+      "body_text": {
+       "type": "string"
+      },
+      "transport": {
+       "type": "object"
+      },
+      "fault": {
+       "type": "object"
+      },
+      "usage": {
+       "type": "object"
+      },
+      "account": {},
+      "record": {
+       "type": "object"
+      },
+      "configure": {
+       "type": "object"
+      }
+     },
+     "required": [
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "List products"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Returns one product by slug: its live catalogue entry (price, licence, lifecycle state, the specification address) together with the routes fetch_data can call and the parameters each route requires, taken from the platform's published product record. Needs no key and charges nothing. Use it before fetch_data — the route names come from here; an unknown slug answers with the slugs the catalogue serves.",
+    "inputSchema": {
+     "properties": {
+      "product": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+       "description": "a product slug from list_products"
+      }
+     },
+     "required": [
+      "product"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "get_product",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "request_id": {
+       "type": "string"
+      },
+      "upstream": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "key_source": {
+       "type": "string",
+       "enum": [
+        "header",
+        "argument",
+        "none"
+       ]
+      },
+      "headers": {
+       "type": "object"
+      },
+      "body": {},
+      "body_text": {
+       "type": "string"
+      },
+      "transport": {
+       "type": "object"
+      },
+      "fault": {
+       "type": "object"
+      },
+      "usage": {
+       "type": "object"
+      },
+      "account": {},
+      "record": {
+       "type": "object"
+      },
+      "configure": {
+       "type": "object"
+      }
+     },
+     "required": [
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Get product"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false,
+     "readOnlyHint": false
+    },
+    "description": "Creates a Forum account for an email address under the Terms version currently served, and returns the account, its secret — the one string that runs the account, shown exactly once — and its first data key, shown exactly once. It grants the account no credits of its own: a new account's free calls are the daily credit account of each product that gives one, spendable on that product alone and replaced every night, and list_products states which products give one and how much. The result's configure block is the client configuration entry that sends the data key from then on; until the client reconnects, pass data_key.key as data_key on fetch_data. Keep the secret with the owner and pass it as secret on account_status and get_topup_link. An address that already has an account answers 409 email_exists with next_action login_to_link.",
+    "inputSchema": {
+     "properties": {
+      "email": {
+       "type": "string",
+       "format": "email",
+       "maxLength": 254,
+       "description": "the owner's email address — the account's identity; one account per address"
+      }
+     },
+     "required": [
+      "email"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "sign_up",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "request_id": {
+       "type": "string"
+      },
+      "upstream": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "key_source": {
+       "type": "string",
+       "enum": [
+        "header",
+        "argument",
+        "none"
+       ]
+      },
+      "headers": {
+       "type": "object"
+      },
+      "body": {},
+      "body_text": {
+       "type": "string"
+      },
+      "transport": {
+       "type": "object"
+      },
+      "fault": {
+       "type": "object"
+      },
+      "usage": {
+       "type": "object"
+      },
+      "account": {},
+      "record": {
+       "type": "object"
+      },
+      "configure": {
+       "type": "object"
+      }
+     },
+     "required": [
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Sign up"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Reads the account behind the secret: tier, accepted Terms version, the products it may call, the balance in credits the account bought minus the spend those credits funded, the last 30 days of usage per day, product and key, and the 50 latest balance movements. A product's own daily credits are spent before that balance and are no part of it, so a call can be served while it reads zero; list_products carries each product's credit account. Pass the secret sign_up returned as the secret argument; the data key your client configuration sends cannot read the account and answers 403 wrong_credential. Charges nothing; without a string the platform answers 401 invalid_key.",
+    "inputSchema": {
+     "properties": {
+      "secret": {
+       "type": "string",
+       "minLength": 1,
+       "description": "the account's secret — the string sign_up returned as secret; the client configuration's header holds the data key, which this tool cannot use; when both are present the argument wins"
+      }
+     },
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "account_status",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "request_id": {
+       "type": "string"
+      },
+      "upstream": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "key_source": {
+       "type": "string",
+       "enum": [
+        "header",
+        "argument",
+        "none"
+       ]
+      },
+      "headers": {
+       "type": "object"
+      },
+      "body": {},
+      "body_text": {
+       "type": "string"
+      },
+      "transport": {
+       "type": "object"
+      },
+      "fault": {
+       "type": "object"
+      },
+      "usage": {
+       "type": "object"
+      },
+      "account": {},
+      "record": {
+       "type": "object"
+      },
+      "configure": {
+       "type": "object"
+      }
+     },
+     "required": [
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Account status"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "description": "Opens a top-up for the account and returns the payment intent with hosted_url, the payment provider's short-lived page where a human completes the payment — no tool pays, and card details never touch the Forum. amount_minor is in cents; the platform accepts USD only and a minimum of 1000 (= $10). Pass the secret sign_up returned as the secret argument; the data key cannot open a payment. Asking again while a page is open returns the same page. Bought credits appear in account_status once the payment completes.",
+    "inputSchema": {
+     "properties": {
+      "amount_minor": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "the amount in the currency's minor unit (cents); the platform's minimum is 1000 = $10 and the platform checks it"
+      },
+      "currency": {
+       "type": "string",
+       "default": "USD",
+       "description": "USD is the only currency the platform accepts; the platform refuses any other"
+      },
+      "secret": {
+       "type": "string",
+       "minLength": 1,
+       "description": "the account's secret — the string sign_up returned as secret; the data key in the client configuration cannot open a payment; when both are present the argument wins"
+      }
+     },
+     "required": [
+      "amount_minor"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "get_topup_link",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "request_id": {
+       "type": "string"
+      },
+      "upstream": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "key_source": {
+       "type": "string",
+       "enum": [
+        "header",
+        "argument",
+        "none"
+       ]
+      },
+      "headers": {
+       "type": "object"
+      },
+      "body": {},
+      "body_text": {
+       "type": "string"
+      },
+      "transport": {
+       "type": "object"
+      },
+      "fault": {
+       "type": "object"
+      },
+      "usage": {
+       "type": "object"
+      },
+      "account": {},
+      "record": {
+       "type": "object"
+      },
+      "configure": {
+       "type": "object"
+      }
+     },
+     "required": [
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Get top-up link"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": true
+    },
+    "description": "Fetches one data response: GET data.forum.bot/{product}/{route} with the query parameters you pass, using the data key from your client configuration's Authorization header or the data_key argument — never the secret, which fetches nothing. A successful call is billed the product's price per call; a refused call costs nothing. The result carries the payload with the platform's meta block (licence and attribution) and the rate-limit headers; the balance is read with account_status, never from a data response. Every refusal is the platform's error envelope unchanged — a code from https://api.forum.bot/errors.json; 402 payment_required means the key is known but cannot pay for this product now, and 401 invalid_key means it is authorized for no product at all, most often because every credit is spent. Both carry an action_url: a human tops up there (get_topup_link returns the page) and the same key serves again within the engine's build interval plus the region's poll interval.",
+    "inputSchema": {
+     "properties": {
+      "product": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+       "description": "a product slug from list_products"
+      },
+      "route": {
+       "type": "string",
+       "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$",
+       "maxLength": 128,
+       "description": "a route from get_product, without the product prefix — e.g. current or timeline/1h"
+      },
+      "params": {
+       "type": "object",
+       "additionalProperties": {
+        "type": [
+         "string",
+         "number",
+         "integer",
+         "boolean"
+        ]
+       },
+       "description": "query parameters, sent as given; the parameters a route requires are in get_product"
+      },
+      "data_key": {
+       "type": "string",
+       "minLength": 1,
+       "description": "only when the client cannot send an Authorization header — the data_key.key sign_up returned in this session; when both are present the argument wins"
+      }
+     },
+     "required": [
+      "product",
+      "route"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "fetch_data",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "request_id": {
+       "type": "string"
+      },
+      "upstream": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "key_source": {
+       "type": "string",
+       "enum": [
+        "header",
+        "argument",
+        "none"
+       ]
+      },
+      "headers": {
+       "type": "object"
+      },
+      "body": {},
+      "body_text": {
+       "type": "string"
+      },
+      "transport": {
+       "type": "object"
+      },
+      "fault": {
+       "type": "object"
+      },
+      "usage": {
+       "type": "object"
+      },
+      "account": {},
+      "record": {
+       "type": "object"
+      },
+      "configure": {
+       "type": "object"
+      }
+     },
+     "required": [
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Fetch data"
+   }
+  ]
+ }
+}

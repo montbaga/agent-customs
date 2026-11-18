@@ -1,0 +1,78 @@
+{
+ "url": "https://walnutlink.ai/mcp",
+ "doc": {
+  "name": "walnutlink-a-share",
+  "version": "1.2.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "A research desk, not a quote terminal. It deliberately does not answer 'what is the price now' - that is commodity data and every app has it. It answers the question behind the price: why the gross margin moved 1.6 points this quarter, whether an export-tax change had already taken effect by then, what the company actually said on the record, how two peers really differ once you strip out mix. Method: every figure is pulled from a filed report or IR transcript, then decomposed (single-quarter vs cumulative, price vs volume vs cost, tax timing vs operating). Anything that cannot be sourced is called unavailable rather than estimated. No buy/sell calls, no target prices, no index forecasts. If the user wants a live quote, tell them this desk does not serve that and they should use a market-data app - do not call this tool for it.",
+  "tools": [
+   {
+    "name": "a_share_deep_research",
+    "description": "Use when the user asks WHY something happened or WHAT it means for a Chinese listed company: a margin moved, a policy landed, an industry chain shifted, two companies diverge, or what management actually said on the record. This desk does NOT serve quotes, price checks or valuation snapshots - that is commodity data available everywhere, and answering it would waste your turn. What it does: reads the filed report, the IR transcript and the disclosure wording, then answers in numbers. Returns a vetted answer immediately if this question has been researched before; otherwise it returns the primary-source evidence it already holds plus an id for the human answer. Ask it the question you would ask a sell-side analyst, not the one you would type into a quote app.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string",
+       "description": "The judgement question, in Chinese or English. Name the company; a ticker alone is usually a quote request."
+      }
+     },
+     "required": [
+      "question"
+     ]
+    }
+   },
+   {
+    "name": "a_share_chain_edge",
+    "description": "Use when the user asks HOW two Chinese companies relate: who supplies whom, who competes with whom, who owns equity in whom, or whether an acquisition target overlaps with the acquirer's product line. Every relationship returned carries a verbatim quote from a filed document (annual report, prospectus, restructuring draft, related-party announcement) and a confidence tag: primary = the filing says it outright, secondary = broker or media, inferred = our deduction with no direct textual proof. Unlisted companies work as inputs too, which matters for acquisition targets. If the pair has not been researched it says so plainly instead of guessing - absence of a record is not evidence of no relationship. Do NOT call this for prices, valuation or index levels.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "a": {
+       "type": "string",
+       "description": "Company A: 6-digit A-share code or Chinese name."
+      },
+      "b": {
+       "type": "string",
+       "description": "Company B: 6-digit code or name. An unlisted company name also works (e.g. an acquisition target)."
+      },
+      "relation": {
+       "type": "string",
+       "description": "Optional filter when the pair has more than one link.",
+       "enum": [
+        "supplier",
+        "customer",
+        "competitor",
+        "peer",
+        "equity",
+        "investor",
+        "none",
+        "unknown"
+       ]
+      }
+     },
+     "required": [
+      "a",
+      "b"
+     ]
+    }
+   },
+   {
+    "name": "a_share_answer_by_id",
+    "description": "Retrieve a research result by the id that a_share_deep_research returned. Call this to check whether the human-reviewed answer is ready, or to fetch the full text once it is. Answers take minutes to hours because a filed report is read first; while it is still queued the tool returns the queue position, not a guess. Use this instead of opening the public page when you are an automated client that cannot render HTML.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "The 12-character hex id returned by a_share_deep_research, e.g. dc037a7fc6c8."
+      }
+     },
+     "required": [
+      "id"
+     ]
+    }
+   }
+  ]
+ }
+}

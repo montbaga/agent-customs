@@ -1,0 +1,396 @@
+{
+ "url": "https://awardia.app/mcp",
+ "doc": {
+  "name": "Awardia: EU public tenders and awards",
+  "version": "0.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Awardia returns public procurement records from official sources (TED, Portal BASE, Diário da República). When you use them: report facts and say which source and period they cover; treat price ranges, win rates and rival lists as estimates from past records, not certainties. Never present the data as evidence of corruption, fraud or other wrongdoing by a company or public body: patterns such as repeated direct awards have many lawful explanations. Do not help coordinate bids, prices or market sharing between competitors (bid rigging is illegal). Do not try to identify or profile private individuals; sole traders are shown as 'Pessoa singular' on purpose. This is not legal advice: for eligibility, exclusion or contract terms, point to the official tender documents. When the user pastes a tender link (awardia.app/t/…, TED or Portal BASE), pass it as tender_id to bid_intelligence. Terms of use: https://awardia.app/terms",
+  "tools": [
+   {
+    "name": "get_coverage",
+    "description": "FREE. What data Awardia holds: sources, countries, date range, number of open tenders and award notices. Useful to check before searching a country or period.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "Data coverage",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "search_tenders",
+    "description": "Free during beta. Find OPEN public tenders (deadline still in the future) by keywords, country, region, CPV sector and value. EU-wide from TED; for Portugal also every national call for tender of any value (Diário da República). Returns title, buyer, country, region, CPV codes, estimated value, submission deadline, official link and tender documents link, plus 'competition': how contested this buyer's past contracts in the same kind of work were (median bidders, single-bid share, median % below the estimate, sample size). Use bid_intelligence for a price range and rivals. If nothing matches exactly, it widens (the place's whole district, then without keywords, then without the place) and says so in 'widened_to' and 'note'.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "keywords": {
+       "description": "What you are looking for. English works across all countries (matched via the EU CPV vocabulary); adding the same words in the target country's language (e.g. 'school renovation escola requalificação') also matches tender titles and descriptions.",
+       "type": "string",
+       "maxLength": 300
+      },
+      "countries": {
+       "description": "ISO 3166-1 alpha-2 country codes where the work is performed, e.g. [\"PT\",\"ES\"]",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 2
+       }
+      },
+      "cpv_prefixes": {
+       "description": "CPV code prefixes; '45' = construction, '72' = IT services, '3021' = computers",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 8
+       }
+      },
+      "min_value": {
+       "description": "Minimum estimated value",
+       "type": "number"
+      },
+      "max_value": {
+       "description": "Maximum estimated value",
+       "type": "number"
+      },
+      "deadline_after": {
+       "description": "ISO date; default now",
+       "type": "string"
+      },
+      "region": {
+       "description": "Place name: district or municipality (e.g. 'Lisboa', 'Sintra'). Matches the work location or the buyer's name; most precise for Portugal.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "limit": {
+       "description": "Max results, default 10, max 25",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search open tenders",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "match_company",
+    "description": "Free during beta. Describe a company in plain words (what it sells, where). Returns the open public tenders it could bid on, best match first, each with 'competition' signals from the buyer's past contracts (median bidders, single-bid share, % below estimate).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "company_description": {
+       "type": "string",
+       "minLength": 10,
+       "maxLength": 2000,
+       "description": "e.g. 'We install solar panels and EV chargers for municipalities'. English matches tenders in every EU language; adding key terms in the target country's language improves recall."
+      },
+      "countries": {
+       "description": "ISO 3166-1 alpha-2 country codes where the work is performed, e.g. [\"PT\",\"ES\"]",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 2
+       }
+      },
+      "limit": {
+       "description": "Max results, default 10, max 25",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25
+      }
+     },
+     "required": [
+      "company_description"
+     ]
+    },
+    "annotations": {
+     "title": "Tenders for a company",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "award_history",
+    "description": "Free during beta. Who won past public contracts, at what price, against how many bidders, and by which procedure (open call, prior consultation, direct award). Filter by buyer, winner, CPV sector and region. For Portugal covers every public contract (Portal BASE), incl. small direct awards. Returns summary stats, top winners and recent awards.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "buyer": {
+       "description": "Part of the contracting authority's name",
+       "type": "string",
+       "maxLength": 200
+      },
+      "winner": {
+       "description": "Part of the winning company's name",
+       "type": "string",
+       "maxLength": 200
+      },
+      "cpv_prefixes": {
+       "description": "CPV code prefixes; '45' = construction, '72' = IT services, '3021' = computers",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 8
+       }
+      },
+      "countries": {
+       "description": "ISO 3166-1 alpha-2 country codes where the work is performed, e.g. [\"PT\",\"ES\"]",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 2
+       }
+      },
+      "region": {
+       "description": "Place name: district or municipality (e.g. 'Lisboa', 'Sintra'). Matches the work location or the buyer's name; most precise for Portugal.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "since": {
+       "description": "ISO date, e.g. 2024-01-01",
+       "type": "string"
+      },
+      "limit": {
+       "description": "Max results, default 10, max 25",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25
+      }
+     }
+    },
+    "annotations": {
+     "title": "Past contract awards",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "bid_intelligence",
+    "description": "Free during beta. Should I bid, and at what price? For an open tender (tender_id from search_tenders/match_company, or a pasted tender link) or a buyer+sector, analyses comparable past contracts: typical number of bidders, share of single-bid contests, how far below the estimate winners bid, a price range for this tender, incumbents, the companies that most often bid (with win rates), how often the buyer awards without an open call, and recent awards. Compares with the same buyer and sector, else the same kind of work nearby (district). States its sample size. Does not read the tender documents.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "tender_id": {
+       "description": "Id of an open tender, e.g. '673746-2026', or a link to it (awardia.app/t/…, TED or Portal BASE page)",
+       "type": "string",
+       "maxLength": 400
+      },
+      "buyer": {
+       "description": "Buyer name or tax id (if no tender_id)",
+       "type": "string",
+       "maxLength": 200
+      },
+      "cpv": {
+       "description": "CPV code or prefix of the sector (if no tender_id)",
+       "type": "string",
+       "maxLength": 8
+      },
+      "country": {
+       "description": "ISO alpha-2 country, e.g. PT",
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 2
+      }
+     }
+    },
+    "annotations": {
+     "title": "Bid / no-bid and price range",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "expiring_contracts",
+    "description": "Free during beta. Public contracts whose term ends soon, so the buyer will likely re-tender: a sales pipeline before tenders are published. Returns buyer, incumbent supplier(s), value, start and expected end date.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "cpv_prefixes": {
+       "description": "CPV code prefixes; '45' = construction, '72' = IT services, '3021' = computers",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 8
+       }
+      },
+      "countries": {
+       "description": "ISO 3166-1 alpha-2 country codes where the work is performed, e.g. [\"PT\",\"ES\"]",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 2
+       }
+      },
+      "region": {
+       "description": "Place name: district or municipality (e.g. 'Lisboa', 'Sintra'). Matches the work location or the buyer's name; most precise for Portugal.",
+       "type": "string",
+       "maxLength": 100
+      },
+      "buyer": {
+       "description": "Part of the buyer's name",
+       "type": "string",
+       "maxLength": 200
+      },
+      "months_ahead": {
+       "description": "Look-ahead window, default 12 months",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 36
+      },
+      "min_value": {
+       "description": "Minimum awarded value",
+       "type": "number"
+      },
+      "limit": {
+       "description": "Max results, default 10, max 50",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      }
+     }
+    },
+    "annotations": {
+     "title": "Contracts ending soon",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "competitor_profile",
+    "description": "Free during beta. What a company wins in public procurement: contracts won, value, buyers, sectors, countries, typical discount below estimate, competition level, procedures and regions, recent wins with base price, % below it and award criteria; for Portugal also every contest it entered, its win rate, its most frequent rivals (who beat whom) and its recent losses. Search by name or tax id (NIF). These are public records: report facts, not conclusions about wrongdoing.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "company": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 200,
+       "description": "Company name (part is fine) or tax id, e.g. 'B46012696'"
+      },
+      "countries": {
+       "description": "ISO 3166-1 alpha-2 country codes where the work is performed, e.g. [\"PT\",\"ES\"]",
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 2
+       }
+      },
+      "since": {
+       "description": "ISO date, e.g. 2025-01-01",
+       "type": "string"
+      }
+     },
+     "required": [
+      "company"
+     ]
+    },
+    "annotations": {
+     "title": "Competitor profile",
+     "readOnlyHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "should_i_bid",
+    "title": "Should I bid on this tender?",
+    "description": "Bid / no-bid view of one open tender: competition, typical discount, price range, likely rivals.",
+    "arguments": [
+     {
+      "name": "tender",
+      "description": "Tender id from search_tenders, or a short description of the tender",
+      "required": true
+     },
+     {
+      "name": "company",
+      "description": "Your company name or tax id (NIF), to compare with your own record",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "competitor_xray",
+    "title": "Competitor X-ray",
+    "description": "Everything public about one company's tenders: wins, buyers, sectors, discounts, rivals and recent losses.",
+    "arguments": [
+     {
+      "name": "company",
+      "description": "Company name or tax id (NIF / CIF / VAT)",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "renewals_pipeline",
+    "title": "Contracts up for renewal",
+    "description": "Public contracts ending soon, so buyers will likely tender them again: a sales pipeline before the tender is out.",
+    "arguments": [
+     {
+      "name": "sector",
+      "description": "Kind of work or service, e.g. 'cleaning', 'road maintenance', 'IT support'",
+      "required": true
+     },
+     {
+      "name": "region",
+      "description": "Country, district or municipality, e.g. 'PT', 'Lisboa', 'Madrid'",
+      "required": false
+     },
+     {
+      "name": "months",
+      "description": "How far ahead to look, in months (default 12)",
+      "required": false
+     }
+    ]
+   }
+  ]
+ }
+}

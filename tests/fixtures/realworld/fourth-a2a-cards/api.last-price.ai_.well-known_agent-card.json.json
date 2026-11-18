@@ -1,0 +1,157 @@
+{
+ "url": "https://api.last-price.ai/.well-known/agent-card.json",
+ "doc": {
+  "protocolVersion": "0.3.0",
+  "name": "Last Price",
+  "description": "Pricing compute for agents: quote a price, verify a price someone proposed, and record whether it was accepted. One API, any pricing logic, metered per call.",
+  "url": "https://api.last-price.ai",
+  "preferredTransport": "HTTP+JSON",
+  "provider": {
+   "organization": "Last Price",
+   "url": "https://last-price.ai"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://last-price.ai/documentation#agent-card",
+  "iconUrl": "https://last-price.ai/icon.svg",
+  "capabilities": {
+   "streaming": false,
+   "pushNotifications": false,
+   "stateTransitionHistory": false,
+   "extensions": [
+    {
+     "uri": "https://last-price.ai/a2a/ext/http-operations/v1",
+     "description": "Each skill is a plain HTTP JSON operation on url. There is no A2A message/send endpoint yet; call the operation listed for the skill.",
+     "required": false,
+     "params": {
+      "base_url": "https://api.last-price.ai",
+      "operations": [
+       {
+        "skill": "compute-price",
+        "method": "POST",
+        "path": "/api/compute/price",
+        "auth": "x-api-key or OAuth bearer, or an x402 payment with no credential where pay per call is offered",
+        "scope": "price:compute",
+        "public_demo": {
+         "method": "POST",
+         "path": "/api/public/compute/demo"
+        }
+       },
+       {
+        "skill": "verify-price",
+        "method": "POST",
+        "path": "/api/price-router/verify",
+        "auth": "x-api-key or OAuth bearer",
+        "scope": "price:compute",
+        "public_demo": {
+         "method": "POST",
+         "path": "/api/public/price-router/verify"
+        }
+       },
+       {
+        "skill": "record-outcome",
+        "method": "PATCH",
+        "path": "/api/usage/events/{receipt_id}/outcome",
+        "auth": "x-api-key or OAuth bearer",
+        "scope": "price:compute"
+       }
+      ],
+      "openapi": "https://api.last-price.ai/api/openapi",
+      "manifest": "https://api.last-price.ai/.well-known/agents.json"
+     }
+    },
+    {
+     "uri": "https://last-price.ai/a2a/ext/x402/v1",
+     "description": "compute-price can be bought one call at a time with an x402 payment and no account.",
+     "required": false,
+     "params": {
+      "network": "base",
+      "asset": "USDC",
+      "price_per_call": "0.01",
+      "endpoint": {
+       "method": "POST",
+       "path": "/api/compute/price"
+      }
+     }
+    }
+   ]
+  },
+  "securitySchemes": {
+   "apiKey": {
+    "type": "apiKey",
+    "in": "header",
+    "name": "x-api-key",
+    "description": "API key. Get one with no human at POST /api/agents/register."
+   },
+   "oauth2": {
+    "type": "oauth2",
+    "description": "OAuth client credentials.",
+    "flows": {
+     "clientCredentials": {
+      "tokenUrl": "https://api.last-price.ai/api/oauth/token",
+      "scopes": {
+       "price:compute": "Compute and verify prices"
+      }
+     }
+    }
+   }
+  },
+  "security": [
+   {
+    "apiKey": []
+   },
+   {
+    "oauth2": [
+     "price:compute"
+    ]
+   }
+  ],
+  "defaultInputModes": [
+   "application/json"
+  ],
+  "defaultOutputModes": [
+   "application/json"
+  ],
+  "skills": [
+   {
+    "id": "compute-price",
+    "name": "Compute a price",
+    "description": "Quote a price for a product or a call from its context (product type, current price, currency, costs, competitor offer) and optional constraints. Returns the price, confidence, the function that computed it and a receipt.",
+    "tags": [
+     "pricing",
+     "quote",
+     "compute"
+    ],
+    "examples": [
+     "{\"context\":{\"product_type\":\"saas\",\"current_price\":49,\"currency\":\"USD\"}}"
+    ]
+   },
+   {
+    "id": "verify-price",
+    "name": "Verify a price",
+    "description": "Check a price someone proposed against its context. Returns a verdict (fair, too_high, too_low or unknown), the band it was judged against, the deviation and the evidence, so a buyer can decide whether to accept, counter or walk away.",
+    "tags": [
+     "pricing",
+     "verification",
+     "buyer"
+    ],
+    "examples": [
+     "{\"proposed_price\":49,\"context\":{\"product_type\":\"saas\",\"current_price\":49,\"currency\":\"USD\"}}"
+    ]
+   },
+   {
+    "id": "record-outcome",
+    "name": "Record an outcome",
+    "description": "Report whether a computed price was accepted or rejected, against the receipt it came with. On a workspace with outcome pricing, a rejection inside the window pays part of the price back.",
+    "tags": [
+     "outcomes",
+     "feedback",
+     "billing"
+    ],
+    "examples": [
+     "{\"accepted\":false}"
+    ]
+   }
+  ],
+  "supportsAuthenticatedExtendedCard": false
+ }
+}

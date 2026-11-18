@@ -1,0 +1,853 @@
+{
+ "url": "https://arcticsci.com/mcp",
+ "doc": {
+  "name": "Arctic White",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Arctic White (arcticsci.com) sells laboratory consumables in the US and internationally: microplates, deep well plates, reservoirs, sealing mats and films, tubes, filter plates and lab equipment. Find products with search_products and get_product. Prices are in USD per selling unit (usually a case); many items are priced on request. To buy items with published prices, call check_price_and_stock, then get_shipping_estimate, then start_checkout, and give the buyer the checkout link: they pay on arcticsci.com. For items priced on request, large orders, POs or net terms, use request_quote; the buyer confirms it by email. Never claim an order is placed or paid: the buyer completes payment on the link. Phone (888) 448-0311, hello@arcticsci.com.",
+  "tools": [
+   {
+    "name": "search_products",
+    "title": "Search products",
+    "description": "Search Arctic White's catalog of lab consumables (microplates, deep well plates, reservoirs, sealing mats and films, tubes, filter plates, lab equipment) by catalog number, a competitor's part number, name, well count or type. Returns SKUs, published prices (or 'pricing on request'), stock and product links.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "What to search for, e.g. '96 deep well 2 mL', 'AWLS-219006', 'sealing mat 384'"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "description": "Most results to return (1 to 25, default 10)"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "description": "Matching products, best match first. Empty when nothing matches.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string",
+          "description": "Product name"
+         },
+         "url": {
+          "type": "string",
+          "description": "Product page on arcticsci.com"
+         },
+         "replaces": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "The competitor part this product replaces, when found through that part number"
+         },
+         "quote_only": {
+          "type": "boolean",
+          "description": "True for a custom made, quote-only product: it has no price and cannot be checked out; use request_quote"
+         },
+         "standard_alternative": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "For a quote-only product, the closest standard product sold today; null otherwise or when none is set",
+          "properties": {
+           "sku": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "SKU of the standard product"
+           },
+           "title": {
+            "type": "string",
+            "description": "Its name"
+           },
+           "url": {
+            "type": "string",
+            "description": "Its page on arcticsci.com"
+           }
+          },
+          "required": [
+           "sku",
+           "title",
+           "url"
+          ]
+         },
+         "variants": {
+          "type": "array",
+          "description": "Orderable options",
+          "items": {
+           "type": "object",
+           "description": "One orderable option of the product.",
+           "properties": {
+            "sku": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "SKU of this option"
+            },
+            "option": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Option name (e.g. Sterile), null when the product has one option"
+            },
+            "price_usd": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Published price per selling unit in USD, null when priced on request"
+            },
+            "price": {
+             "type": "string",
+             "description": "Price as shown, e.g. $246.00, or Pricing on request"
+            },
+            "availability": {
+             "type": "string",
+             "enum": [
+              "in_stock",
+              "backorder",
+              "out_of_stock"
+             ],
+             "description": "Stock status: in_stock, backorder (available to order) or out_of_stock"
+            }
+           },
+           "required": [
+            "sku",
+            "option",
+            "price_usd",
+            "price",
+            "availability"
+           ]
+          }
+         }
+        },
+        "required": [
+         "title",
+         "url",
+         "replaces",
+         "quote_only",
+         "standard_alternative",
+         "variants"
+        ]
+       }
+      }
+     },
+     "required": [
+      "results"
+     ]
+    },
+    "annotations": {
+     "title": "Search products",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_product",
+    "title": "Get product details",
+    "description": "Full details for one product: description, specifications and dimensions, options with SKU, price and stock, image and page link.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "sku": {
+       "type": "string",
+       "description": "SKU (e.g. AWLS-219006) or an arcticsci.com product link"
+      }
+     },
+     "required": [
+      "sku"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "title": {
+       "type": "string",
+       "description": "Product name"
+      },
+      "url": {
+       "type": "string",
+       "description": "Product page on arcticsci.com"
+      },
+      "brand": {
+       "type": "string",
+       "description": "Brand, Arctic White"
+      },
+      "discontinued": {
+       "type": "boolean",
+       "description": "True when the product is discontinued"
+      },
+      "quote_only": {
+       "type": "boolean",
+       "description": "True for a custom made, quote-only product: it has no price and cannot be checked out; use request_quote"
+      },
+      "standard_alternative": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "For a quote-only product, the closest standard product sold today; null otherwise or when none is set",
+       "properties": {
+        "sku": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "SKU of the standard product"
+        },
+        "title": {
+         "type": "string",
+         "description": "Its name"
+        },
+        "url": {
+         "type": "string",
+         "description": "Its page on arcticsci.com"
+        }
+       },
+       "required": [
+        "sku",
+        "title",
+        "url"
+       ]
+      },
+      "description": {
+       "type": "string",
+       "description": "Plain-text product description"
+      },
+      "specifications": {
+       "type": "array",
+       "description": "Specifications and dimensions, in display order",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "description": "Specification, e.g. Well Count"
+         },
+         "value": {
+          "type": "string",
+          "description": "Value, e.g. 96"
+         }
+        },
+        "required": [
+         "name",
+         "value"
+        ]
+       }
+      },
+      "variants": {
+       "type": "array",
+       "description": "Orderable options",
+       "items": {
+        "type": "object",
+        "description": "One orderable option of the product.",
+        "properties": {
+         "sku": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "SKU of this option"
+         },
+         "option": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Option name (e.g. Sterile), null when the product has one option"
+         },
+         "price_usd": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Published price per selling unit in USD, null when priced on request"
+         },
+         "price": {
+          "type": "string",
+          "description": "Price as shown, e.g. $246.00, or Pricing on request"
+         },
+         "availability": {
+          "type": "string",
+          "enum": [
+           "in_stock",
+           "backorder",
+           "out_of_stock"
+          ],
+          "description": "Stock status: in_stock, backorder (available to order) or out_of_stock"
+         }
+        },
+        "required": [
+         "sku",
+         "option",
+         "price_usd",
+         "price",
+         "availability"
+        ]
+       }
+      },
+      "image_url": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Main product image, null when there is none"
+      }
+     },
+     "required": [
+      "title",
+      "url",
+      "brand",
+      "discontinued",
+      "quote_only",
+      "standard_alternative",
+      "description",
+      "specifications",
+      "variants",
+      "image_url"
+     ]
+    },
+    "annotations": {
+     "title": "Get product details",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "check_price_and_stock",
+    "title": "Check price and stock",
+    "description": "Price and stock for a list of items, the subtotal, and whether the order can be bought online now (published prices, within the payment limits) or needs a quote.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "items": {
+       "type": "array",
+       "description": "Products and quantities. Quantity is in the product's selling unit (usually cases).",
+       "minItems": 1,
+       "maxItems": 50,
+       "items": {
+        "type": "object",
+        "description": "One product line.",
+        "properties": {
+         "sku": {
+          "type": "string",
+          "description": "Arctic White SKU, e.g. AWLS-219006"
+         },
+         "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Number of selling units (usually cases)"
+         }
+        },
+        "required": [
+         "sku",
+         "quantity"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "items"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "lines": {
+       "type": "array",
+       "description": "One entry per requested item",
+       "items": {
+        "type": "object",
+        "properties": {
+         "sku": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "SKU"
+         },
+         "title": {
+          "type": "string",
+          "description": "Product name"
+         },
+         "quantity": {
+          "type": "integer",
+          "description": "Selling units requested"
+         },
+         "unit_price_usd": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Price per selling unit in USD, null when priced on request"
+         },
+         "line_total_usd": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Quantity times unit price in USD, null when priced on request"
+         },
+         "availability": {
+          "type": "string",
+          "enum": [
+           "in_stock",
+           "backorder",
+           "out_of_stock"
+          ],
+          "description": "Stock status: in_stock, backorder (available to order) or out_of_stock"
+         }
+        },
+        "required": [
+         "sku",
+         "title",
+         "quantity",
+         "unit_price_usd",
+         "line_total_usd",
+         "availability"
+        ]
+       }
+      },
+      "subtotal_usd": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Goods subtotal in USD before shipping and tax, null when any item is priced on request"
+      },
+      "can_checkout": {
+       "type": "boolean",
+       "description": "True when start_checkout can sell these items now; otherwise use request_quote"
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Why the items can't be bought online, null when they can"
+      }
+     },
+     "required": [
+      "lines",
+      "subtotal_usd",
+      "can_checkout",
+      "reason"
+     ]
+    },
+    "annotations": {
+     "title": "Check price and stock",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_shipping_estimate",
+    "title": "Get shipping estimate",
+    "description": "Live FedEx shipping options and prices for the items to a destination, the same rates checkout charges. Needs only the country, postal code and, in the US and Canada, the state.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "items": {
+       "type": "array",
+       "description": "Products and quantities. Quantity is in the product's selling unit (usually cases).",
+       "minItems": 1,
+       "maxItems": 50,
+       "items": {
+        "type": "object",
+        "description": "One product line.",
+        "properties": {
+         "sku": {
+          "type": "string",
+          "description": "Arctic White SKU, e.g. AWLS-219006"
+         },
+         "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Number of selling units (usually cases)"
+         }
+        },
+        "required": [
+         "sku",
+         "quantity"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "address": {
+       "type": "object",
+       "description": "Where the items ship to. state is required only in the US and Canada (2-letter code). zip is required except in countries without postal codes.",
+       "properties": {
+        "country": {
+         "type": "string",
+         "description": "2-letter country code, e.g. US, DE, GB"
+        },
+        "zip": {
+         "type": "string",
+         "description": "ZIP or postal code"
+        },
+        "state": {
+         "type": "string",
+         "description": "2-letter state or province code in the US and Canada (e.g. PA, ON); region name or blank elsewhere"
+        },
+        "city": {
+         "type": "string",
+         "description": "City (optional)"
+        }
+       },
+       "required": [
+        "country"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "items",
+      "address"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "rates": {
+       "type": "array",
+       "description": "Shipping options, as offered by the carrier",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "Pass this to start_checkout as shipping_rate_id"
+         },
+         "service": {
+          "type": "string",
+          "description": "Carrier and service, e.g. FedEx Ground"
+         },
+         "price_usd": {
+          "type": "number",
+          "description": "Shipping charge in USD"
+         },
+         "estimated_days": {
+          "type": [
+           "integer",
+           "null"
+          ],
+          "description": "Estimated business days in transit, null when the carrier gives none"
+         }
+        },
+        "required": [
+         "id",
+         "service",
+         "price_usd",
+         "estimated_days"
+        ]
+       }
+      }
+     },
+     "required": [
+      "rates"
+     ]
+    },
+    "annotations": {
+     "title": "Get shipping estimate",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "start_checkout",
+    "title": "Start checkout",
+    "description": "Create a secure Stripe checkout link on arcticsci.com for items with published prices. The buyer opens the link to review the order, see sales tax and pay; nothing is charged until they do. Use the shipping option id from get_shipping_estimate, or leave it out for the lowest rate. Items priced on request, custom made (quote_only) products, or orders over the payment limits need request_quote instead.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "items": {
+       "type": "array",
+       "description": "Products and quantities. Quantity is in the product's selling unit (usually cases).",
+       "minItems": 1,
+       "maxItems": 50,
+       "items": {
+        "type": "object",
+        "description": "One product line.",
+        "properties": {
+         "sku": {
+          "type": "string",
+          "description": "Arctic White SKU, e.g. AWLS-219006"
+         },
+         "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Number of selling units (usually cases)"
+         }
+        },
+        "required": [
+         "sku",
+         "quantity"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "address": {
+       "type": "object",
+       "description": "Shipping address. state is required only in the US and Canada (2-letter code); elsewhere it is optional. zip is required except in countries without postal codes.",
+       "properties": {
+        "name": {
+         "type": "string",
+         "description": "Recipient name"
+        },
+        "company": {
+         "type": "string",
+         "description": "Company or institution. Required: Arctic White ships to businesses and labs."
+        },
+        "street1": {
+         "type": "string",
+         "description": "Street address"
+        },
+        "street2": {
+         "type": "string",
+         "description": "Suite, building or floor (optional)"
+        },
+        "city": {
+         "type": "string",
+         "description": "City"
+        },
+        "state": {
+         "type": "string",
+         "description": "2-letter state or province code in the US and Canada (e.g. PA, ON); region name or blank elsewhere"
+        },
+        "zip": {
+         "type": "string",
+         "description": "ZIP or postal code"
+        },
+        "country": {
+         "type": "string",
+         "description": "2-letter country code, e.g. US, DE, GB"
+        }
+       },
+       "required": [
+        "company",
+        "street1",
+        "city",
+        "country"
+       ],
+       "additionalProperties": false
+      },
+      "email": {
+       "type": "string",
+       "description": "Buyer's email, prefilled on the payment page (optional)"
+      },
+      "shipping_rate_id": {
+       "type": "string",
+       "description": "id from get_shipping_estimate (optional; the lowest rate is used when left out)"
+      }
+     },
+     "required": [
+      "items",
+      "address"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "checkout_url": {
+       "type": "string",
+       "description": "Stripe payment page on arcticsci.com's account. Give it to the buyer; it expires in 24 hours."
+      },
+      "subtotal_usd": {
+       "type": "number",
+       "description": "Goods subtotal in USD"
+      },
+      "shipping_usd": {
+       "type": "number",
+       "description": "Shipping charge in USD"
+      },
+      "shipping_service": {
+       "type": "string",
+       "description": "Carrier and service, e.g. FedEx Ground"
+      }
+     },
+     "required": [
+      "checkout_url",
+      "subtotal_usd",
+      "shipping_usd",
+      "shipping_service"
+     ]
+    },
+    "annotations": {
+     "title": "Start checkout",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "request_quote",
+    "title": "Request a quote",
+    "description": "Ask Arctic White for a quote (any items, including those priced on request, large orders, POs or net terms). We email the buyer a link to confirm the request; once confirmed, our team replies with pricing.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "email": {
+       "type": "string",
+       "description": "Buyer's work email; they confirm the request from it"
+      },
+      "name": {
+       "type": "string",
+       "description": "Buyer's name (optional)"
+      },
+      "company": {
+       "type": "string",
+       "description": "Company or institution"
+      },
+      "phone": {
+       "type": "string",
+       "description": "Phone number (optional)"
+      },
+      "note": {
+       "type": "string",
+       "description": "Anything the team should know: timeline, PO, terms, freight account (optional)"
+      },
+      "address": {
+       "type": "object",
+       "description": "Shipping address. state is required only in the US and Canada (2-letter code); elsewhere it is optional. zip is required except in countries without postal codes.",
+       "properties": {
+        "name": {
+         "type": "string",
+         "description": "Recipient name"
+        },
+        "company": {
+         "type": "string",
+         "description": "Company or institution (optional here; give it as the top-level company)"
+        },
+        "street1": {
+         "type": "string",
+         "description": "Street address"
+        },
+        "street2": {
+         "type": "string",
+         "description": "Suite, building or floor (optional)"
+        },
+        "city": {
+         "type": "string",
+         "description": "City"
+        },
+        "state": {
+         "type": "string",
+         "description": "2-letter state or province code in the US and Canada (e.g. PA, ON); region name or blank elsewhere"
+        },
+        "zip": {
+         "type": "string",
+         "description": "ZIP or postal code"
+        },
+        "country": {
+         "type": "string",
+         "description": "2-letter country code, e.g. US, DE, GB"
+        }
+       },
+       "required": [
+        "street1",
+        "city",
+        "country"
+       ],
+       "additionalProperties": false
+      },
+      "items": {
+       "type": "array",
+       "description": "Products and quantities. Quantity is in the product's selling unit (usually cases).",
+       "minItems": 1,
+       "maxItems": 50,
+       "items": {
+        "type": "object",
+        "description": "One product line.",
+        "properties": {
+         "sku": {
+          "type": "string",
+          "description": "Arctic White SKU, e.g. AWLS-219006"
+         },
+         "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Number of selling units (usually cases)"
+         }
+        },
+        "required": [
+         "sku",
+         "quantity"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "email",
+      "company",
+      "address",
+      "items"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "awaiting_email_confirmation"
+       ],
+       "description": "The request waits for the buyer to confirm it from the email"
+      },
+      "email": {
+       "type": "string",
+       "description": "Where the confirmation link was sent"
+      }
+     },
+     "required": [
+      "status",
+      "email"
+     ]
+    },
+    "annotations": {
+     "title": "Request a quote",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   }
+  ]
+ }
+}

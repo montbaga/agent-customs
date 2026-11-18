@@ -1,0 +1,809 @@
+{
+ "url": "https://mcp.ai-architectures.com/mcp",
+ "doc": {
+  "name": "AI Architectures",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "AI Architectures (20Vision GmbH, Vienna) makes floor plans, CAD drawings and architecture images.\n- Ready-made plans: search_house_plans, then get_house_plan. Free PDF/DXF/IFC downloads, no account.\n- A new floor plan as a measured CAD drawing (DXF/DWG/PDF): with the user's account, start_cad_drawing, then get_cad_drawing until it is ready; change_cad_drawing for edits. Without an account, or to attach a sketch on the site, prepare_cad_drawing_link.\n- Photos and renders (remodel preview, sketch to render, staging): get_design_tool_link.\nDrawings are concepts, not permit or construction documents.",
+  "tools": [
+   {
+    "name": "search_house_plans",
+    "title": "Search free house plans",
+    "description": "Use this when the user wants ready-made house plans, floor plan ideas or downloadable plans (for example \"3 bedroom ranch under 2,000 sq ft\", \"small ADU\", \"barndominium\"). Searches a library of about 500 free house plans by AI Architectures, each with a floor plan image, room sizes and free PDF, DXF, IFC and GLB downloads. Returns plan cards with links to the plan page and to change the plan in the CAD studio. Filters are optional; leave out what the user did not ask for.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Style or type words, e.g. \"modern farmhouse\", \"ranch\", \"ADU\", \"barndominium\", \"narrow lot\", \"30x40\"."
+      },
+      "bedrooms": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 8,
+       "description": "Exact number of bedrooms (0 = studio)."
+      },
+      "bathrooms": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 8,
+       "description": "Minimum number of bathrooms."
+      },
+      "min_sqft": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 20000,
+       "description": "Smallest living area in square feet (1 m² = 10.76 sq ft)."
+      },
+      "max_sqft": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 20000,
+       "description": "Largest living area in square feet."
+      },
+      "stories": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 3,
+       "description": "Number of storeys."
+      },
+      "garage": {
+       "type": "boolean",
+       "description": "true = only plans with a garage, false = only without."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 12,
+       "default": 6
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "house_plans"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Search free house plans",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Searching house plans…",
+     "openai/toolInvocation/invoked": "House plans found",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_house_plan",
+    "title": "Get a house plan",
+    "description": "Use this to show one house plan from search_house_plans in detail: description, every floor plan image and all free download links (PDF plan set, DXF per level, IFC, GLB).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "The plan slug from search_house_plans."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "house_plan"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Get a house plan",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Opening the plan…",
+     "openai/toolInvocation/invoked": "Plan ready",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "show_community_cad_drawings",
+    "title": "Show community CAD drawings",
+    "description": "Use this when the user wants to see what the AI drafter draws, or examples of AI-made CAD floor plans. Lists published drawings from the Plan Chat CAD studio (real, unretouched output), each with a preview, the brief it was drawn from, a free DXF download and a link to draw a similar one.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Optional words to filter by, e.g. \"townhouse\", \"office\", \"3 bedrooms\"."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 12,
+       "default": 6
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "community_drawings"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Show community CAD drawings",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Loading drawings…",
+     "openai/toolInvocation/invoked": "Drawings loaded",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "prepare_cad_drawing_link",
+    "title": "Prepare a CAD studio link",
+    "description": "Use this when the user wants a floor plan drawn as CAD (DXF/DWG) but is not signed in to an AI Architectures account here, or prefers to continue on the website, or wants to attach a sketch there. Returns a link that opens the Plan Chat CAD studio with the request already typed in; nothing is drawn or charged until the user presses send on the site.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "brief": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 2000,
+       "description": "The building in the user's words: type, rooms, sizes, storeys, plot. Any language."
+      }
+     },
+     "required": [
+      "brief"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "handoff"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Prepare a CAD studio link",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Preparing the studio…",
+     "openai/toolInvocation/invoked": "Studio link ready",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_design_tool_link",
+    "title": "Link to an AI Architectures design tool",
+    "description": "Use this when the user wants something AI Architectures does on its website from a photo or image: a remodel preview on a photo of their own home, a photoreal render from a sketch or model view, a render from a description, virtual staging, a listing photo kit, a clean floor plan image from a sketch or scan, a CAD drawing from a sketch, or before/after examples. Returns the page that does it; the user uploads the photo there.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "enum": [
+        "remodel_preview",
+        "architecture_render",
+        "render_from_description",
+        "virtual_staging",
+        "listing_kit",
+        "floor_plan_image_from_sketch",
+        "cad_from_sketch",
+        "examples_gallery"
+       ],
+       "description": "What the user wants to do."
+      }
+     },
+     "required": [
+      "task"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "handoff"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Link to a design tool",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Finding the right tool…",
+     "openai/toolInvocation/invoked": "Tool link ready",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "start_cad_drawing",
+    "title": "Start a CAD drawing",
+    "description": "Use this when the user asks to draw or design a floor plan as a real CAD drawing and wants it made now. The AI drafter of the Plan Chat CAD studio draws a layered, dimensioned plan (walls, doors, windows, furniture, dimensions, room names and areas) from the description and, if attached, a sketch or photo of a plan. Needs the user's AI Architectures account and spends credits from it (usually 700 to 1,800 credits per drawing; get_credit_balance shows the balance). Drawing takes 1 to 5 minutes; then call get_cad_drawing with the returned drawing_id. Confirm the brief with the user before starting.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "brief": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 4000,
+       "description": "The building: type, rooms with sizes if known, storeys, overall size or plot, style. Any language. With a sketch, say what it shows."
+      },
+      "units": {
+       "type": "string",
+       "enum": [
+        "m",
+        "ft"
+       ],
+       "default": "m",
+       "description": "m = metres and m², ft = feet-inches and sq ft. Use ft for US users."
+      },
+      "sketch": {
+       "type": "object",
+       "description": "A sketch, photo or screenshot of a floor plan the user attached in the chat.",
+       "properties": {
+        "download_url": {
+         "type": "string"
+        },
+        "file_id": {
+         "type": "string"
+        },
+        "mime_type": {
+         "type": "string"
+        },
+        "file_name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "download_url",
+        "file_id"
+       ],
+       "additionalProperties": false
+      },
+      "sketch_url": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional https URL of a sketch, photo or screenshot of a floor plan (JPG, PNG, WebP, HEIC; up to 15 MB), if no file was attached."
+      }
+     },
+     "required": [
+      "brief"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "drawing"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Start a CAD drawing",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": true,
+     "idempotentHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "drawings"
+      ]
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Starting the drafter…",
+     "openai/toolInvocation/invoked": "Drafter started",
+     "openai/fileParams": [
+      "sketch"
+     ],
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "drawings"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_cad_drawing",
+    "title": "Get a CAD drawing",
+    "description": "Use this to check a drawing started with start_cad_drawing (or one of list_my_cad_drawings): status, what the drafter says, room names, a preview image, the studio link and, when the account allows, DXF, DWG and PDF download links (valid for 10 minutes; call again for fresh ones). While it is still drawing this waits up to wait_seconds for it to finish.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "drawing_id": {
+       "type": "string",
+       "pattern": "^[a-z0-9]{6,32}$",
+       "description": "The id from start_cad_drawing or list_my_cad_drawings."
+      },
+      "wait_seconds": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 45,
+       "default": 20,
+       "description": "How long to wait for a running drawing to finish before answering."
+      }
+     },
+     "required": [
+      "drawing_id"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "drawing"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Get a CAD drawing",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "drawings"
+      ]
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Checking the drawing…",
+     "openai/toolInvocation/invoked": "Drawing status",
+     "openai/widgetAccessible": true,
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "drawings"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "change_cad_drawing",
+    "title": "Change a CAD drawing",
+    "description": "Use this when the user asks to change one of their CAD drawings in words (\"make the kitchen 4.2 m wide\", \"move the garage to the left\", \"add a window to bedroom 2\"). The drafter makes the change as a new version (earlier versions stay in the studio). Spends credits from the user's AI Architectures account (usually 60 to 600 per change). Then call get_cad_drawing.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "drawing_id": {
+       "type": "string",
+       "pattern": "^[a-z0-9]{6,32}$"
+      },
+      "change": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 4000,
+       "description": "What should change, in the user's words."
+      }
+     },
+     "required": [
+      "drawing_id",
+      "change"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "drawing"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Change a CAD drawing",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "drawings"
+      ]
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Sending the change…",
+     "openai/toolInvocation/invoked": "Change started",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "drawings"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "list_my_cad_drawings",
+    "title": "List my CAD drawings",
+    "description": "Use this when the user asks about their own drawings in the Plan Chat CAD studio. Lists them newest first with id, title, number of versions and whether one is being drawn now.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 30,
+       "default": 10
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "my_drawings"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "List my CAD drawings",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "drawings"
+      ]
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Loading your drawings…",
+     "openai/toolInvocation/invoked": "Your drawings",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "drawings"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_credit_balance",
+    "title": "Get credit balance",
+    "description": "Use this when the user asks how many AI Architectures credits their account has left before starting or changing a drawing.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "const": "account"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Get credit balance",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "drawings"
+      ]
+     }
+    ],
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://ai-architectures/widget-v2.html"
+     },
+     "openai/outputTemplate": "ui://ai-architectures/widget-v2.html",
+     "openai/toolInvocation/invoking": "Checking credits…",
+     "openai/toolInvocation/invoked": "Credits checked",
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "drawings"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "get_profile",
+    "title": "Get profile",
+    "description": "Return the AI Architectures account behind this connection. The opaque id is the account id, unique and unchanged across token refresh, reconnection and changes to the email or name.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "pattern": "\\S",
+       "description": "Opaque, stable AI Architectures account id."
+      },
+      "name": {
+       "type": "string",
+       "description": "Display name for the authenticated profile."
+      },
+      "email": {
+       "type": "string",
+       "description": "Email address for display; not used as the profile identity."
+      },
+      "nickname": {
+       "type": "string",
+       "description": "A useful label that helps users distinguish connected profiles."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get profile",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "drawings"
+      ]
+     }
+    ],
+    "_meta": {
+     "openai/profile": true,
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "drawings"
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "find_house_plan",
+    "title": "Find a house plan",
+    "description": "Find free house plans that fit a brief.",
+    "arguments": [
+     {
+      "name": "brief",
+      "description": "e.g. 3 bedroom ranch under 2,000 sq ft",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "draw_cad_floor_plan",
+    "title": "Draw a CAD floor plan",
+    "description": "Have the AI drafter draw a floor plan as a CAD drawing (DXF/DWG/PDF).",
+    "arguments": [
+     {
+      "name": "brief",
+      "description": "The building: rooms, sizes, storeys",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://ai-architectures/widget-v2.html",
+    "name": "ai-architectures-widget",
+    "title": "AI Architectures results",
+    "description": "Cards for house plans, CAD drawings and links.",
+    "mimeType": "text/html;profile=mcp-app"
+   }
+  ]
+ }
+}

@@ -1,0 +1,711 @@
+{
+ "url": "https://mcp.arcnautical.com/mcp",
+ "doc": {
+  "name": "ArcNautical",
+  "version": "0.2.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "ArcNautical screens commercial vessels for sanctions and risk. Identify a ship by its seven-digit IMO number (never by name alone: names repeat and change). Use check_vessel for a quick verdict with no key; use screen_vessel for the full evidence record when an API key is configured. Sanctions status semantics: RED = confirmed match on the vessel identifier, AMBER = possible match needing review, GREEN = no match against the sources reached, INCOMPLETE = a core source could not be read, which must never be presented as clear. Always quote the status, the checkedAt/screened_at time, and say that designations change daily.",
+  "tools": [
+   {
+    "name": "check_vessel",
+    "title": "Check a vessel (no key)",
+    "description": "Screen one vessel by IMO number against OFAC SDN, EU, UN, UK OFSI and OpenSanctions, with an ownership-opacity score and an A–E vetting grade from port-state-control history. Works with no API key. Rate-limited to 100 requests per hour per IP. Returns the VERDICT SUMMARY only; for every sanctions match with its source list and confidence class use screen_vessel (needs a key).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "imo": {
+       "type": "string",
+       "pattern": "^\\d{7}$",
+       "description": "Seven-digit IMO number of the vessel"
+      }
+     },
+     "required": [
+      "imo"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "imo": {
+       "type": "string",
+       "description": "The seven-digit IMO number screened"
+      },
+      "sanctions": {
+       "type": "object",
+       "properties": {
+        "status": {
+         "type": "string",
+         "description": "RED | AMBER | GREEN | INCOMPLETE"
+        },
+        "detail": {
+         "type": "string",
+         "description": "One sentence explaining the status"
+        },
+        "coverageComplete": {
+         "type": "boolean",
+         "description": "false when a supplementary list was unavailable — re-screen before relying on a GREEN"
+        }
+       },
+       "required": [
+        "status"
+       ],
+       "additionalProperties": true
+      },
+      "ownership": {
+       "type": "object",
+       "properties": {
+        "opacity": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "score": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       },
+       "additionalProperties": true
+      },
+      "vetting": {
+       "type": "object",
+       "properties": {
+        "grade": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "score": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "status": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": true
+      },
+      "assessed": {
+       "type": "boolean",
+       "description": "false means ownership and vetting are defaults, not findings"
+      },
+      "checkedAt": {
+       "type": "string",
+       "description": "ISO-8601 time the sources were read; designations change daily"
+      },
+      "fullReport": {
+       "type": "string",
+       "description": "Human-readable report URL for this hull"
+      },
+      "rate_limit": {
+       "type": "object",
+       "properties": {
+        "limit": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "remaining": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "reset": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "limit",
+        "remaining",
+        "reset"
+       ],
+       "additionalProperties": false,
+       "description": "Keyless allowance for the caller's address"
+      }
+     },
+     "required": [
+      "imo",
+      "sanctions",
+      "checkedAt",
+      "rate_limit"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "find_port",
+    "title": "Find a port / UN/LOCODE (no key)",
+    "description": "Resolve a port name, country or partial UN/LOCODE to the LOCODEs the routing engine knows. Routes are addressed by LOCODE, so call this before score_voyage rather than guessing a code. Works with no API key.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 2,
+       "description": "Port name, country, or LOCODE fragment, e.g. \"rotterdam\", \"NLRTM\", \"Piraeus\""
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "description": "Maximum matches to return (default 5)"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "ports": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "locode": {
+          "type": "string",
+          "description": "UN/LOCODE, e.g. NLRTM"
+         },
+         "name": {
+          "type": "string"
+         },
+         "country": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "locode",
+         "name"
+        ],
+        "additionalProperties": true
+       },
+       "description": "Best matches first"
+      }
+     },
+     "required": [
+      "ports"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "screen_vessel",
+    "title": "Screen a vessel (full record, API key)",
+    "description": "The authenticated screening record for one vessel: every sanctions match with its source list, programme and confidence class, ownership opacity, the graded vetting factors, per-source freshness, and a retained record id. Needs ARCNAUTICAL_API_KEY. Metered: a new self-serve key includes a one-time free allowance of live screenings; get_usage reports what is left. The same vessel asked again on the same day replays the stored record free. If the result is INCOMPLETE for identity, call again with vessel_name.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "imo": {
+       "type": "string",
+       "pattern": "^\\d{7}$",
+       "description": "Seven-digit IMO number of the vessel"
+      },
+      "vessel_name": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Only when a previous screen was INCOMPLETE for identity; a name you can confirm"
+      },
+      "customer_reference": {
+       "type": "string",
+       "maxLength": 128,
+       "description": "Your own reference (order id, voyage id); echoed on the record"
+      },
+      "include_vetting": {
+       "type": "boolean",
+       "description": "false skips the vetting grade for a faster sanctions-only screen"
+      }
+     },
+     "required": [
+      "imo"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Screening record id, retained ten years"
+      },
+      "imo": {
+       "type": "string"
+      },
+      "sanctions": {
+       "type": "object",
+       "properties": {
+        "status": {
+         "type": "string",
+         "description": "RED | AMBER | GREEN | INCOMPLETE"
+        },
+        "detail": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": true
+      },
+      "ownership": {
+       "type": "object",
+       "properties": {
+        "opacity": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "score": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       },
+       "additionalProperties": true
+      },
+      "vetting": {
+       "type": "object",
+       "properties": {
+        "grade": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "status": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": true
+      },
+      "screened_at": {
+       "type": "string",
+       "description": "ISO-8601 time the sources were read"
+      },
+      "vessel_name": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "screen_vessels",
+    "title": "Screen up to 50 vessels (API key)",
+    "description": "Batch-screen a list of IMO numbers and wait for the results (up to two minutes). Returns one verdict per hull plus the batch status. Needs ARCNAUTICAL_API_KEY. Each hull spends one screening unit unless it was already screened today.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "imos": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "pattern": "^\\d{7}$",
+        "description": "Seven-digit IMO number of the vessel"
+       },
+       "minItems": 1,
+       "maxItems": 50,
+       "description": "Up to 50 seven-digit IMO numbers"
+      },
+      "include_vetting": {
+       "type": "boolean",
+       "description": "false skips the vetting grade for a faster sanctions-only screen"
+      }
+     },
+     "required": [
+      "imos"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "batch": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "status": {
+         "type": "string",
+         "description": "queued | running | completed | partial | failed"
+        }
+       },
+       "additionalProperties": true,
+       "description": "The batch as last read"
+      },
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "imo": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "status": {
+          "type": "string"
+         },
+         "screening_id": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "result_body": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "sanctions": {
+              "type": "object",
+              "properties": {
+               "status": {
+                "type": "string"
+               }
+              },
+              "additionalProperties": true
+             }
+            },
+            "additionalProperties": true
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "additionalProperties": true
+       },
+       "description": "One row per hull"
+      }
+     },
+     "required": [
+      "batch",
+      "items"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_screening",
+    "title": "Retrieve a screening record (API key)",
+    "description": "Fetch a stored screening record by id — the audit copy, retained ten years. Needs ARCNAUTICAL_API_KEY.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Screening id returned by screen_vessel or in a batch item"
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Screening record id, retained ten years"
+      },
+      "imo": {
+       "type": "string"
+      },
+      "sanctions": {
+       "type": "object",
+       "properties": {
+        "status": {
+         "type": "string",
+         "description": "RED | AMBER | GREEN | INCOMPLETE"
+        },
+        "detail": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": true
+      },
+      "ownership": {
+       "type": "object",
+       "properties": {
+        "opacity": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "score": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       },
+       "additionalProperties": true
+      },
+      "vetting": {
+       "type": "object",
+       "properties": {
+        "grade": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "status": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": true
+      },
+      "screened_at": {
+       "type": "string",
+       "description": "ISO-8601 time the sources were read"
+      },
+      "vessel_name": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "score_voyage",
+    "title": "Score a voyage route (API key)",
+    "description": "Route risk between two ports (UN/LOCODEs): a 0–100 score, risk level, the signals driving it (war-risk areas, piracy, chokepoints, weather, sanctions exposure of transited EEZs), sea days, confidence and any missing sources. On lanes that can go either way round Africa it also scores the other passage (Suez or Cape) in `alternatives`. Resolve port names with find_port first. Needs ARCNAUTICAL_API_KEY; see get_usage for the allowance.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "origin": {
+       "type": "string",
+       "pattern": "^[A-Za-z]{5}$",
+       "description": "Origin UN/LOCODE, e.g. NLRTM"
+      },
+      "destination": {
+       "type": "string",
+       "pattern": "^[A-Za-z]{5}$",
+       "description": "Destination UN/LOCODE, e.g. CNSHA"
+      },
+      "passage": {
+       "type": "string",
+       "enum": [
+        "shortest",
+        "suez",
+        "cape"
+       ],
+       "description": "Which way round Africa to score: shortest (default; Suez on Asia-Europe), suez or cape. Refused on lanes with no such passage"
+      },
+      "vessel_type": {
+       "type": "string",
+       "enum": [
+        "container",
+        "bulk",
+        "tanker",
+        "lng",
+        "general"
+       ],
+       "description": "Vessel class; changes which threat signals weigh most (default: general)"
+      },
+      "load_condition": {
+       "type": "string",
+       "enum": [
+        "laden",
+        "ballast"
+       ],
+       "description": "laden or ballast; affects exposure on the transit (with vessel_type)"
+      },
+      "speed_knots": {
+       "type": "number",
+       "minimum": 8,
+       "maximum": 25,
+       "description": "Planned service speed, 8-25 knots; sets route.transit_days (default 14), and with vessel_type times the weather"
+      },
+      "dwt_tonnes": {
+       "type": "number",
+       "minimum": 1,
+       "maximum": 600000,
+       "description": "Deadweight in tonnes; accepted, but it does not change the score today"
+      },
+      "customer_reference": {
+       "type": "string",
+       "maxLength": 128,
+       "description": "Your own reference (voyage id, fixture); echoed on the assessment"
+      }
+     },
+     "required": [
+      "origin",
+      "destination"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Assessment id"
+      },
+      "score": {
+       "type": "number",
+       "description": "0-100, higher is riskier"
+      },
+      "risk_level": {
+       "type": "string",
+       "description": "low | moderate | elevated | high | critical"
+      },
+      "confidence": {
+       "type": "number",
+       "description": "0-1"
+      },
+      "missing_sources": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Signals that could not be read for this assessment"
+      },
+      "route": {
+       "type": "object",
+       "properties": {
+        "distance_nm": {
+         "type": "number"
+        }
+       },
+       "additionalProperties": true
+      },
+      "signals": {}
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_usage",
+    "title": "Usage and quota (API key)",
+    "description": "Live and test usage, remaining allowance, reset time, batch limits and monitor capacity for the configured key.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": true,
+     "idempotentHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "environment": {
+       "type": "string",
+       "description": "live | test"
+      },
+      "assessments": {
+       "type": "object",
+       "properties": {},
+       "additionalProperties": true,
+       "description": "Allowance, used, remaining and reset per environment"
+      },
+      "screenings": {
+       "type": "object",
+       "properties": {},
+       "additionalProperties": true
+      },
+      "limits": {
+       "type": "object",
+       "properties": {},
+       "additionalProperties": true
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   }
+  ]
+ }
+}

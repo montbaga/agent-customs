@@ -1,0 +1,859 @@
+{
+ "url": "https://storageprices.au/mcp",
+ "doc": {
+  "name": "storageprices",
+  "version": "1.5.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "StoragePrices exposes read-only Australian self-storage pricing. Use 'search' + 'fetch' for suburb discovery, or call the typed tools directly. Promotional advertised rates are never ongoing-rate claims: inspect is_promotional, standard_price_monthly_aud, promo_duration, ongoing_price_known, and price_disclosure. Never annualise an intro price unless twelve_month_cost_calculable is true. Every tool reads AVAILABLE units by default — the same set storageprices.au shows a human. Pass available_only=false for latest-known rows including units the source stopped listing. Being listed is not live stock: never claim live availability or guaranteed booking prices. CONTRACT: rate limit 20/minute anonymous, 120/minute with a connect token; batch max 3 calls. Errors: (1) JSON-RPC -32602 with data {field,value,allowed|hint|one_of} — fix that argument, do not retry unchanged; (2) isError result {error_code:'handler_error',message,retryable}; (3) isError result {error_code:'timeout',retryable:true,hint}. Row caps: 25-50 rows per call anonymous; a connect token (/mcp/<token>) lifts every tool to 500 — limit_applied and cap_reason say when you were capped. Prefer booking_handoff_url over url when linking a user to book. observed_at is a scrape time, not live availability. place.match_type and place.ambiguous say how a place name resolved. Pass a fetch document's metadata.typed_tool_args verbatim to the tools in its typed_tool_args_for. Full contract: resource storageprices://contract (also GET /mcp-info).",
+  "tools": [
+   {
+    "name": "search",
+    "description": "Search StoragePrices for Australian suburbs that have self-storage pricing data. Returns a list of matching suburb documents (id, title, url). Use the returned id with the 'fetch' tool to get a full pricing snapshot. When no published suburb page matches, it falls back to facility suburbs that have current prices and returns those as 'place:<state>:<slug>' ids with result_scope='facilities_only' (e.g. 'place:nsw:bondi-junction') — still fetchable, just without a suburb page behind them. Generic words (storage, prices, cheapest, ...) and state names are stripped first, so 'storage prices sydney' finds the Sydney city scope ('city:nsw:sydney', result_scope='city_scope'); a place with a centre but no data of its own returns its priced neighbours with result_scope='nearby' and distance_km. An empty result always carries `suggestions` (never empty): the nearest published suburbs with distance_km when the query could be placed, else the capital-city scopes and 'index:national' — all fetchable ids; `suggestions_basis` says which. Every hit carries suburb, state and match_type (exact, token = a whole word of a longer name, or prefix), exact first. A name that lives in several states is listed in each, with ambiguous=true and ambiguity_note; a catalogue suburb with no page is result_scope='catalogue_unpublished'. result_scope says what kind of place an id names; the same string is still sent as `coverage` on search hits and fetch documents, deprecated: read result_scope. A place that only contains the query inside a longer word is never a result: it is a suggestion, and other_state_matches names where the exact name exists.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Suburb name or partial text to search for.",
+       "minLength": 1,
+       "maxLength": 100
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "fetch",
+    "description": "Fetch the full self-storage pricing snapshot for a document id returned by 'search' — a published suburb page ('suburb:nsw:chatswood'), a facility suburb ('place:nsw:bondi-junction', answered as a 5 km radius snapshot around the centroid of the facilities recorded there — result_scope='nearby' when those facilities carry no current prices), a capital-city scope ('city:nsw:sydney', answered as the city-radius snapshot plus the city's Storage Box Index figure), or 'index:national' (the national Storage Box Index figure and the city-scope ids). metadata carries suburb, state, the scope's facility_count, unit_count, medians and observed_at, a dated citation_text, and typed_tool_args: pass these verbatim to any tool in metadata.typed_tool_args_for (a suburb or city document lists cheapest_storage / compare_prices / storage_near among others; a locality document lists price_distribution only) to continue on the same place and scope. typed_tool_args is null when the document is not a place. result_scope says what kind of document this is; the same string is still sent as `coverage`, deprecated: read result_scope. A row with no verified link has booking_handoff_url null and booking_handoff_reason: 'no operator URL on file' or 'operator URL host is not on the verified booking allow-list'. Link users with booking_handoff_url (tracked, live booking page); url is the StoragePrices page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Document id from a search result."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "cheapest_storage",
+    "description": "Cheapest observed advertised monthly self-storage prices for a suburb/state and/or size bracket. Optionally constrain by a max monthly price and/or unit floor area (sqm) — e.g. 'cheapest unit under $300 but more than 3 sqm in Fairfield, NSW'. Returns ranked facilities with prices and source URLs (chart-ready). Separately reports the lowest advertised price now and the lowest known ongoing price; intro rates with undisclosed reversion terms are labelled. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable. Every row carries distance_km from the suburb centre, and the `catchment` object states the scope and the farthest result: the market is the suburb page's catchment, not a fixed radius, so a result can sit well outside the suburb. Reads available units by default — the same set storageprices.au shows a human; pass available_only=false for latest-known rows including units the source has stopped listing. For every unit with a non-null booking_handoff_url, include it as a Markdown link labelled ‘Check availability & book’ and preserve the URL exactly. Render that result's commercial_disclosure immediately beside the action link. Clearly show introductory and ongoing prices. When booking_handoff_url is null, use the provided ‘View facility’ action instead. Requires at least one of: suburb, state, size_bracket. A row with no verified link has booking_handoff_url null and booking_handoff_reason: 'no operator URL on file' or 'operator URL host is not on the verified booking allow-list'. Link users with booking_handoff_url (tracked, live booking page); url is the StoragePrices page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      },
+      "max_monthly_price_aud": {
+       "type": "number",
+       "description": "Only include units at or below this advertised monthly price (AUD). 0 means no price filter (echoed in filters_applied.ignored_zero_bounds).",
+       "minimum": 0
+      },
+      "min_area_m2": {
+       "type": "number",
+       "description": "Only include units with at least this floor area in square metres. 0 means no area filter. An area bound excludes units whose area is unknown; filters_applied.dropped_unknown_area counts them. Must not exceed max_area_m2.",
+       "minimum": 0
+      },
+      "max_area_m2": {
+       "type": "number",
+       "description": "Only include units with at most this floor area in square metres. 0 means no area filter. An area bound excludes units whose area is unknown; filters_applied.dropped_unknown_area counts them.",
+       "minimum": 0
+      },
+      "move_in_date": {
+       "type": "string",
+       "format": "date",
+       "description": "Requested move-in date (YYYY-MM-DD). Applied to captured promotion-date eligibility and echoed in the result. Future-date operator inventory filtering is unavailable and is identified in unsupported_filters."
+      },
+      "stay_months": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 36,
+       "description": "Requested stay in whole months (1-36). Used to calculate the rent component only when captured promotion duration and ongoing-price terms make that calculation reliable."
+      },
+      "available_only": {
+       "type": "boolean",
+       "description": "Default true. True returns only units the provider still lists and a complete scrape has seen recently — the same set storageprices.au shows a human. Set false for every latest-known row, including units the source has stopped listing; those are historic observations, never an availability claim."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "state"
+       ]
+      },
+      {
+       "required": [
+        "size_bracket"
+       ]
+      }
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://storageprices/verdict"
+     }
+    }
+   },
+   {
+    "name": "best_value_storage",
+    "description": "Best-value self-storage ranking using known ongoing rates: annualised price per square metre when area is known, then ongoing monthly price when area is unknown. Intro-only rows whose reversion price is undisclosed remain visible but receive no value rank. Transparent price ranking, not a personalised recommendation. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable. Every row carries distance_km from the suburb centre, and the `catchment` object states the scope and the farthest result: the market is the suburb page's catchment, not a fixed radius, so a result can sit well outside the suburb. Reads available units by default — the same set storageprices.au shows a human; pass available_only=false for latest-known rows including units the source has stopped listing. For every unit with a non-null booking_handoff_url, include it as a Markdown link labelled ‘Check availability & book’ and preserve the URL exactly. Render that result's commercial_disclosure immediately beside the action link. Clearly show introductory and ongoing prices. When booking_handoff_url is null, use the provided ‘View facility’ action instead. Requires at least one of: suburb, state, size_bracket. A row with no verified link has booking_handoff_url null and booking_handoff_reason: 'no operator URL on file' or 'operator URL host is not on the verified booking allow-list'. Link users with booking_handoff_url (tracked, live booking page); url is the StoragePrices page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      },
+      "max_monthly_price_aud": {
+       "type": "number",
+       "description": "Only include units at or below this advertised monthly price (AUD). 0 means no price filter (echoed in filters_applied.ignored_zero_bounds).",
+       "minimum": 0
+      },
+      "min_area_m2": {
+       "type": "number",
+       "description": "Only include units with at least this floor area in square metres. 0 means no area filter. An area bound excludes units whose area is unknown; filters_applied.dropped_unknown_area counts them. Must not exceed max_area_m2.",
+       "minimum": 0
+      },
+      "max_area_m2": {
+       "type": "number",
+       "description": "Only include units with at most this floor area in square metres. 0 means no area filter. An area bound excludes units whose area is unknown; filters_applied.dropped_unknown_area counts them.",
+       "minimum": 0
+      },
+      "move_in_date": {
+       "type": "string",
+       "format": "date",
+       "description": "Requested move-in date (YYYY-MM-DD). Applied to captured promotion-date eligibility and echoed in the result. Future-date operator inventory filtering is unavailable and is identified in unsupported_filters."
+      },
+      "stay_months": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 36,
+       "description": "Requested stay in whole months (1-36). Used to calculate the rent component only when captured promotion duration and ongoing-price terms make that calculation reliable."
+      },
+      "available_only": {
+       "type": "boolean",
+       "description": "Default true. True returns only units the provider still lists and a complete scrape has seen recently — the same set storageprices.au shows a human. Set false for every latest-known row, including units the source has stopped listing; those are historic observations, never an availability claim."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "state"
+       ]
+      },
+      {
+       "required": [
+        "size_bracket"
+       ]
+      }
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "compare_prices",
+    "description": "Compare local self-storage prices for a market (suburb/state/size), optionally focused on a provider or facility. Returns a competitor set plus summary stats (median, range, market position). For a RENTER asking 'am I overpaying?' or a general market lookup. If the user is a storage OPERATOR checking their OWN price, use operator_benchmark instead. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable. Every row carries distance_km from the suburb centre, and the `catchment` object states the scope and the farthest result: the market is the suburb page's catchment, not a fixed radius, so a result can sit well outside the suburb. Reads available units by default — the same set storageprices.au shows a human; pass available_only=false for latest-known rows including units the source has stopped listing. For every unit with a non-null booking_handoff_url, include it as a Markdown link labelled ‘Check availability & book’ and preserve the URL exactly. Render that result's commercial_disclosure immediately beside the action link. Clearly show introductory and ongoing prices. When booking_handoff_url is null, use the provided ‘View facility’ action instead. Requires at least one of: suburb, state, size_bracket, provider. A row with no verified link has booking_handoff_url null and booking_handoff_reason: 'no operator URL on file' or 'operator URL host is not on the verified booking allow-list'. Link users with booking_handoff_url (tracked, live booking page); url is the StoragePrices page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      },
+      "provider": {
+       "type": "string",
+       "description": "Provider slug, e.g. 'kennards'."
+      },
+      "facility": {
+       "type": "string",
+       "description": "Facility name to focus the comparison on."
+      },
+      "move_in_date": {
+       "type": "string",
+       "format": "date",
+       "description": "Requested move-in date (YYYY-MM-DD). Applied to captured promotion-date eligibility and echoed in the result. Future-date operator inventory filtering is unavailable and is identified in unsupported_filters."
+      },
+      "stay_months": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 36,
+       "description": "Requested stay in whole months (1-36). Used to calculate the rent component only when captured promotion duration and ongoing-price terms make that calculation reliable."
+      },
+      "available_only": {
+       "type": "boolean",
+       "description": "Default true. True returns only units the provider still lists and a complete scrape has seen recently — the same set storageprices.au shows a human. Set false for every latest-known row, including units the source has stopped listing; those are historic observations, never an availability claim."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "state"
+       ]
+      },
+      {
+       "required": [
+        "size_bracket"
+       ]
+      },
+      {
+       "required": [
+        "provider"
+       ]
+      }
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "operator_benchmark",
+    "description": "For SELF-STORAGE OPERATORS checking their OWN pricing. Give your advertised monthly rate and a market; returns whether you're below / above / aligned with the local median per unit size, the %-distance, the annualised $ per unit you're leaving on the table (or charging over), and your rank vs nearby competitors. Omit size_bracket to sweep all unit sizes at once. Use for 'am I underpriced / overpriced / leaving money on the table / can I raise my rates'. Advertised public rates only — not occupancy or RevPAM. A market needs 3 competitor facilities and 3 observations; below that the status is insufficient_data. Omit my_monthly_price_aud if the user has not stated a price. Never invent one. Without a price the answer is the market median per unit size with verdict=null and a next_step. Pass provider or facility (the operator's own brand) so their own units are excluded from the competitor set. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "my_monthly_price_aud": {
+       "type": "number",
+       "description": "The operator's own advertised monthly price (AUD) to benchmark, greater than 0. Optional: omit it when the user has not stated a price.",
+       "exclusiveMinimum": 0
+      },
+      "my_price_is_promotional": {
+       "type": "boolean",
+       "description": "True when my_monthly_price_aud is an introductory/promotional rate. When omitted the price is treated as ongoing and the answer says assumed_ongoing=true."
+      },
+      "my_ongoing_price_aud": {
+       "type": "number",
+       "description": "Known post-promotion ongoing monthly rate (AUD), if publicly disclosed.",
+       "exclusiveMinimum": 0
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Unit size to benchmark. Omit to benchmark all sizes at once."
+      },
+      "provider": {
+       "type": "string",
+       "description": "Provider slug to exclude/identify your own brand."
+      },
+      "facility": {
+       "type": "string",
+       "description": "Your facility name, if focusing the comparison."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "required": [
+      "suburb",
+      "state"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "price_distribution",
+    "description": "Price distribution across facilities for a market + size bracket: per-facility median advertised prices plus known ongoing medians, coverage, and min/p25/median/p75/max summary. The coverage object separates a recognised locality from no known facilities, known but unpriced facilities, a thin sample, and sufficient distribution evidence. Promo-inclusive facility points are explicitly labelled. Requires at least one of: suburb, state, size_bracket.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      }
+     },
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "state"
+       ]
+      },
+      {
+       "required": [
+        "size_bracket"
+       ]
+      }
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "visible_promos",
+    "description": "Currently visible public self-storage promotions/discounts for a market. Only advertised promo copy captured at observation time. Reversion price, duration, discount, and calculable 12-month cost are separate nullable fields and are never inferred from a bare intro price. Reads available units by default — the same set storageprices.au shows a human; pass available_only=false for latest-known rows including units the source has stopped listing. For every unit with a non-null booking_handoff_url, include it as a Markdown link labelled ‘Check availability & book’ and preserve the URL exactly. Render that result's commercial_disclosure immediately beside the action link. Clearly show introductory and ongoing prices. When booking_handoff_url is null, use the provided ‘View facility’ action instead. Requires at least one of: suburb, state, size_bracket, provider. A row with no verified link has booking_handoff_url null and booking_handoff_reason: 'no operator URL on file' or 'operator URL host is not on the verified booking allow-list'. Link users with booking_handoff_url (tracked, live booking page); url is the StoragePrices page.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      },
+      "provider": {
+       "type": "string",
+       "description": "Provider slug, e.g. 'national'."
+      },
+      "move_in_date": {
+       "type": "string",
+       "format": "date",
+       "description": "Requested move-in date (YYYY-MM-DD). Applied to captured promotion-date eligibility and echoed in the result. Future-date operator inventory filtering is unavailable and is identified in unsupported_filters."
+      },
+      "stay_months": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 36,
+       "description": "Requested stay in whole months (1-36). Used to calculate the rent component only when captured promotion duration and ongoing-price terms make that calculation reliable."
+      },
+      "available_only": {
+       "type": "boolean",
+       "description": "Default true. True returns only units the provider still lists and a complete scrape has seen recently — the same set storageprices.au shows a human. Set false for every latest-known row, including units the source has stopped listing; those are historic observations, never an availability claim."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "state"
+       ]
+      },
+      {
+       "required": [
+        "size_bracket"
+       ]
+      },
+      {
+       "required": [
+        "provider"
+       ]
+      }
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "market_overview",
+    "description": "National Australian self-storage market snapshot: per-size-bracket price quartiles (IQR) and a provider league table with median prices and facility counts. Chart-ready. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "storage_box_index",
+    "description": "The Storage Box Index for a suburb: estimated monthly rent for a standardised ~9 sqm unit and parity vs the national benchmark using known ongoing rates. The index is null when no local ongoing rate is observable; promo-inclusive monthly medians are not presented as annual costs. A suburb is indexed over its suburb-page catchment, the market cheapest_storage and compare_prices read, and over all of it: `index_scope` states the basis, facility_count, observation_count and population_capped. A capital city is answered as the public index page's city scope. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "include_observations": {
+       "type": "boolean",
+       "description": "Default false: the index plus at most 25 observation rows and observations_total. True returns every observation row the index was computed from (up to the row cap)."
+      }
+     },
+     "required": [
+      "suburb"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "storage_near",
+    "description": "Unit-level self-storage prices within a kilometre radius of a point or suburb centre — e.g. 'storage within 5km of Fairfield, NSW'. At least one of suburb or lat+lng is required. Returns individual units (not aggregated) with distance: by default the 3 cheapest units of each facility, nearest facility first, so the page spans the radius; group_by_facility=false gives the flat nearest-unit-first list. Use this for true competitor data at the unit level and for radius questions. Every row separates advertised promotional, standard, and reversion pricing and states when ongoing pricing is unknown. Rows below the implausibly-cheap floor are excluded from the rows and the market population. A row is below it when its advertised rate is under $5, or when its ongoing rate (the advertised rate if none is known) is under $7 per square metre of unit area, capped at the per-size floor (locker $20, small $20, medium $30, large $50, extra_large $80, garage_plus $50, vehicle $30). A row with no recorded area is held to the per-size floor. Rows with no recorded size and only a category name (large warehouse, office, other, small warehouse, warehouse) are left out too: their prices are unreliable. Reads available units by default — the same set storageprices.au shows a human; pass available_only=false for latest-known rows including units the source has stopped listing. For every unit with a non-null booking_handoff_url, include it as a Markdown link labelled ‘Check availability & book’ and preserve the URL exactly. Render that result's commercial_disclosure immediately beside the action link. Clearly show introductory and ongoing prices. When booking_handoff_url is null, use the provided ‘View facility’ action instead. A row with no verified link has booking_handoff_url null and booking_handoff_reason: 'no operator URL on file' or 'operator URL host is not on the verified booking allow-list'. Link users with booking_handoff_url (tracked, live booking page); url is the StoragePrices page.",
+    "inputSchema": {
+     "type": "object",
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "lat",
+        "lng"
+       ]
+      }
+     ],
+     "properties": {
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "lat": {
+       "type": "number",
+       "minimum": -44.5,
+       "maximum": -9,
+       "description": "Latitude of the search centre (alternative to suburb; pass lng too). Inside Australia. If a suburb is also sent the coordinates win and `place.ignored_args` says so."
+      },
+      "lng": {
+       "type": "number",
+       "minimum": 112,
+       "maximum": 154.5,
+       "description": "Longitude of the search centre (alternative to suburb; pass lat too). Inside Australia."
+      },
+      "radius_km": {
+       "type": "number",
+       "description": "Search radius in kilometres (default 5). Must be greater than 0. A value below 0.5 is clamped to 0.5 and a value above 25 is clamped to 25, never rejected: radius_applied_km states the radius that ran and radius_note says when it was clamped.",
+       "exclusiveMinimum": 0
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      },
+      "available_only": {
+       "type": "boolean",
+       "description": "Default true. True returns only units the provider still lists and a complete scrape has seen recently — the same set storageprices.au shows a human. Set false for every latest-known row, including units the source has stopped listing; those are historic observations, never an availability claim."
+      },
+      "max_monthly_price_aud": {
+       "type": "number",
+       "description": "Only include units at or below this advertised monthly price (AUD). 0 means no price filter (echoed in filters_applied.ignored_zero_bounds).",
+       "minimum": 0
+      },
+      "min_area_m2": {
+       "type": "number",
+       "description": "Only include units with at least this floor area in square metres. 0 means no area filter. An area bound excludes units whose area is unknown; filters_applied.dropped_unknown_area counts them. Must not exceed max_area_m2.",
+       "minimum": 0
+      },
+      "max_area_m2": {
+       "type": "number",
+       "description": "Only include units with at most this floor area in square metres. 0 means no area filter. An area bound excludes units whose area is unknown; filters_applied.dropped_unknown_area counts them.",
+       "minimum": 0
+      },
+      "move_in_date": {
+       "type": "string",
+       "format": "date",
+       "description": "Requested move-in date (YYYY-MM-DD). Applied to captured promotion-date eligibility and echoed in the result. Future-date operator inventory filtering is unavailable and is identified in unsupported_filters."
+      },
+      "stay_months": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 36,
+       "description": "Requested stay in whole months (1-36). Used to calculate the rent component only when captured promotion duration and ongoing-price terms make that calculation reliable."
+      },
+      "group_by_facility": {
+       "type": "boolean",
+       "default": true,
+       "description": "Default true: at most per_facility_limit cheapest units per facility, nearest facility first, so the page spans the radius. group_by_facility=false returns the flat list, nearest unit first (a page can then fill up from one facility). facilities_in_radius and truncated report the whole radius either way."
+      },
+      "per_facility_limit": {
+       "type": "integer",
+       "description": "With group_by_facility=true: cheapest units per facility (default 3). Must be at least 1 (0 or below is rejected); a value above 25 is clamped to 25, and per_facility_limit_requested / _applied echo both.",
+       "minimum": 1,
+       "maximum": 25
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows to return. Anonymous callers are capped at 25-50 depending on the tool; a valid API key lifts the ceiling to 500. Values above your ceiling are clamped, not rejected.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "price_trends",
+    "description": "Add provider (for example storage_king) for provider history: ongoing and advertised monthly series, typical matched-facility movement and rising/falling counts, with explicit coverage gates. Provider-only queries are allowed and return separate size panels, never an all-size median. Storage King and National reconstruct products from historical booking links; other providers have descriptive history but no supported matched headline. A failed coverage gate returns insufficient_comparable_history, never a fallback price movement. Provider history defaults to monthly full UTC periods; use facility_id for a single facility. Without provider, returns the existing market trend: median advertised monthly price per week or month over a lookback window, plus the promotional share each period. Use for 'are prices going up?', seasonality, and promo cycles. Returns a chart-ready time series. trend_summary.direction follows the like-for-like matched panel (direction_basis) and keeps the raw change as advertised_change_pct. National and state-level series are cached for ten minutes (cached, cache_age_s). A query that overruns its statement timeout returns error_code='timeout' with retryable=true — narrow lookback_days or add state/suburb. Requires at least one of: suburb, state, size_bracket, provider.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "provider": {
+       "type": "string",
+       "description": "Provider slug or name, e.g. storage_king / Storage King. Enables provider history."
+      },
+      "facility_id": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 2147483647,
+       "description": "Optional exact facility ID, within provider. Requires provider; any geography also intersects this filter."
+      },
+      "suburb": {
+       "type": "string",
+       "description": "Australian suburb name, e.g. 'Chatswood'. A trailing state or postcode is peeled ('Sydney 2000'). Capital cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin, Gold Coast) resolve to a city-wide radius scope. On price_distribution, an otherwise-empty exact Australian locality can resolve from the packaged ABS SAL snapshot even when StoragePrices has no prices there. Every answer states how the place resolved in `place`. `place.match_type` says how the name matched (exact, token or prefix, ...); when `place.ambiguous` is true the name also matches the places in `place.other_candidates` — confirm with the user or pass state."
+      },
+      "state": {
+       "type": "string",
+       "description": "State code, e.g. 'NSW', 'VIC', 'QLD'."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket."
+      },
+      "lookback_days": {
+       "type": "integer",
+       "description": "How far back to look, in days (default 180, max 1095). Values outside 7–1095 are clamped; lookback_days_requested / _applied echo both.",
+       "minimum": 7,
+       "maximum": 1095
+      },
+      "granularity": {
+       "type": "string",
+       "enum": [
+        "week",
+        "month"
+       ],
+       "description": "Time bucket size (default month for provider history, week for market history)."
+      }
+     },
+     "anyOf": [
+      {
+       "required": [
+        "suburb"
+       ]
+      },
+      {
+       "required": [
+        "state"
+       ]
+      },
+      {
+       "required": [
+        "size_bracket"
+       ]
+      },
+      {
+       "required": [
+        "provider"
+       ]
+      }
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "inferred_market_rate",
+    "description": "Inferred market ASKING-rate range ($/m²/yr) for self-storage by size band and location: a plain median of asking $/m²/yr from public advertised standard rates, promo-haircut 0.95 (floor). States radius_facility_count and nearest_priced_facility_km; when fewer than 8 comparable facilities sit inside the radius the headline falls back to the state pool and is flagged (fallback, headline_is_fallback, confidence='insufficient') — not a local rate. A market screen — not achieved rent, occupancy, or valuation.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "lat": {
+       "type": "number",
+       "minimum": -44.5,
+       "maximum": -9,
+       "description": "Latitude of the location to query (required). Decimal degrees inside Australia, e.g. -33.796."
+      },
+      "lng": {
+       "type": "number",
+       "minimum": 112,
+       "maximum": 154.5,
+       "description": "Longitude of the location to query (required). Decimal degrees inside Australia, e.g. 151.183."
+      },
+      "size_bracket": {
+       "type": "string",
+       "enum": [
+        "locker",
+        "small",
+        "medium",
+        "large",
+        "extra_large",
+        "garage_plus",
+        "vehicle"
+       ],
+       "description": "Storage unit size bracket (required). One of: locker, small, medium, large, extra_large, garage_plus, vehicle."
+      },
+      "radius_km": {
+       "type": "number",
+       "description": "Radius to search for comparable facilities in kilometres (default 5). Must be greater than 0. A value below 1 is clamped to 1 and a value above 50 is clamped to 50, never rejected: radius_applied_km states the radius that ran and radius_note says when it was clamped.",
+       "exclusiveMinimum": 0
+      }
+     },
+     "required": [
+      "lat",
+      "lng",
+      "size_bracket"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://storageprices/verdict",
+    "name": "storageprices_verdict",
+    "title": "StoragePrices cheapest-storage verdict card",
+    "description": "Self-contained HTML card (MCP App) that renders the `verdict` block of a cheapest_storage result: the cheapest advertised rate, where it sits in the local market, and a shortlist. For hosts that render UI resources; it carries no data of its own.",
+    "mimeType": "text/html;profile=mcp-app"
+   },
+   {
+    "uri": "storageprices://contract",
+    "name": "storageprices_contract",
+    "title": "StoragePrices connector contract",
+    "description": "Machine-readable contract for this connector: rate limits, JSON-RPC batch cap, the error shapes (-32602 data, handler_error, timeout), per-tool row caps and how a connect token lifts them, which link to give a user, the REST-to-MCP row field map, and the payload fields a client branches on (place.match_type, search result_scope, fetch typed_tool_args, index_scope, booking_handoff_reason). Read this before answering questions about limits, errors or integration.",
+    "mimeType": "application/json"
+   }
+  ]
+ }
+}

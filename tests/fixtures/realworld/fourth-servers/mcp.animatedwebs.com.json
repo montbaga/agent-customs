@@ -1,0 +1,2576 @@
+{
+ "url": "https://mcp.animatedwebs.com",
+ "doc": {
+  "name": "AnimatedWebs",
+  "version": "1.4.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "AnimatedWebs MCP. Every tool call needs a signed-in session (OAuth 2.1, protected-resource metadata at /.well-known/oauth-protected-resource) or an API key sent as 'Authorization: Bearer aw_...' from /dashboard/developer; tools/list, prompts/list and resources/list work without sign-in. The server allows 240 requests a minute per client address and answers 429 with retry_after beyond that. Routing: search_catalog finds anything (AnimatedWebs templates, UI components, cinematic backgrounds, style references, creators; kind narrows it, an empty query browses, nextCursor pages); list_categories gives valid category values. Templates: get_template for details, with include_prompt true to build it here, or open_builder to hand it to Lovable, v0 or Bolt. UI components: get_component, with include_source true for code (Pro); generate_component and refine_component create and edit one (daily limit shared). Backgrounds: get_background. Style references: get_style_reference. Creators: get_creator. Account: get_account (plan, limits, include_items for saved, unlocked and generated items, includeDesignConnect for the Design MCP), get_pricing for plans, save_item to save, unsave or list favorites. Missing something: request_template, then manage_request to list, check or cancel requests. Older tool names (search, get_template_prompt, get_component_source, open_in_builder, get_request_status, list_my_items, search_templates, search_components, search_everything, search_backgrounds, search_styles, search_creators, list_component_categories, get_design_workspace) still work but are not listed.",
+  "tools": [
+   {
+    "name": "search_catalog",
+    "title": "Search the AnimatedWebs catalog",
+    "description": "Searches the AnimatedWebs catalog (AnimatedWebs templates, UI library components, cinematic video backgrounds, website style references and verified creators) and returns metadata grouped by kind, never prompt text or source code. Use it first to find an identifier, then open one item with get_template, get_component, get_background, get_style_reference or get_creator; use list_categories for valid category values. An empty query browses a family in catalog order. Template and component queries match each word as a case-insensitive substring and rank by words matched (ties keep catalog order); background, style and creator queries match the whole text as one substring. Filters apply per kind (templates: category, access, templateKind, technique; components: category, runtime). With kind all a family that cannot use a supplied filter is skipped; with one kind an unusable filter is an error. Paging: each group has nextCursor (null on the last page); pass it back as cursor with the same kind, query and filters. Template results include views, saves and likes. Read-only. Example: {\"query\":\"particles hero\",\"kind\":\"templates\",\"technique\":\"particles\",\"limit\":5}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "description": "Free text. Empty or omitted browses the family in catalog order. Templates and components split it on spaces and match each word as a substring ('webgl particles hero'); backgrounds, styles and creators match the whole text as one substring ('nature', 'stripe', 'webgl').",
+       "type": "string"
+      },
+      "kind": {
+       "default": "all",
+       "description": "Which family to search: templates (AnimatedWebs templates), components (UI library), backgrounds (cinematic video loops), styles (website style references), creators, or all (default) for every family at once.",
+       "type": "string",
+       "enum": [
+        "all",
+        "templates",
+        "components",
+        "backgrounds",
+        "styles",
+        "creators"
+       ]
+      },
+      "category": {
+       "description": "Templates and components only. Templates: exact category, case-insensitive, from list_categories (kind templates), e.g. 'AI / SaaS'. Components: exact category from list_categories (kind components), e.g. 'Hero', 'Three.js', 'Buttons'. An unknown value returns no results.",
+       "type": "string"
+      },
+      "access": {
+       "description": "Templates only. free: prompts any signed-in account can fetch; pro: needs a Pro or Lifetime plan or a Prompt Pack credit.",
+       "type": "string",
+       "enum": [
+        "free",
+        "pro"
+       ]
+      },
+      "templateKind": {
+       "description": "Templates only. website (full page), section (one page section), background (coded motion backdrop) or component.",
+       "type": "string",
+       "enum": [
+        "website",
+        "section",
+        "background",
+        "component"
+       ]
+      },
+      "technique": {
+       "description": "Templates only. A 3D / WebGL technique facet: threejs (three.js scenes), particles (particle fields), shaders (GLSL, raymarching, noise fields), 3d-objects (products to spin, inspect or configure), scroll-3d (scroll-driven 3D camera or scene) or simulators (machines, robots, physics). Same facets as animatedwebs.com/templates/3d.",
+       "type": "string",
+       "enum": [
+        "threejs",
+        "particles",
+        "shaders",
+        "3d-objects",
+        "scroll-3d",
+        "simulators"
+       ]
+      },
+      "runtime": {
+       "description": "Components only. Exact runtime, case-insensitive, e.g. 'react', 'three' or 'css'.",
+       "type": "string"
+      },
+      "limit": {
+       "description": "Maximum results per family on this page. Defaults / ceilings: templates and components 10 / 50, backgrounds and styles 20 / 50, creators 10 / 30, kind all 6 / 20 per family. A value above the ceiling is lowered to it.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "cursor": {
+       "description": "The nextCursor of a previous result, unchanged, sent with the same kind, query and filters. Single kind only (not kind all).",
+       "type": "string"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search the AnimatedWebs catalog",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/search.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "description": "The kind that was searched"
+      },
+      "templates": {
+       "type": "object",
+       "properties": {
+        "count": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Results on this page"
+        },
+        "total": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "All matches for this query and filters"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "slug": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "tagline": {
+            "type": "string"
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "website",
+             "section",
+             "background",
+             "component"
+            ]
+           },
+           "category": {
+            "type": "string"
+           },
+           "access": {
+            "type": "string",
+            "enum": [
+             "free",
+             "pro"
+            ]
+           },
+           "tags": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "stack": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "url": {
+            "type": "string",
+            "description": "Template page on animatedwebs.com"
+           },
+           "demo": {
+            "description": "Live demo URL, null when no demo exists",
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "preview": {
+            "description": "Preview image URL, null when none",
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "techniques": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            },
+            "description": "3D / WebGL technique facets (threejs, particles, shaders, 3d-objects, scroll-3d, simulators); empty when the template is not 3D"
+           },
+           "views": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "All-time page and demo views (refreshed every few hours)"
+           },
+           "saves": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Accounts that saved the template"
+           },
+           "likes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Accounts that liked the template"
+           }
+          },
+          "required": [
+           "slug",
+           "title",
+           "tagline",
+           "kind",
+           "category",
+           "access",
+           "tags",
+           "stack",
+           "url",
+           "demo",
+           "preview",
+           "techniques",
+           "views",
+           "saves",
+           "likes"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "nextCursor": {
+         "description": "Pass as cursor (with the same kind, query and filters) for the next page; null when this is the last page",
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "count",
+        "total",
+        "results",
+        "nextCursor"
+       ],
+       "additionalProperties": false
+      },
+      "components": {
+       "type": "object",
+       "properties": {
+        "count": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Results on this page"
+        },
+        "total": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "All matches for this query and filters"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "category": {
+            "type": "string"
+           },
+           "tags": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "runtime": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "variants": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            },
+            "description": "Variant titles"
+           },
+           "url": {
+            "type": "string"
+           },
+           "thumbnail": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "source": {
+            "type": "string",
+            "enum": [
+             "pro",
+             "none"
+            ]
+           }
+          },
+          "required": [
+           "id",
+           "title",
+           "category",
+           "tags",
+           "runtime",
+           "variants",
+           "url",
+           "thumbnail",
+           "source"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "nextCursor": {
+         "description": "Pass as cursor (with the same kind, query and filters) for the next page; null when this is the last page",
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "count",
+        "total",
+        "results",
+        "nextCursor"
+       ],
+       "additionalProperties": false
+      },
+      "backgrounds": {
+       "type": "object",
+       "properties": {
+        "count": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Results on this page"
+        },
+        "total": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "All matches for this query and filters"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "slug": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "tags": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "size": {
+            "type": "string"
+           },
+           "seconds": {
+            "type": "number"
+           },
+           "preview": {
+            "type": "string",
+            "description": "Watermarked preview video"
+           },
+           "poster": {
+            "type": "string"
+           },
+           "template": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "slug",
+           "title",
+           "tags",
+           "size",
+           "seconds",
+           "preview",
+           "poster",
+           "template"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "nextCursor": {
+         "description": "Pass as cursor (with the same kind, query and filters) for the next page; null when this is the last page",
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "count",
+        "total",
+        "results",
+        "nextCursor"
+       ],
+       "additionalProperties": false
+      },
+      "styles": {
+       "type": "object",
+       "properties": {
+        "count": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Results on this page"
+        },
+        "total": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "All matches for this query and filters"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "slug": {
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           },
+           "source": {
+            "type": "string"
+           },
+           "theme": {
+            "type": "string"
+           },
+           "displayFont": {
+            "type": "string"
+           },
+           "accent": {
+            "type": "string"
+           },
+           "screenshot": {
+            "type": "string"
+           },
+           "page": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "slug",
+           "name",
+           "source",
+           "theme",
+           "displayFont",
+           "accent",
+           "screenshot",
+           "page"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "nextCursor": {
+         "description": "Pass as cursor (with the same kind, query and filters) for the next page; null when this is the last page",
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "count",
+        "total",
+        "results",
+        "nextCursor"
+       ],
+       "additionalProperties": false
+      },
+      "creators": {
+       "type": "object",
+       "properties": {
+        "count": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "Results on this page"
+        },
+        "total": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991,
+         "description": "All matches for this query and filters"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "handle": {
+            "type": "string"
+           },
+           "display_name": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "headline": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "stack": {
+            "anyOf": [
+             {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "specialties": {
+            "anyOf": [
+             {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "tier": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "url": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "handle",
+           "display_name",
+           "headline",
+           "stack",
+           "specialties",
+           "tier",
+           "url"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "nextCursor": {
+         "description": "Pass as cursor (with the same kind, query and filters) for the next page; null when this is the last page",
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "count",
+        "total",
+        "results",
+        "nextCursor"
+       ],
+       "additionalProperties": false
+      },
+      "nextCursor": {
+       "description": "Single kind: the cursor for the next page, null on the last page. Always null for kind all; use each group's nextCursor instead.",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "unavailable": {
+       "description": "Kind all only: families that could not be searched right now",
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "kind",
+      "nextCursor"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_categories",
+    "title": "List AnimatedWebs categories",
+    "description": "Lists the valid values for search_catalog's category filter, with counts. Use it before filtering a search by category; use search_catalog itself to find items. kind templates (default) returns AnimatedWebs template categories under categories (fixed display order, zero-count categories included, some with a description) and the template kinds website, section and background under kinds; kind components returns UI library categories with component and variant counts under componentCategories (only non-empty ones); kind all returns both. Backgrounds, styles and creators have no categories. No pagination. Read-only. Example: {\"kind\":\"components\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "kind": {
+       "description": "templates (default): template categories and template kinds. components: UI library categories. all: both.",
+       "type": "string",
+       "enum": [
+        "templates",
+        "components",
+        "all"
+       ]
+      },
+      "scope": {
+       "description": "Deprecated name for kind, still accepted. kind wins when both are sent.",
+       "type": "string",
+       "enum": [
+        "templates",
+        "components",
+        "all"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "title": "List AnimatedWebs categories",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/list-categories.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "templates",
+        "components",
+        "all"
+       ],
+       "description": "The kind that was listed"
+      },
+      "categories": {
+       "description": "Template categories (kind templates or all)",
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "count": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         },
+         "description": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "name",
+         "count"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "kinds": {
+       "description": "Template kinds website, section and background (kind templates or all)",
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "count": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         }
+        },
+        "required": [
+         "name",
+         "count"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "componentCategories": {
+       "description": "UI library categories (kind components or all)",
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "components": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         },
+         "variants": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+         }
+        },
+        "required": [
+         "name",
+         "components",
+         "variants"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_template",
+    "title": "Get an AnimatedWebs template",
+    "description": "Returns one AnimatedWebs template by slug: description, stack, tags, access level, tools it works with, licence note, demo and preview URLs, views, saves and likes, and with include_prompt true the full build prompt as Markdown. Use it to inspect a template found with search_catalog and, once the user has chosen, to get the prompt and build it in the current project; use open_builder instead to hand the prompt to Lovable, v0 or Bolt. Without include_prompt it never spends a credit and changes nothing. With include_prompt: free templates work on any signed-in account; a Pro template is included with Pro and Lifetime, otherwise the first fetch spends one Prompt Pack credit (later fetches of that slug are free) and an account with no credits gets an error with the pack link. New Pro prompts have a fair-use cap (20 per 10 minutes, 60 a day, 200 a week, shared with open_builder) that never blocks a prompt already opened today. Free-plan accounts may get a short upgrade note as a second text block. Unknown slugs return an error. Example: {\"slug\":\"aurora-site\",\"include_prompt\":true}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "Template slug exactly as returned by search_catalog (lowercase, hyphenated), e.g. 'aurora-site'."
+      },
+      "include_prompt": {
+       "default": false,
+       "description": "true adds prompt (the build prompt as Markdown) after the access check above. Default false: details only, nothing spent.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Get an AnimatedWebs template",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-template.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "tagline": {
+       "type": "string"
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "website",
+        "section",
+        "background",
+        "component"
+       ]
+      },
+      "category": {
+       "type": "string"
+      },
+      "access": {
+       "type": "string",
+       "enum": [
+        "free",
+        "pro"
+       ]
+      },
+      "tags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "stack": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "url": {
+       "type": "string",
+       "description": "Template page on animatedwebs.com"
+      },
+      "demo": {
+       "description": "Live demo URL, null when no demo exists",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "preview": {
+       "description": "Preview image URL, null when none",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "techniques": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "3D / WebGL technique facets (threejs, particles, shaders, 3d-objects, scroll-3d, simulators); empty when the template is not 3D"
+      },
+      "views": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "All-time page and demo views (refreshed every few hours)"
+      },
+      "saves": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "Accounts that saved the template"
+      },
+      "likes": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "Accounts that liked the template"
+      },
+      "description": {
+       "type": "string"
+      },
+      "worksWith": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "AI builders and tools the prompt was tested with"
+      },
+      "license": {
+       "type": "string",
+       "description": "Licence summary for this access level"
+      },
+      "prompt": {
+       "description": "Only with include_prompt: Markdown with title, description, stack, then the build prompt",
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "title",
+      "tagline",
+      "kind",
+      "category",
+      "access",
+      "tags",
+      "stack",
+      "url",
+      "demo",
+      "preview",
+      "techniques",
+      "views",
+      "saves",
+      "likes",
+      "description",
+      "worksWith",
+      "license"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_component",
+    "title": "Get an AnimatedWebs UI component",
+    "description": "Returns one AnimatedWebs UI library component by id: description, runtime, interaction, tags, every variant with live URL and thumbnail, import name, shadcn install command, and with include_source true its complete source code (Pro). Use it after search_catalog (kind components) to inspect a component and then add it to a project; use generate_component instead when nothing in the library fits. Details never spend a credit. include_source needs AnimatedWebs Pro (others get an error with the pricing link) and returns code: the renderer and shared files with a per-account watermark, filling about 120,000 characters; files that did not fit have no code and are named in code.omitted, so call again with that path to get one file. New components count toward a fair-use cap (40 per 10 minutes, 150 a day, 500 a week, shared with get_background) that never blocks one already opened today. Unknown ids return an error. Example: {\"id\":\"aurora-hero\",\"include_source\":true}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Component id exactly as returned by search_catalog (kind components), e.g. 'aurora-hero'."
+      },
+      "include_source": {
+       "default": false,
+       "description": "true adds code with the source files (Pro only). Default false: public details only.",
+       "type": "boolean"
+      },
+      "path": {
+       "description": "One file path from code.files or code.omitted of an earlier call for the same id; returns only that file in code.files. Implies include_source.",
+       "type": "string"
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "annotations": {
+     "title": "Get an AnimatedWebs UI component",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-component.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "category": {
+       "type": "string"
+      },
+      "tags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "description": {
+       "type": "string"
+      },
+      "runtime": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "interaction": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "url": {
+       "type": "string"
+      },
+      "thumbnail": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "importName": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "install": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "string",
+       "enum": [
+        "pro",
+        "none"
+       ],
+       "description": "pro: full source available with AnimatedWebs Pro; none: no source bundle"
+      },
+      "variants": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "thumbnail": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "title",
+         "description",
+         "url",
+         "thumbnail"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "shadcnInstall": {
+       "type": "string"
+      },
+      "shadcnSetup": {
+       "type": "string"
+      },
+      "license": {
+       "type": "string"
+      },
+      "code": {
+       "description": "Only with include_source or path",
+       "type": "object",
+       "properties": {
+        "exportName": {
+         "type": "string"
+        },
+        "runtime": {
+         "type": "string"
+        },
+        "files": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "path": {
+            "type": "string"
+           },
+           "language": {
+            "type": "string"
+           },
+           "lines": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "bytes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+           },
+           "shared": {
+            "type": "boolean",
+            "description": "Shared helper used by several components"
+           },
+           "code": {
+            "description": "Missing when the file did not fit; fetch it with path",
+            "type": "string"
+           }
+          },
+          "required": [
+           "path",
+           "language",
+           "lines",
+           "bytes",
+           "shared"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "assets": {
+         "description": "Asset list from the source bundle"
+        },
+        "omitted": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Paths without code in this reply"
+        }
+       },
+       "required": [
+        "exportName",
+        "runtime",
+        "files",
+        "omitted"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "id",
+      "title",
+      "category",
+      "tags",
+      "description",
+      "runtime",
+      "interaction",
+      "url",
+      "thumbnail",
+      "importName",
+      "install",
+      "source",
+      "variants",
+      "shadcnInstall",
+      "shadcnSetup",
+      "license"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "generate_component",
+    "title": "Generate an AnimatedWebs UI component",
+    "description": "Writes one new UI component from a text description with AnimatedWebs AI and returns a complete self-contained HTML document (Tailwind CDN, inline JS). Use it when no library component fits; search_catalog (kind components) first to reuse one, and refine_component to change a result. The text block is the HTML preceded by an HTML comment naming the model and the generations left; structuredContent has html, model and generationsLeftToday. Each successful call uses one daily generation (Free 5, Pro 100 per UTC day, shared with refine_component and the tools site); a call where no model ran is not counted. Not idempotent: each call gives different output. If the generator is busy it returns an error; retry after a minute. Example: {\"prompt\":\"a pricing section with three plans and a yearly toggle\",\"style\":\"glass\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "prompt": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 1200,
+       "description": "What to build, 8 to 1200 characters: content, layout and motion. Example: 'a pricing section with three plans and a yearly toggle'."
+      },
+      "style": {
+       "default": "luxury",
+       "description": "Visual system: luxury (dark, gold accent, serif; default), editorial (warm light page, oxblood accent), glass (navy-black, frosted layers, violet accent) or brutalist (black and white, signal red, hard borders).",
+       "type": "string",
+       "enum": [
+        "luxury",
+        "editorial",
+        "glass",
+        "brutalist"
+       ]
+      }
+     },
+     "required": [
+      "prompt"
+     ]
+    },
+    "annotations": {
+     "title": "Generate an AnimatedWebs UI component",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/generate-component.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "html": {
+       "type": "string",
+       "description": "Complete self-contained HTML document (Tailwind CDN, inline JS)"
+      },
+      "model": {
+       "type": "string",
+       "description": "Model that wrote it"
+      },
+      "generationsLeftToday": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "Generations left for this account today (UTC)"
+      }
+     },
+     "required": [
+      "html",
+      "model",
+      "generationsLeftToday"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "refine_component",
+    "title": "Refine an AnimatedWebs UI component",
+    "description": "Applies one requested change to an existing component's HTML with AnimatedWebs AI and returns the complete updated HTML document. Use it to iterate on a generate_component result (or any self-contained HTML component); use generate_component to start from scratch. Output has the same shape as generate_component (HTML text block with a model comment; structuredContent html, model, generationsLeftToday). Uses one daily generation from the same shared allowance (Free 5, Pro 100 per UTC day); a call where no model ran is not counted. Not idempotent. If the generator is busy it returns an error; retry after a minute. Example: {\"html\":\"<!doctype html>...\",\"change\":\"make the cards glass and add a hover tilt\",\"style\":\"glass\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "html": {
+       "type": "string",
+       "minLength": 50,
+       "maxLength": 60000,
+       "description": "The current component as a full HTML document, 50 to 60,000 characters; pass the previous output unchanged."
+      },
+      "change": {
+       "type": "string",
+       "minLength": 4,
+       "maxLength": 800,
+       "description": "One change, 4 to 800 characters. Example: 'make the cards glass and add a hover tilt'."
+      },
+      "style": {
+       "default": "luxury",
+       "description": "Visual system to keep: luxury (default), editorial, glass or brutalist. Pass the style the component was generated with.",
+       "type": "string",
+       "enum": [
+        "luxury",
+        "editorial",
+        "glass",
+        "brutalist"
+       ]
+      }
+     },
+     "required": [
+      "html",
+      "change"
+     ]
+    },
+    "annotations": {
+     "title": "Refine an AnimatedWebs UI component",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/refine-component.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "html": {
+       "type": "string",
+       "description": "Complete self-contained HTML document (Tailwind CDN, inline JS)"
+      },
+      "model": {
+       "type": "string",
+       "description": "Model that wrote it"
+      },
+      "generationsLeftToday": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991,
+       "description": "Generations left for this account today (UTC)"
+      }
+     },
+     "required": [
+      "html",
+      "model",
+      "generationsLeftToday"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "open_builder",
+    "title": "Open an AnimatedWebs template in a builder",
+    "description": "Returns links that start a new project from one AnimatedWebs template's build prompt in Lovable, v0 and Bolt; nothing is created until the user opens a link. Use it to hand a template to a hosted AI builder; use get_template with include_prompt true instead to build it yourself in the current project. Same access rule and fair-use cap as get_template with include_prompt: free templates need any signed-in account; a Pro template is included with Pro and Lifetime or spends one Prompt Pack credit on first use (later calls are free). The prompt is embedded in each link, so v0 and Bolt links are left out when longer than 7,000 characters; lovable is always present. Unknown slugs return an error. Example: {\"slug\":\"aurora-site\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "Template slug exactly as returned by search_catalog (kind templates), e.g. 'aurora-site'."
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Open an AnimatedWebs template in a builder",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/open-in-builder.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "template": {
+       "type": "string",
+       "description": "Template title"
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "lovable": {
+         "type": "string",
+         "description": "Always present"
+        },
+        "v0": {
+         "description": "Omitted when the link exceeds 7,000 characters",
+         "type": "string"
+        },
+        "bolt": {
+         "description": "Omitted when the link exceeds 7,000 characters",
+         "type": "string"
+        }
+       },
+       "required": [
+        "lovable"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "template",
+      "links"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_background",
+    "title": "Get an AnimatedWebs cinematic background",
+    "description": "Returns one AnimatedWebs cinematic video background by slug: on Pro and Lifetime the clean watermark-free MP4 URL plus an HTML snippet for a muted, looping, autoplaying hero video; on other plans the watermarked preview URL, clean: null and the plan required (not an error). Use it after search_catalog (kind backgrounds); use get_template for full website templates. A clean file counts toward the fair-use cap shared with get_component source (40 per 10 minutes, 150 a day, 500 a week; never blocks one already opened today). Read-only. Unknown slugs return an error. Example: {\"slug\":\"aurora-loop\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "Background slug exactly as returned by search_catalog (kind backgrounds), e.g. 'aurora-loop'."
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Get an AnimatedWebs cinematic background",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-background.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "url": {
+       "description": "Clean MP4 URL (Pro only)",
+       "type": "string"
+      },
+      "snippet": {
+       "description": "HTML video element (Pro only)",
+       "type": "string"
+      },
+      "license": {
+       "type": "string"
+      },
+      "preview": {
+       "description": "Watermarked preview (non-Pro only)",
+       "type": "string"
+      },
+      "clean": {
+       "description": "Always null for non-Pro",
+       "type": "null"
+      },
+      "plan": {
+       "type": "string"
+      },
+      "pricing": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_style_reference",
+    "title": "Get an AnimatedWebs style reference",
+    "description": "Returns the full DESIGN.md for one AnimatedWebs website style reference (colour tokens, type scale, radius, buttons, layout notes, build prompt) plus a Tailwind v4 @theme block and CSS variables. Use it after search_catalog (kind styles) to build original work in that style; use get_template for a ready AnimatedWebs template. It is guidance only: do not copy the source site's logo, images, copy or trademarks. No credits, no pagination. Read-only. Unknown slugs return an error. Example: {\"slug\":\"stripe\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "Style slug exactly as returned by search_catalog (kind styles), e.g. 'stripe'."
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Get an AnimatedWebs style reference",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-style-reference.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string"
+      },
+      "source": {
+       "type": "string",
+       "description": "The measured public website"
+      },
+      "page": {
+       "type": "string"
+      },
+      "designMd": {
+       "type": "string",
+       "description": "Markdown design brief"
+      },
+      "tailwind": {
+       "type": "string",
+       "description": "Tailwind v4 @theme block"
+      },
+      "css": {
+       "type": "string",
+       "description": "CSS custom properties"
+      },
+      "note": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "name",
+      "source",
+      "page",
+      "designMd",
+      "tailwind",
+      "css",
+      "note"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_creator",
+    "title": "Get an AnimatedWebs creator",
+    "description": "Returns one verified AnimatedWebs creator's public profile by handle (name, headline, bio, website, stack, specialties, tier, certificate number, profile URL) and their live templates (title, tagline, kind, access, price in USD, stack, demo and preview URLs). Use it after search_catalog (kind creators); for catalog templates use get_template. Never includes prompts. Read-only. Unknown or unverified handles return an error. Example: {\"handle\":\"ada\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "handle": {
+       "type": "string",
+       "description": "Creator handle as returned by search_catalog (kind creators); case-insensitive, no leading slash or @, e.g. 'ada'."
+      }
+     },
+     "required": [
+      "handle"
+     ]
+    },
+    "annotations": {
+     "title": "Get an AnimatedWebs creator",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-creator.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "handle": {
+       "type": "string"
+      },
+      "display_name": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "headline": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "bio": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "website": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "stack": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "specialties": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "tier": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "certificate_no": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "url": {
+       "type": "string"
+      },
+      "templates": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "tagline": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "kind": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "access": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "price": {
+          "type": "number",
+          "description": "USD, 0 when free"
+         },
+         "stack": {
+          "anyOf": [
+           {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "demo_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "preview_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "title",
+         "tagline",
+         "kind",
+         "access",
+         "price",
+         "stack",
+         "demo_url",
+         "preview_url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "handle",
+      "display_name",
+      "headline",
+      "bio",
+      "website",
+      "stack",
+      "specialties",
+      "tier",
+      "certificate_no",
+      "url",
+      "templates"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_pricing",
+    "title": "Get AnimatedWebs pricing",
+    "description": "Returns AnimatedWebs plans and prices (Free, Prompt Pack, Pro monthly and yearly, Lifetime) with what each includes, founding Lifetime spots left and the pricing page URL. Use it for plan and price questions; use get_account for the signed-in user's own plan, credits and usage. Prices are numbers in USD; only the founding or the regular Lifetime plan is listed, depending on spots left. No parameters. Read-only. Example: {}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "Get AnimatedWebs pricing",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-pricing.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "free": {
+       "type": "object",
+       "properties": {
+        "price": {
+         "type": "number"
+        },
+        "includes": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "price",
+        "includes"
+       ],
+       "additionalProperties": false
+      },
+      "plans": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "price": {
+          "type": "number",
+          "description": "USD"
+         },
+         "interval": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "blurb": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "name",
+         "price"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "includes": {
+       "type": "object",
+       "properties": {
+        "pack": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "pro": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "lifetime": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "pack",
+        "pro",
+        "lifetime"
+       ],
+       "additionalProperties": false
+      },
+      "foundingLifetimeSpotsLeft": {
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      },
+      "pricingUrl": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "free",
+      "plans",
+      "includes",
+      "foundingLifetimeSpotsLeft",
+      "pricingUrl"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_account",
+    "title": "Get my AnimatedWebs account",
+    "description": "Returns the signed-in account's AnimatedWebs plan and today's usage (Pro prompt access or Prompt Pack credits, UI generations and Design AI requests used against the daily limits), links, the Design workspace URL, and on request the account's items. Use it to check whether a Pro prompt, generate_component or refine_component call will succeed, or to pick up earlier work; use get_pricing for plan prices and save_item to change saved items. include_items adds items: saved (templates, components and backgrounds saved with save_item or hearted on animatedwebs.com), unlocked (Pro templates already opened, so fetching their prompt again is free) and generated (prompt, model and date of each AI generation; the HTML itself is not stored). includeDesignConnect adds ready-to-paste setup for the separate AnimatedWebs Design MCP server; it contains a personal bearer token, so never write it to shared files. Counts are per UTC day. Read-only. Example: {\"include_items\":true,\"items\":\"saved\",\"items_limit\":10}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "include_items": {
+       "default": false,
+       "description": "true adds items (saved, unlocked and generated lists, newest first). Default false.",
+       "type": "boolean"
+      },
+      "items": {
+       "default": "all",
+       "description": "With include_items: which list to return. all (default), saved, unlocked or generated.",
+       "type": "string",
+       "enum": [
+        "all",
+        "saved",
+        "unlocked",
+        "generated"
+       ]
+      },
+      "items_limit": {
+       "default": 20,
+       "description": "With include_items: entries per list, 1 to 50 (default 20).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "includeDesignConnect": {
+       "default": false,
+       "description": "true adds design.connect (Claude Code command, Cursor and VS Code config with a personal bearer token) and design.note. Default false keeps the token out of the reply.",
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "title": "Get my AnimatedWebs account",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-account.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "plan": {
+       "type": "string",
+       "description": "Plan id, e.g. free, starter, pro or lifetime"
+      },
+      "tier": {
+       "type": "string"
+      },
+      "prompts": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "object",
+         "properties": {
+          "creditsLeft": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "monthlyUsed": {
+           "type": "number"
+          },
+          "packCredits": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "creditsLeft",
+          "monthlyUsed",
+          "packCredits"
+         ],
+         "additionalProperties": false
+        }
+       ],
+       "description": "'unlimited (Pro)' or the credit counts"
+      },
+      "uiGenerations": {
+       "type": "object",
+       "properties": {
+        "usedToday": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "dailyLimit": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "usedToday",
+        "dailyLimit"
+       ],
+       "additionalProperties": false
+      },
+      "designAi": {
+       "type": "object",
+       "properties": {
+        "usedToday": {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        "dailyLimit": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "usedToday",
+        "dailyLimit"
+       ],
+       "additionalProperties": false
+      },
+      "design": {
+       "type": "object",
+       "properties": {
+        "workspace": {
+         "type": "string",
+         "description": "Design workspace URL"
+        },
+        "connect": {
+         "description": "Only with includeDesignConnect",
+         "type": "object",
+         "properties": {
+          "claudeCode": {
+           "type": "string",
+           "description": "Shell command"
+          },
+          "cursor": {
+           "type": "object",
+           "propertyNames": {
+            "type": "string"
+           },
+           "additionalProperties": {},
+           "description": "mcp.json fragment"
+          },
+          "vscode": {
+           "type": "object",
+           "propertyNames": {
+            "type": "string"
+           },
+           "additionalProperties": {},
+           "description": "VS Code mcp.json fragment"
+          }
+         },
+         "required": [
+          "claudeCode",
+          "cursor",
+          "vscode"
+         ],
+         "additionalProperties": false
+        },
+        "note": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "workspace"
+       ],
+       "additionalProperties": false
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "pricing": {
+         "type": "string"
+        },
+        "uiLibrary": {
+         "type": "string"
+        },
+        "design": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "pricing",
+        "uiLibrary",
+        "design"
+       ],
+       "additionalProperties": false
+      },
+      "items": {
+       "description": "Only with include_items",
+       "type": "object",
+       "properties": {
+        "saved": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "type": {
+            "type": "string",
+            "enum": [
+             "template",
+             "component",
+             "background"
+            ]
+           },
+           "id": {
+            "type": "string",
+            "description": "Template slug, component id or background slug"
+           },
+           "title": {
+            "description": "null when the item left the catalog",
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "url": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "savedAt": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "type",
+           "id",
+           "title",
+           "url",
+           "savedAt"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "unlocked": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "slug": {
+            "type": "string"
+           },
+           "title": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "url": {
+            "type": "string"
+           },
+           "unlockedAt": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "slug",
+           "title",
+           "url",
+           "unlockedAt"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "generated": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "tool": {
+            "type": "string",
+            "description": "ui (component generator) or design (Design AI)"
+           },
+           "prompt": {
+            "type": "string",
+            "description": "First 200 characters"
+           },
+           "model": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "createdAt": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "tool",
+           "prompt",
+           "model",
+           "createdAt"
+          ],
+          "additionalProperties": false
+         }
+        }
+       },
+       "additionalProperties": false
+      }
+     },
+     "required": [
+      "plan",
+      "tier",
+      "prompts",
+      "uiGenerations",
+      "designAi",
+      "design",
+      "links"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "request_template",
+    "title": "Request an AnimatedWebs template",
+    "description": "Sends the AnimatedWebs team a request for a new template or component that the catalog does not have, and returns the request id. Use it only after search_catalog found nothing suitable; use manage_request to check, list or cancel requests already sent instead of sending one again. It writes one message to the team's inbox tied to the signed-in account; every call creates a new request, so repeating it makes a duplicate. Requests are reviewed for the weekly template drops and Lifetime members are prioritized. Example: {\"request\":\"a scroll-driven hero for a yacht charter in Miami with a night-sea video\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "request": {
+       "type": "string",
+       "minLength": 10,
+       "maxLength": 1500,
+       "description": "What you want built, 10 to 1500 characters: subject, industry, style, references. Example: 'a scroll-driven hero for a yacht charter in Miami with a night-sea video'."
+      }
+     },
+     "required": [
+      "request"
+     ]
+    },
+    "annotations": {
+     "title": "Request an AnimatedWebs template",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/request-template.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "id": {
+       "description": "Request id for manage_request; null if the inbox did not return one",
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "status": {
+       "type": "string",
+       "const": "received"
+      },
+      "message": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id",
+      "status",
+      "message"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "manage_request",
+    "title": "Manage my AnimatedWebs template requests",
+    "description": "Lists, checks or cancels the signed-in account's own template requests (sent with request_template or the contact form's template-request topic). Use it to follow up on a request instead of sending it again; use request_template to send a new one. action list (default) returns recent requests newest first; action status returns one request by id; action cancel withdraws one request by id, which only works while it is still received (not yet reviewed) and marks it cancelled so the team skips it. Each request has id, createdAt, the first 200 characters and status (received, reviewed or cancelled). Only the account's own requests are visible or cancellable: another account's id answers as not found. list and status change nothing; cancel cannot be undone (send a new request instead). Examples: {\"action\":\"list\",\"limit\":5}, {\"action\":\"cancel\",\"id\":42}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "action": {
+       "default": "list",
+       "description": "list (default): recent requests. status: one request by id. cancel: withdraw one received request by id.",
+       "type": "string",
+       "enum": [
+        "list",
+        "status",
+        "cancel"
+       ]
+      },
+      "id": {
+       "description": "Request id as returned by request_template or list. Required for status and cancel.",
+       "type": "integer",
+       "exclusiveMinimum": 0,
+       "maximum": 9007199254740991
+      },
+      "limit": {
+       "default": 10,
+       "description": "For list: how many recent requests, 1 to 50 (default 10).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      }
+     }
+    },
+    "annotations": {
+     "title": "Manage my AnimatedWebs template requests",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/request-template.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "list",
+        "status",
+        "cancel"
+       ]
+      },
+      "requests": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "number"
+         },
+         "createdAt": {
+          "type": "string"
+         },
+         "request": {
+          "type": "string",
+          "description": "First 200 characters"
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "received",
+           "reviewed",
+           "cancelled"
+          ],
+          "description": "received: in the team's inbox, not reviewed yet; reviewed: handled by the team; cancelled: withdrawn by you"
+         }
+        },
+        "required": [
+         "id",
+         "createdAt",
+         "request",
+         "status"
+        ],
+        "additionalProperties": false
+       },
+       "description": "For status and cancel: the one request, after the change"
+      }
+     },
+     "required": [
+      "action",
+      "requests"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "save_item",
+    "title": "Save an AnimatedWebs item",
+    "description": "Saves, unsaves or lists the signed-in account's favorite AnimatedWebs templates, UI components and cinematic backgrounds. Use it when the user wants to keep an item for later or see what they kept; use get_account with include_items for the full picture (saved plus unlocked and generated items). action save adds the item (saving twice is a no-op), unsave removes only the bookmark (removing an unsaved item is a no-op, and it can be saved again), list returns saved items newest first, optionally only one type. Saved templates are the same list as the Save heart on animatedwebs.com and the dashboard. The id must exist in the catalog. Examples: {\"action\":\"save\",\"type\":\"template\",\"id\":\"aurora-site\"}, {\"action\":\"list\",\"type\":\"component\"}.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "save",
+        "unsave",
+        "list"
+       ],
+       "description": "save: add a favorite. unsave: remove it. list: show saved items."
+      },
+      "type": {
+       "description": "template (default for save and unsave), component or background. For list, filters to one type; omit to list all.",
+       "type": "string",
+       "enum": [
+        "template",
+        "component",
+        "background"
+       ]
+      },
+      "id": {
+       "description": "Required for save and unsave: template slug, component id or background slug exactly as returned by search_catalog, e.g. 'aurora-site'.",
+       "type": "string"
+      },
+      "limit": {
+       "default": 20,
+       "description": "For list: how many items, 1 to 50 (default 20).",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      }
+     },
+     "required": [
+      "action"
+     ]
+    },
+    "annotations": {
+     "title": "Save an AnimatedWebs item",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "icons": [
+     {
+      "src": "https://animatedwebs.com/brand/tools/get-account.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+       "any"
+      ]
+     }
+    ],
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "save",
+        "unsave",
+        "list"
+       ]
+      },
+      "saved": {
+       "description": "For save and unsave: whether the item is saved after the call",
+       "type": "boolean"
+      },
+      "item": {
+       "description": "For save and unsave",
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "template",
+          "component",
+          "background"
+         ]
+        },
+        "id": {
+         "type": "string"
+        },
+        "title": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "type",
+        "id",
+        "title",
+        "url"
+       ],
+       "additionalProperties": false
+      },
+      "items": {
+       "description": "For list, newest first",
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "template",
+           "component",
+           "background"
+          ]
+         },
+         "id": {
+          "type": "string",
+          "description": "Template slug, component id or background slug"
+         },
+         "title": {
+          "description": "null when the item left the catalog",
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "savedAt": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "type",
+         "id",
+         "title",
+         "url",
+         "savedAt"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "action"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "build_animated_site",
+    "title": "Build an animated website",
+    "description": "Pick the best AnimatedWebs template for a business and build it in the current project.",
+    "arguments": [
+     {
+      "name": "business",
+      "description": "Business name and what it does",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "upgrade_hero",
+    "title": "Upgrade the hero section",
+    "description": "Give the current project's hero a cinematic AnimatedWebs upgrade.",
+    "arguments": [
+     {
+      "name": "style",
+      "description": "Preferred style, e.g. 'liquid chrome' or 'space'",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "add_ui_component",
+    "title": "Add an AnimatedWebs UI component",
+    "description": "Find and add a ready animated component (button, text animation, background, effect) to the current project.",
+    "arguments": [
+     {
+      "name": "need",
+      "description": "What you need, e.g. 'a magnetic CTA button' or 'animated headline'",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "generate_ui",
+    "title": "Generate a UI component",
+    "description": "Generate a new component with AnimatedWebs AI and iterate on it.",
+    "arguments": [
+     {
+      "name": "description",
+      "description": "What to generate",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "design_with_animatedwebs",
+    "title": "Design with AnimatedWebs Design",
+    "description": "Set up the AnimatedWebs Design MCP connection for the current user.",
+    "arguments": []
+   }
+  ],
+  "resources": [
+   {
+    "uri": "animatedwebs://catalog/templates",
+    "name": "templates_catalog",
+    "title": "AnimatedWebs templates catalog",
+    "description": "Every AnimatedWebs template with slug, title, kind, category, access and demo URL.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "animatedwebs://catalog/components",
+    "name": "components_catalog",
+    "title": "AnimatedWebs UI library catalog",
+    "description": "Every AnimatedWebs UI component with id, title, category, variants and live URL.",
+    "mimeType": "application/json"
+   }
+  ]
+ }
+}

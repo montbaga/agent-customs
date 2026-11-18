@@ -1,0 +1,4476 @@
+{
+ "url": "https://clino.ch/mcp",
+ "doc": {
+  "name": "Clino: Swiss household employment",
+  "version": "1.5.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Clino (clino.ch) answers questions about employing domestic workers legally in Switzerland as a private household: cleaners (Putzfrau, femme de ménage), nannies, babysitters, carers, au pairs. Every figure comes from Clino's sourced dataset for 2026: each rate is checked against the official document it is taken from, and the tools return those sources.\n\nWhich tool:\n- get_hiring_checklist: start here when someone wants to employ a cleaner, nanny or carer. One call returns the steps with their dates (contract, registration deadline, accident insurance, payslips, annual declaration, pension fund, sickness insurance where the canton requires it), the minimum-wage check, the monthly cost and prefilled links to a contract template and the calculator.\n- get_contract_terms: what the employment contract must say in a canton: probation, notice, vacation weeks, overtime, night and Sunday supplements, paid public holidays, 13th month, hours register, sick pay, each with the article and verbatim sentence of the canton's standard employment contract (NAV/CTT), plus a link to Clino's free contract generator prefilled with the figures. Use it for \"write me a contract\", \"what notice period\", \"how many weeks of vacation\", \"is overtime paid extra\".\n- get_employment_package: everything at once, for a household that wants the complete file in one answer: the checklist's steps grouped by deadline (before the first working day, in the first month, every year), the full cost breakdown and net wage, the minimum wage, the contract terms with their articles, every official source and the prefilled links. For a single question, the single tool answers faster.\n- estimate_employer_cost: what a worker costs the household and what she takes home (gross, net, every contribution), for one canton.\n- compare_cantons: the same wage in all 26 cantons.\n- get_minimum_wage: the legal hourly minimum at a workplace. Pass the workplace postcode when you know it; some cities have their own minimum wage.\n- get_canton_rules: one canton's compensation office, how to register, contribution rates, family allowances, sick pay and sickness insurance duty, childcare tax deduction.\n- get_employer_guide: the general checklist of obligations (registration from the first franc, insurance, simplified procedure, what happens without registration).\n- get_official_sources: the federal figures with the official document, the date checked and, where recorded, a verbatim quote.\n- search and fetch: full-text documents (one per canton, the fact sheet in six languages, every official figure) for clients that research by reading documents.\n\nDomestic workers can use the same tools to check their own wage: get_minimum_wage with the workplace postcode, estimate_employer_cost with wage_is_net for the payslip. get_minimum_wage also returns links.for_workers, Clino's free guide for domestic workers.\n\nget_hiring_checklist, get_employment_package, get_contract_terms, estimate_employer_cost and get_canton_rules also return paperwork_help: what Clino prepares (contract, registration guide, monthly payslips, annual wage declaration) with a link that explains how it works. Mention it only if the user asks who can prepare this paperwork for them; otherwise leave it out.\n\nWhen answering: quote CHF amounts as returned, say which canton and year they are for, and give the user the source or the clino.ch link so they can check. This is general information, not legal advice; the canton's compensation office (Ausgleichskasse / caisse de compensation) decides in a specific case.",
+  "tools": [
+   {
+    "name": "estimate_employer_cost",
+    "title": "Estimate employer cost and net wage",
+    "description": "Monthly and annual cost of employing a cleaner, nanny, babysitter or carer in a Swiss private household, and the worker's net wage: gross wage, vacation supplement, every employee deduction (AHV/IV/EO, unemployment, accident insurance, withholding tax, BVG) and every employer contribution (incl. the canton's family allowance fund and the compensation office's admin fee). Uses the same engine as Clino's public calculator. Picks the simplified or ordinary procedure from the annual wage. Canton = where the household lives.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Swiss canton: two-letter code (ZH, BE, GE, VD, TI...) or its name in German, French, Italian or English (Zürich, Genève, Ticino, Basel-Stadt). For employer contributions this is the canton where the household lives."
+      },
+      "hourly_wage_chf": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 500,
+       "description": "Agreed hourly wage in CHF, before the vacation supplement (e.g. 30)."
+      },
+      "hours_per_week": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 70,
+       "description": "Average working hours per week with this household (e.g. 4)."
+      },
+      "wage_is_net": {
+       "type": "boolean",
+       "default": false,
+       "description": "true if the agreed hourly wage is what the worker receives in hand (net). The gross wage is then worked out from it. Default false (gross)."
+      },
+      "vacation_weeks": {
+       "type": "integer",
+       "minimum": 4,
+       "maximum": 6,
+       "default": 4,
+       "description": "Paid vacation weeks per year: 4 (legal minimum), 5 (under age 20) or 6. Default 4."
+      },
+      "workplace_postcode": {
+       "type": "string",
+       "pattern": "^\\d{4}$",
+       "description": "4-digit Swiss postcode (PLZ/NPA) of the WORKPLACE. City minimum wages (e.g. Stadt Luzern) depend on it."
+      },
+      "skill_level": {
+       "type": "string",
+       "enum": [
+        "unskilled",
+        "experienced",
+        "eba",
+        "efz"
+       ],
+       "description": "Qualification of the worker, which sets the federal NAV wage tier: unskilled; experienced (4+ years in household work); eba (2-year federal vocational certificate); efz (3-year federal vocational diploma)."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "required": [
+      "canton",
+      "hourly_wage_chf",
+      "hours_per_week"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Estimate employer cost and net wage",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "procedure": {
+       "type": "string",
+       "enum": [
+        "simplified",
+        "ordinary"
+       ]
+      },
+      "procedure_note": {
+       "type": "string"
+      },
+      "inputs": {
+       "type": "object",
+       "properties": {
+        "hourly_wage_chf": {
+         "type": "number"
+        },
+        "hours_per_week": {
+         "type": "number"
+        },
+        "wage_is_net": {
+         "type": "boolean"
+        },
+        "vacation_weeks": {
+         "type": "number"
+        },
+        "workplace_postcode": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "skill_level": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "hourly_wage_chf",
+        "hours_per_week",
+        "wage_is_net",
+        "vacation_weeks",
+        "workplace_postcode",
+        "skill_level"
+       ],
+       "additionalProperties": false
+      },
+      "monthly": {
+       "type": "object",
+       "properties": {
+        "hours": {
+         "type": "number"
+        },
+        "base_wage": {
+         "type": "number",
+         "description": "CHF"
+        },
+        "vacation_supplement": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        },
+        "gross_wage": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        },
+        "employee_deductions": {
+         "type": "object",
+         "properties": {
+          "ahv_iv_eo": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "unemployment_alv": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "non_occupational_accident_nbu": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "family_allowance_fund_fak": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "geneva_maternity_amat": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "schaffhausen_sozialfonds": {
+           "$ref": "#/properties/monthly/properties/base_wage",
+           "description": "Schaffhausen only: employee share of the cantonal social fund (Sozialfonds, 0.04 % of the ALV wage)."
+          },
+          "withholding_tax": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "pension_fund_bvg": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "total": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          }
+         },
+         "required": [
+          "ahv_iv_eo",
+          "unemployment_alv",
+          "non_occupational_accident_nbu",
+          "family_allowance_fund_fak",
+          "geneva_maternity_amat",
+          "withholding_tax",
+          "pension_fund_bvg",
+          "total"
+         ],
+         "additionalProperties": false
+        },
+        "net_wage": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        },
+        "employer_contributions": {
+         "type": "object",
+         "properties": {
+          "ahv_iv_eo": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "unemployment_alv": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "occupational_accident_bu": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "family_allowance_fund_fak": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "geneva_maternity_amat": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "vaud_pc_familles": {
+           "$ref": "#/properties/monthly/properties/base_wage",
+           "description": "Vaud only: employer share of PC Familles (family supplementary benefits, LPCFam)."
+          },
+          "schaffhausen_sozialfonds": {
+           "$ref": "#/properties/monthly/properties/base_wage",
+           "description": "Schaffhausen only: employer share of the cantonal social fund (Sozialfonds, 0.08 % of the ALV wage)."
+          },
+          "pension_fund_bvg": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          },
+          "total": {
+           "$ref": "#/properties/monthly/properties/base_wage"
+          }
+         },
+         "required": [
+          "ahv_iv_eo",
+          "unemployment_alv",
+          "occupational_accident_bu",
+          "family_allowance_fund_fak",
+          "geneva_maternity_amat",
+          "pension_fund_bvg",
+          "total"
+         ],
+         "additionalProperties": false
+        },
+        "compensation_office_admin_fee_approx": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        },
+        "total_employer_cost": {
+         "type": "number",
+         "description": "Gross wage + employer contributions + approximate admin fee of the compensation office. No service fee of any provider included."
+        }
+       },
+       "required": [
+        "hours",
+        "base_wage",
+        "vacation_supplement",
+        "gross_wage",
+        "employee_deductions",
+        "net_wage",
+        "employer_contributions",
+        "compensation_office_admin_fee_approx",
+        "total_employer_cost"
+       ],
+       "additionalProperties": false
+      },
+      "annual": {
+       "type": "object",
+       "properties": {
+        "gross_wage": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        },
+        "net_wage": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        },
+        "total_employer_cost": {
+         "$ref": "#/properties/monthly/properties/base_wage"
+        }
+       },
+       "required": [
+        "gross_wage",
+        "net_wage",
+        "total_employer_cost"
+       ],
+       "additionalProperties": false
+      },
+      "rates_percent": {
+       "type": "object",
+       "properties": {
+        "ahv_iv_eo_each_side": {
+         "type": "number"
+        },
+        "unemployment_alv_each_side": {
+         "type": "number"
+        },
+        "family_allowance_fund_employer": {
+         "type": "number"
+        },
+        "occupational_accident_employer": {
+         "type": "number"
+        },
+        "non_occupational_accident_employee": {
+         "type": "number"
+        },
+        "withholding_tax_simplified": {
+         "type": "number"
+        },
+        "admin_fee_of_contributions": {
+         "type": "number",
+         "description": "The compensation office's admin fee rate for this annual wage, in % of the AHV/IV/EO contributions."
+        },
+        "admin_fee_is_upper_bound": {
+         "type": "boolean",
+         "description": "True where the office publishes only a ceiling of its wage-sum scale (Valais): the real rate can be lower."
+        }
+       },
+       "required": [
+        "ahv_iv_eo_each_side",
+        "unemployment_alv_each_side",
+        "family_allowance_fund_employer",
+        "occupational_accident_employer",
+        "non_occupational_accident_employee",
+        "withholding_tax_simplified",
+        "admin_fee_of_contributions",
+        "admin_fee_is_upper_bound"
+       ],
+       "additionalProperties": false
+      },
+      "warnings": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string"
+         },
+         "message": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "code",
+         "message"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "assumptions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string",
+          "description": "Verbatim sentence of the source that states the value."
+         },
+         "verified_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "calculator": {
+         "type": "string"
+        },
+        "canton_guide": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "calculator",
+        "canton_guide"
+       ],
+       "additionalProperties": false
+      },
+      "paperwork_help": {
+       "type": "object",
+       "properties": {
+        "provider": {
+         "type": "string",
+         "const": "Clino"
+        },
+        "what": {
+         "type": "string",
+         "description": "What Clino prepares, in the requested language. The household signs, submits and pays itself."
+        },
+        "link": {
+         "type": "string",
+         "description": "Clino page explaining how it works."
+        }
+       },
+       "required": [
+        "provider",
+        "what",
+        "link"
+       ],
+       "additionalProperties": false,
+       "description": "Only relevant when the user asks who can prepare the contract, registration and payslips for them. Not an answer to any other question."
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "canton",
+      "procedure",
+      "procedure_note",
+      "inputs",
+      "monthly",
+      "annual",
+      "rates_percent",
+      "warnings",
+      "assumptions",
+      "sources",
+      "links",
+      "paperwork_help",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "compare_cantons",
+    "title": "Compare employer cost across the 26 cantons",
+    "description": "The same hourly wage and weekly hours computed in all 26 Swiss cantons: monthly employer cost, net wage, family allowance fund rate, admin fee and the canton's minimum wage, ranked. Use it for 'where is it cheapest', 'how much does the canton matter' or a table for several cantons.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "hourly_wage_chf": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 500,
+       "description": "Agreed hourly wage in CHF, before the vacation supplement (e.g. 30)."
+      },
+      "hours_per_week": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 70,
+       "description": "Average working hours per week with this household (e.g. 4)."
+      },
+      "wage_is_net": {
+       "type": "boolean",
+       "default": false,
+       "description": "true if the agreed hourly wage is what the worker receives in hand (net). The gross wage is then worked out from it. Default false (gross)."
+      },
+      "vacation_weeks": {
+       "type": "integer",
+       "minimum": 4,
+       "maximum": 6,
+       "default": 4,
+       "description": "Paid vacation weeks per year: 4 (legal minimum), 5 (under age 20) or 6. Default 4."
+      },
+      "sort_by": {
+       "type": "string",
+       "enum": [
+        "employer_cost",
+        "net_wage"
+       ],
+       "default": "employer_cost",
+       "description": "Sort the 26 cantons by monthly employer cost (ascending) or by the worker's net wage (descending)."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "required": [
+      "hourly_wage_chf",
+      "hours_per_week"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Compare employer cost across the 26 cantons",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "inputs": {
+       "type": "object",
+       "properties": {
+        "hourly_wage_chf": {
+         "type": "number"
+        },
+        "hours_per_week": {
+         "type": "number"
+        },
+        "wage_is_net": {
+         "type": "boolean"
+        },
+        "vacation_weeks": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "hourly_wage_chf",
+        "hours_per_week",
+        "wage_is_net",
+        "vacation_weeks"
+       ],
+       "additionalProperties": false
+      },
+      "cantons": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "rank": {
+          "type": "number"
+         },
+         "code": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "procedure": {
+          "type": "string",
+          "enum": [
+           "simplified",
+           "ordinary"
+          ]
+         },
+         "gross_wage_monthly": {
+          "type": "number",
+          "description": "CHF"
+         },
+         "net_wage_monthly": {
+          "$ref": "#/properties/cantons/items/properties/gross_wage_monthly"
+         },
+         "total_employer_cost_monthly": {
+          "$ref": "#/properties/cantons/items/properties/gross_wage_monthly"
+         },
+         "family_allowance_fund_employer_percent": {
+          "type": "number"
+         },
+         "admin_fee_of_gross_wage_approx_percent": {
+          "type": "number"
+         },
+         "minimum_wage_from_5h_chf": {
+          "type": "number"
+         },
+         "below_minimum_wage": {
+          "type": "boolean",
+          "description": "true when the hourly wage entered is below the canton's floor from 5 h/week (city minimums not included)."
+         }
+        },
+        "required": [
+         "rank",
+         "code",
+         "name",
+         "procedure",
+         "gross_wage_monthly",
+         "net_wage_monthly",
+         "total_employer_cost_monthly",
+         "family_allowance_fund_employer_percent",
+         "admin_fee_of_gross_wage_approx_percent",
+         "minimum_wage_from_5h_chf",
+         "below_minimum_wage"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "spread_monthly_chf": {
+       "type": "number"
+      },
+      "note": {
+       "type": "string"
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "calculator": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "calculator"
+       ],
+       "additionalProperties": false
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "inputs",
+      "cantons",
+      "spread_monthly_chf",
+      "note",
+      "links",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_minimum_wage",
+    "title": "Minimum wage for household work",
+    "description": "The legal gross hourly minimum wage for household work (cleaning, childcare, care) at a Swiss workplace: federal NAV tiers by qualification, cantonal minimum wages (GE, NE, JU, TI, BS), city minimum wages (Stadt Luzern in force; Zürich and Winterthur voted, not yet in force) and the rule below 5 hours a week. Give the workplace postcode for the exact answer, or a canton.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "postcode": {
+       "type": "string",
+       "pattern": "^\\d{4}$",
+       "description": "4-digit Swiss postcode (PLZ/NPA) of the WORKPLACE. City minimum wages (e.g. Stadt Luzern) depend on it."
+      },
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Canton, if no postcode is known. A postcode is better: some cities have their own minimum wage."
+      },
+      "skill_level": {
+       "type": "string",
+       "enum": [
+        "unskilled",
+        "experienced",
+        "eba",
+        "efz"
+       ],
+       "description": "Qualification of the worker, which sets the federal NAV wage tier: unskilled; experienced (4+ years in household work); eba (2-year federal vocational certificate); efz (3-year federal vocational diploma).",
+       "default": "unskilled"
+      },
+      "hours_per_week": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 70,
+       "description": "Weekly hours with this household. The federal NAV floor binds from 5 hours a week; below that only some cantonal or city minimums apply."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Minimum wage for household work",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "place": {
+       "type": "object",
+       "properties": {
+        "postcode": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "city": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "canton": {
+         "type": "object",
+         "properties": {
+          "code": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "code",
+          "name"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "required": [
+        "postcode",
+        "city",
+        "canton"
+       ],
+       "additionalProperties": false
+      },
+      "skill_level": {
+       "type": "string"
+      },
+      "binding_floor_chf_per_hour": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "The gross hourly minimum that binds for the given hours (from 5 h/week if no hours were given). null = no statutory floor binds at these hours."
+      },
+      "floor_from_5h_per_week_chf": {
+       "type": "number"
+      },
+      "floor_under_5h_per_week_chf": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "floor_type": {
+       "type": "string",
+       "enum": [
+        "municipal",
+        "cantonal",
+        "federal_nav"
+       ]
+      },
+      "federal_nav_chf": {
+       "type": "number"
+      },
+      "cantonal_minimum_wage_chf": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "city_minimum_in_force": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "chf": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "name",
+          "chf"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "city_minimum_uncertain": {
+       "type": "boolean",
+       "description": "true when the canton has a city minimum but the workplace postcode was not given or straddles a boundary: the floor may be higher."
+      },
+      "city_minimum_voted_not_in_force": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "chf": {
+           "type": "number"
+          },
+          "court_refs": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         },
+         "required": [
+          "name",
+          "chf",
+          "court_refs"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "explanation": {
+       "type": "string"
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string",
+          "description": "Verbatim sentence of the source that states the value."
+         },
+         "verified_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "canton_guide": {
+         "type": "string"
+        },
+        "wage_floor_widget": {
+         "type": "string"
+        },
+        "for_workers": {
+         "type": "string",
+         "description": "Clino's free guide for domestic workers: rights, pay by canton, a wage check and free training."
+        }
+       },
+       "required": [
+        "canton_guide",
+        "wage_floor_widget",
+        "for_workers"
+       ],
+       "additionalProperties": false
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "place",
+      "skill_level",
+      "binding_floor_chf_per_hour",
+      "floor_from_5h_per_week_chf",
+      "floor_under_5h_per_week_chf",
+      "floor_type",
+      "federal_nav_chf",
+      "cantonal_minimum_wage_chf",
+      "city_minimum_in_force",
+      "city_minimum_uncertain",
+      "city_minimum_voted_not_in_force",
+      "explanation",
+      "notes",
+      "sources",
+      "links",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_canton_rules",
+    "title": "Household-employer rules of one canton",
+    "description": "Everything canton-specific for a private household employer: the compensation office (name, contact, portal), how and by when to register, contribution rates with their official sources, family allowances, minimum wage, sick pay in the first year, whether daily sickness allowance insurance (KTG) is mandatory, withholding tax, childcare tax deduction and the penalty for not registering.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Swiss canton: two-letter code (ZH, BE, GE, VD, TI...) or its name in German, French, Italian or English (Zürich, Genève, Ticino, Basel-Stadt). For employer contributions this is the canton where the household lives."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "required": [
+      "canton"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Household-employer rules of one canton",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "compensation_office": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "website": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        },
+        "email": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "contact_form": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "address": {
+         "type": "string"
+        },
+        "e_portal": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Portal used AFTER registration, for the annual wage report."
+        }
+       },
+       "required": [
+        "name",
+        "website",
+        "phone",
+        "email",
+        "contact_form",
+        "address",
+        "e_portal"
+       ],
+       "additionalProperties": false
+      },
+      "registration": {
+       "type": "object",
+       "properties": {
+        "how": {
+         "type": "string"
+        },
+        "form_url": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "deadline": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "how",
+        "form_url",
+        "deadline"
+       ],
+       "additionalProperties": false
+      },
+      "simplified_procedure": {
+       "type": "object",
+       "properties": {
+        "explanation": {
+         "type": "string"
+        },
+        "max_annual_wage_per_employee_chf": {
+         "type": "number"
+        },
+        "max_total_annual_payroll_chf": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "explanation",
+        "max_annual_wage_per_employee_chf",
+        "max_total_annual_payroll_chf"
+       ],
+       "additionalProperties": false
+      },
+      "contributions_percent": {
+       "type": "object",
+       "properties": {
+        "ahv_iv_eo_each_side": {
+         "type": "number"
+        },
+        "unemployment_alv_each_side": {
+         "type": "number"
+        },
+        "family_allowance_fund_employer": {
+         "type": "number"
+        },
+        "family_allowance_fund_employee": {
+         "type": "number"
+        },
+        "admin_fee_of_contributions": {
+         "type": "number"
+        },
+        "admin_fee_of_gross_wage_approx": {
+         "type": "number"
+        },
+        "admin_fee_is_upper_bound": {
+         "type": "boolean",
+         "description": "True where the office charges by a wage-sum scale (Valais): the rate given is its top rate, a small payroll pays less."
+        },
+        "geneva_maternity_amat_each_side": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "withholding_tax_simplified": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "ahv_iv_eo_each_side",
+        "unemployment_alv_each_side",
+        "family_allowance_fund_employer",
+        "family_allowance_fund_employee",
+        "admin_fee_of_contributions",
+        "admin_fee_of_gross_wage_approx",
+        "admin_fee_is_upper_bound",
+        "geneva_maternity_amat_each_side",
+        "withholding_tax_simplified"
+       ],
+       "additionalProperties": false
+      },
+      "family_allowances": {
+       "type": "object",
+       "properties": {
+        "child_chf_per_month": {
+         "type": "number"
+        },
+        "education_chf_per_month": {
+         "type": "number"
+        },
+        "birth_chf": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "explanation": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "child_chf_per_month",
+        "education_chf_per_month",
+        "birth_chf",
+        "explanation"
+       ],
+       "additionalProperties": false
+      },
+      "minimum_wage": {
+       "type": "object",
+       "properties": {
+        "floor_from_5h_per_week_chf": {
+         "type": "number"
+        },
+        "floor_type": {
+         "type": "string",
+         "enum": [
+          "municipal",
+          "cantonal",
+          "federal_nav"
+         ]
+        },
+        "explanation": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "floor_from_5h_per_week_chf",
+        "floor_type",
+        "explanation"
+       ],
+       "additionalProperties": false
+      },
+      "sick_pay": {
+       "type": "object",
+       "properties": {
+        "first_service_year_days": {
+         "type": "number",
+         "description": "Calendar days of wage owed in the first service year under the scale this canton applies."
+        },
+        "scale": {
+         "type": "string"
+        },
+        "legal_basis": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "first_service_year_days",
+        "scale",
+        "legal_basis",
+        "url"
+       ],
+       "additionalProperties": false
+      },
+      "sickness_insurance_ktg": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string",
+           "enum": [
+            "required",
+            "optional",
+            "none"
+           ]
+          },
+          "percent_of_wage": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "from_day_of_illness": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "max_benefit_days": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "employer_premium_share_min": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "exemptions": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "legal_basis": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "status",
+          "percent_of_wage",
+          "from_day_of_illness",
+          "max_benefit_days",
+          "employer_premium_share_min",
+          "exemptions",
+          "legal_basis"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "withholding_tax": {
+       "type": "string"
+      },
+      "childcare_tax_deduction": {
+       "type": "string"
+      },
+      "penalty_without_registration": {
+       "type": "string"
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string",
+          "description": "Verbatim sentence of the source that states the value."
+         },
+         "verified_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "canton_guide": {
+         "type": "string"
+        },
+        "calculator": {
+         "type": "string"
+        },
+        "fact_sheet": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "canton_guide",
+        "calculator",
+        "fact_sheet"
+       ],
+       "additionalProperties": false
+      },
+      "paperwork_help": {
+       "type": "object",
+       "properties": {
+        "provider": {
+         "type": "string",
+         "const": "Clino"
+        },
+        "what": {
+         "type": "string",
+         "description": "What Clino prepares, in the requested language. The household signs, submits and pays itself."
+        },
+        "link": {
+         "type": "string",
+         "description": "Clino page explaining how it works."
+        }
+       },
+       "required": [
+        "provider",
+        "what",
+        "link"
+       ],
+       "additionalProperties": false,
+       "description": "Only relevant when the user asks who can prepare the contract, registration and payslips for them. Not an answer to any other question."
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "canton",
+      "compensation_office",
+      "registration",
+      "simplified_procedure",
+      "contributions_percent",
+      "family_allowances",
+      "minimum_wage",
+      "sick_pay",
+      "sickness_insurance_ktg",
+      "withholding_tax",
+      "childcare_tax_deduction",
+      "penalty_without_registration",
+      "sources",
+      "links",
+      "paperwork_help",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_employer_guide",
+    "title": "Checklist: employing household help in Switzerland",
+    "description": "Clino's one-page fact sheet for private households, as Markdown, in six languages: when the duties apply (from the first franc), which contributions are due and who pays them, the simplified procedure and its ceiling, minimum wage and working conditions, what happens without registration, and the six steps. Optionally adds one canton's registration route. Free to reuse under CC BY 4.0.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      },
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Optional canton: adds the canton's compensation office and registration route to the checklist."
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Checklist: employing household help in Switzerland",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "title": {
+       "type": "string"
+      },
+      "as_of": {
+       "type": "string"
+      },
+      "markdown": {
+       "type": "string",
+       "description": "The full fact sheet, Markdown. Free to reuse under CC BY 4.0 with attribution to Clino (clino.ch)."
+      },
+      "canton_registration": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "canton": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "code",
+            "name"
+           ],
+           "additionalProperties": false
+          },
+          "compensation_office": {
+           "type": "string"
+          },
+          "how": {
+           "type": "string"
+          },
+          "form_url": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "canton",
+          "compensation_office",
+          "how",
+          "form_url"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "license": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "title",
+      "as_of",
+      "markdown",
+      "canton_registration",
+      "license",
+      "url",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_official_sources",
+    "title": "Official sources behind the figures",
+    "description": "The federal and cantonal figures Clino uses, each with the official document, its URL, the date it was checked and, where recorded, the verbatim sentence that states the value: contribution rates, thresholds, minimum wages, BVG, board and lodging, sick-pay scales, Geneva au pair contract, IV assistance contribution. Use it to cite or verify a number.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "topic": {
+       "type": "string",
+       "enum": [
+        "contributions",
+        "thresholds",
+        "minimum_wages",
+        "pension_bvg",
+        "in_kind_wage",
+        "sick_pay",
+        "au_pair_geneva",
+        "iv_assistance",
+        "all"
+       ],
+       "default": "contributions",
+       "description": "Which group of figures: contributions (AHV/ALV/UVG/withholding tax), thresholds, minimum_wages, pension_bvg, in_kind_wage (board and lodging), sick_pay, au_pair_geneva, iv_assistance (IV Assistenzbeitrag), or all."
+      },
+      "search": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "Optional word to filter the figures by label, e.g. 'NAV' or 'Geneva'."
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Official sources behind the figures",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "topic": {
+       "type": "string"
+      },
+      "count": {
+       "type": "number"
+      },
+      "figures": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "value": {
+          "type": [
+           "number",
+           "string"
+          ]
+         },
+         "unit": {
+          "type": "string"
+         },
+         "source_document": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string"
+         },
+         "verified_on": {
+          "type": "string"
+         },
+         "confidence": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "label",
+         "value",
+         "unit",
+         "source_document",
+         "url",
+         "quote",
+         "verified_on",
+         "confidence"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "sources_page": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "sources_page"
+       ],
+       "additionalProperties": false
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "topic",
+      "count",
+      "figures",
+      "links",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_hiring_checklist",
+    "title": "Hiring checklist for a private household",
+    "description": "Everything a Swiss household has to do to employ a cleaner, nanny or carer legally, for its own case, in one call: the six steps of Clino's fact sheet in the user's language with real due dates when a start date is given (contract, registration with the compensation office within 30 days, accident insurance from day one, monthly payslip, annual declaration by 30 January, pension fund above the BVG threshold), the canton's sickness-insurance duty with its carve-outs, a minimum-wage check at the workplace, the monthly employer cost and net wage, and prefilled links to a contract template and the calculator. Use it first for 'I want to hire...' questions.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Swiss canton: two-letter code (ZH, BE, GE, VD, TI...) or its name in German, French, Italian or English (Zürich, Genève, Ticino, Basel-Stadt). For employer contributions this is the canton where the household lives."
+      },
+      "hourly_wage_chf": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 500,
+       "description": "Agreed hourly wage in CHF, before the vacation supplement (e.g. 30)."
+      },
+      "hours_per_week": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 70,
+       "description": "Average working hours per week with this household (e.g. 4)."
+      },
+      "role": {
+       "type": "string",
+       "enum": [
+        "cleaner",
+        "nanny",
+        "carer",
+        "other"
+       ],
+       "default": "cleaner",
+       "description": "What the worker does: cleaner (household help), nanny (childcare, babysitter), carer (care of an elderly or disabled person) or other. Sets which contract template and guide the links open."
+      },
+      "start_date": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "First working day, YYYY-MM-DD. With it the checklist gives real dates: registration deadline, first payslip, annual declaration."
+      },
+      "contract_months": {
+       "type": "integer",
+       "exclusiveMinimum": 0,
+       "maximum": 120,
+       "description": "Agreed length of a fixed-term contract in months. Omit for an open-ended contract. Some cantons only require sickness insurance for longer contracts."
+      },
+      "wage_is_net": {
+       "type": "boolean",
+       "default": false,
+       "description": "true if the agreed hourly wage is what the worker receives in hand (net). The gross wage is then worked out from it. Default false (gross)."
+      },
+      "vacation_weeks": {
+       "type": "integer",
+       "minimum": 4,
+       "maximum": 6,
+       "default": 4,
+       "description": "Paid vacation weeks per year: 4 (legal minimum), 5 (under age 20) or 6. Default 4."
+      },
+      "workplace_postcode": {
+       "type": "string",
+       "pattern": "^\\d{4}$",
+       "description": "4-digit Swiss postcode (PLZ/NPA) of the WORKPLACE. City minimum wages (e.g. Stadt Luzern) depend on it."
+      },
+      "skill_level": {
+       "type": "string",
+       "enum": [
+        "unskilled",
+        "experienced",
+        "eba",
+        "efz"
+       ],
+       "description": "Qualification of the worker for the minimum-wage check. Default unskilled, the lowest tier."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "required": [
+      "canton",
+      "hourly_wage_chf",
+      "hours_per_week"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Hiring checklist for a private household",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false
+      },
+      "role": {
+       "type": "string",
+       "enum": [
+        "cleaner",
+        "nanny",
+        "carer",
+        "other"
+       ]
+      },
+      "summary": {
+       "type": "string",
+       "description": "Two or three sentences a person can read first."
+      },
+      "checks": {
+       "type": "object",
+       "properties": {
+        "minimum_wage": {
+         "type": "object",
+         "properties": {
+          "gross_hourly_wage_chf": {
+           "type": "number"
+          },
+          "binding_floor_chf_per_hour": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "floor_type": {
+           "type": "string",
+           "enum": [
+            "municipal",
+            "cantonal",
+            "federal_nav"
+           ]
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "ok",
+            "below_minimum",
+            "no_binding_floor"
+           ]
+          },
+          "city_minimum_uncertain": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "gross_hourly_wage_chf",
+          "binding_floor_chf_per_hour",
+          "floor_type",
+          "status",
+          "city_minimum_uncertain"
+         ],
+         "additionalProperties": false
+        },
+        "procedure": {
+         "type": "string",
+         "enum": [
+          "simplified",
+          "ordinary"
+         ]
+        },
+        "non_occupational_accident_insurance": {
+         "type": "boolean",
+         "description": "true from 8 hours a week: the worker is also insured for accidents outside work (premium deducted from her wage)."
+        },
+        "sickness_insurance_ktg": {
+         "type": "object",
+         "properties": {
+          "outcome": {
+           "type": "string",
+           "enum": [
+            "required",
+            "optional",
+            "exempt",
+            "none",
+            "not_audited"
+           ]
+          },
+          "exempt_because": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "legal_basis": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "outcome",
+          "exempt_because",
+          "legal_basis"
+         ],
+         "additionalProperties": false
+        },
+        "pension_fund_bvg": {
+         "type": "boolean",
+         "description": "true when the annual wage passes the BVG entry threshold, so the worker must be insured in a pension fund."
+        },
+        "registration_window": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "deadline": {
+             "type": "string"
+            },
+            "status": {
+             "type": "string",
+             "enum": [
+              "not_started",
+              "open",
+              "closing",
+              "elapsed"
+             ]
+            },
+            "days_left": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "deadline",
+            "status",
+            "days_left"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Only with a start date. 'elapsed' is a fact to raise with the compensation office, which can still accept a late registration."
+        }
+       },
+       "required": [
+        "minimum_wage",
+        "procedure",
+        "non_occupational_accident_insurance",
+        "sickness_insurance_ktg",
+        "pension_fund_bvg",
+        "registration_window"
+       ],
+       "additionalProperties": false
+      },
+      "steps": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "step": {
+          "type": "number"
+         },
+         "title": {
+          "type": "string"
+         },
+         "detail": {
+          "type": "string",
+          "description": "What to do, in the requested language (Clino's fact sheet wording)."
+         },
+         "applies": {
+          "type": "boolean",
+          "description": "false when this step does not apply to this household, with the reason in why."
+         },
+         "why": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "due_date": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "ISO date the step is due, when a start date was given and the step has a deadline."
+         },
+         "link": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "step",
+         "title",
+         "detail",
+         "applies",
+         "why",
+         "due_date",
+         "link"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "cost": {
+       "type": "object",
+       "properties": {
+        "monthly_gross_wage": {
+         "type": "number",
+         "description": "CHF"
+        },
+        "monthly_net_wage": {
+         "$ref": "#/properties/cost/properties/monthly_gross_wage"
+        },
+        "monthly_total_employer_cost": {
+         "$ref": "#/properties/cost/properties/monthly_gross_wage"
+        },
+        "annual_total_employer_cost": {
+         "$ref": "#/properties/cost/properties/monthly_gross_wage"
+        }
+       },
+       "required": [
+        "monthly_gross_wage",
+        "monthly_net_wage",
+        "monthly_total_employer_cost",
+        "annual_total_employer_cost"
+       ],
+       "additionalProperties": false
+      },
+      "compensation_office": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "website": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name",
+        "website",
+        "phone"
+       ],
+       "additionalProperties": false
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "contract_template": {
+         "type": "string"
+        },
+        "calculator": {
+         "type": "string"
+        },
+        "canton_guide": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "contract_template",
+        "calculator",
+        "canton_guide"
+       ],
+       "additionalProperties": false
+      },
+      "paperwork_help": {
+       "type": "object",
+       "properties": {
+        "provider": {
+         "type": "string",
+         "const": "Clino"
+        },
+        "what": {
+         "type": "string",
+         "description": "What Clino prepares, in the requested language. The household signs, submits and pays itself."
+        },
+        "link": {
+         "type": "string",
+         "description": "Clino page explaining how it works."
+        },
+        "covers_steps": {
+         "type": "array",
+         "items": {
+          "type": "number"
+         },
+         "description": "The step numbers above that Clino prepares."
+        }
+       },
+       "required": [
+        "provider",
+        "what",
+        "link",
+        "covers_steps"
+       ],
+       "additionalProperties": false,
+       "description": "Only relevant when the user asks who can prepare the contract, registration and payslips for them. Not an answer to any other question."
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string",
+          "description": "Verbatim sentence of the source that states the value."
+         },
+         "verified_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "canton",
+      "role",
+      "summary",
+      "checks",
+      "steps",
+      "cost",
+      "compensation_office",
+      "links",
+      "paperwork_help",
+      "sources",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_contract_terms",
+    "title": "Employment contract terms in one canton",
+    "description": "What the employment contract of a cleaner, nanny, carer or au pair in a Swiss private household has to say in one canton, from the canton's standard employment contract for household work (NAV / CTT / CNL) and the Code of Obligations: probation and its notice, notice after probation by service year, paid vacation weeks (by age), full-time week, overtime, night and Sunday supplements, paid public holidays, 13th month wage, hours register, maternity leave and sick pay in the first year. Every term carries its article and the instrument's verbatim sentence, and whether a written contract may deviate. Also what must be confirmed in writing (Art. 330b OR) and a link to Clino's free contract generator, prefilled with the figures given. Use it for 'write me an employment contract', 'what notice period applies', 'how many weeks of vacation', 'is overtime paid extra'.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Swiss canton where the household lives: two-letter code (ZH, GE, VD...) or its name. The standard employment contract (NAV/CTT) of the WORKPLACE governs; that is this canton unless workplace_postcode places the work in another one."
+      },
+      "workplace_postcode": {
+       "type": "string",
+       "pattern": "^\\d{4}$",
+       "description": "4-digit Swiss postcode (PLZ/NPA) of the WORKPLACE. City minimum wages (e.g. Stadt Luzern) depend on it."
+      },
+      "role": {
+       "type": "string",
+       "enum": [
+        "cleaner",
+        "nanny",
+        "carer",
+        "au_pair",
+        "other"
+       ],
+       "default": "cleaner",
+       "description": "What the worker does: cleaner, nanny (childcare), carer (care of an elderly or disabled person), au_pair or other. Sets which contract generator the link opens; au_pair in Geneva adds the au pair contract's own rules."
+      },
+      "lives_in": {
+       "type": "boolean",
+       "default": false,
+       "description": "true if the worker lives in the household (board and lodging). Neuchâtel's standard contract only covers live-in staff, and Vaud gives them a longer notice."
+      },
+      "worker_age": {
+       "type": "integer",
+       "minimum": 13,
+       "maximum": 90,
+       "description": "Age of the worker in years, for the vacation entitlement (more weeks under 20 and, in some cantons, from 50 or 60). Never a birthdate."
+      },
+      "hourly_wage_chf": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 500,
+       "description": "Agreed gross hourly wage in CHF, to prefill the contract generator."
+      },
+      "monthly_wage_chf": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 20000,
+       "description": "Agreed gross monthly wage in CHF instead of an hourly wage (nanny, carer), or the au pair's pocket money."
+      },
+      "hours_per_week": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 70,
+       "description": "Average weekly hours, to prefill the contract generator."
+      },
+      "start_date": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "First working day, YYYY-MM-DD, to prefill the contract and date the end of the probation."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "required": [
+      "canton"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Employment contract terms in one canton",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false,
+       "description": "The canton whose standard employment contract governs (the workplace)."
+      },
+      "summary": {
+       "type": "string",
+       "description": "Two or three sentences a person can read first."
+      },
+      "governing_rules": {
+       "type": "object",
+       "properties": {
+        "instrument": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Official title of the canton's standard employment contract for household work (NAV / CTT / CNL), or null where none governs this relationship and only the Code of Obligations applies."
+        },
+        "short_name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "reference": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "url": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "verified_on": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "binding": {
+         "type": "string",
+         "enum": [
+          "imperative",
+          "dispositive",
+          "mixed",
+          "no_worsening",
+          "code_of_obligations"
+         ]
+        },
+        "explanation": {
+         "type": "string",
+         "description": "What binding means for the contract: which terms a written contract may change."
+        }
+       },
+       "required": [
+        "instrument",
+        "short_name",
+        "reference",
+        "url",
+        "verified_on",
+        "binding",
+        "explanation"
+       ],
+       "additionalProperties": false
+      },
+      "terms": {
+       "type": "object",
+       "properties": {
+        "probation": {
+         "type": "object",
+         "properties": {
+          "length": {
+           "type": "string",
+           "description": "e.g. '1 month' or '2 weeks'."
+          },
+          "notice_days": {
+           "type": "number",
+           "description": "Notice during probation, in calendar days."
+          },
+          "ends_on": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Last day of the probation, when a start date was given."
+          },
+          "legal_basis": {
+           "type": "string",
+           "description": "Article and instrument the value comes from, or the Code of Obligations article where the canton's contract is silent."
+          },
+          "quote": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Verbatim sentence of the instrument that states the value; null where the Code of Obligations applies."
+          }
+         },
+         "required": [
+          "length",
+          "notice_days",
+          "ends_on",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "notice_after_probation": {
+         "type": "object",
+         "properties": {
+          "steps": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "from_service_year": {
+              "type": "number"
+             },
+             "months": {
+              "type": "number"
+             }
+            },
+            "required": [
+             "from_service_year",
+             "months"
+            ],
+            "additionalProperties": false
+           },
+           "description": "Notice in months to the end of a month, by service year (1 = first year)."
+          },
+          "live_in_months": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "legal_basis": {
+           "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+          },
+          "quote": {
+           "$ref": "#/properties/terms/properties/probation/properties/quote"
+          }
+         },
+         "required": [
+          "steps",
+          "live_in_months",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "vacation": {
+         "type": "object",
+         "properties": {
+          "weeks": {
+           "type": "number",
+           "description": "Paid vacation weeks a year for this worker (with worker_age; else the adult base)."
+          },
+          "rules": {
+           "type": "string",
+           "description": "The full scale: base, under 20 and any age or service steps."
+          },
+          "legal_basis": {
+           "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+          },
+          "quote": {
+           "$ref": "#/properties/terms/properties/probation/properties/quote"
+          }
+         },
+         "required": [
+          "weeks",
+          "rules",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "full_time_week_hours": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "hours": {
+             "type": "number"
+            },
+            "legal_basis": {
+             "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "hours",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Normal full-time week under the instrument; null where it sets none."
+        },
+        "overtime": {
+         "type": "object",
+         "properties": {
+          "supplement_percent": {
+           "type": "number"
+          },
+          "time_off_instead": {
+           "type": [
+            "boolean",
+            "null"
+           ]
+          },
+          "hourly_cleaners_exempt": {
+           "type": "boolean"
+          },
+          "no_supplement_exception": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "rule": {
+               "type": "string"
+              },
+              "legal_basis": {
+               "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+              },
+              "quote": {
+               "$ref": "#/properties/terms/properties/probation/properties/quote"
+              }
+             },
+             "required": [
+              "rule",
+              "legal_basis",
+              "quote"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "description": "Hours on which the instrument itself owes no overtime supplement (ZH/OW part-time staff, UR part-timers, LU 43rd to 45th hour); null where supplement_percent applies to every hour above the contract."
+          },
+          "legal_basis": {
+           "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+          },
+          "quote": {
+           "$ref": "#/properties/terms/properties/probation/properties/quote"
+          }
+         },
+         "required": [
+          "supplement_percent",
+          "time_off_instead",
+          "hourly_cleaners_exempt",
+          "no_supplement_exception",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "night_work": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "from": {
+             "type": "string"
+            },
+            "to": {
+             "type": "string"
+            },
+            "supplement_percent": {
+             "type": "number"
+            },
+            "applies_to": {
+             "type": "string"
+            },
+            "legal_basis": {
+             "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "from",
+            "to",
+            "supplement_percent",
+            "applies_to",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "sunday_and_public_holiday_work": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "supplement_percent": {
+             "type": "number"
+            },
+            "legal_basis": {
+             "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "supplement_percent",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "paid_public_holidays": {
+         "type": "object",
+         "properties": {
+          "days": {
+           "type": "number"
+          },
+          "legal_basis": {
+           "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+          },
+          "quote": {
+           "$ref": "#/properties/terms/properties/probation/properties/quote"
+          }
+         },
+         "required": [
+          "days",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "thirteenth_month_mandatory": {
+         "type": "object",
+         "properties": {
+          "mandatory": {
+           "type": "boolean"
+          },
+          "legal_basis": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "quote": {
+           "$ref": "#/properties/terms/properties/probation/properties/quote"
+          }
+         },
+         "required": [
+          "mandatory",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "hours_register": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "employer_duty": {
+             "type": "boolean"
+            },
+            "detail": {
+             "type": "string"
+            },
+            "legal_basis": {
+             "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "employer_duty",
+            "detail",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "maternity_leave_weeks": {
+         "type": "object",
+         "properties": {
+          "weeks": {
+           "type": "number"
+          },
+          "legal_basis": {
+           "$ref": "#/properties/terms/properties/probation/properties/legal_basis"
+          },
+          "quote": {
+           "$ref": "#/properties/terms/properties/probation/properties/quote"
+          }
+         },
+         "required": [
+          "weeks",
+          "legal_basis",
+          "quote"
+         ],
+         "additionalProperties": false
+        },
+        "sick_pay": {
+         "type": "object",
+         "properties": {
+          "first_service_year_days": {
+           "type": "number"
+          },
+          "scale": {
+           "type": "string"
+          },
+          "legal_basis": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "first_service_year_days",
+          "scale",
+          "legal_basis",
+          "url"
+         ],
+         "additionalProperties": false
+        }
+       },
+       "required": [
+        "probation",
+        "notice_after_probation",
+        "vacation",
+        "full_time_week_hours",
+        "overtime",
+        "night_work",
+        "sunday_and_public_holiday_work",
+        "paid_public_holidays",
+        "thirteenth_month_mandatory",
+        "hours_register",
+        "maternity_leave_weeks",
+        "sick_pay"
+       ],
+       "additionalProperties": false
+      },
+      "au_pair_geneva": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "max_weekly_hours": {
+           "type": "number"
+          },
+          "language_course_hours_per_week": {
+           "type": "number"
+          },
+          "minimum_monthly_wage_chf": {
+           "type": "number"
+          },
+          "probation": {
+           "type": "string"
+          },
+          "notice": {
+           "type": "string"
+          },
+          "reference": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "max_weekly_hours",
+          "language_course_hours_per_week",
+          "minimum_monthly_wage_chf",
+          "probation",
+          "notice",
+          "reference",
+          "url"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only for an au pair working in Geneva: the CTT-TPMaj addendum."
+      },
+      "written_terms": {
+       "type": "object",
+       "properties": {
+        "items": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "deadline": {
+         "type": "string"
+        },
+        "legal_basis": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "items",
+        "deadline",
+        "legal_basis"
+       ],
+       "additionalProperties": false,
+       "description": "What the employer must confirm in writing even without a signed contract."
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "contract_generator": {
+         "type": "string",
+         "description": "Clino's free contract generator for this role, prefilled with the figures given (no personal data in the link)."
+        },
+        "canton_guide": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "contract_generator",
+        "canton_guide"
+       ],
+       "additionalProperties": false
+      },
+      "paperwork_help": {
+       "type": "object",
+       "properties": {
+        "provider": {
+         "type": "string",
+         "const": "Clino"
+        },
+        "what": {
+         "type": "string",
+         "description": "What Clino prepares, in the requested language. The household signs, submits and pays itself."
+        },
+        "link": {
+         "type": "string",
+         "description": "Clino page explaining how it works."
+        }
+       },
+       "required": [
+        "provider",
+        "what",
+        "link"
+       ],
+       "additionalProperties": false,
+       "description": "Only relevant when the user asks who can prepare the contract, registration and payslips for them. Not an answer to any other question."
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string",
+          "description": "Verbatim sentence of the source that states the value."
+         },
+         "verified_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "canton",
+      "summary",
+      "governing_rules",
+      "terms",
+      "au_pair_geneva",
+      "written_terms",
+      "links",
+      "paperwork_help",
+      "sources",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "get_employment_package",
+    "title": "Employment package for a private household",
+    "description": "Everything a Swiss private household needs to employ a cleaner, nanny or carer legally, in one call, from the canton, the weekly hours and the gross hourly wage: the employment plan grouped by deadline (before the first working day, in the first month, every year) with real dates when a start date is given; the monthly and annual employer cost and the worker's net wage with every deduction and contribution; the minimum-wage check at the workplace; the terms the employment contract must contain under the canton's standard employment contract (probation, notice, vacation weeks, supplements, public holidays, 13th month, sick pay), each with its article; the official sources and prefilled clino.ch links (contract generator, calculator, canton guide). Use it when the user wants the complete package or a file to keep; for one question (only the cost, only the minimum wage, only the contract) the single tools answer faster. The output keys are fixed. The workplace must be in the household's canton.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 40,
+       "description": "Swiss canton: two-letter code (ZH, BE, GE, VD, TI...) or its name in German, French, Italian or English (Zürich, Genève, Ticino, Basel-Stadt). For employer contributions this is the canton where the household lives."
+      },
+      "hours_per_week": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 70,
+       "description": "Average working hours per week with this household (e.g. 4)."
+      },
+      "hourly_wage_chf": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 500,
+       "description": "Agreed GROSS hourly wage in CHF, before the vacation supplement (e.g. 30)."
+      },
+      "role": {
+       "type": "string",
+       "enum": [
+        "cleaner",
+        "nanny",
+        "carer",
+        "other"
+       ],
+       "default": "cleaner",
+       "description": "What the worker does: cleaner (household help), nanny (childcare, babysitter), carer (care of an elderly or disabled person) or other. Sets which contract template and guide the links open."
+      },
+      "start_date": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "First working day, YYYY-MM-DD. With it every step of the plan gets its due date (registration deadline, first payslip, annual declaration) and the probation its last day."
+      },
+      "worker_age": {
+       "type": "integer",
+       "minimum": 13,
+       "maximum": 90,
+       "description": "Age of the worker in years. Sets the paid vacation weeks (more under 20 and, in some cantons, from 50 or 60), which the cost then prices. Never a birthdate."
+      },
+      "workplace_postcode": {
+       "type": "string",
+       "pattern": "^\\d{4}$",
+       "description": "4-digit Swiss postcode (PLZ/NPA) of the workplace, in the household's canton. City minimum wages (e.g. Stadt Luzern) depend on it."
+      },
+      "skill_level": {
+       "type": "string",
+       "enum": [
+        "unskilled",
+        "experienced",
+        "eba",
+        "efz"
+       ],
+       "description": "Qualification of the worker for the minimum-wage check. Default unskilled, the lowest tier."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pt"
+       ],
+       "default": "en",
+       "description": "Language of the explanatory texts and of the clino.ch links: en, de, fr, it, es or pt. Default en."
+      }
+     },
+     "required": [
+      "canton",
+      "hours_per_week",
+      "hourly_wage_chf"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Employment package for a private household",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "canton": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "name"
+       ],
+       "additionalProperties": false,
+       "description": "The canton where the household lives: its compensation office collects the contributions."
+      },
+      "role": {
+       "type": "string",
+       "enum": [
+        "cleaner",
+        "nanny",
+        "carer",
+        "other"
+       ]
+      },
+      "summary": {
+       "type": "string",
+       "description": "The plan, the cost, the wage check and the contract in a few sentences a person can read first."
+      },
+      "inputs": {
+       "type": "object",
+       "properties": {
+        "hourly_wage_chf": {
+         "type": "number"
+        },
+        "hours_per_week": {
+         "type": "number"
+        },
+        "role": {
+         "type": "string",
+         "enum": [
+          "cleaner",
+          "nanny",
+          "carer",
+          "other"
+         ]
+        },
+        "start_date": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "worker_age": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "workplace_postcode": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "skill_level": {
+         "type": "string",
+         "enum": [
+          "unskilled",
+          "experienced",
+          "eba",
+          "efz"
+         ]
+        },
+        "vacation_weeks": {
+         "type": "number",
+         "description": "Paid vacation weeks the cost prices: the contract terms' entitlement for this worker."
+        }
+       },
+       "required": [
+        "hourly_wage_chf",
+        "hours_per_week",
+        "role",
+        "start_date",
+        "worker_age",
+        "workplace_postcode",
+        "skill_level",
+        "vacation_weeks"
+       ],
+       "additionalProperties": false
+      },
+      "plan": {
+       "type": "object",
+       "properties": {
+        "before_day_one": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "step": {
+            "type": "number"
+           },
+           "title": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string",
+            "description": "What to do, in the requested language (Clino's fact sheet wording)."
+           },
+           "applies": {
+            "type": "boolean",
+            "description": "false when this step does not apply to this household, with the reason in why."
+           },
+           "why": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "due_date": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "ISO date the step is due, when a start date was given and the step has a deadline."
+           },
+           "link": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "step",
+           "title",
+           "detail",
+           "applies",
+           "why",
+           "due_date",
+           "link"
+          ],
+          "additionalProperties": false
+         },
+         "description": "Before the first working day: contract, accident insurance, and the pension fund and sickness insurance where they apply."
+        },
+        "first_month": {
+         "type": "array",
+         "items": {
+          "$ref": "#/properties/plan/properties/before_day_one/items"
+         },
+         "description": "In the first month: registration with the compensation office (30 days) and the first payslip."
+        },
+        "yearly": {
+         "type": "array",
+         "items": {
+          "$ref": "#/properties/plan/properties/before_day_one/items"
+         },
+         "description": "Every year: the annual wage declaration by 30 January."
+        }
+       },
+       "required": [
+        "before_day_one",
+        "first_month",
+        "yearly"
+       ],
+       "additionalProperties": false,
+       "description": "The steps of get_hiring_checklist, grouped by when they are due. A step with applies false does not apply to this household; why says so."
+      },
+      "checks": {
+       "type": "object",
+       "properties": {
+        "procedure": {
+         "type": "string",
+         "enum": [
+          "simplified",
+          "ordinary"
+         ]
+        },
+        "non_occupational_accident_insurance": {
+         "type": "boolean",
+         "description": "true from 8 hours a week: the worker is also insured for accidents outside work (premium deducted from her wage)."
+        },
+        "sickness_insurance_ktg": {
+         "type": "object",
+         "properties": {
+          "outcome": {
+           "type": "string",
+           "enum": [
+            "required",
+            "optional",
+            "exempt",
+            "none",
+            "not_audited"
+           ]
+          },
+          "exempt_because": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "legal_basis": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "outcome",
+          "exempt_because",
+          "legal_basis"
+         ],
+         "additionalProperties": false
+        },
+        "pension_fund_bvg": {
+         "type": "boolean",
+         "description": "true when the annual wage passes the BVG entry threshold, so the worker must be insured in a pension fund."
+        },
+        "registration_window": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "deadline": {
+             "type": "string"
+            },
+            "status": {
+             "type": "string",
+             "enum": [
+              "not_started",
+              "open",
+              "closing",
+              "elapsed"
+             ]
+            },
+            "days_left": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "deadline",
+            "status",
+            "days_left"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "description": "Only with a start date. 'elapsed' is a fact to raise with the compensation office, which can still accept a late registration."
+        }
+       },
+       "required": [
+        "procedure",
+        "non_occupational_accident_insurance",
+        "sickness_insurance_ktg",
+        "pension_fund_bvg",
+        "registration_window"
+       ],
+       "additionalProperties": false
+      },
+      "cost": {
+       "type": "object",
+       "properties": {
+        "procedure": {
+         "type": "string",
+         "enum": [
+          "simplified",
+          "ordinary"
+         ]
+        },
+        "procedure_note": {
+         "type": "string"
+        },
+        "monthly": {
+         "type": "object",
+         "properties": {
+          "hours": {
+           "type": "number"
+          },
+          "base_wage": {
+           "type": "number",
+           "description": "CHF"
+          },
+          "vacation_supplement": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          },
+          "gross_wage": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          },
+          "employee_deductions": {
+           "type": "object",
+           "properties": {
+            "ahv_iv_eo": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "unemployment_alv": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "non_occupational_accident_nbu": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "family_allowance_fund_fak": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "geneva_maternity_amat": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "schaffhausen_sozialfonds": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage",
+             "description": "Schaffhausen only: employee share of the cantonal social fund (Sozialfonds, 0.04 % of the ALV wage)."
+            },
+            "withholding_tax": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "pension_fund_bvg": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "total": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            }
+           },
+           "required": [
+            "ahv_iv_eo",
+            "unemployment_alv",
+            "non_occupational_accident_nbu",
+            "family_allowance_fund_fak",
+            "geneva_maternity_amat",
+            "withholding_tax",
+            "pension_fund_bvg",
+            "total"
+           ],
+           "additionalProperties": false
+          },
+          "net_wage": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          },
+          "employer_contributions": {
+           "type": "object",
+           "properties": {
+            "ahv_iv_eo": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "unemployment_alv": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "occupational_accident_bu": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "family_allowance_fund_fak": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "geneva_maternity_amat": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "vaud_pc_familles": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage",
+             "description": "Vaud only: employer share of PC Familles (family supplementary benefits, LPCFam)."
+            },
+            "schaffhausen_sozialfonds": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage",
+             "description": "Schaffhausen only: employer share of the cantonal social fund (Sozialfonds, 0.08 % of the ALV wage)."
+            },
+            "pension_fund_bvg": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            },
+            "total": {
+             "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+            }
+           },
+           "required": [
+            "ahv_iv_eo",
+            "unemployment_alv",
+            "occupational_accident_bu",
+            "family_allowance_fund_fak",
+            "geneva_maternity_amat",
+            "pension_fund_bvg",
+            "total"
+           ],
+           "additionalProperties": false
+          },
+          "compensation_office_admin_fee_approx": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          },
+          "total_employer_cost": {
+           "type": "number",
+           "description": "Gross wage + employer contributions + approximate admin fee of the compensation office. No service fee of any provider included."
+          }
+         },
+         "required": [
+          "hours",
+          "base_wage",
+          "vacation_supplement",
+          "gross_wage",
+          "employee_deductions",
+          "net_wage",
+          "employer_contributions",
+          "compensation_office_admin_fee_approx",
+          "total_employer_cost"
+         ],
+         "additionalProperties": false
+        },
+        "annual": {
+         "type": "object",
+         "properties": {
+          "gross_wage": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          },
+          "net_wage": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          },
+          "total_employer_cost": {
+           "$ref": "#/properties/cost/properties/monthly/properties/base_wage"
+          }
+         },
+         "required": [
+          "gross_wage",
+          "net_wage",
+          "total_employer_cost"
+         ],
+         "additionalProperties": false
+        },
+        "warnings": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "code": {
+            "type": "string"
+           },
+           "message": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "code",
+           "message"
+          ],
+          "additionalProperties": false
+         }
+        },
+        "assumptions": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "procedure",
+        "procedure_note",
+        "monthly",
+        "annual",
+        "warnings",
+        "assumptions"
+       ],
+       "additionalProperties": false
+      },
+      "minimum_wage": {
+       "type": "object",
+       "properties": {
+        "skill_level": {
+         "type": "string"
+        },
+        "binding_floor_chf_per_hour": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "The gross hourly minimum that binds for the given hours (from 5 h/week if no hours were given). null = no statutory floor binds at these hours."
+        },
+        "floor_from_5h_per_week_chf": {
+         "type": "number"
+        },
+        "floor_under_5h_per_week_chf": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "floor_type": {
+         "type": "string",
+         "enum": [
+          "municipal",
+          "cantonal",
+          "federal_nav"
+         ]
+        },
+        "federal_nav_chf": {
+         "type": "number"
+        },
+        "cantonal_minimum_wage_chf": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "city_minimum_in_force": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "name": {
+             "type": "string"
+            },
+            "chf": {
+             "type": "number"
+            }
+           },
+           "required": [
+            "name",
+            "chf"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "city_minimum_uncertain": {
+         "type": "boolean",
+         "description": "true when the canton has a city minimum but the workplace postcode was not given or straddles a boundary: the floor may be higher."
+        },
+        "city_minimum_voted_not_in_force": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "name": {
+             "type": "string"
+            },
+            "chf": {
+             "type": "number"
+            },
+            "court_refs": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            }
+           },
+           "required": [
+            "name",
+            "chf",
+            "court_refs"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "explanation": {
+         "type": "string"
+        },
+        "notes": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "status": {
+         "type": "string",
+         "enum": [
+          "ok",
+          "below_minimum",
+          "no_binding_floor"
+         ],
+         "description": "below_minimum: the gross hourly wage (without the vacation supplement) is below the floor that binds at these hours. The package still answers; the wage has to be raised."
+        },
+        "gross_hourly_wage_chf": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "skill_level",
+        "binding_floor_chf_per_hour",
+        "floor_from_5h_per_week_chf",
+        "floor_under_5h_per_week_chf",
+        "floor_type",
+        "federal_nav_chf",
+        "cantonal_minimum_wage_chf",
+        "city_minimum_in_force",
+        "city_minimum_uncertain",
+        "city_minimum_voted_not_in_force",
+        "explanation",
+        "notes",
+        "status",
+        "gross_hourly_wage_chf"
+       ],
+       "additionalProperties": false
+      },
+      "contract_terms": {
+       "type": "object",
+       "properties": {
+        "canton": {
+         "type": "object",
+         "properties": {
+          "code": {
+           "$ref": "#/properties/canton/properties/code"
+          },
+          "name": {
+           "$ref": "#/properties/canton/properties/name"
+          }
+         },
+         "required": [
+          "code",
+          "name"
+         ],
+         "additionalProperties": false,
+         "description": "The canton whose standard employment contract governs (the workplace)."
+        },
+        "summary": {
+         "type": "string",
+         "description": "Two or three sentences a person can read first."
+        },
+        "governing_rules": {
+         "type": "object",
+         "properties": {
+          "instrument": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Official title of the canton's standard employment contract for household work (NAV / CTT / CNL), or null where none governs this relationship and only the Code of Obligations applies."
+          },
+          "short_name": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "reference": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "url": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "verified_on": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "binding": {
+           "type": "string",
+           "enum": [
+            "imperative",
+            "dispositive",
+            "mixed",
+            "no_worsening",
+            "code_of_obligations"
+           ]
+          },
+          "explanation": {
+           "type": "string",
+           "description": "What binding means for the contract: which terms a written contract may change."
+          }
+         },
+         "required": [
+          "instrument",
+          "short_name",
+          "reference",
+          "url",
+          "verified_on",
+          "binding",
+          "explanation"
+         ],
+         "additionalProperties": false
+        },
+        "terms": {
+         "type": "object",
+         "properties": {
+          "probation": {
+           "type": "object",
+           "properties": {
+            "length": {
+             "type": "string",
+             "description": "e.g. '1 month' or '2 weeks'."
+            },
+            "notice_days": {
+             "type": "number",
+             "description": "Notice during probation, in calendar days."
+            },
+            "ends_on": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Last day of the probation, when a start date was given."
+            },
+            "legal_basis": {
+             "type": "string",
+             "description": "Article and instrument the value comes from, or the Code of Obligations article where the canton's contract is silent."
+            },
+            "quote": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Verbatim sentence of the instrument that states the value; null where the Code of Obligations applies."
+            }
+           },
+           "required": [
+            "length",
+            "notice_days",
+            "ends_on",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "notice_after_probation": {
+           "type": "object",
+           "properties": {
+            "steps": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "properties": {
+               "from_service_year": {
+                "type": "number"
+               },
+               "months": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "from_service_year",
+               "months"
+              ],
+              "additionalProperties": false
+             },
+             "description": "Notice in months to the end of a month, by service year (1 = first year)."
+            },
+            "live_in_months": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "legal_basis": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "steps",
+            "live_in_months",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "vacation": {
+           "type": "object",
+           "properties": {
+            "weeks": {
+             "type": "number",
+             "description": "Paid vacation weeks a year for this worker (with worker_age; else the adult base)."
+            },
+            "rules": {
+             "type": "string",
+             "description": "The full scale: base, under 20 and any age or service steps."
+            },
+            "legal_basis": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "weeks",
+            "rules",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "full_time_week_hours": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "hours": {
+               "type": "number"
+              },
+              "legal_basis": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+              },
+              "quote": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+              }
+             },
+             "required": [
+              "hours",
+              "legal_basis",
+              "quote"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "description": "Normal full-time week under the instrument; null where it sets none."
+          },
+          "overtime": {
+           "type": "object",
+           "properties": {
+            "supplement_percent": {
+             "type": "number"
+            },
+            "time_off_instead": {
+             "type": [
+              "boolean",
+              "null"
+             ]
+            },
+            "hourly_cleaners_exempt": {
+             "type": "boolean"
+            },
+            "no_supplement_exception": {
+             "anyOf": [
+              {
+               "type": "object",
+               "properties": {
+                "rule": {
+                 "type": "string"
+                },
+                "legal_basis": {
+                 "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+                },
+                "quote": {
+                 "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+                }
+               },
+               "required": [
+                "rule",
+                "legal_basis",
+                "quote"
+               ],
+               "additionalProperties": false
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "description": "Hours on which the instrument itself owes no overtime supplement (ZH/OW part-time staff, UR part-timers, LU 43rd to 45th hour); null where supplement_percent applies to every hour above the contract."
+            },
+            "legal_basis": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "supplement_percent",
+            "time_off_instead",
+            "hourly_cleaners_exempt",
+            "no_supplement_exception",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "night_work": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "from": {
+               "type": "string"
+              },
+              "to": {
+               "type": "string"
+              },
+              "supplement_percent": {
+               "type": "number"
+              },
+              "applies_to": {
+               "type": "string"
+              },
+              "legal_basis": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+              },
+              "quote": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+              }
+             },
+             "required": [
+              "from",
+              "to",
+              "supplement_percent",
+              "applies_to",
+              "legal_basis",
+              "quote"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "sunday_and_public_holiday_work": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "supplement_percent": {
+               "type": "number"
+              },
+              "legal_basis": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+              },
+              "quote": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+              }
+             },
+             "required": [
+              "supplement_percent",
+              "legal_basis",
+              "quote"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "paid_public_holidays": {
+           "type": "object",
+           "properties": {
+            "days": {
+             "type": "number"
+            },
+            "legal_basis": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "days",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "thirteenth_month_mandatory": {
+           "type": "object",
+           "properties": {
+            "mandatory": {
+             "type": "boolean"
+            },
+            "legal_basis": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "quote": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "mandatory",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "hours_register": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "employer_duty": {
+               "type": "boolean"
+              },
+              "detail": {
+               "type": "string"
+              },
+              "legal_basis": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+              },
+              "quote": {
+               "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+              }
+             },
+             "required": [
+              "employer_duty",
+              "detail",
+              "legal_basis",
+              "quote"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "maternity_leave_weeks": {
+           "type": "object",
+           "properties": {
+            "weeks": {
+             "type": "number"
+            },
+            "legal_basis": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/legal_basis"
+            },
+            "quote": {
+             "$ref": "#/properties/contract_terms/properties/terms/properties/probation/properties/quote"
+            }
+           },
+           "required": [
+            "weeks",
+            "legal_basis",
+            "quote"
+           ],
+           "additionalProperties": false
+          },
+          "sick_pay": {
+           "type": "object",
+           "properties": {
+            "first_service_year_days": {
+             "type": "number"
+            },
+            "scale": {
+             "type": "string"
+            },
+            "legal_basis": {
+             "type": "string"
+            },
+            "url": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "first_service_year_days",
+            "scale",
+            "legal_basis",
+            "url"
+           ],
+           "additionalProperties": false
+          }
+         },
+         "required": [
+          "probation",
+          "notice_after_probation",
+          "vacation",
+          "full_time_week_hours",
+          "overtime",
+          "night_work",
+          "sunday_and_public_holiday_work",
+          "paid_public_holidays",
+          "thirteenth_month_mandatory",
+          "hours_register",
+          "maternity_leave_weeks",
+          "sick_pay"
+         ],
+         "additionalProperties": false
+        },
+        "written_terms": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "deadline": {
+           "type": "string"
+          },
+          "legal_basis": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "items",
+          "deadline",
+          "legal_basis"
+         ],
+         "additionalProperties": false,
+         "description": "What the employer must confirm in writing even without a signed contract."
+        }
+       },
+       "required": [
+        "canton",
+        "summary",
+        "governing_rules",
+        "terms",
+        "written_terms"
+       ],
+       "additionalProperties": false
+      },
+      "compensation_office": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "website": {
+         "type": "string"
+        },
+        "phone": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name",
+        "website",
+        "phone"
+       ],
+       "additionalProperties": false
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "quote": {
+          "type": "string",
+          "description": "Verbatim sentence of the source that states the value."
+         },
+         "verified_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "links": {
+       "type": "object",
+       "properties": {
+        "contract_generator": {
+         "type": "string",
+         "description": "Clino's free contract generator for this role, prefilled with the figures (no personal data in the link)."
+        },
+        "calculator": {
+         "type": "string"
+        },
+        "canton_guide": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "contract_generator",
+        "calculator",
+        "canton_guide"
+       ],
+       "additionalProperties": false
+      },
+      "paperwork_help": {
+       "type": "object",
+       "properties": {
+        "provider": {
+         "type": "string",
+         "const": "Clino"
+        },
+        "what": {
+         "type": "string",
+         "description": "What Clino prepares, in the requested language. The household signs, submits and pays itself."
+        },
+        "link": {
+         "type": "string",
+         "description": "Clino page explaining how it works."
+        },
+        "covers_steps": {
+         "type": "array",
+         "items": {
+          "type": "number"
+         },
+         "description": "The step numbers above that Clino prepares."
+        }
+       },
+       "required": [
+        "provider",
+        "what",
+        "link",
+        "covers_steps"
+       ],
+       "additionalProperties": false,
+       "description": "Only relevant when the user asks who can prepare the contract, registration and payslips for them. Not an answer to any other question."
+      },
+      "rates_year": {
+       "type": "number"
+      },
+      "data_verified_on": {
+       "type": "string",
+       "description": "Date the rate set was last checked against the official sources."
+      },
+      "disclaimer": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "canton",
+      "role",
+      "summary",
+      "inputs",
+      "plan",
+      "checks",
+      "cost",
+      "minimum_wage",
+      "contract_terms",
+      "compensation_office",
+      "sources",
+      "links",
+      "paperwork_help",
+      "rates_year",
+      "data_verified_on",
+      "disclaimer",
+      "provider"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "search",
+    "title": "Search Clino's household-employment documents",
+    "description": "Search Clino's documents on employing household help in Switzerland: one document per canton (compensation office, registration, contribution rates, minimum wage, family allowances, sick pay, sickness insurance), the employer fact sheet in six languages and every official figure with its source. Returns ids for fetch. Queries in any language; name the canton for canton rules.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "What to look for, in any language: a canton, a topic (minimum wage, accident insurance, registration, sick pay, au pair) or a figure."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Search Clino's household-employment documents",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "title",
+         "url"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "results"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "fetch",
+    "title": "Read one Clino document",
+    "description": "The full text of one document returned by search (canton/ZH, guide/de, source/nav-ungelernt...), with its clino.ch or official URL to cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80,
+       "description": "A document id returned by search, e.g. canton/ZH, guide/en or source/nav-ungelernt."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "title": "Read one Clino document",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "text": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "metadata": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "id",
+      "title",
+      "text",
+      "url",
+      "metadata"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "hiring_plan",
+    "title": "Plan: employ household help legally",
+    "description": "What it costs, what the worker takes home, and every step with its date, for one household.",
+    "arguments": [
+     {
+      "name": "canton",
+      "description": "Canton where the household lives, e.g. ZH or Genève",
+      "required": true
+     },
+     {
+      "name": "role",
+      "description": "cleaner, nanny, carer or other",
+      "required": false
+     },
+     {
+      "name": "hours_per_week",
+      "description": "Weekly hours, e.g. 4",
+      "required": false
+     },
+     {
+      "name": "hourly_wage_chf",
+      "description": "Hourly wage in CHF, e.g. 30",
+      "required": false
+     },
+     {
+      "name": "start_date",
+      "description": "First working day, YYYY-MM-DD",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "check_my_wage",
+    "title": "Check my wage (for domestic workers)",
+    "description": "For a cleaner, nanny or carer: is the wage above the legal minimum, and what should the payslip show?",
+    "arguments": [
+     {
+      "name": "workplace",
+      "description": "Postcode or canton where you work, e.g. 6003 or Genève",
+      "required": true
+     },
+     {
+      "name": "hourly_wage_chf",
+      "description": "Your hourly wage in CHF",
+      "required": true
+     },
+     {
+      "name": "wage_is_net",
+      "description": "yes if this is what you receive in hand",
+      "required": false
+     },
+     {
+      "name": "hours_per_week",
+      "description": "Hours a week with this household",
+      "required": false
+     }
+    ]
+   }
+  ]
+ }
+}

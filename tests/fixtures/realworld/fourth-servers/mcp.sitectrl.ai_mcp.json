@@ -1,0 +1,452 @@
+{
+ "url": "https://mcp.sitectrl.ai/mcp",
+ "doc": {
+  "name": "sitectrl",
+  "version": "0.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "sitectrl builds and hosts real websites. create_site turns a plain-language description into a LIVE hosted site (1-3 min); edit_site changes it; write_site_files lets YOU author the code. Before editing files yourself call get_site_context (the site's notes, brand, pages and the parts every page must keep) and change pages with patch_site_file. Working contact/booking forms: POST to /_sc/form/submit with a hidden _form field — submissions reach the owner's dashboard + email (never mailto:). Sites also have a built-in data API (/_sc/data/<collection>: public_* readable AND writable by anyone, published_* readable by anyone but written only by officers/admins (brackets, schedules, results), member_* needs a signed-in site member, bare names owner-only) and visitor accounts (/_sc/site-auth/register|login|logout|me) — use them for guestbooks, RSVPs, bookings, member areas; never invent your own storage or auth. search_domains finds real domains with prices; purchases hand the user a checkout link (the connector never spends money). get_analytics reads the site's private first-party traffic. Free tier: one site, no card.",
+  "tools": [
+   {
+    "name": "whoami",
+    "title": "Who am I",
+    "description": "The connected sitectrl account: email, plan status, free-site slot, and credit balance.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "list_sites",
+    "title": "List my sites",
+    "description": "List the user's sitectrl sites with their live URLs and hosting platform.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "get_site",
+    "title": "Get site details",
+    "description": "Details for one site: live URL, draft URL, status.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "The site's slug from list_sites."
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "create_site",
+    "title": "Create a new site",
+    "description": "Build a brand-new hosted website from a plain-language description. RETURNS IMMEDIATELY with status 'building' — the site takes about 2-3 minutes and is NOT ready when this returns. Tell the user where it will be (expected_url / live_url) and poll get_build_status — with the returned slug when signed in, with the returned claim_token for a guest build. NEVER call create_site a second time for the same site: each call builds another one. Works WITHOUT signing in: an unauthenticated call builds a guest site and returns a claim_url — the user signs up free (no card) at that link to keep it; unclaimed guest sites are deleted after 72 hours. Signed in, the site lands directly on the connected account (free tier: one site, no card).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "site_name": {
+       "type": "string",
+       "description": "Short human name for the site, e.g. 'Whitney Apparel'."
+      },
+      "description": {
+       "type": "string",
+       "minLength": 12,
+       "description": "What the site is for. MINIMUM 12 CHARACTERS — a bare 'bike shop' is rejected. Say what the business is, where it is, and what the site should include; the AI builds directly from this, so more detail means a better first result. Good: 'Oak Barrel Coffee, a small-batch roaster in Turlock CA — our story, three coffees with tasting notes and prices, and a contact form.' If the user was vague, ask them one question before calling this rather than sending two words."
+      },
+      "template": {
+       "type": "string",
+       "enum": [
+        "local-services",
+        "restaurant",
+        "shop",
+        "portfolio",
+        "classes",
+        "community"
+       ],
+       "description": "Optional override of the starting template. Omit it and the template is chosen from the description."
+      },
+      "contact_email": {
+       "type": "string",
+       "description": "Optional, guest builds only: the user's email — we send the site link and a reminder before the unclaimed site expires."
+      }
+     },
+     "required": [
+      "site_name",
+      "description"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "get_build_status",
+    "title": "Check a site build",
+    "description": "Check whether a site started by create_site has finished. Signed in: pass the slug create_site returned (status building / built / failed). Guest build: pass the claim_token — works WITHOUT signing in. Poll this every 30-60 seconds rather than calling create_site again — a second create_site call builds a SECOND site.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "claim_token": {
+       "type": "string",
+       "description": "Guest builds: the claim_token from create_site."
+      },
+      "slug": {
+       "type": "string",
+       "description": "Signed in: the slug from create_site."
+      }
+     },
+     "required": []
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "edit_site",
+    "title": "Edit site (AI developer)",
+    "description": "Ask sitectrl's AI editor to change an existing site ('add a contact page', 'make the hero darker'). Edits land in the site's draft; the first build of a brand-new site goes straight live. Returns what changed plus the draft URL.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "instruction": {
+       "type": "string",
+       "description": "The change to make, in plain language."
+      }
+     },
+     "required": [
+      "slug",
+      "instruction"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "write_site_files",
+    "title": "Write site files",
+    "description": "Call get_site_context first. Push NEW files (HTML/CSS/JS/images) into a site's DRAFT. To CHANGE an existing page use patch_site_file instead (find/replace on the current file) — rewriting a whole page from memory drops or duplicates things; overwriting an existing .html needs base_hash from read_site_file. Use this when YOU are writing the code yourself instead of asking sitectrl's AI. Text files go in 'content'; binary files (images/fonts) in 'content_base64'. Max 40 files/call, 2 MB/file. Keep the <script defer src=\"sc-track.js\"></script> include on every HTML page (the site's built-in private analytics — publish re-adds it if missing). Use clearly-marked placeholder contact info unless the user provided real details. For working forms, POST to /_sc/form/submit with a hidden _form name field — submissions reach the owner's dashboard + email (never use mailto:). Every HTML file is checked before it's written (DOCTYPE, charset, and any invariant this site has declared) — a file that fails is refused and comes back in 'refused' with what's wrong and the exact fix; other files in the same call still write. Site rules: keep sc-track.js, the data-sc-carry canonical/og:url tags and the sc-badge block; never add noindex or 'Disallow: /' on a site with its own domain. Follow with publish_site to go live.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "files": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "path": {
+          "type": "string",
+          "description": "Relative path in the site, e.g. index.html or css/style.css"
+         },
+         "content": {
+          "type": "string"
+         },
+         "content_base64": {
+          "type": "string"
+         },
+         "base_hash": {
+          "type": "string",
+          "description": "The 'hash' read_site_file returned for this path. Required to overwrite an existing .html file; the write is refused if the file changed since."
+         }
+        },
+        "required": [
+         "path"
+        ]
+       }
+      }
+     },
+     "required": [
+      "slug",
+      "files"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true
+    }
+   },
+   {
+    "name": "list_site_files",
+    "title": "List site files",
+    "description": "List the files in a site's draft tree (paths + sizes).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "get_site_context",
+    "title": "Get the site's editing context",
+    "description": "CALL THIS BEFORE ANY WRITE. Returns what sitectrl's own editing agent knows about the site: its notes, brand tokens, page inventory, declared invariants, the platform-owned parts every page must keep (with the exact snippet and why), each HTML file's base_hash, and the edit rules (patch, never regenerate a whole file; writes land in the draft; publish_site goes live).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "patch_site_file",
+    "title": "Edit part of a site file",
+    "description": "Call get_site_context first. Change an existing draft file IN PLACE — the way to modify a page. Each edit is {find, replace} (swap exact text) or {after, insert} (add text right after an anchor); the anchor must appear exactly once in the current file, else nothing is written and you are told why. Edits apply in order. Prefer this to rewriting the page with write_site_files: whole-file rewrites from memory drop or duplicate things. Same checks as write_site_files (keep sc-track.js, data-sc-carry tags and the sc-badge block; no noindex / 'Disallow: /' on a site with its own domain). Optional base_hash (from read_site_file) refuses the edit if the file changed.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "path": {
+       "type": "string"
+      },
+      "edits": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "find": {
+          "type": "string"
+         },
+         "replace": {
+          "type": "string"
+         },
+         "after": {
+          "type": "string"
+         },
+         "insert": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "base_hash": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "path",
+      "edits"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false
+    }
+   },
+   {
+    "name": "read_site_file",
+    "title": "Read a site file",
+    "description": "Read one file from a site's draft tree (text, or base64 for binary; 512 KB cap). Returns a 'hash' of the current bytes.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "path": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "path"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "publish_site",
+    "title": "Publish to live site",
+    "description": "Publish the site's draft to the LIVE site (hosted sites). A snapshot of the previous live version is taken first, so it's undoable.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true
+    }
+   },
+   {
+    "name": "add_component",
+    "title": "Add a library component",
+    "description": "Insert a component from the site's shared library into one or more existing pages, INSTEAD of hand-writing the markup yourself — the classes are already styled and themed to this site's colours. Choices: sc-page-title (the page's one <h1>), sc-gallery (cross-fading photo reel — needs 'images'), sc-info-tiles (title + picture + text sections — needs 'tiles'), sc-instructions (numbered/titled steps, optionally with a button each — needs 'tiles'), sc-event (one dated thing: a class, a session, an opening — needs 'title'), sc-btn (a link styled as a button — needs 'label'). NOT offered: sc-header/sc-footer (the site's own shell already emits those) or sc-hero (placed once, on the home page, by the site's own build). 'anchor' says where it goes: {\"type\": \"heading\", \"value\": \"<text on the page>\", \"position\": \"after\"} (default), {\"type\": \"id\", \"value\": \"<element id>\", \"position\": \"after\"}, {\"type\": \"main_end\"} (append at the end of the page), or {\"type\": \"replace\", \"value\": \"<class of an existing sc-* block>\"}. 'pages' is \"all\" or a list of paths from list_site_files. A page whose anchor doesn't match comes back in 'findings' with what's wrong and the fix — other pages in the same call still get the component. Follow with publish_site.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "name": {
+       "type": "string",
+       "enum": [
+        "sc-page-title",
+        "sc-gallery",
+        "sc-info-tiles",
+        "sc-instructions",
+        "sc-event",
+        "sc-btn"
+       ]
+      },
+      "pages": {
+       "oneOf": [
+        {
+         "type": "string",
+         "enum": [
+          "all"
+         ]
+        },
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "minItems": 1
+        }
+       ],
+       "description": "\"all\", or an array of page paths, e.g. [\"index.html\", \"about.html\"]"
+      },
+      "anchor": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "heading",
+          "id",
+          "main_end",
+          "replace"
+         ]
+        },
+        "value": {
+         "type": "string",
+         "description": "heading text / element id / class to replace — not used for main_end"
+        },
+        "position": {
+         "type": "string",
+         "enum": [
+          "before",
+          "after"
+         ],
+         "description": "for heading/id anchors, default after"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      },
+      "fields": {
+       "type": "object",
+       "description": "Component-specific content. sc-page-title: {text, eyebrow?}. sc-gallery: {images: [{src, alt}]}. sc-info-tiles: {tiles: [{title, img?, alt?, text}]}. sc-instructions: {title?, intro?, tiles: [{title?, body, img?, alt?, button?: [label, href]}]}. sc-event: {title, img?, meta?: [{label, value}], desc?, rsvp_href?, rsvp_label?}. sc-btn: {label, href}."
+      }
+     },
+     "required": [
+      "slug",
+      "name",
+      "anchor",
+      "fields"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true
+    }
+   },
+   {
+    "name": "search_domains",
+    "title": "Search domains",
+    "description": "Search real domain availability + prices (com/net/org/co/io/site and more). Available results include a purchase_url — hand it to the USER to complete checkout; the connector never spends money. Purchased domains connect to their sites in one click.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Domain or name to check, e.g. 'sierratrailcoffee.com'."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "get_analytics",
+    "title": "Get site analytics",
+    "description": "The site's private first-party traffic: pageviews/visitors/sessions/clicks totals, top pages, referrers, devices. Windows: 24h, 7d, 30d.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "window": {
+       "type": "string",
+       "enum": [
+        "24h",
+        "7d",
+        "30d"
+       ]
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   }
+  ]
+ }
+}

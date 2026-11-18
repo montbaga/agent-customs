@@ -1,0 +1,350 @@
+{
+ "url": "https://cervejabarata.com.br/mcp",
+ "doc": {
+  "name": "Cerveja Barata",
+  "version": "0.3.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Cerveja Barata (cervejabarata.com.br) ranks real beer prices in Brazil by price per litre (R$/L). Bars, where people sit down and drink, are the default ranking: their prices come in deals. Supermarkets and depósitos (drinks shops) sell to take away: their prices come separately, in shops. To drink out, use bars; to buy and take home, use shops. Never call a shop the cheapest place to drink, and never mix a shop's price into an answer about bars; if it is unclear which the person wants, give the cheapest bar and the cheapest shop, each labelled. Pass category (bar, mercado, deposito) for one kind only; it then comes in deals. Start with catalog for the cities covered and the brand and format slugs; search_deals ranks prices with filters, cheapest_now lists what is on right now (happy hours included), get_venue shows one place, list_neighbourhoods and price_index give the city's picture. Cite the url each price carries and say when it was last checked (verified_on). A price leaves out service charge and cover (service_charge_pct and couvert_brl, when known).",
+  "tools": [
+   {
+    "name": "price_per_litre",
+    "title": "Price per litre",
+    "description": "Convert a Brazilian beer price into reais per litre, the unit Cerveja Barata ranks by. Give the price paid in BRL, the volume of one unit in ml and how many units the price buys (e.g. 5 for a bucket of 5 long necks).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "price_brl": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "Price paid, in BRL, e.g. 9.99"
+      },
+      "volume_ml": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "Volume of one unit in millilitres, e.g. 600"
+      },
+      "units": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "description": "Units the price buys"
+      }
+     },
+     "required": [
+      "price_brl",
+      "volume_ml"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "price_per_litre_brl": {
+       "type": "number"
+      },
+      "formatted": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "price_per_litre_brl",
+      "formatted"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "search_deals",
+    "title": "Search beer prices",
+    "description": "Beer prices in a city, cheapest per litre first. Bars' prices, to drink there, come in deals; supermarkets' and depósitos' prices, to take away, come separately in shops (at most 5), never mixed with the bars'. Each price has the place and its category, the serving, the price, when it applies (happy hours) and when it was last checked. Filter by category (one kind only), neighbourhood, brand, format, kind or a maximum price per litre. Open-bar packages only come with kind=open_bar, ranked by package price.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "city": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "City slug from catalog, e.g. \"salvador\""
+      },
+      "category": {
+       "type": "string",
+       "enum": [
+        "bar",
+        "mercado",
+        "deposito"
+       ],
+       "description": "Only this kind of place: bar (to drink there), mercado (supermarkets and corner shops) or deposito (drinks shops), the last two to take away; its prices then come in deals. Without it, bars' prices come in deals and shops' prices (at most 5) in shops"
+      },
+      "neighbourhood": {
+       "type": "string",
+       "maxLength": 80,
+       "description": "Bairro slug from list_neighbourhoods"
+      },
+      "brand": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "Brand slug from catalog, e.g. \"brahma\""
+      },
+      "format": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Format type (lata, long_neck, garrafa, litrao, chopp, torre) or code (garrafa_600), from catalog"
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "regular",
+        "happy_hour",
+        "promo",
+        "combo",
+        "open_bar"
+       ],
+       "description": "Only this kind of price"
+      },
+      "max_price_per_litre": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "In BRL per litre, e.g. 15"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "default": 10,
+       "description": "How many prices"
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "pt-BR",
+        "en"
+       ],
+       "default": "pt-BR",
+       "description": "Language of labels, schedules and page links"
+      }
+     },
+     "required": [
+      "city"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "cheapest_now",
+    "title": "Cheapest beer right now",
+    "description": "The beer prices that hold right now in the city's time zone, cheapest per litre first, happy hours and timed promos included: bars' prices in deals, supermarkets' and depósitos' separately in shops. Give lat and lng to keep places within radius_m of a point (each price then carries distance_m). category=bar leaves the shops out.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "city": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "City slug from catalog, e.g. \"salvador\""
+      },
+      "category": {
+       "type": "string",
+       "enum": [
+        "bar",
+        "mercado",
+        "deposito"
+       ],
+       "description": "Only this kind of place: bar (to drink there), mercado (supermarkets and corner shops) or deposito (drinks shops), the last two to take away; its prices then come in deals. Without it, bars' prices come in deals and shops' prices (at most 5) in shops"
+      },
+      "lat": {
+       "type": "number",
+       "minimum": -90,
+       "maximum": 90,
+       "description": "Latitude of the point, e.g. -13.0109"
+      },
+      "lng": {
+       "type": "number",
+       "minimum": -180,
+       "maximum": 180,
+       "description": "Longitude of the point, e.g. -38.4915"
+      },
+      "radius_m": {
+       "type": "integer",
+       "minimum": 100,
+       "maximum": 10000,
+       "default": 2000,
+       "description": "Around the point"
+      },
+      "format": {
+       "type": "string",
+       "maxLength": 40,
+       "description": "Format type (lata, long_neck, garrafa, litrao, chopp, torre) or code (garrafa_600), from catalog"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "default": 5,
+       "description": "How many prices"
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "pt-BR",
+        "en"
+       ],
+       "default": "pt-BR",
+       "description": "Language of labels, schedules and page links"
+      }
+     },
+     "required": [
+      "city"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_venue",
+    "title": "One place and its prices",
+    "description": "Details of one bar, supermarket or depósito (kind, drink_on_site, bairro, address, location, Instagram, opening hours, attributes) and every beer price it has, each with its category, cheapest per litre first, open-bar packages last. The venue slug is the last part of the url on a price from search_deals or cheapest_now.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "city": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "City slug from catalog, e.g. \"salvador\""
+      },
+      "venue": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Venue slug, e.g. \"boteco-do-ze\""
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "pt-BR",
+        "en"
+       ],
+       "default": "pt-BR",
+       "description": "Language of labels, schedules and page links"
+      }
+     },
+     "required": [
+      "city",
+      "venue"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_neighbourhoods",
+    "title": "Bairros with prices",
+    "description": "The city's bairros (neighbourhoods) with beer prices: how many bars, shops and prices each has, and its cheapest price per litre at a bar and at a shop, kept apart, most bars first. Pass a slug as the neighbourhood argument of search_deals.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "city": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "City slug from catalog, e.g. \"salvador\""
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "pt-BR",
+        "en"
+       ],
+       "default": "pt-BR",
+       "description": "Language of labels, schedules and page links"
+      }
+     },
+     "required": [
+      "city"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "price_index",
+    "title": "Monthly beer price index",
+    "description": "The monthly Índice Cerveja Barata for a city: median, quartiles and minimum price per litre at bars, for the whole city and by format, bairro and brand, with how many prices and bars each cell rests on. Latest month by default; final once the month is closed.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "city": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "City slug from catalog, e.g. \"salvador\""
+      },
+      "month": {
+       "type": "string",
+       "maxLength": 7,
+       "description": "Month as YYYY-MM, e.g. \"2026-11\"; latest by default"
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "pt-BR",
+        "en"
+       ],
+       "default": "pt-BR",
+       "description": "Language of labels, schedules and page links"
+      }
+     },
+     "required": [
+      "city"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "catalog",
+    "title": "Cities, brands and formats",
+    "description": "The cities covered (with how many prices each has), the beer brands and the serving formats: the slugs the other tools take.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "lang": {
+       "type": "string",
+       "enum": [
+        "pt-BR",
+        "en"
+       ],
+       "default": "pt-BR",
+       "description": "Language of labels, schedules and page links"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

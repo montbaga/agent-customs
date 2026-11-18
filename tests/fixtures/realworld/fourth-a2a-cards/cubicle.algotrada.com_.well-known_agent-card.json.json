@@ -1,0 +1,626 @@
+{
+ "url": "https://cubicle.algotrada.com/.well-known/agent-card.json",
+ "doc": {
+  "protocolVersion": "0.3.0",
+  "name": "Cubicle",
+  "description": "Cubicle: trading tools for AI agents and the people they work for. Turn a trading rule into a deterministic state machine and rehearse it on real candles, read the tape (NQ, ES, YM, BTC, ETH, SOL), study and follow trading models with verifiable records (copy-trading), hire the house Accumulate strategy to run your own Robinhood Chain vault (spot, USDG) that only you control, and pay for a plan on chain from your own wallet (pro-50: 50 USDG per 30 days, the cheapest plan, no card, no human in the loop).",
+  "url": "https://cubicle.algotrada.com/deck/api/mcp",
+  "preferredTransport": "MCP",
+  "additionalInterfaces": [
+   {
+    "url": "https://cubicle.algotrada.com/deck/api/mcp",
+    "transport": "MCP"
+   }
+  ],
+  "version": "1.3.0",
+  "documentationUrl": "https://cubicle.algotrada.com/llms.txt",
+  "provider": {
+   "organization": "Cubicle",
+   "url": "https://cubicle.algotrada.com"
+  },
+  "capabilities": {
+   "streaming": false,
+   "pushNotifications": false
+  },
+  "securitySchemes": {
+   "bearer": {
+    "type": "http",
+    "scheme": "bearer",
+    "description": "a Cubicle key: free at https://cubicle.algotrada.com/deck/join?from=agent"
+   }
+  },
+  "defaultInputModes": [
+   "application/json"
+  ],
+  "defaultOutputModes": [
+   "application/json"
+  ],
+  "skills": [
+   {
+    "id": "catalogue",
+    "name": "catalogue",
+    "description": "The whole Cubicle API as data: the studio's eight-state machine and what each gate asks, every tool with the tier that opens it (and whether it is open to the caller), and the flows. Call it first when asked what Cubicle can do.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "account",
+    "name": "account",
+    "description": "The caller's Cubicle account: their tier (free, Cubicle Operators holder, starter-20, pro-50, max premium-99), their plan and until when, and every capability with whether it is open and which tier opens it. Call it before telling a trader what they can or cannot do.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "plans",
+    "name": "plans",
+    "description": "The Cubicle plans (price per 30 days, what each includes) and exactly how to pay on Robinhood Chain in USDG: the treasury, the token, and — when the subscription vault is live — the two wallet transactions (approve, subscribe) that renew automatically every 30 days. Nothing here moves money: the trader signs in their own wallet.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "plan_claim",
+    "name": "plan_claim",
+    "description": "Claim a plan you paid for on chain: give the payment's transaction hash and the paying wallet's EIP-191 signature over the exact message the plans tool returns (\"Cubicle plan claim\\nagent: <your agent id>\\ntx: <tx hash>\"). The door reads the transfer to the treasury itself and opens the plan for this principal; only the wallet that paid can claim it. Needs your Cubicle key.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "models",
+    "name": "models",
+    "description": "The trading LLM models on the Taifoon venue a trader can study and, from the STARTER plan, follow: each with its status (trading or stopped, derived from its last trade), markets, fills, realized PnL and win rate — all read from the venue, never from a model's words. Simulated market-maker and flow actors are never listed.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "desk_read",
+    "name": "desk_read",
+    "description": "The house Nemotron desk (llm-nemotron-fest) as it is: its last turn (every 30 minutes), each market's decision and which reader decided it (the vote rule the Nemotron answers, or Jev), the facts it read, and the venue's own positions with realised and unrealised PnL. Composed from the desk's log and the venue, no model asked; a turn older than 45 minutes is marked stale. Not a forecast.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "model_record",
+    "name": "model_record",
+    "description": "One trading model's record from the venue's first-in-first-out paired closes: realized PnL, maximum drawdown, win rate, per market, and the window. Always say what the record is not: a forecast, or what a follower would have made.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "follow_quote",
+    "name": "follow_quote",
+    "description": "Quote following a trading model (from the STARTER plan, starter-20): checks the model is live and followable, validates the follower's sizing (fixed_notional usd, or proportional bps of their balance) and caps (max_notional_usd, max_open_positions, max_daily_loss_usd, markets the model trades), and shows what one mirror would be at the given balance. Creates nothing and moves nothing.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "follow",
+    "name": "follow",
+    "description": "Follow a trading model (from the STARTER plan, starter-20): creates the follow record — the model, your sizing (fixed_notional usd, or proportional bps of your balance), your caps (max_notional_usd, max_open_positions, max_daily_loss_usd, markets) and optionally the wallet your own runner will sign with. Validated exactly as follow_quote; one active follow per model, a new one supersedes it. Returns the record, its digest (the coordination record follow.created) and the attribution every mirror of it is placed under (copy:<you>:<model>). Nothing is traded by this call: your own runner mirrors fills under this record, and it can be stopped with unfollow at any time.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "stream_key",
+    "name": "stream_key",
+    "description": "Cubicle's paid signal stream on the Taifoon coordination layer (any paid plan, from starter-20): the desks' world-clock signals and Kronos forecasts arrive as kind signal from venue cubicle, sealed with a topic key per UTC day. Register your X25519 PUBLIC key (make a pair with `npx -y @taifoon-io/sdk coord keygen --out FILE`; the secret never leaves your machine) and the day's keys are sealed to it on the stream; you get your holder id, the stream URL and the one SDK command that prints the signals decoded. Call again to have today's keys re-sent; action forget stops it. Ticks and outcomes are public; anyone without a key sees the signal bodies as ciphertext.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "follows",
+    "name": "follows",
+    "description": "Your own follow records (from the STARTER plan, starter-20): every follow you created, active, stopped or replaced, with its digest and attribution. Yours only — no follower ever sees another's.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "unfollow",
+    "name": "unfollow",
+    "description": "Stop following a model at once (any tier may stop): the active follow record is marked stopped and kept; open mirror positions stay yours to manage. Returns the stopped record, or says there was none.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "strategies",
+    "name": "strategies",
+    "description": "The strategies anyone can rent to run a Cubicle spot vault (today: accumulate, which buys a fixed amount of ETH or BTC on an interval up to a budget and never sells): what each does, its parameters, the venues and assets, the limits the vault itself enforces, the fee, how to rent it, and its honest status (not live with real funds yet). Beside them, scripts.proven: the cubicle.scripts the reader gate PROVED (their own trades beat random entries under the same exit, on discovery and on a later confirmation), each by its shape and its proof, never its rules; a script that is not PROVEN is never listed.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "digest",
+    "name": "digest",
+    "description": "FREE, no key: the sha256 (or keccak256) digest of a text, as 64 hex characters, computed here. Agents, registries and the coordination layer use it to check that this server answers with content they can verify by code; it is also a plain utility. Nothing is stored.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "price",
+    "name": "price",
+    "description": "FREE, no key, no sign-in: the tape's latest price for one market (NQ, ES, YM, BTC, ETH or SOL) with the time of that 1-minute close and whether the tape is stale. Use it whenever an agent needs a current price; it is the same tape every Cubicle vault checks its orders against. For a window of candles use tape (needs a key).",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "book_depth",
+    "name": "book_depth",
+    "description": "FREE, no key: the Taifoon venue's order book for one market as it stands: up to 40 bid and 40 ask levels (price, qty), the mid, the best bid and ask, the qty resting on each side, the largest resting levels as walls, and the venue clock (t_logical, unix seconds) with the age of the reading and whether it is stale. This is the VENUE's own book (its market-making and flow actors are synthetic), never CME order flow: say 'venue book' when you use it. For candles use tape; for the last close use price.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "book_fills",
+    "name": "book_fills",
+    "description": "FREE, no key: the Taifoon venue's last fills for one market (newest first, up to 500): each with side, price, qty, whether the taker was the maker, and t_logical; plus the flow over them computed here: fills, taker buy qty, taker sell qty, the window in seconds, VWAP. Venue flow (synthetic makers and flow actors), never CME order flow: say 'venue book'. Attributions are the venue's anonymised ids; no person is named.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "book_stats",
+    "name": "book_stats",
+    "description": "FREE, no key: the Taifoon venue's 24 h statistics for one market as the venue computes them: volume, quote volume, trade and fill counts, high, low, open, close, change in percent, and the venue clock with the reading's age. Venue figures (test money, synthetic actors), never an exchange's: say 'venue book'.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "strategy_quote",
+    "name": "strategy_quote",
+    "description": "A live quote for one accumulate buy on Robinhood Chain: what a USD amount of USDG buys of ETH or BTC on the best Uniswap route right now, the tape's price, the cost against the tape in bps, and whether the vault's own price rule (at most 1% worse than the tape) would accept it. A static call: nothing is signed or sent.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "my_vaults",
+    "name": "my_vaults",
+    "description": "The caller's trading vaults, read from the chain: each with whether its funds are devnet (test money) or mainnet (real), what is in it, what is free, what is set aside as margin, the mandate and who administers it.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "operator_link",
+    "name": "operator_link",
+    "description": "Make a wallet the venue's payout wallet for this principal (S1 step 4). A name or email join registers the principal under the deck's house wallet, and the venue pays withdrawals ONLY to the principal's operator wallet — so until this step a venue withdrawal cannot reach the person. Call without arguments for the exact message to sign (EIP-191 personal_sign, valid 10 minutes) and its signed_at; then call again with wallet_hex, signed_at and signature_hex. The identity door recovers the signer itself; refused when the signature is stale or foreign, when another principal already operates under that wallet, when the wallet's key is public, or when the principal is registered on chain. When the payout wallet is already a person's (the first call says must_sign and current_wallet), that current wallet signs the SAME message too and you pass it as current_signature_hex; a lost wallet is reset by support. Behind the second factor.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "step_up_receipt",
+    "name": "step_up_receipt",
+    "description": "A five-minute proof that the account's owner passed their second factor, for the venue's vault: send it as the x-step-up header of POST /vault/withdraw (api.taifoon.dev/vault/withdraw) with your key. Minted only for an account that has a second factor set up (in the deck, by its owner) and is unlocked right now with agents allowed; a key with no second factor cannot withdraw from the venue at all.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "vault_prepare",
+    "name": "vault_prepare",
+    "description": "The wallet steps for a Cubicle vault as UNSIGNED transactions and EIP-712 typed data for the owner's own wallet. Open: call without vault for the transaction that opens it. Fund and hire: call again with the new vault's address (from my_vaults) for allow + deposit and the mandate to sign. Withdraw: withdraw_shares queues shares, then claim_shares pays what the vault's free funds cover to the owner. Chain 4663 is Robinhood Chain (real USDG; open to any wallet since 2026-10-07, no deposit cap; the contracts are not externally audited, so deposit only what you can afford to lose); 36927 is the devnet (test money). Signs and sends nothing.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "shared_vaults",
+    "name": "shared_vaults",
+    "description": "The shared vaults anyone may join, on every venue (today: the Hyperliquid vault on HyperEVM testnet, test money): each one's NAV, shares, whether it prices right now, the agent that trades its venue account, its positions, the strategy it copies (a strategy measured on the time compressor, the desk of the Taifoon book that trades it, the ratio and the cap per pass), its caps, the bridge that brings money to it, and, with wallet, that wallet's invite, shares, their worth and what it can claim. Read only.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "vault_join",
+    "name": "vault_join",
+    "description": "UNSIGNED transactions for the person's own wallet to join or leave a shared vault: with deposit_usd, allow + deposit (the shares go to owner); with withdraw_shares, queue those shares for redemption (paid at the vault's NAV when the keeper fills the queue); with claim true, collect what was paid; with bridge_usd (step zero, test money), the transactions on the Taifoon devnet that bring that many test dollars to the vault's chain over the testnet bridge (mint true adds the open mint first). Nothing is signed or sent. If a vault is invite-only, shared_vaults with wallet says whether the wallet is on its list (the testnet vault takes anyone, inside its caps). The deposit costs about 800,000 gas: let the wallet estimate it.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "vault_copy",
+    "name": "vault_copy",
+    "description": "Set what a shared vault copies: one of the strategies measured on the time compressor (or \"none\" to stand aside), the book desk that trades it (its attribution on the Taifoon book; leave it out while the strategy has no desk and the vault stands aside), the ratio of that desk's position the vault holds, the most it may trade in one pass, and the markets. The vault's mirror reads this and brings the vault's venue account to desk position x ratio. Only the vault's administrators may set it (the house: people and the house agents acting for them); every mandate is kept, newest first.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "operators_market",
+    "name": "operators_market",
+    "description": "The open listings of Cubicle Operators (ERC-721) on Seaport 1.6, peer to peer: each listing's token, price and seller, re-checked NOW by simulating its fill on chain (a sold, moved, cancelled or ended listing says so). chain 4663 = the live collection on Robinhood Chain (real ETH); 998 = Test Operators on HyperEVM testnet, to rehearse (anyone may mint one). Read only.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "operator_sell",
+    "name": "operator_sell",
+    "description": "Step one of selling an Operator you hold: reads that your wallet holds the token, whether Seaport may move it (if not, returns the one approval transaction your wallet sends first) and your Seaport counter, then returns the EIP-712 typed data your wallet signs (eth_signTypedData_v4: a signature, not a transaction). Step two is operator_list with the listing and that signature. Nothing is signed or sent here.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "operator_list",
+    "name": "operator_list",
+    "description": "Step two of selling: publish a listing your wallet signed (the `listing` operator_sell returned, and the signature). The deck checks it the only way that counts, by simulating its fill on chain; a listing Seaport would refuse is refused here with the reason. Signed in only.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "operator_cancel",
+    "name": "operator_cancel",
+    "description": "Cancel every Operator listing your wallet signed, at once: returns the ONE unsigned transaction (Seaport incrementCounter) your wallet sends on that chain. Each listing signed the counter it was made under, so a new counter voids them all; operators_market then shows them closed. Moving the token also ends its listing. Nothing is signed or sent here.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "operator_buy",
+    "name": "operator_buy",
+    "description": "Buy a listed Operator: re-checks the listing on chain, then returns the ONE unsigned transaction the buyer's own wallet sends to Seaport (value = the price). Seaport moves the token and pays the seller in the same transaction, or neither. Nothing is signed or sent here.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "script_validate",
+    "name": "script_validate",
+    "description": "Validate a cubicle.script v1 (the YAML text) with the reference validator: the JSON report with every diagnostic (codes C000–C095, file:line:col) and the budget (warm-up bars, memory, nodes per bar), and `explained`: every diagnostic beside its code's title and what the code means, in the runner's own words. Nothing runs. Free.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "script_explain",
+    "name": "script_explain",
+    "description": "Explain a cubicle.script v1 as the runner compiled it: its kind (strategy or indicator), inputs with bounds, fields with their types, states, what it draws and its budget, every order (the transition it sits on, where it fills: close, next_open, limit(<price>) or stop(<price>), its stop, target and trail), the fill model it declares, and the same in plain lines to say to the trader. Or pass `code` (C050) for what one diagnostic code means. Nothing runs. Free.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "studio_knowledge",
+    "name": "studio_knowledge",
+    "description": "Ask the studio's knowledge graph a question in a trader's words (how do I backtest, what does C039 mean, the Pine twin of ta.crossover, what comes after the gate). It answers the nodes that hold the rule: cubicle.script concepts, the runner's functions, series and truths with their Pine names, every diagnostic code, every studio tool, the seven desk steps, the templates and our research scripts with their evidence. Each node carries `act`: the tool (with arguments) or the deck place that does it, so take that action next instead of describing it. Pass `id` (fn:ema, code:C039, step:gate) for one node. Read only, free, needs no sign-in.",
+    "tags": [
+     "free",
+     "trading"
+    ]
+   },
+   {
+    "id": "script_catalogue",
+    "name": "script_catalogue",
+    "description": "The cubicle.script catalogue, read from the runner: every function with its signature, what it returns and its Pine equivalent (ta.ema for ema; high(n) is ta.highest(high, n)[1], the bars before this one), the series, built-ins and truths a gate can read, the order kinds, where an order can fill, the fill models, the draw kinds, the timeframes and the budget. Pass `name` to keep only the names that contain it. Free.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "script_import_pine",
+    "name": "script_import_pine",
+    "description": "Import a Pine v5 or v6 strategy or indicator as a cubicle.script, with the runner's own importer (cubicle-script import-pine). It answers the script (YAML, validated before it is handed out), the importer's notes (where Pine and the runner differ: fills, warm-up, na) and its header. A construct outside the subset is refused, never guessed: each diagnostic names its code (C057 a construct with no faithful translation: a `while` loop, a loop past 64 steps or over a range the bars decide, an array outside a capped `var` list of levels, maps, types, strings, the wall clock; bounded `for` loops, constant and display arrays and `var` level lists do translate, the last as 1.1 pools; C058 a second market, C059 not translated yet, C040 lookahead_on), the construct, the rule it breaks, its Pine line and what the code means. The translation goes on past a refusal, so every refused statement is listed at once. Say the refusal plainly and offer the rewrite the code suggests. At most 64 KB of Pine. Free.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "script_export",
+    "name": "script_export",
+    "description": "Export a cubicle.script to one self-contained Python file for backtesting.py (target backtesting), vectorbt or backtrader, with the cubicle exporter: the file carries its own Pine-exact indicators and the script's machine as the runner steps it, and its header names the script hash and the fill settings. A construct the target cannot express is refused and named (say which one, and that script_rehearse still runs the script). If the deck answers that the exporter is not installed, say so; never write an export by hand. Free.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "library_keep",
+    "name": "library_keep",
+    "description": "Keep a strategy from the studio library as the trader's own script, its rules exactly as published, so it can be filmed, rehearsed or sent to the gate under its own name. The only change allowed is the glyph each of its states wears on the chart and in a film. Use this, never forge, when the trader names a library strategy: the forge cannot read the library and would write a different rule. Returns the kept name (pass it to film as scripts) and the glyphs it changed.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "script_rehearse",
+    "name": "script_rehearse",
+    "description": "Step a cubicle.script v1 over the deck's own bars with the deterministic reference runner (cubicle-script run): one frame per bar (state, every gate's truth and the two sides it compared, fields, vars, position, order, fill, log), the summary (trades, wins, sum R, final state, blocked counts) and the frame hash — the run's receipt. Same script, params and window → the same hash (cached). Window defaults: the previous weekday's cash session (13:30–20:00 UTC) for NQ/ES, the last sealed 8 h for BTC/ETH/SOL; at most 6,000 bars. Pass `script` (YAML) or `example` (ny-open-breakout, range-aware-stop); `params` replaces defaults within min..max and changes the hash. Metered on the run, not the bars.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "onboard",
+    "name": "onboard",
+    "description": "Where a wallet stands on the way to a funded Cubicle vault, read from the chain (gas, USDG in the wallet, its accounts, the factory's invite gate), and the ONE next step with the tool that does it: connect, add gas, open a vault (vault_prepare), buy USDG with a card (fund_with_card) or send it, fund the vault (vault_prepare), or ready. Also `path`: the account's whole way from join to withdraw in eight steps (join, sign in, second factor, wallets, plan, vault, trade, withdraw), each done, next, later or blocked with the reason, and `path.next_step`. Call it first, and again after every step the trader signs.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "fund_with_card",
+    "name": "fund_with_card",
+    "description": "A link to buy USDG on Robinhood Chain with a card, bank transfer or Apple/Google Pay through MoonPay, paid straight into the trader's own wallet (Cubicle never holds the money). Then call onboard again: the next step is funding the vault. Answers plainly when card purchases are not switched on yet.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "session_size",
+    "name": "session_size",
+    "description": "How big to trade the crypto session that is open now (BTC, ETH, SOL): full size when the session is expected to move more than usual, reduced when it should be quiet. Set by Cubicle's house model vol-weekday (trained by the 120B, distilled to the 4B, promoted because it matched the clean room's PROVEN rule on unseen weeks) and checked against that rule in code. A sizing input only, never a direction.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "weather",
+    "name": "weather",
+    "description": "The weather over a market: the tone the last 72 h of news headlines set (each headline tagged up, down or flat by Cubicle's house model; the tone and its band are computed in code from those tags, recency-weighted), the headlines themselves with their times and links, the tape's regime (trend, drift or chop by the efficiency ratio of the last 48 five-minute closes) and one word for the sky (clear, crosswind, overcast, fog). Refreshed every half hour. A mood, never a forecast or a direction to trade; social feeds are not read and the result says so.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "workflow_read",
+    "name": "workflow_read",
+    "description": "Read a trading idea the way the studio does: the deterministic reader fills the 7 parts (markets, trigger, direction, stand aside, stop, target, session) from the trader's OWN words and says which required parts are still missing. Use it before restating or forging a rule; never fill a part the trader did not say.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "reverse",
+    "name": "reverse",
+    "description": "Reverse-engineer what the trader POSTED before saying anything about it: a rule in words, a pasted Pine script (read statically, never run) or a chat transcript. Returns a dossier: the route (what it is and the first tool), findings each marked observation, inference or unknown with an id (E1, E2) and what would settle each unknown, the checklist (market, bar size, trigger, direction, stop, target, stand aside, numbers match the tape, run over recorded bars) as answered, partial or unresolved, and the ceiling (hypothesis until rehearsed). A Pine script is also imported by the runner's importer (`import`: the cubicle.script, or each refused construct with its code, Pine line and why, and the next step). Cite the ids; never present an inference or an unknown as a fact. For an attached chart use the image tool first.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "studio_move",
+    "name": "studio_move",
+    "description": "Move the trader's rule through the studio's state machine when forge is refused: score_parts (Jev scores clarity — needs the trader's own TypeSafe key), accept_parts (the trader accepts the rule as read, without a Jev score), choose_coverage with choice approximate (build from the gates the tape can measure) or stop, reset (start over). Ask the trader before accepting or choosing for them; the studio decides every gate, this only performs the move they chose.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "forge",
+    "name": "forge",
+    "description": "The studio machine's FORGED move: compiles the trader's strategy from the gates the tape can measure into a cubicle.script v1 (the file the reader gate grades; its runner hash is the seed). The studio refuses it unless the strategy has passed READ, CLARIFIED and EXPRESSIBLE — when refused, tell the trader the move the studio is waiting for (it is in the result).",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "grade",
+    "name": "grade",
+    "description": "Grade a forge with Jev (RUBRIC_v1): code checks the facts first, then Jev answers whether the code does what the trader said. Spends one of the trader's Jev decisions (trial, plan or their own key). It judges fidelity to their words, never profitability.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "rehearse",
+    "name": "rehearse",
+    "description": "Run the forged cubicle.script over the real tape with the reference runner, cubicle-script, net of 8 bps a round trip (the last week by default): how many trades it took, the R, and a comparison with a random null. Call it after a forge when the trader wants to know whether the rule actually fires. A rehearsal is evidence about the past, never a forecast.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "watch_fields",
+    "name": "watch_fields",
+    "description": "What a strategy test reports at every step the strategy takes: the trader's current list, and the whole vocabulary, grouped by indicator (price, volume, RSI 14, EMA 20, EMA 60, VWAP, the Bollinger bands, the 20 bar range, bar size, the 50 bar mean, the clock). Each indicator has named fields (the bands have boll_up and boll_dn, the range has range_high, range_low and range_pos). An item may also be an expression over the fields, such as close - ema20 or rsi14 > 50. Call it before watch_set, and when the trader asks what can be tracked.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "watch_set",
+    "name": "watch_set",
+    "description": "Set what the trader's strategy tests report at every step: up to 8 items, each a field id from watch_fields or an expression over those fields (numbers, + - * / and brackets, optionally one comparison with < > <= >=). This replaces the list. It applies to the NEXT test, so offer to rehearse again afterwards. An item that cannot be read is refused by name and the rest are kept. Use it when the trader says what they want tracked ('watch the RSI and how far price is from the EMA'): translate their words into fields; never invent a field.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "strategy_steps",
+    "name": "strategy_steps",
+    "description": "The steps the trader's last tested strategy took on one market, as the test engine reported them: each step's time, the move (ready to in a trade, and so on), the conditions true at that bar, the trade it opened or closed, and the watched items' values at that bar. Also, per watched item, its average at the entries of winning trades and of losing trades. Use it to answer 'what was the RSI when it bought', 'why did it enter there', 'what do the winners have in common'. These are past bars of one tested week: a description, never a forecast and never advice.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "tape",
+    "name": "tape",
+    "description": "Read real candles from the Taifoon tape for one market. Use it to ground an answer in what the market actually did in a past window — never to predict. NQ is not continuous (weekend halt, 21:00 UTC daily break). A past window is SEALED: its bars never change, so cache it. The same tape is open over plain HTTP with no key: GET https://clob.taifoon.dev/tape/v1/candles/{market}/{tf}?from=&to= with unix SECONDS and a User-Agent that names you (OpenAPI: https://www.taifoon.io/clob/openapi.yaml). It is the tape the coordination layer's conformance check replays, so what you read here is what the judge reads.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "forecast",
+    "name": "forecast",
+    "description": "The envelope the forecast sidecar had issued for one market and timeframe by a given time: a MAGNITUDE band (how far price may travel over the next 24 bars, as two prices and a width in ATR), the odds of a move of 0.5, 1 and 2 ATR within 6, 12 and 24 bars, and its measured calibration (ece, n, band coverage). It carries NO direction — there is no side, no median, and the band is symmetric about the last close by construction; say so, and never turn it into 'up' or 'down'. When calibration reads unmeasured or uncalibrated the deck does not draw it and you should say the band is not yet trusted. Facts only, computed in code; nothing here is a recommendation.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "chart_state",
+    "name": "chart_state",
+    "description": "What the deck's chart would show for one market, timeframe and window, as ONE JSON object computed in code: the bars (count, first and last, the last candle), the indicators drawn, the trader's own marked levels and zones (theirs — they may be used as levels the trader gave), the envelope under its draw gate and its facts, and the fact sheet of the window (open, close, high, low, range, change, volume, session). Use it instead of reading pixels: every number is measured, not read. Past windows only; at most 600 bars.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "chart_image",
+    "name": "chart_image",
+    "description": "The deck's own chart plate for one market, timeframe and window, rendered server-side from the same geometry the screen uses (bars, indicators, the envelope cone when its calibration permits) as a PNG you can look at, together with the chart_state JSON for the same window. The picture is for shape; the numbers are in the JSON — quote those, never read them off the image. Past windows only; at most 600 bars.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "drawings",
+    "name": "drawings",
+    "description": "The trader's own drawings on one market's chart: lines, boxes, paths and notes, each anchored at bars (UTC times) and prices. They are things the trader drew (or asked you to draw), not signals; a film of the window lets each one appear as the clock reaches it.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "draw",
+    "name": "draw",
+    "description": "Draw on the trader's chart, as they ask: a line (two points), a box (two corners), a path (2 to 24 points moving forward in time: a zigzag of legs) or a note (one point and a short word). Every point is a bar's time (ISO-8601 UTC, in the past) and a price the trader gave or the tape tool returned; never invent a level. Inks: parchment, gold, teal, brick (lime is the fire's and is refused). The drawing appears on their chart and in any film of that window.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "erase",
+    "name": "erase",
+    "description": "Remove one of the trader's drawings by its id (from the drawings tool). Only when they ask.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "film",
+    "name": "film",
+    "description": "Seal a past window of the tape into a FILM: the bars replayed one by one with the trader's drawings and marked levels, optionally the structure computed over the bars (pivots, legs, swings and the range they share, none drawn before the bar that confirmed it) and a rehearsed machine's trades. Returns the film's public link, where it plays and can be downloaded as a video. 24 to 360 bars; the window must be in the past. A film is a replay of what printed: say so, and never present it as a forecast.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "replay_open",
+    "name": "replay_open",
+    "description": "Put the trader's chart and its time compressor on a past window: the market, the window, the speed to play it at and, optionally, the moment to hold on (a trade, a sweep, a touch of a level). The studio shows a card; pressing it opens the chart there, held and ready to play, with a way back to the studio. Use it whenever you talk about what happened in a window: show it on the chart instead of only describing it. Past windows only, ten minutes to thirty days; a replay shows what printed, never a forecast.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "replay_record",
+    "name": "replay_record",
+    "description": "Read back what happened in the trader's last replay of one market: every beat on the tape, each of their strategies' trades and state changes, and their own moves (travel, speed, seek), in order with their times, plus the recording's hash (the same at any replay speed). Use it after replay_open, or when the trader asks what they just watched, to answer from what was recorded rather than from memory.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "image",
+    "name": "image",
+    "description": "Look at a chart the trader attached (the id is in the studio state). Read what is on it — instrument, timeframe, levels, the pattern they point at — and say plainly that numbers read off a picture are READ, not measured; check the ones that matter against the tape.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "skills",
+    "name": "skills",
+    "description": "List the Cubicle skill bank: every skill's name, family, grade and status (runnable / stub / concluded). A stub is a promise, not a capability — say so when you cite one.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   },
+   {
+    "id": "skill_read",
+    "name": "skill_read",
+    "description": "Read one skill's method (its SKILL.md) — only the methodology and engineering skills are readable; strategy, lens, pillar and copy skills are sealed and will be refused.",
+    "tags": [
+     "keyed",
+     "trading"
+    ]
+   }
+  ]
+ }
+}

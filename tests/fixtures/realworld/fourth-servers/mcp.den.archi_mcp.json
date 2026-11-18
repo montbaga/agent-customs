@@ -1,0 +1,800 @@
+{
+ "url": "https://mcp.den.archi/mcp",
+ "doc": {
+  "name": "den-mcp",
+  "version": "1.28.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Den(AEC 전문 지식 큐레이팅 시스템)은 AI 에이전트에 AEC 규범·실무 지식을 출처와 함께 제공하는 서버입니다.\n보유 범위는 국가건설기준 KDS·KCS, KS, 건축 관련 법령과 별표, 그리고 구조·시공·설비·재료·계획 분야의 기준과 실무 지식입니다.\n수치·조문 외에 인과(answer_why), 공정 순서(scenario), 비교(compare), 종류(enumerate) 질문에도 근거를 붙여 답합니다.\n\n■ 호출 시점\n건축, 토목, 시공, 구조, 설비, 법규 질문에는 **자체 지식이나 웹 검색보다 먼저** Den을 부릅니다.\n특히 수치·조문·요건을 답에 적어야 하면 반드시 k_snippets를 먼저 호출합니다.\n★\"왜 그런가\", \"어떤 순서로\", \"무엇과 어떻게 다른가\", \"어떤 종류가 있는가\"도 Den이 답하는 질문입니다.\n 이런 질문에 answer_why, scenario, compare, enumerate를 부르지 않고 자체 지식으로 답하지 않습니다.\n\n■ 미보유 자료의 처리 (가장 중요)\nrelevance=low · lacks_answer=true · snippets 비어 있음 → Den이 **그 자료를 갖고 있지 않습니다**.\n스니펫을 근거로 쓰지 않고 \"Den은 이 부분을 보유하지 않습니다\"라고 말한 뒤 다른 출처로 답합니다.\n보유 범위는 국가건설기준 KDS·KCS, KS, 건축 관련 법령 분야 안에서도 부분적입니다. 그 분야의 자료가 없으면\n\"범위 밖\"으로 단정하지 않고 **\"Den 미보유\"**라고 말합니다.\nanswer_boundary.status=partial → 복합 요청 중 `unanswered_parts`는 이번 응답 기준으로 **Den 미보유**입니다.\n인접 조항으로 빈칸을 채우지 않고, 그 항목만 좁혀 다시 묻거나 기준 원문을 확인합니다. 이 표시는\n검색 누락도 포함하는 응답 경계이며, Den 보유 자료 전체에 그 항목이 없다는 확정은 아닙니다.\n\n■ 인용 규칙\n· source_ref를 그대로 적습니다(예: KDS 14 20 22 §4.3.1). 비어 있으면 출처를 지어내지 않습니다.\n· source_citations에 source_ref가 정확히 같고 source_url이 하나뿐이면 source_ref만 떼지\n  않고 그 카드의 citation 전체를 그대로 인용합니다. URL이 0개이거나 2개 이상이면 추측하지 않습니다.\n· direct_standard_sources에서 수치 주장의 단위 포함 수치 전부를 supports_values로 갖는\n  KCS/KDS 카드가 하나뿐이면 그 카드의 source_ref를 인용합니다. 0개나 2개 이상이면\n  자동으로 고르지 않습니다. 이미 같은 기준코드의 다른 절을 인용했어도 그 절이 수치를\n  직접 지지하지 않으면, 수치를 모두 지지하는 그 유일한 절을 함께 인용합니다. 다른 기준의\n  같은 수치나 인접 법령 항목으로 source_ref를 바꾸지 않습니다.\n· cited_articles(조문 원문)가 **같은 법령 좌표의** snippets(요약)와 다르면 조문이 옳습니다.\n  다만 이 규칙은 직접 KCS/KDS 조항의 출처를 인접 법령 조문으로 대체한다는 뜻이 아닙니다.\n· context는 출처가 없는 배경 설명이므로 근거로 인용하지 않습니다.\n· source_scope: kr-norm=국내 규범 · reference=해외 문헌(국내 준수 대상 아님) · den-internal=Den 자체 분석.\n  reference와 den-internal은 국내 기준처럼 제시하지 않습니다.\n· statement_truncated=true이면 조문 앞부분만 온 상태입니다. 뒤에 단서·예외가 있을 수 있으므로 단정하지 않습니다.\n· source_standards의 기준 코드가 질의 분야와 다르면 그 수치를 쓰지 않습니다\n  (relevance는 주제가 가까운지를 재며, 같은 기준인지는 재지 않습니다).\n· disclaimer가 있으면 답변에 그대로 표기합니다.\n\n■ 질의 요령\n넓은 질문이나 고유명사 질문은 원자 개념으로 나눠 다시 묻습니다.\n대지·지역·좌표가 있으면 site_context를 먼저 부르고, 그 scope를 후속 질의에 전달합니다.\nwarming=true이면 예열 중이라 느리고 품질이 낮을 수 있으므로, 중요한 수치는 나중에 재확인하도록 안내합니다.\n\n■ 피드백 (사용자 반응을 Den에 전하는 유일한 경로)\nDen 응답을 쓴 뒤 사용자가 보인 반응(수정 지시/불만/채택/무시)을 대화 종료 전 feedback으로\n요약해 전달합니다. 채택·긍정은 satisfied=true로, 수정 지시·불만·명시적 무시는 satisfied=false와\n가장 가까운 issue_type(오답, 무관, 얕음, 기권과다, 기타)으로 매핑합니다.\n불만족이면 **무엇이 없어서 다른 출처로 갔는지** comment에 한 줄 남깁니다. Den은 이 한 줄만 봅니다.\n채택·긍정이면 **Den이 없었으면 무엇을 했을지**(다른 수치를 쓰려 했다 · 몰라서 못 정하고 있었다 ·\n다른 출처로 갔어야 했다) 한 줄을 함께 남깁니다. 판단이 바뀌었는지는 이 한 줄로만 구분됩니다.\n**단, 사용자가 말하지 않았으면 비워 두고 추측해 적지 않습니다.**\n★그러나 satisfied=true인데 comment를 **통째로 비워 보내지는 않습니다.** 반사실을 말하지\n않았어도 **무엇을 채택했는지**(어느 수치·조문·판단을 그대로 썼는지) 한 줄은 적습니다.\n비우는 대상은 반사실 한 마디이고 반응 요지는 비우지 않습니다. 요지까지 비면 Den은 그 만족이\n'말하지 않은 경우'인지 '전달되지 않은 경우'인지 구분하지 못하고, 그 기록은 어느 쪽으로도 세지 못합니다.\n사용자 대화 원문은 보내지 않습니다. 반응이 없으면 만족 여부를 추측하지 않습니다.\n\n■ 응답 영수증 (meta.receipt)\n응답마다 판단 기록이 붙습니다. 기록에는 팩 판(pack), 코드 판(code), 근거 노드와 그 내용 지문(nodes),\n응답 지문(response_sha256), 시점(as_of · issued_at)이 담기며 질의 원문은 싣지 않습니다.\n사용자가 근거를 나중에 대조해야 하면 답변 끝에 receipt.id를 적습니다.\n영수증은 근거의 출처·시점 기록이며, 답의 옳음을 판정하지 않습니다.",
+  "tools": [
+   {
+    "name": "answer_why",
+    "title": "Explain Why (인과 설명)",
+    "description": "건축·공간의 **왜·원리·득실**을 인과 경로로 설명합니다.\n\"왜 콘크리트에 양생이 필요한가\", \"왜 방수층에 보호몰탈을 까는가\"처럼 이유를 묻는 질문에 씁니다.\n\n→ 대체 도구: 이미 아는 인과 **한 줄의 근거만** 확인하려면 evidence_for ·\n  두 개념이 **이어지는지만** 보려면 path_between · **수치·조문**이 필요하면 k_snippets ·\n  용어 **뜻**만 물으면 define.\n\n★파라미터: depth는 L1<L2<L3 순으로 경로를 넓게 봅니다(홉 상한 4). profile은 depth와\n 별개로 **탐색 예산**을 정합니다. direct=2홉/3경로, standard=기본이며, **deep은 쿼터를 5회분\n 씁니다**(6홉/12경로). 둘 다 주면 profile이 실제 예산을 정합니다. as_of는 YYYY-MM-DD입니다.\n★relevance=low이거나 no_path_reason이 있으면 Den이 그 경로를 갖고 있지 않다는 뜻이므로 근거로 쓰지 않습니다.\n읽기 전용이며 외부를 부르지 않고, 적재된 자료만 봅니다.",
+    "inputSchema": {
+     "properties": {
+      "question": {
+       "description": "Natural-language why question.",
+       "title": "Question",
+       "type": "string"
+      },
+      "scope": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional comma scope filter such as climate=arid,epoch=ancient.",
+       "title": "Scope"
+      },
+      "depth": {
+       "default": "L2",
+       "description": "L1, L2, or L3. Hops are hard-capped at 4.",
+       "title": "Depth",
+       "type": "string"
+      },
+      "as_of": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "과거 발주도서나 분쟁에서 '당시 기준'을 물을 때 씁니다. 예: as_of=2020-06-01",
+       "title": "As Of"
+      },
+      "profile": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "탐색 예산 프로파일입니다. direct=2홉/3경로(드릴다운), standard=각 도구의 기본 예산(기본), deep=6홉/12경로+교차축(쿼터 5배)입니다. 지정하지 않으면 질의 의도에 따라 정한 기본 프로파일(대개 standard)을 씁니다.",
+       "title": "Profile"
+      }
+     },
+     "required": [
+      "question"
+     ],
+     "title": "answer_whyArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "answer_whyDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "path_between",
+    "title": "Find Path Between Concepts (개념 연결 찾기)",
+    "description": "두 개념이 **어떻게 이어지는지** 확인합니다.\n\"단열과 결로는 어떻게 연결되나\", \"전단벽에서 층간변위까지\"처럼 **출발·도착이 분명할 때** 씁니다.\n\n→ 대체 도구: 한 지점에서 **관계를 따라가며** 훑으려면 traverse · 공정 **전체 흐름**이면\n  scenario · **왜 그런지 설명**이 필요하면 answer_why · **한 연결의 근거**만이면 evidence_for.\n\n★파라미터: a·b에는 질문 문장 대신 **개념 이름/구**를 입력합니다(\"결로\" O, \"왜 결로가 생기나\" X).\n a와 b가 같으면 빈 결과입니다. scope에 쉼표로 여러 축을 주면 **모두 만족**하는 경로만 남깁니다\n (climate=arid,epoch=ancient). **profile=deep은 쿼터를 5회분 씁니다**. 먼저 기본으로 보고\n 결과가 없을 때만 올립니다.\n★경로가 없으면 만들어 내지 않고 연결이 확인되지 않는다고 말합니다.\n읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "a": {
+       "description": "Start concept name or phrase.",
+       "title": "A",
+       "type": "string"
+      },
+      "b": {
+       "description": "End concept name or phrase.",
+       "title": "B",
+       "type": "string"
+      },
+      "scope": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional comma scope filter such as climate=arid,epoch=ancient.",
+       "title": "Scope"
+      },
+      "profile": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "탐색 예산 프로파일입니다. direct=2홉/3경로(드릴다운), standard=각 도구의 기본 예산(기본), deep=6홉/12경로+교차축(쿼터 5배)입니다. 지정하지 않으면 질의 의도에 따라 정한 기본 프로파일(대개 standard)을 씁니다.",
+       "title": "Profile"
+      }
+     },
+     "required": [
+      "a",
+      "b"
+     ],
+     "title": "path_betweenArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "path_betweenDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "evidence_for",
+    "title": "Check Evidence For Link (연결 근거 확인)",
+    "description": "\"A가 B를 유발한다\"는 **한 연결의 근거**를 확인합니다.\n앞선 답에 쓰인 인과를 검증할 때 씁니다.\n\n→ 대체 도구: 두 개념 사이 **경로를 찾으려면** path_between · **왜 그런지 설명**이면\n  answer_why · 수치·조문 근거면 k_snippets. 이 도구는 **이미 아는 한 연결**을 확인합니다.\n\n★파라미터: from·to는 개념 이름이고(문장 아님), relation은 그래프 관계 종류입니다.\n causes(유발), enables(가능하게 함), requires(선행 필요), contrasts(대비)를 쓰며, from, to, relation 셋 다 필수입니다.\n relation을 모르면 이 도구 대신 path_between으로 어떤 관계인지 먼저 봅니다.\n★evidence_note와 stance를 구분해 전하고, disclaimer가 있으면 그대로 표기합니다.\n연결이 없으면 없다고 답하고 근거를 지어내지 않습니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "from": {
+       "description": "Source concept name.",
+       "title": "From",
+       "type": "string"
+      },
+      "to": {
+       "description": "Target concept name.",
+       "title": "To",
+       "type": "string"
+      },
+      "relation": {
+       "description": "Relation type: causes, enables, requires or contrasts. Other graph relations such as evokes are also accepted.",
+       "title": "Relation",
+       "type": "string"
+      },
+      "as_of": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "과거 발주도서나 분쟁에서 '당시 기준'을 물을 때 씁니다. 예: as_of=2020-06-01",
+       "title": "As Of"
+      }
+     },
+     "required": [
+      "from",
+      "to",
+      "relation"
+     ],
+     "title": "evidence_forArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "evidence_forDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "k_snippets",
+    "title": "Find Standard Clauses (기준·조문 찾기)",
+    "description": "국가건설기준 KDS·KCS, KS, 건축 관련 법령과 별표의 **수치·조문**을 찾습니다.\n건축, 토목, 시공, 구조, 설비 질문에 근거를 붙일 때 **웹 검색보다 먼저** 이 도구를 씁니다.\n예: \"철근 피복두께\", \"방화구획 면적\", \"이어치기 면 처리\", \"되메우기 다짐\", 건축법 조항.\n\n→ 대체 도구: **용어 뜻**은 define · **종류 열거**는 enumerate · **공정 순서**는 scenario ·\n  **두 공법 차이**는 compare · **왜 그런지**는 answer_why. 대지·행정구역이 걸리면\n  site_context를 **먼저** 부르고 그 scope를 여기에 전달합니다.\n\n★파라미터: scope와 profile은 **다른 축**으로, scope는 *어느 공종*(좁힘), profile은\n *얼마나 깊이*(예산)를 정합니다. **profile=deep은 쿼터를 5회분 씁니다**. 기본 결과가 없을 때만\n 올립니다. limit는 기본 8이며 올릴수록 뒤쪽 관련도가 떨어집니다.\n as_of는 YYYY-MM-DD(그 시점 기준)입니다.\n ★scope를 **모르면 입력하지 않습니다**. 틀린 범위는 틀린 답을 만듭니다. 입력하지 않으면\n 기준이 달라지는 공종을 scope_split으로 알려 줍니다.\n\n응답 내용: 수치·요건 스니펫과 출처(예: KDS 14 20 22 §4.3.1), 조문 원문이 있으면 cited_articles.\n **출처를 그대로 인용합니다.**\n★relevance=low이거나 lacks_answer=true이면 Den이 그 자료를 **갖고 있지 않습니다**. 스니펫을\n 근거로 쓰지 않고 그렇게 말한 뒤 다른 출처로 답합니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "question": {
+       "description": "Question about values or clauses in the Korean Design Standards (KDS), Korean Construction Specifications (KCS), Korean Industrial Standards (KS) or building-related statutes, for example 철근 피복두께.",
+       "title": "Question",
+       "type": "string"
+      },
+      "limit": {
+       "default": 8,
+       "description": "Maximum snippets to return.",
+       "title": "Limit",
+       "type": "integer"
+      },
+      "as_of": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "과거 발주도서나 분쟁에서 '당시 기준'을 물을 때 씁니다. 예: as_of=2020-06-01",
+       "title": "As Of"
+      },
+      "profile": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "탐색 예산 프로파일입니다. direct=2홉/3경로(드릴다운), standard=각 도구의 기본 예산(기본), deep=6홉/12경로+교차축(쿼터 5배)입니다. 지정하지 않으면 질의 의도에 따라 정한 기본 프로파일(대개 standard)을 씁니다.",
+       "title": "Profile"
+      },
+      "scope": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "선택 항목입니다. 이 질문이 속한 **공종·기준**을 알면 입력하며, 그 범위로 좁혀 답합니다. 같은 용어라도 공종마다 규정 수치가 다릅니다(되메우기 다짐 두께는 도로·하수도·조경이 각각 다릅니다). 입력하지 않으면 Den은 기준이 달라지는 공종을 `scope_split`으로 알려 주고, 수치를 인용하기 전에 공종을 확인하도록 요구합니다. 입력했는데 그 범위 밖 자료가 섞여 나가면 `scope_partial`로, 범위 안 자료가 하나도 없으면 `scope_absent`로 알려 줍니다. Den은 범위 밖 자료를 버리지 않고 **고지**합니다. 형식은 공종 이름('도로'·'하수도'·'건축') 또는 기준코드('KCS 44'·'KDS 14 20 50')입니다. ★모르면 입력하지 않습니다. 틀린 범위는 틀린 답을 만듭니다.",
+       "title": "Scope"
+      }
+     },
+     "required": [
+      "question"
+     ],
+     "title": "k_snippetsArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "k_snippetsDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "scenario",
+    "title": "Build Work Sequence (공정 순서 구성)",
+    "description": "공정 시나리오를 구성합니다. 관련 공정 노드를 모아 enables/requires 관계로 위상정렬해 순서 있는 단계 흐름을 반환합니다. '기초부터 3층까지 시공 순서', '가설공사 절차' 같은 **시퀀스·시나리오** 요청에 호출합니다.\n→ 대체 도구: 단순 사실·수치는 k_snippets · **두 지점 사이**만 궁금하면 path_between · 한 노드의 **선후 이웃**만이면 traverse · 두 공법 **차이**는 compare.\n★파라미터: max_nodes는 **5~60으로 잘립니다**(기본 40). 올리면 넓게 모으지만 느슨한 노드가 섞여 ordering_coverage가 떨어질 수 있으므로, 먼저 기본으로 보고 gaps를 확인한 뒤 올립니다.\n결정론으로 구성합니다(LLM 없음). ordering_coverage가 낮거나 gaps가 있으면 그래프에 순서 지식이 아직 없다는 표시이므로, 그 구간은 지어내지 않고 gaps를 그대로 사용자에게 전합니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "query": {
+       "description": "공정/시퀀스 질의(예: 철근콘크리트 골조 시공 순서).",
+       "title": "Query",
+       "type": "string"
+      },
+      "max_nodes": {
+       "default": 40,
+       "description": "수집할 공정 노드 상한.",
+       "title": "Max Nodes",
+       "type": "integer"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "title": "scenarioArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "scenarioDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "compare",
+    "title": "Compare Two Methods (두 공법 대조)",
+    "description": "두 공법·개념의 **차이**를 대조합니다. 'RC 구조 vs 조적조 시공순서 차이', '스틱 vs 유닛 커튼월' 같은 **비교/차이** 요청에 호출합니다.\n→ 대체 도구: 단일 순서는 scenario · 종류 열거는 enumerate · 용어 뜻은 define · 수치·조문은 k_snippets.\n★파라미터: a·b는 **개념/공법 이름**입니다(질문 문장 아님). 'A vs B'를 a에 한 번에 주면 b를 비우며, 이때 구분자는 vs입니다. 한 개념만 주고 b를 비우면 비교할 짝이 없어 결과가 없습니다.\n각각을 결정론으로 구성해 A/B 시퀀스, A에만/B에만 있는 단계, 공유 단계, contrasts 관계를 반환합니다(LLM 없음). a_coverage/b_coverage가 낮으면 그 개념의 지식이 얇다는 표시이므로, 지어내지 않고 gaps를 그대로 전합니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "a": {
+       "description": "첫째 공법/개념(예: RC 골조 시공). 'A vs B'를 a에 한 번에 줄 수도 있습니다.",
+       "title": "A",
+       "type": "string"
+      },
+      "b": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "둘째 공법/개념(예: 철골 시공). a에 vs가 있으면 생략할 수 있습니다.",
+       "title": "B"
+      }
+     },
+     "required": [
+      "a"
+     ],
+     "title": "compareArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "compareDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "enumerate",
+    "title": "Enumerate Kinds (종류 열거)",
+    "description": "한 개념의 **종류·구성요소·분류**를 열거합니다. '건축물 하중의 종류', '구조용 강종 체계', '건축 도면의 종류' 같은 **'X의 종류/체계'** 요청에 호출합니다.\n→ 대체 도구: 순서는 scenario · 비교는 compare · **한 용어의 뜻**은 define · 수치·조문은 k_snippets.\n★파라미터: query는 'X의 종류/체계/구성요소' 형식으로 줍니다. 낱말 하나만 주면(예: '하중') 열거 대상이 정해지지 않아 match가 잡히지 않을 수 있습니다.\n큐레이션한 주제는 표준이나 실무 체계(grounded_in)의 분류에 따른 멤버 목록을 반환하고, 각 멤버의 정의는 그래프에서 불러옵니다. 결정론으로 구성합니다. match=None이면 큐레이션하지 않은 주제이므로 k_snippets로 대신 찾습니다. gaps는 멤버 정의가 아직 그래프에 없다는 표시이며, 지어내지 않고 그대로 전합니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "query": {
+       "description": "'X의 종류/체계/구성요소' 질의(예: 건축물 하중의 종류).",
+       "title": "Query",
+       "type": "string"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "title": "enumerateArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "enumerateDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "define",
+    "title": "Define Term (용어 정의)",
+    "description": "건축·건설 **용어 하나의 뜻**을 돌려줍니다. '이형철근이 뭔가', '방화구획이란', '옹벽과 흙막이의 정의' 같은 **'X가 무엇인가'** 질문에 호출합니다.\n→ 대체 도구: **수치·조문**이 필요하면 k_snippets · **종류/체계 열거**는 enumerate · **왜 그런지**는 answer_why · **두 개념 차이**는 compare · 두 개념이 **어떻게 이어지는지**는 path_between. 이 도구는 정의 한 덩어리만 주고 기준 수치는 주지 않습니다.\n★파라미터: term에는 **용어 하나**를 입력합니다(질문 문장이나 여러 용어의 나열은 입력하지 않습니다). limit는 동음이의로 후보가 나뉠 때 몇 개까지 볼지를 정하며 1~5로 잘립니다(기본 3). as_of는 YYYY-MM-DD입니다.\n★abstained=true이면 Den이 그 용어의 정의를 **갖고 있지 않다**는 뜻입니다. 비슷한 말을 지어내지 않고 그대로 전한 뒤 다른 출처로 답합니다. exact=false는 이름이 정확히 일치하지 않는다는 표시이므로 이름이 맞는지 확인하고 씁니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "term": {
+       "description": "정의를 물을 용어 하나(예: 이형철근).",
+       "title": "Term",
+       "type": "string"
+      },
+      "limit": {
+       "default": 3,
+       "description": "동음이의로 후보가 나뉠 때 볼 후보 수(1~5).",
+       "title": "Limit",
+       "type": "integer"
+      },
+      "as_of": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "과거 발주도서나 분쟁에서 '당시 기준'을 물을 때 씁니다. 예: as_of=2020-06-01",
+       "title": "As Of"
+      }
+     },
+     "required": [
+      "term"
+     ],
+     "title": "defineArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "defineDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "traverse",
+    "title": "Follow Order Relations (선후 관계 따라가기)",
+    "description": "**시공 순서와 선후 관계**를 따라갑니다('무엇이 무엇보다 먼저 와야 하는가').\n'기초부터 골조까지 순서', '거푸집 해체 전 확인 사항' 같은 공정 질문에 씁니다.\n→ 대체 도구: 출발·도착 **두 지점이 분명하면** path_between · 공정 **전체 흐름**을 한 번에 구성하려면 scenario · 두 공법 **차이**는 compare · 단순 수치·조문은 k_snippets.\n★파라미터: relation=requires는 **선행 조건**(시작 개념보다 먼저 와야 하는 항목), enables는 **후속 가능 작업**, causes는 인과, contrasts는 대비입니다. 생략하면 전부 봅니다. direction=out은 정방향(다음), in은 역방향(이전)이며, 'X 전에 무엇을'은 in입니다. depth는 **1~4로 잘립니다**(넘겨도 4). limit는 모든 홉을 합친 최대 스텝 수입니다(기본 40).\n빈 결과는 Den이 그 순서를 아직 갖고 있지 않다는 뜻이며, 순서를 지어내지 않습니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "start": {
+       "description": "시작 개념 이름/구문(예: 거푸집).",
+       "title": "Start",
+       "type": "string"
+      },
+      "relation": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "순회할 관계(requires/enables/causes/contrasts 등). 생략하면 전체를 봅니다.",
+       "title": "Relation"
+      },
+      "direction": {
+       "default": "out",
+       "description": "out(정방향) 또는 in(역방향).",
+       "title": "Direction",
+       "type": "string"
+      },
+      "depth": {
+       "default": 2,
+       "description": "순회 홉 수(1~4).",
+       "title": "Depth",
+       "type": "integer"
+      },
+      "limit": {
+       "default": 40,
+       "description": "최대 스텝 수.",
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     "required": [
+      "start"
+     ],
+     "title": "traverseArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "traverseDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "site_context",
+    "title": "Resolve Site Context (대지 조건 확인)",
+    "description": "지명·좌표를 **기후·문화·관할** 조건으로 바꿉니다.\n대지, 지역, 행정구역, 위경도가 언급되면 다른 도구보다 **먼저** 부릅니다.\n\n→ 그다음: 돌아온 scope를 k_snippets·answer_why에, jurisdiction을 review_plan에 전달합니다.\n  이 도구는 기준·수치를 주지 않습니다. 수치는 k_snippets, 도면 검토는 review_plan이 맡습니다.\n\n★파라미터: region을 **먼저** 봅니다. lat/lng는 region이 없거나 찾지 못할 때의 대체 경로이며,\n 둘 다 주면 region이 우선합니다. region은 등재된 지명·별칭에 맞아야 합니다(\"부산 수영구\" O).\n 셋 다 비우면 아무 조건도 정하지 못하고 relevance=low로 돌려줍니다.\n★행정구역이 확인되지 않은 좌표 결과는 **추정**이라고 밝힙니다.\n읽기 전용이며 **외부 지오코딩을 부르지 않습니다**(적재된 지명표만 봅니다).",
+    "inputSchema": {
+     "properties": {
+      "region": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Place name such as \"부산 수영구\" or \"Dubai\".",
+       "title": "Region"
+      },
+      "lat": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Latitude for coordinate fallback.",
+       "title": "Lat"
+      },
+      "lng": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Longitude for coordinate fallback.",
+       "title": "Lng"
+      }
+     },
+     "title": "site_contextArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "site_contextDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "emotional_palette",
+    "title": "Read Spatial Atmosphere (공간 분위기 읽기)",
+    "description": "공간을 순서대로 지날 때의 **분위기 전이**를 읽습니다.\n\"진입에서 거실까지 감정 흐름\", \"압축에서 해방\"처럼 이동 순서와 체험 목표가 있을 때 씁니다.\n\n→ 대체 도구: 작품 평가나 \"왜 걸작인가\" 같은 **이유**는 answer_why · 법규 관점 평면 검토는\n  review_plan · 공정 순서는 scenario. 이 도구는 **체험 순서**만 다룹니다.\n\n★파라미터: spaces는 **실제 이동 순서**로 입력합니다. 배열 순서가 곧 동선이며, 순서를 바꾸면\n 결과가 바뀝니다. 공간을 하나만 입력하면 전이가 없어 결과가 없으므로 둘 이상을 입력합니다.\n target은 선택이며, 입력하면 그 목표에 대한 정합/괴리를 함께 봅니다.\n읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "spaces": {
+       "description": "Ordered spaces such as [\"좁은 진입로\", \"낮은 천장 복도\", \"높은 거실\"].",
+       "items": {
+        "type": "string"
+       },
+       "title": "Spaces",
+       "type": "array"
+      },
+      "target": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional affective target such as \"환대와 개방감\".",
+       "title": "Target"
+      }
+     },
+     "required": [
+      "spaces"
+     ],
+     "title": "emotional_paletteArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "emotional_paletteDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "review_plan",
+    "title": "Review Floor Plan (평면 법규 검토)",
+    "description": "평면 정보(방 용도, 외부창, 인접, 동선)를 **공간 규칙과 건축 법규 관점에서 점검**해 외부창 없는 거실·침실(채광·환기·피난), 용도 불명 폐쇄 공간, 은폐 수직 통로, 동선 위계, 다른 공간 접근 통로로 쓰이는 거실·침실을 짚습니다.\n사용자가 도면을 공유하거나 공간 구성 검토를 요청하면 이 도구를 씁니다.\n→ 대체 도구: 특정 **수치·조문 하나**의 근거면 k_snippets · **왜 그 요건인지**는 answer_why · 체험·분위기 관점이면 emotional_palette. 대지의 관할이 걸리면 site_context를 **먼저** 부르고 그 jurisdiction을 여기에 전달합니다.\n★입력: 이미지 대신 **도면에서 읽어낸 구조**(방의 용도와 외부창 유무, 인접, 개구부, 동선)를 입력합니다. rooms만 필수이고 나머지는 선택이며, **빠뜨린 만큼 검토가 좁아집니다**(adjacency가 없으면 인접 요건을, circulation이 없으면 피난 동선을 보지 못합니다). 검토하지 못한 축은 결과에 그대로 밝힙니다. jurisdiction은 KR-서울 형식이며, 주면 그 관할 이름이 적힌 조문 기록을 우선 매칭합니다. 관할 조례를 따로 조회하지는 않습니다.\n위반(violation) 항목은 답변에서 빼지 않습니다. 읽기 전용이며 외부 호출이 없습니다.",
+    "inputSchema": {
+     "properties": {
+      "rooms": {
+       "description": "Parsed rooms with id, use, ext_windows, optional area/floor/access/shape.",
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "title": "Rooms",
+       "type": "array"
+      },
+      "adjacency": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Room adjacency pairs such as [[a,b]] or objects with from/to.",
+       "title": "Adjacency"
+      },
+      "openings": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Openings, including exterior windows and doors, as parsed objects or pairs.",
+       "title": "Openings"
+      },
+      "circulation": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Circulation edges or ordered paths, e.g. [[from,to]] or [a,b,c].",
+       "title": "Circulation"
+      },
+      "jurisdiction": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional jurisdiction key such as KR-서울. Clause records that name this jurisdiction are matched first; local ordinances are not looked up separately.",
+       "title": "Jurisdiction"
+      },
+      "site_scope": {
+       "anyOf": [
+        {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional site scope such as climate/culture/epoch/tech_level.",
+       "title": "Site Scope"
+      }
+     },
+     "required": [
+      "rooms"
+     ],
+     "title": "review_planArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "review_planDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "feedback",
+    "title": "Record User Feedback (사용자 반응 기록)",
+    "description": "호출 에이전트가 직전 Den 응답을 활용한 뒤 사용자가 보인 반응(수정 지시/불만/채택/무시)을 대화 종료 전 요약 수준으로 기록하는 릴레이 도구입니다. 사용자 입력 폼은 아닙니다.\nquery_id가 있으면 그대로, 없으면 직전 Den 도구에 전달한 question_text만 전달합니다. satisfied를 기록하고, 불만족이면 issue_type을 지정하며, comment는 반응 요지만 200자 이내로 요약합니다.\n채택·긍정은 satisfied=true로, 수정 지시·불만·명시적 무시는 satisfied=false와 가장 가까운 issue_type으로 매핑합니다. 반응이 전혀 없으면 만족 여부를 추측하지 않습니다.\n★satisfied=true(채택·긍정)이면 comment에 **Den이 없었으면 무엇을 하려 했는지** 한 마디를 함께 적습니다(\"다른 수치를 쓰려 했다\", \"몰라서 정하지 못하고 있었다\", \"다른 출처로 갔어야 했다\" 가운데 사용자가 실제로 말한 내용). 'Den을 썼다'와 'Den 때문에 달라졌다'는 이 한 마디로만 구분되므로 중요합니다.\n★★사용자가 말하지 않았으면 **비워 둡니다.** 추측해 지어내지 않습니다. 지어낸 내용은 빈칸보다 나쁩니다.\n★★★그렇다고 comment를 통째로 생략하지는 않습니다. satisfied=true이면 **무엇을 채택했는지** 한 줄은 항상 적습니다(어느 수치·조문·판단을 그대로 썼는지). 비워 두는 대상은 반사실 한 마디로 한정됩니다. 요지까지 비면 그 만족 기록은 쓸 수 없습니다.\n→ 이 도구는 질의 도구가 아닙니다. 답은 k_snippets·answer_why로 찾습니다.\n사용자 대화 원문은 전송하지 않습니다. 불만족과 사유는 다음 날 보완 후보로 접수됩니다.",
+    "inputSchema": {
+     "properties": {
+      "satisfied": {
+       "description": "Whether the previous Den response was satisfactory.",
+       "title": "Satisfied",
+       "type": "boolean"
+      },
+      "query_id": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "The 16-character query_id returned in the previous response meta.",
+       "title": "Query Id"
+      },
+      "question_text": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "The exact prior Den tool query, used only when query_id is unavailable.",
+       "title": "Question Text"
+      },
+      "issue_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "오답",
+          "무관",
+          "기권과다",
+          "얕음",
+          "기타"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Required when dissatisfied: 오답, 무관, 기권과다, 얕음, or 기타.",
+       "title": "Issue Type"
+      },
+      "comment": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Summary of the user's reaction; never send conversation text. When satisfied=true this is expected, not optional: state in one line what the user actually did with the answer (which value / clause / decision they adopted). Also add what the user would have done without Den (used a different value, was stuck undecided, or would have gone to another source), but ONLY if the user actually said it; never infer or invent that part. Omitting that one clause is correct when unsaid; omitting the whole comment is not.",
+       "title": "Comment"
+      }
+     },
+     "required": [
+      "satisfied"
+     ],
+     "title": "feedbackArguments",
+     "type": "object"
+    },
+    "outputSchema": {
+     "additionalProperties": true,
+     "title": "feedbackDictOutput",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

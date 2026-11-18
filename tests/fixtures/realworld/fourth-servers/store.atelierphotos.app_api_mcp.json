@@ -1,0 +1,1539 @@
+{
+ "url": "https://store.atelierphotos.app/api/mcp",
+ "doc": {
+  "name": "atelier-store",
+  "version": "0.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "A store of original photographs sold under a personal-use license, and some under a commercial one too. Searching needs no account; the first account tool (get_account and the others that spend or download) asks the person to sign in by email, so tell them before you call it. Search with search_images, passing the destination screen size when there is one, then show the person the previews and let them choose. A host that supports MCP Apps draws the pictures for the person; others show them nothing, so there give them each result's preview_url as a link to open. Buying spends the image's price in credits (price.credits — not always 1): check get_account first, and confirm with the person before calling fulfil_image. The free trial is 3 credits, once per person and only before they have paid for anything (get_account says trial_available): offer start_trial only when it would buy the image they chose — price.credits no more than that, and price.trial_credits_accepted true. An image bought with trial credits comes as the screen file only; its print file can be bought afterwards at the full price (fulfil_image with buy_print: true, in paid credits, or by card). Anything the buyer already owns (owned: true in results once signed in) re-downloads free. For more credits, or to pay for one image by card where price.card_available is true, create_checkout returns a link for them to open — never ask anyone for card details. After they pay for an image by card, fulfil_image delivers it without spending credits. The personal license does not cover business use. When the person wants an image for a business, a client, marketing, advertising or anything sold, they need the commercial license: offered only where price.commercial is not null (search_images with licence: \"commercial\" finds those), bought by card with create_checkout kind=one_off licence=commercial, and never with credits, the trial or a subscription. Ask what the image is for when it is unclear, and read get_licence code=commercial before recommending it. If the person has a private gallery's link and access code from a photographer, unlock_collection opens it to their account. Every image names its photographer; the license asks for credit where practical, so pass the name on with the file. A bought image comes as a screen file and a full-resolution print file; the person can download them again at any time from the account_url that get_account returns. There, too, they cancel or change a subscription, disconnect you, or delete their data; you cannot do those for them.",
+  "tools": [
+   {
+    "name": "search_images",
+    "title": "Search the image catalogue",
+    "description": "Find images for sale by description, mood, colour or subject — a plain description of the feeling or scene works as well as a keyword, so pass what the person actually said. Give target_width and target_height when the image is destined for a specific screen — results are then ranked by how close each frame is to that shape, and frames whose shape is badly wrong for it (a landscape frame for a phone) are left out. Images are sold as the photographer framed them, never cropped. Returns a preview of each image. Use get_image for one listing you already have the id of; use list_collections to browse rather than search.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "query": {
+       "description": "Free text: subject, mood, colour, setting.",
+       "type": "string"
+      },
+      "orientation": {
+       "type": "string",
+       "enum": [
+        "landscape",
+        "portrait",
+        "square"
+       ]
+      },
+      "target_width": {
+       "description": "Destination width in pixels, e.g. 1290 for an iPhone. Give both or neither.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 9007199254740991
+      },
+      "target_height": {
+       "description": "Destination height in pixels, e.g. 2796. Give both or neither.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 9007199254740991
+      },
+      "collection_id": {
+       "description": "Restrict to one collection from list_collections.",
+       "type": "string"
+      },
+      "licence": {
+       "description": "\"commercial\" for only the images that can be licensed for business use. Every image has the personal license.",
+       "type": "string",
+       "enum": [
+        "personal",
+        "commercial"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 12
+      },
+      "cursor": {
+       "description": "next_cursor from the previous page, unchanged, with the same query and filters. Cannot be combined with target_width/target_height.",
+       "type": "string"
+      },
+      "include_previews": {
+       "description": "Set false for metadata only, which is much cheaper.",
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://atelier/pictures-v2.html"
+     },
+     "ui/resourceUri": "ui://atelier/pictures-v2.html"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "listing_id": {
+          "type": "string"
+         },
+         "headline": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "keywords": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "orientation": {
+          "type": "string"
+         },
+         "aspect_ratio": {
+          "type": "string"
+         },
+         "pixels": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "width": {
+              "type": "number"
+             },
+             "height": {
+              "type": "number"
+             }
+            },
+            "required": [
+             "width",
+             "height"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "collection": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "title": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "id",
+           "title"
+          ],
+          "additionalProperties": false
+         },
+         "photographer": {
+          "type": "string"
+         },
+         "preview_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "price": {
+          "type": "object",
+          "properties": {
+           "credits": {
+            "type": "number"
+           },
+           "cents": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "trial_credits_accepted": {
+            "type": "boolean"
+           },
+           "card_available": {
+            "type": "boolean"
+           },
+           "commercial": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "cents": {
+                "type": "number"
+               },
+               "currency": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "cents",
+               "currency"
+              ],
+              "additionalProperties": false
+             },
+             {
+              "type": "null"
+             }
+            ]
+           }
+          },
+          "required": [
+           "credits",
+           "cents",
+           "currency",
+           "trial_credits_accepted",
+           "card_available",
+           "commercial"
+          ],
+          "additionalProperties": false
+         },
+         "licence": {
+          "type": "object",
+          "properties": {
+           "code": {
+            "type": "string"
+           },
+           "version": {
+            "type": "number"
+           }
+          },
+          "required": [
+           "code",
+           "version"
+          ],
+          "additionalProperties": false
+         },
+         "shape_fit": {
+          "type": "object",
+          "properties": {
+           "score": {
+            "type": "number"
+           },
+           "target": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "score",
+           "target"
+          ],
+          "additionalProperties": false
+         },
+         "match": {
+          "type": "string",
+          "enum": [
+           "keyword",
+           "semantic",
+           "semantic_weak"
+          ]
+         },
+         "owned": {
+          "type": "boolean"
+         },
+         "owned_licences": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "listing_id",
+         "headline",
+         "title",
+         "description",
+         "keywords",
+         "orientation",
+         "aspect_ratio",
+         "pixels",
+         "collection",
+         "photographer",
+         "preview_url",
+         "price",
+         "licence"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "next_cursor": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "results",
+      "next_cursor"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_image",
+    "title": "Get one image",
+    "description": "Everything known about a single listing: its description, keywords, price in credits and money, the license it sells under, and a preview. Use after search_images when the person wants a closer look at one option.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "listing_id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://atelier/pictures-v2.html"
+     },
+     "ui/resourceUri": "ui://atelier/pictures-v2.html"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "string"
+      },
+      "headline": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "title": {
+       "type": "string"
+      },
+      "description": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "keywords": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "orientation": {
+       "type": "string"
+      },
+      "aspect_ratio": {
+       "type": "string"
+      },
+      "pixels": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "width": {
+           "type": "number"
+          },
+          "height": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "width",
+          "height"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "collection": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "title": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "id",
+        "title"
+       ],
+       "additionalProperties": false
+      },
+      "photographer": {
+       "type": "string"
+      },
+      "preview_url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "price": {
+       "type": "object",
+       "properties": {
+        "credits": {
+         "type": "number"
+        },
+        "cents": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        },
+        "trial_credits_accepted": {
+         "type": "boolean"
+        },
+        "card_available": {
+         "type": "boolean"
+        },
+        "commercial": {
+         "anyOf": [
+          {
+           "type": "object",
+           "properties": {
+            "cents": {
+             "type": "number"
+            },
+            "currency": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "cents",
+            "currency"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "credits",
+        "cents",
+        "currency",
+        "trial_credits_accepted",
+        "card_available",
+        "commercial"
+       ],
+       "additionalProperties": false
+      },
+      "licence": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "version": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "code",
+        "version"
+       ],
+       "additionalProperties": false
+      },
+      "shape_fit": {
+       "type": "object",
+       "properties": {
+        "score": {
+         "type": "number"
+        },
+        "target": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "score",
+        "target"
+       ],
+       "additionalProperties": false
+      },
+      "match": {
+       "type": "string",
+       "enum": [
+        "keyword",
+        "semantic",
+        "semantic_weak"
+       ]
+      },
+      "owned": {
+       "type": "boolean"
+      },
+      "owned_licences": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "licence_summary": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "code": {
+           "type": "string"
+          },
+          "version": {
+           "type": "number"
+          },
+          "name": {
+           "type": "string"
+          },
+          "summary": {
+           "type": "string"
+          },
+          "permitted": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "prohibited": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "effective_from": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "code",
+          "version",
+          "name",
+          "summary",
+          "permitted",
+          "prohibited",
+          "effective_from"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      }
+     },
+     "required": [
+      "listing_id",
+      "headline",
+      "title",
+      "description",
+      "keywords",
+      "orientation",
+      "aspect_ratio",
+      "pixels",
+      "collection",
+      "photographer",
+      "preview_url",
+      "price",
+      "licence",
+      "licence_summary"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_collections",
+    "title": "List collections",
+    "description": "The collections available in the store, with how many images are in each. Use for browsing when there is no particular search in mind; prefer search_images when the person has described what they want.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "collections": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "listing_count": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "id",
+         "title",
+         "description",
+         "listing_count"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "collections"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_licence",
+    "title": "Read the license",
+    "description": "The full terms an image is sold under: what the buyer may and may not do with it. Read this before recommending a purchase, and whenever the person asks what they are allowed to do with an image. \"personal\" (the default) is what credits and a card one-off buy; \"commercial\" is the business licence, sold by card where price.commercial is offered.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "code": {
+       "description": "One of: personal, commercial. Omit for personal.",
+       "type": "string"
+      },
+      "version": {
+       "description": "Omit for the terms currently on offer. Pass a version to read what was sold earlier.",
+       "type": "integer",
+       "minimum": -9007199254740991,
+       "maximum": 9007199254740991
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "code": {
+       "type": "string"
+      },
+      "version": {
+       "type": "number"
+      },
+      "name": {
+       "type": "string"
+      },
+      "summary": {
+       "type": "string"
+      },
+      "permitted": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "prohibited": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "effective_from": {
+       "type": "number"
+      },
+      "terms": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "code",
+      "version",
+      "name",
+      "summary",
+      "permitted",
+      "prohibited",
+      "effective_from",
+      "terms"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "unlock_collection",
+    "title": "Unlock a private collection",
+    "description": "Open a PRIVATE collection to the signed-in buyer, using the address and access code its photographer gave them — for example a wedding or client gallery whose pictures are also for sale. Afterwards search_images, get_image and list_collections include it for this buyer, and its images can be bought like any other. Use it only with a code the person gave you; never guess one. Requires sign-in.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "gallery": {
+       "type": "string",
+       "description": "The gallery's address as the person has it, e.g. https://example.com/jane/smith-wedding, or \"jane/smith-wedding\"."
+      },
+      "access_code": {
+       "type": "string",
+       "minLength": 1,
+       "description": "The access code the photographer gave the person."
+      }
+     },
+     "required": [
+      "gallery",
+      "access_code"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "collection_id": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "listing_count": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "collection_id",
+      "title",
+      "listing_count"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_account",
+    "title": "Check the signed-in account",
+    "description": "The signed-in buyer: their credit balance, subscription status, how many images they already own, and whether a free trial is still available. Call this before proposing a purchase, so you know what they can already afford. Requires sign-in.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "email": {
+       "type": "string"
+      },
+      "credits": {
+       "type": "number"
+      },
+      "trial_credits": {
+       "type": "number"
+      },
+      "paid_credits": {
+       "type": "number"
+      },
+      "subscription": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "plan_code": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string"
+          },
+          "credits_per_period": {
+           "type": "number"
+          },
+          "current_period_end": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "cancel_at_period_end": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "plan_code",
+          "status",
+          "credits_per_period",
+          "current_period_end",
+          "cancel_at_period_end"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "entitlement_count": {
+       "type": "number"
+      },
+      "trial_available": {
+       "type": "boolean"
+      },
+      "licence": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "version": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "code",
+        "version"
+       ],
+       "additionalProperties": false
+      },
+      "account_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "email",
+      "credits",
+      "trial_credits",
+      "paid_credits",
+      "subscription",
+      "entitlement_count",
+      "trial_available",
+      "licence",
+      "account_url"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "start_trial",
+    "title": "Start the free trial",
+    "description": "Give the signed-in buyer 3 credits free, once per email address, ever, and never to an account that has paid here. Offer it when get_account says trial_available, someone wants an image, has no credits and has not tried the store before — AND the trial would buy that image: its price.credits is no more than 3 and price.trial_credits_accepted is true. Otherwise the trial is spent on nothing they wanted. Trial credits buy the screen file only — tell the person, so a print is not expected; the print can be bought afterwards at the full price. Requires sign-in.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "granted": {
+       "type": "number"
+      },
+      "credits": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "granted",
+      "credits"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "create_checkout",
+    "title": "Start a purchase the person completes themselves",
+    "description": "Return a payment link for the person to open in a browser: either a subscription plan, or a single image bought outright (only where price.card_available is true) — or that image's commercial license, with licence=commercial, where price.commercial is not null. The commercial license is sold only this way; Stripe's page asks the person to name the licensee. THE AGENT NEVER HANDLES CARD DETAILS and must not ask for any — hand the url over and let the person pay on the payment page. Nothing is granted until they finish. After a one-off, call fulfil_image with the same listing_id: once the payment has landed it delivers the image at no credit cost, and until then it answers payment_pending. After a subscription, get_account shows it. Every result lists the plans with their prices. Use fulfil_image instead when the buyer already has credits or already owns the image, and start_trial when they have none and have not tried the store. Refused when the buyer already owns the image or already has a subscription, so that nobody pays twice — except an image the free trial bought, which is the screen file only: a one-off for it buys the print file at the full price. Each new link cancels the previous one — any earlier subscription link, or an earlier link for the same image — so give the person only the latest.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "subscription",
+        "one_off"
+       ]
+      },
+      "plan_code": {
+       "description": "For kind=subscription. Call with kind=subscription and no plan_code to list the plans and their prices.",
+       "type": "string"
+      },
+      "listing_id": {
+       "description": "For kind=one_off: the image to buy outright.",
+       "type": "string"
+      },
+      "licence": {
+       "description": "For kind=one_off. \"commercial\" buys the business licence, by card only; omit for personal.",
+       "type": "string",
+       "enum": [
+        "personal",
+        "commercial"
+       ]
+      }
+     },
+     "required": [
+      "kind"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "checkout_url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "kind": {
+       "type": "string"
+      },
+      "order_id": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "listing_id": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "expires_at": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "plans": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "credits_per_period": {
+          "type": "number"
+         },
+         "price": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "cents": {
+              "type": "number"
+             },
+             "currency": {
+              "type": "string"
+             },
+             "interval": {
+              "type": "string"
+             },
+             "interval_count": {
+              "type": "number"
+             }
+            },
+            "required": [
+             "cents",
+             "currency",
+             "interval",
+             "interval_count"
+            ],
+            "additionalProperties": false
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "code",
+         "name",
+         "description",
+         "credits_per_period",
+         "price"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "checkout_url",
+      "kind",
+      "order_id",
+      "listing_id",
+      "expires_at",
+      "plans"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "fulfil_image",
+    "title": "Get an image the buyer is entitled to",
+    "description": "Deliver an image to the signed-in buyer, spending the image's price in credits (price.credits in search_images and get_image — often 1, sometimes more) if they do not already own it. Credits buy the personal license only; the commercial license is bought with create_checkout, and this then delivers it. If they DO already own it this is free and always will be — use it freely for re-downloads, and for a fresh download link. The purchased image comes as two links, both as the photographer framed it, uncropped: download_url, 2560px WebP on the long side, which a phone or desktop fits to its own screen as a wallpaper; and print_url, the original file at full resolution (often 10–35 MB), for printing (null when unavailable). Give the person both; they expire at download_expires_at, a day out, and their account page (account_url in get_account) lists every image they own with fresh links. The picture returned inline is a 1200px copy to show them what they got. Pass full_image: true to have the full file inline as well — often 1–3 MB — only if you can accept a result that large and save it yourself. Confirm the price with the person before spending credits. An image bought wholly with free-trial credits is the screen file only: print_url is null, print_included false, and print_offer says what the print costs — the full price again, in paid credits. With the person's agreement, call again with buy_print: true to spend them (or create_checkout kind=one_off to pay by card). After a card checkout for this image it spends nothing: it answers payment_pending until the payment lands, then delivers. Requires sign-in.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "string"
+      },
+      "full_image": {
+       "description": "Also return the full 2560px file inline. Large; see the description.",
+       "type": "boolean"
+      },
+      "abandon_checkout": {
+       "description": "Only after payment_pending, and only when the person has said they will not pay by card: cancels the open payment link and spends credits instead.",
+       "type": "boolean"
+      },
+      "buy_print": {
+       "description": "For an image the free trial bought (print_included false): buy its print file, spending print_offer.credits of PAID credit. Only with the person's agreement.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "listing_id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "listing_id": {
+       "type": "string"
+      },
+      "already_owned": {
+       "type": "boolean"
+      },
+      "credits_spent": {
+       "type": "number"
+      },
+      "entitlement_id": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "licence": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "code": {
+           "type": "string"
+          },
+          "version": {
+           "type": "number"
+          },
+          "expires_at": {
+           "type": [
+            "number",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "code",
+          "version",
+          "expires_at"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "credits_remaining": {
+       "type": "number"
+      },
+      "source_pixels": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "width": {
+           "type": "number"
+          },
+          "height": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "width",
+          "height"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "download_url": {
+       "type": "string"
+      },
+      "print_url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "print_included": {
+       "type": "boolean"
+      },
+      "print_offer": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "credits": {
+           "type": "number"
+          },
+          "paid_credits": {
+           "type": "number"
+          },
+          "card_price": {
+           "anyOf": [
+            {
+             "type": "object",
+             "properties": {
+              "cents": {
+               "type": "number"
+              },
+              "currency": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "cents",
+              "currency"
+             ],
+             "additionalProperties": false
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "credits",
+          "paid_credits",
+          "card_price"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "download_expires_at": {
+       "type": "number"
+      },
+      "file_name": {
+       "type": "string"
+      },
+      "inline": {
+       "type": "string",
+       "enum": [
+        "preview",
+        "full",
+        "none"
+       ]
+      },
+      "paid_by": {
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "credit",
+          "trial",
+          "purchase",
+          "comp"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "photographer": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "listing_id",
+      "already_owned",
+      "credits_spent",
+      "licence",
+      "credits_remaining",
+      "source_pixels",
+      "download_url",
+      "print_url",
+      "print_included",
+      "print_offer",
+      "download_expires_at",
+      "file_name",
+      "inline",
+      "paid_by",
+      "photographer"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_entitlements",
+    "title": "List images the buyer owns",
+    "description": "Everything the signed-in buyer has bought, newest first. Re-downloading any of them with fulfil_image costs nothing. Pass include_previews: true whenever the person wants to see their library: small pictures (at most 12 per page) without a fulfil_image per image. Requires sign-in.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "cursor": {
+       "type": "string"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50
+      },
+      "include_previews": {
+       "description": "A small picture of each image. Caps the page at 12.",
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://atelier/pictures-v2.html"
+     },
+     "ui/resourceUri": "ui://atelier/pictures-v2.html"
+    },
+    "outputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "entitlements": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "listing_id": {
+          "type": "string"
+         },
+         "headline": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "orientation": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "photographer": {
+          "type": "string"
+         },
+         "preview_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "licence": {
+          "type": "object",
+          "properties": {
+           "code": {
+            "type": "string"
+           },
+           "version": {
+            "type": "number"
+           }
+          },
+          "required": [
+           "code",
+           "version"
+          ],
+          "additionalProperties": false
+         },
+         "licensee": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "print_included": {
+          "type": "boolean"
+         },
+         "granted_at": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "listing_id",
+         "headline",
+         "title",
+         "description",
+         "orientation",
+         "photographer",
+         "preview_url",
+         "licence",
+         "licensee",
+         "print_included",
+         "granted_at"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "next_cursor": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "revoked": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "listing_id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "licence": {
+          "type": "string"
+         },
+         "revoked_at": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "listing_id",
+         "title",
+         "licence",
+         "revoked_at"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "entitlements",
+      "next_cursor",
+      "revoked"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "phone_wallpaper",
+    "title": "Find a phone wallpaper",
+    "description": "A portrait photograph that fits a phone screen, in the mood you describe.",
+    "arguments": [
+     {
+      "name": "look",
+      "description": "What it should feel like, e.g. \"calm, moody and minimal, a deep teal seascape at night\".",
+      "required": false
+     },
+     {
+      "name": "screen",
+      "description": "Which phone, e.g. \"iPhone 16 Pro\" or \"Pixel 9\".",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "desktop_background",
+    "title": "Find a desktop background",
+    "description": "A wide photograph that fits a computer screen, in the mood you describe.",
+    "arguments": [
+     {
+      "name": "look",
+      "description": "What it should feel like, e.g. \"warm golden-hour mountains, not too busy\".",
+      "required": false
+     },
+     {
+      "name": "screen",
+      "description": "Which screen, e.g. \"MacBook Air\" or \"2560×1440 monitor\".",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "print_for_home",
+    "title": "Find a photo to print for your home",
+    "description": "A landscape photograph to print large for a room, checked for print size and licence.",
+    "arguments": [
+     {
+      "name": "room",
+      "description": "The room and the feeling, e.g. \"my bright, airy living room: light, calm and open, soft blues and pale sand, coastal if you have it\".",
+      "required": false
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "atelier://licence/personal/1",
+    "name": "Personal use license v1",
+    "description": "Use the image on your own devices and personal projects, forever. No resale, no redistribution, no commercial use, no AI training.",
+    "mimeType": "text/plain"
+   },
+   {
+    "uri": "atelier://licence/personal/2",
+    "name": "Personal use license v2",
+    "description": "Use the image on your own devices and in personal projects, with no expiry. Credit the photographer where practical. No resale, no redistribution, no commercial use, no AI training.",
+    "mimeType": "text/plain"
+   },
+   {
+    "uri": "atelier://licence/commercial/1",
+    "name": "Commercial use license v1",
+    "description": "Use the image to promote and run a business — websites, social media, advertising, marketing and client work — with no expiry. Licensed to one named person or business. No merchandise or templates for resale, no redistribution, no AI training.",
+    "mimeType": "text/plain"
+   },
+   {
+    "uri": "ui://atelier/pictures-v2.html",
+    "name": "Photographs",
+    "description": "The search results and images, drawn for the person.",
+    "mimeType": "text/html;profile=mcp-app"
+   }
+  ]
+ }
+}

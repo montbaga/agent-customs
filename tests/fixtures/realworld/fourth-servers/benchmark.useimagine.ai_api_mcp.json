@@ -1,0 +1,191 @@
+{
+ "url": "https://benchmark.useimagine.ai/api/mcp",
+ "doc": {
+  "name": "Imagine AI Benchmark",
+  "version": "0.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Imagine AI Benchmark: LinkedIn post data for 900+ B2B companies, their teams and competitors (benchmark.useimagine.ai; live counts in the methodology tool). Imagine AI is a content agent built to generate revenue at high-growth companies. It creates coordinated content precisely for your ICP and maps your content to your pipeline and closed revenue.\nCustomer (workspace) keys: call the workspace tool FIRST, every session. It is the live competitor list from the dashboard (own company, current competitors, tracked people); never rely on a cached or hardcoded list, and every comparison tool defaults to that set when you omit companyIds / competitorIds.\nStart with methodology once per session: engagement is log-normal per account, so compare ACCOUNTS by geometric mean reactions (and x/÷ spread), and judge a POST only against its own account (posts_vs_account). Never rank posts from different accounts against each other on raw numbers.\nTypical flow: workspace -> competitor_moves / share_of_voice / compare_competitors with no ids (live set) -> posts_vs_account. Catalog flow: list_companies / search_people -> get_company -> account_fits or company_fit_summary -> compare_competitors or industry_landscape -> posts_vs_account for what over/under-performed.\nWrite tools (add_company, add_people, queue_scrape, cancel_run) need a write-scope token and spend scraping credits: only call them when the user asked.\nLimits per key: 300 calls/hour, offset <= 500, page caps per tool. Post-level data (text, URL, per-post reactions) only for companies in your workspace set; elsewhere rows come back scoped with a scopeNotice (add the company as a competitor to unlock). A limited call says when it resets: wait, never retry in a loop.",
+  "tools": [
+   {
+    "name": "list_companies",
+    "title": "List tracked companies",
+    "description": "List companies in the benchmark catalog (customers, competitors, industry peers). Filter by name substring, industry, or tracking. Returns ids you pass to every other tool.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Case-insensitive name substring, e.g. \"rho\"."
+      },
+      "industry": {
+       "type": "string",
+       "description": "Exact industry label, e.g. \"Sales & Marketing Tech\", \"AI Infrastructure\", \"Fintech\". Omit to see all industries."
+      },
+      "trackingOnly": {
+       "type": "boolean",
+       "description": "Only companies in the scheduled scrapes (tracking_enabled). Default false."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max rows, default 200, max 500.",
+       "minimum": 1,
+       "maximum": 500
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "company_fit_summary",
+    "title": "One company, the research way",
+    "description": "A company's page fit plus the distribution of its people's geometric means (median, baseline band), top people and who is under the 18-post floor. Company typical post = median over up to 5 counted fitted people plus the company page: founders, CEO and C-suite who posted in the last 90 days first, then the most active fitted people (by original posts in that window). With exactly one fitted account (a person or the page) the company ranks on that account's own fit, flagged \"1 account\"; it is held back while teammates still await their history pull. people.counted / countedPersonIds say who is in. Use for 'how is X doing on LinkedIn'.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "companyId": {
+       "type": "string",
+       "description": "Company UUID. Workspace keys: omit = your own company."
+      },
+      "company": {
+       "type": "string",
+       "description": "Company name or dashboard slug, if no id."
+      },
+      "workspaceId": {
+       "type": "string",
+       "description": "Internal callers only: default to this workspace's own company."
+      },
+      "dateFrom": {
+       "type": "string",
+       "description": "Inclusive start date YYYY-MM-DD (post_date)."
+      },
+      "dateTo": {
+       "type": "string",
+       "description": "Inclusive end date YYYY-MM-DD (post_date)."
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "industry_landscape",
+    "title": "Industry landscape",
+    "description": "Every account in an industry (or a custom company set): per-company rollup (page fit + people median over the 5 most active fitted people (peopleCounted), preliminary = \"Few posts\" under 40 team posts, solo = \"1 account\" when one fitted account carries the company), population vs the research baseline, and category lift with the author effect removed (which post types beat each author's own typical post). Public callers get bands and pooled lifts, the same as Discover. Use for \"what works in fintech\" or \"where does X sit in its market\".",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "industry": {
+       "type": "string",
+       "description": "Industry label, e.g. \"Sales & Marketing Tech\". Omit with companyIds for a custom set; omit both = the live dashboard set for workspace keys, the whole catalog for operators."
+      },
+      "companyIds": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Custom company set (e.g. a customer + its competitors). Workspace keys: omit (with no industry) = own company + current competitors from the dashboard."
+      },
+      "workspaceId": {
+       "type": "string",
+       "description": "Internal callers only: default the set from this workspace."
+      },
+      "dateFrom": {
+       "type": "string",
+       "description": "Inclusive start date YYYY-MM-DD (post_date)."
+      },
+      "dateTo": {
+       "type": "string",
+       "description": "Inclusive end date YYYY-MM-DD (post_date)."
+      },
+      "limit": {
+       "type": "integer",
+       "description": "Max accounts listed, default 40, max 300.",
+       "minimum": 1,
+       "maximum": 300
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "methodology",
+    "title": "How to read benchmark numbers",
+    "description": "Imagine AI research rules (log-normal engagement, geometric means, research baseline 49/77/130). Call once before interpreting any numbers.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "category_breakdown",
+    "title": "Category (post type) breakdown",
+    "description": "Post counts and engagement per content category (product update, hiring, personal story, industry insight, ...) for companies or people.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "companyIds": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Company UUIDs. Workspace keys: omit = the live dashboard set (own company + current competitors, see the workspace tool)."
+      },
+      "personIds": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Person UUIDs (narrows to these people)."
+      },
+      "workspaceId": {
+       "type": "string",
+       "description": "Internal callers only: default the set from this workspace."
+      },
+      "source": {
+       "type": "string",
+       "enum": [
+        "company",
+        "people",
+        "all"
+       ],
+       "description": "'company' = the company page only, 'people' = its tracked people only, 'all' = both. Default varies per tool."
+      },
+      "dateFrom": {
+       "type": "string",
+       "description": "Inclusive start date YYYY-MM-DD (post_date)."
+      },
+      "dateTo": {
+       "type": "string",
+       "description": "Inclusive end date YYYY-MM-DD (post_date)."
+      },
+      "includeReposts": {
+       "type": "boolean",
+       "description": "Include reposts. Default false."
+      }
+     },
+     "required": [],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   }
+  ]
+ }
+}

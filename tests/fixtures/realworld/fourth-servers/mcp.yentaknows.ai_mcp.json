@@ -1,0 +1,1994 @@
+{
+ "url": "https://mcp.yentaknows.ai/mcp",
+ "doc": {
+  "name": "Yenta Directory",
+  "version": "0.2.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Yenta directory of restaurants, bars and travel destinations. Covers: Los Cabos, Dubai, Milan and more. search finds by name; fetch reads a result; search_venues filters venues. venue_profile, venue_menu, destination_overview, destination_listings and other venue_*/destination_* tools read one by name, no reconnect. `source` gives freshness. `booking.url` is a venue's booking page; `mcp_endpoint` (under venues.yentaknows.ai) is a read-only server unless booking.method is live. No auth. Powered by Yenta.",
+  "tools": [
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Search venues, travel destinations and places inside destinations by name or keyword. Returns results of id, title and url; pass an id to fetch for the full page. For filters use search_venues, search_menus or destination_listings.",
+    "inputSchema": {
+     "properties": {
+      "query": {
+       "description": "A name or keywords, e.g. 'whale watching' or 'Acme Bistro'.",
+       "maxLength": 256,
+       "type": "string"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object"
+    },
+    "name": "search",
+    "outputSchema": {
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "title",
+         "url"
+        ]
+       }
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "results"
+     ],
+     "type": "object",
+     "description": "OpenAI search results: each id can be passed to fetch."
+    },
+    "title": "Search everything by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Read a search result's full page: a restaurant's menu, dietary options, hours and events, or a destination's. Returns Markdown text with its citable url. Ids look like \"venue:acme-bistro\", \"venue:acme-bistro:menu\", \"destination:los-cabos\" or \"listing:los-cabos:1234\".",
+    "inputSchema": {
+     "properties": {
+      "id": {
+       "description": "An id exactly as search returned it.",
+       "maxLength": 256,
+       "type": "string"
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "type": "object"
+    },
+    "name": "fetch",
+    "outputSchema": {
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "text": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "metadata": {
+       "type": "object"
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": "string"
+      },
+      "sample": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "One OpenAI fetch document: its full Markdown text and citable url."
+    },
+    "title": "Fetch a search result"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find restaurants and bars by city, cuisine, opening time or features. Filters are HARD, prefer_* and avoid are SOFT (rank only), and query is a name, a keyword or a short description. Each result has slug, capabilities, open_now and distance_km; a destination city's venues are here, its listings in destination_listings.",
+    "inputSchema": {
+     "properties": {
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "A name, a cuisine word or a short description of the place (e.g. 'quiet seafood with a sea view'); a dish is in search_menus. Venues whose name, description, cuisine, neighbourhood, city or alternate names contain every word come first, then venues whose profile is closest in meaning, each with match.similarity; omit to list all."
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "HARD filter: only venues in this city (case-insensitive); call list_cities for the exact values this directory knows."
+      },
+      "cuisine": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "HARD filter: only venues with this cuisine (case-insensitive exact match; a miss's reason lists the valid values)."
+      },
+      "price_band": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "HARD filter: only venues in this price band, e.g. '$$'."
+      },
+      "neighbourhood": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "HARD filter: only venues in this neighbourhood (case-insensitive exact match; a miss's reason lists the valid values)."
+      },
+      "accepts_reservations": {
+       "type": [
+        "boolean",
+        "null"
+       ],
+       "default": null,
+       "description": "Set true to require venues that take reservations (a booking link or a live booking tool); omit otherwise."
+      },
+      "near": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "HARD filter: only venues within radius_km of this 'latitude,longitude' point, nearest first, each with a distance_km; venues with no coordinates are excluded.",
+       "examples": [
+        "19.0413,-98.2062"
+       ]
+      },
+      "radius_km": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "maximum": 50,
+       "minimum": 0,
+       "default": null,
+       "description": "Search radius in km around 'near' (default applied when omitted)."
+      },
+      "open_on": {
+       "anyOf": [
+        {
+         "enum": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+          "today",
+          "tomorrow"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "HARD filter: only venues open on this weekday, or today/tomorrow in the venue's own timezone (optionally at 'at'); for tonight use open_on=today with at. Venues with no published hours are excluded. A result's open_now is still the request time (open_now_at), not the open_on/at time."
+      },
+      "at": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "A local time (20:00 or 8pm) for the open_on filter; requires open_on."
+      },
+      "open_now": {
+       "type": [
+        "boolean",
+        "null"
+       ],
+       "default": null,
+       "description": "Set true = open at this moment, not later today (venue local time, as open_now_at); for tonight use open_on=today with at; omit otherwise."
+      },
+      "prefer_cuisine": {
+       "description": "SOFT: venues of these cuisines rank higher; non-matches are NOT dropped.",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "avoid": {
+       "description": "SOFT: venues matching these cuisine/neighbourhood tokens rank LOWER; not dropped.",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "prefer_neighbourhood": {
+       "description": "SOFT: venues in these neighbourhoods rank higher; non-matches are NOT dropped.",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "facets": {
+       "description": "HARD experiential-facet filter: each token is '<facet_type>:<value>' (e.g. 'dietary:vegetarian', 'view:sea'). A venue must match every facet_type given (values OR within a type); a miss EXCLUDES it. Values: vibe: authentic, bustling, buzzy, calm, casual, charming, chic, chill, classic, cozy, creative, elegant, energetic, family-friendly, friendly, fun, hidden-gem, historic, intimate, laid-back, lively, local, local-favorite, luxurious, modern, neighbourhood, party, quiet, refined, relaxed, romantic, rustic, scenic, sophisticated, stylish, traditional, trendy, upscale, vibrant, warm, welcoming; good_for: business-dinner, business-lunch, celebration, date-night, drinks, family, groups, nightlife, quick-bite, solo, work-friendly; not_good_for: alcohol, budget, date-night, dogs, fine-dining, kids, large-groups, late-night, outdoor-dining, quick-bite, quiet-conversation, sports-watching, vegetarians, work-friendly; feature: alcohol-free, beach-club, beer, bib-gourmand, cocktails, coffee, delivery, desserts, dog-friendly, kids-menu, live-music, michelin-guide, michelin-star, nightclub, outdoor-seating, private-dining, reservations, rooftop, serves-alcohol, shisha, sports-screening, takeout, waterfront, wine-list; noise_level: lively, loud, moderate, quiet; view: garden, sea, skyline, street, waterfront; dress_code: casual, formal, smart-casual; meal_period: breakfast, brunch, dinner, late-night, lunch; dietary: dairy-free, gluten-free, halal, jain, kosher, nut-free, pescatarian, vegan, vegetarian; accessibility: accessible-parking, accessible-restroom, step-free, wheelchair-accessible; cuisine: a cuisine word, e.g. italian, japanese, seafood.",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "prefer_facets": {
+       "description": "SOFT experiential-facet preference, the same '<facet_type>:<value>' tokens and values as facets: a venue that declares them ranks higher but is NEVER dropped.",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "type": "object"
+    },
+    "name": "search_venues",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Search venues"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "List the cities that have published restaurants and bars. A city can also be a travel destination, such as Los Cabos: search_venues finds its venues, and destination_overview and destination_listings read the destination's own board.",
+    "inputSchema": {
+     "properties": {
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "type": "object"
+    },
+    "name": "list_cities",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "List cities"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find dishes across all venues by text, city, dietary tags or allergens to avoid. Each item is tagged with its venue, so one call compares venues; for one named venue use venue_menu.",
+    "inputSchema": {
+     "properties": {
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Text matched in item name, description, section and menu names; every word must match; connector words (and, with, in) aren't required."
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Only return items from venues in this city (case-insensitive); call list_cities for the exact values."
+      },
+      "dietary_tags": {
+       "description": "Require ALL of these dietary tags (case- and separator-insensitive).",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "allergens": {
+       "description": "Exclude items that declare any of these allergens (spelling-insensitive; synonyms match: milk, lactose and dairy all match dairy; pass one term).",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "max_price": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "maximum": 1000000,
+       "minimum": 0,
+       "default": null,
+       "description": "Only items priced at or under this, in the menu's currency."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "type": "object"
+    },
+    "name": "search_menus",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Search menus across venues"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false,
+     "readOnlyHint": false
+    },
+    "description": "Send Yenta a report: data that is missing or looks wrong, a tool that was hard to use, or anything else. Stored for Yenta's team and never shown publicly; the answer carries a reference. Leave out personal details.",
+    "inputSchema": {
+     "properties": {
+      "kind": {
+       "description": "What the report is about.",
+       "enum": [
+        "missing_data",
+        "wrong_data",
+        "hard_to_use",
+        "other"
+       ],
+       "type": "string"
+      },
+      "message": {
+       "description": "The report itself, in plain words.",
+       "maxLength": 1000,
+       "minLength": 1,
+       "type": "string"
+      },
+      "tool": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 64,
+       "default": null,
+       "description": "The Yenta tool the report is about, if any."
+      },
+      "subject": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "The venue, destination or city the report is about, if any."
+      },
+      "model": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 64,
+       "default": null,
+       "description": "The model sending the report, e.g. its model id."
+      },
+      "client": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 64,
+       "default": null,
+       "description": "The app or agent the model runs in."
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "The city the question was about; a city name only, never an address."
+      },
+      "purpose": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "What the person was trying to do, in one short sentence."
+      }
+     },
+     "required": [
+      "kind",
+      "message"
+     ],
+     "type": "object"
+    },
+    "name": "send_feedback",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Send feedback to Yenta"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Get a venue's hours, address, map, phone, booking and links by name or slug, e.g. venue=\"Acme Bistro\". It also holds cuisine, attributes, menu_summary and capabilities (the other venue_* tools that answer for it); hours_summary is ready to quote.",
+    "inputSchema": {
+     "properties": {
+      "venue": {
+       "description": "Venue name or slug; call search_venues to discover one.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Disambiguate a name by city (call list_cities); ignored for a slug."
+      }
+     },
+     "required": [
+      "venue"
+     ],
+     "type": "object"
+    },
+    "name": "venue_profile",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Venue profile by name or slug"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find dishes at a named venue, e.g. venue=\"Acme Bistro\", dietary_tags=[\"vegan\"], allergens=[\"milk\"]. Filter by text, tags, allergens or max_price; unfiltered, item lists its dietary tags, example dishes and allergen counts. If not available, check the capabilities venue_profile lists; the venue may not publish this.",
+    "inputSchema": {
+     "properties": {
+      "venue": {
+       "description": "Venue name or slug; call search_venues to discover one.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Disambiguate a name by city (call list_cities); ignored for a slug."
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Text matched in item name, description, section and menu names; every word must match; connector words (and, with, in) aren't required."
+      },
+      "dietary_tags": {
+       "description": "A JSON array, e.g. [\"gluten-free\"]: items must carry ALL of these tags; case- and separator-insensitive (gluten free = gluten-free).",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "allergens": {
+       "description": "Exclude items declaring any of these allergens (case- and separator-insensitive (gluten free = gluten-free); synonyms match: milk, lactose and dairy all match dairy; pass one term).",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "max_price": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "maximum": 1000000,
+       "minimum": 0,
+       "default": null,
+       "description": "Only items priced at or under this, in the menu's currency."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "venue"
+     ],
+     "type": "object"
+    },
+    "name": "venue_menu",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "A venue's menu by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Answer a question about a named venue from its published FAQs; omit query to read them all. If not available, check the capabilities venue_profile lists; the venue may not publish this.",
+    "inputSchema": {
+     "properties": {
+      "venue": {
+       "description": "Venue name or slug; call search_venues to discover one.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Disambiguate a name by city (call list_cities); ignored for a slug."
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Text to match against questions and answers."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "venue"
+     ],
+     "type": "object"
+    },
+    "name": "venue_faq",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Venue FAQ by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find what is on at a named venue: dated events from its local today onwards. Filter by exact event_type if you know it. If not available, check the capabilities venue_profile lists; the venue may not publish this.",
+    "inputSchema": {
+     "properties": {
+      "venue": {
+       "description": "Venue name or slug; call search_venues to discover one.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Disambiguate a name by city (call list_cities); ignored for a slug."
+      },
+      "from_date": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date; defaults to the venue's own local today, or to today UTC if it publishes no timezone."
+      },
+      "to_date": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date; omit to_date for everything upcoming (recommended for \"coming up\")."
+      },
+      "event_type": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Exact event_type spelling from published events."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "venue"
+     ],
+     "type": "object"
+    },
+    "name": "venue_events",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Search a venue's events by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "One call answers what a destination offers and what's on: counts, a few places, next events and guide topics. It counts offers, seasonality and FAQs too, and names the categories and areas listings, events and offers filter by. preview.complete is false when destination_listings / destination_events hold more.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_overview",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Destination overview by name or slug"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find places to stay, eat and visit in a named destination by text, category, area or tags. Every query word matches, in any order; each business appears once (also_listed_as) with a snippet and map_url, so call it again with listing_id for the full text. An unknown filter value's reason lists the valid ones.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Words matched in any order against listing names, descriptions, tags and categories."
+      },
+      "category": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Category name or slug; destination_overview lists them."
+      },
+      "area": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Area name or slug; destination_overview lists them."
+      },
+      "tags": {
+       "description": "Tag slugs; only listings carrying ALL are returned.",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 8,
+       "type": "array"
+      },
+      "language": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Language code (e.g. 'en', 'es'); defaults to the destination's."
+      },
+      "near_listing_id": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "A listing id; returns listings within radius_km, nearest first, each with distance_km."
+      },
+      "radius_km": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "maximum": 50,
+       "minimum": 0,
+       "default": null,
+       "description": "Search radius in km around near_listing_id; a larger value is reduced to the server maximum."
+      },
+      "listing_id": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "One listing's id from a previous result: returns its full detail in item, ignoring the other filters; read a live linked_venue_slug with the venue_* tools, whose answer carries its booking link."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_listings",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Search a destination's listings by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find what is on in a named destination: events from today onwards. A recurring event's dates are its series span, so read its recurrence. Results carry booking_url, the partner's booking page when present, and canonical_url, the destination's page.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Words matched in any order against event names and descriptions."
+      },
+      "from_date": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date; defaults to today."
+      },
+      "to_date": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date; omit to_date for everything upcoming (recommended for \"coming up\")."
+      },
+      "category": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Category name or slug; destination_overview lists them."
+      },
+      "area": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Area name or slug; destination_overview lists them."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_events",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Search a destination's events by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Read a named destination's travel guides: weather, getting here, transport, entry requirements, safety and more. Pass topic (from destination_overview guide_topics) to read one subject; page with cursor.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "topic": {
+       "anyOf": [
+        {
+         "enum": [
+          "weather",
+          "getting_here",
+          "transportation",
+          "entry_requirements",
+          "emergencies",
+          "safety",
+          "culture",
+          "packing",
+          "sustainability"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Guide topic; omit for all."
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Text to match in guide title/body."
+      },
+      "limit": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "maximum": 50,
+       "minimum": 1,
+       "default": null,
+       "description": "Entries per page; omit for the server's short default."
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_guide",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Destination guides by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Answer a question about a named destination from its published FAQs; omit query to read them all.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "Text to match in question/answer."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_faq",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Destination FAQ by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Find a named destination's current deals and packages, with the partner booking link. Only offers valid on valid_on (today by default), or on any day from from_date to to_date, are returned. Results carry booking_url, the partner's booking page when present, and canonical_url, the destination's page.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "valid_on": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date an offer must be valid on (valid_from to valid_through, inclusive); defaults to today."
+      },
+      "from_date": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date; first day of a date range (defaults to today)."
+      },
+      "to_date": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date",
+       "default": null,
+       "description": "ISO date; last day of the range; open-ended if omitted."
+      },
+      "category": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Category name or slug; destination_overview lists them."
+      },
+      "area": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "default": null,
+       "description": "Area name or slug; destination_overview lists them."
+      },
+      "limit": {
+       "default": 20,
+       "description": "Maximum number of items to return.",
+       "maximum": 50,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "cursor": {
+       "default": 0,
+       "description": "Number of items to skip; pass `next_cursor` from the previous page.",
+       "maximum": 10000,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_offers",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Search a destination's offers by name"
+   },
+   {
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Get a named destination's best time to visit, weather and wildlife seasons (e.g. whale watching), month by month.",
+    "inputSchema": {
+     "properties": {
+      "destination": {
+       "description": "Destination name or slug, e.g. 'Los Cabos'; list_cities names them.",
+       "maxLength": 256,
+       "type": "string"
+      },
+      "month": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "maximum": 12,
+       "minimum": 1,
+       "default": null,
+       "description": "1-12; omit for all twelve."
+      },
+      "interest": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 256,
+       "default": null,
+       "description": "An activity or season, e.g. whales; keeps the months whose highlights or notes mention it."
+      }
+     },
+     "required": [
+      "destination"
+     ],
+     "type": "object"
+    },
+    "name": "destination_seasonality",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "not_available",
+        "validation_error"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "item": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "items": {
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "pagination": {
+       "type": [
+        "object",
+        "null"
+       ]
+      },
+      "source": {
+       "type": "object"
+      },
+      "sample": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "The Yenta response envelope: a status, the answer in `item` or `items`, and the approved content revision it was read from.",
+     "additionalProperties": false
+    },
+    "title": "Destination seasonality by name"
+   }
+  ],
+  "prompts": [
+   {
+    "arguments": [
+     {
+      "description": "City to search; call list_cities for the exact values.\n\nProvide a value matching the following JSON schema: {\"type\":\"string\"}. Encode non-string values as JSON.",
+      "name": "city",
+      "required": true
+     },
+     {
+      "description": "Optional cuisine or dish to match in the query.\n\nProvide a value matching the following JSON schema: {\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]}. Encode non-string values as JSON.",
+      "name": "cuisine",
+      "required": false
+     }
+    ],
+    "description": "Find a published venue in a city and read it by name from here.",
+    "name": "find_a_venue",
+    "title": "Find a venue"
+   }
+  ]
+ }
+}

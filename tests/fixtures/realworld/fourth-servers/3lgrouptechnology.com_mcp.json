@@ -1,0 +1,351 @@
+{
+ "url": "https://3lgrouptechnology.com/mcp",
+ "doc": {
+  "name": "3l-group-technology-letter-mail",
+  "version": "4.1.4",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "description": "Create a letter DRAFT: verifies the recipient address with PostGrid,\nscreens content, and returns a price quote. This NEVER mails anything.\n\nPass EITHER html (letter body as an HTML string) OR pdf_path (path to a\nPDF file on the server). PDF text is extracted for screening; if\nextraction fails the draft is kept but flagged needs_review.",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "to": {
+       "additionalProperties": true,
+       "type": "object",
+       "description": "recipient address dict with name, address_line1, address_city,\naddress_state, address_zip (US)."
+      },
+      "from_address": {
+       "additionalProperties": true,
+       "type": "object",
+       "description": "sender address dict, same shape as `to`."
+      },
+      "html": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "letter body as an HTML string (use this OR pdf_path)."
+      },
+      "pdf_path": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "server-local path to a PDF to mail instead of html."
+      },
+      "color": {
+       "default": false,
+       "type": "boolean",
+       "description": "True for color printing, False for black & white."
+      },
+      "quantity": {
+       "default": 1,
+       "type": "integer",
+       "description": "number of identical letters (10+ gets the bulk rate)."
+      },
+      "description": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "optional label for your own records."
+      },
+      "certified": {
+       "default": false,
+       "type": "boolean",
+       "description": "OPT-IN ONLY — True for USPS Certified Mail with Electronic\nReceipt (tracked, signature on delivery). Defaults to False, which\nsends standard First Class mail. Only set True when the customer\nexplicitly asked for certified mail: it costs significantly more\n(PostGrid's certified rate + the flat $1.00 service fee, roughly\n$11 per letter). Never default this to True."
+      }
+     },
+     "required": [
+      "api_key",
+      "to",
+      "from_address"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "draft_letter",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Draft a Letter"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "description": "Request that a draft be mailed.\n\napproval-tier keys: creates a PENDING request and returns a one-tap\nAllow/Deny approval_url for the human. Nothing is mailed until Allow.\non_command keys: may auto-send inside guardrails (spend caps, content\nscreening, anomaly detection); anything outside them stays PENDING.",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "draft_id": {
+       "type": "integer",
+       "description": "the draft_id returned by draft_letter."
+      }
+     },
+     "required": [
+      "api_key",
+      "draft_id"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "request_send",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Request Letter Send"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false,
+     "readOnlyHint": false
+    },
+    "description": "Check a send request: status (PENDING/SENT/REJECTED/FAILED), the key's\ntrust tier and tier decision, approval state (+approval_url while pending),\nand billing state (Stripe charge id when billed).",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "request_id": {
+       "type": "integer",
+       "description": "the request_id returned by request_send."
+      }
+     },
+     "required": [
+      "api_key",
+      "request_id"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "send_status",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Check Letter Send Status"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false,
+     "readOnlyHint": false
+    },
+    "description": "Create a fax DRAFT: validates the recipient number, counts the PDF's\npages, screens its text, and returns a price quote (Phaxio per-page\ncost x pages + the flat $1.00 service fee). This NEVER transmits\nanything — call approve_fax, then send_fax.",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "to_number": {
+       "type": "string",
+       "description": "recipient fax number — 10-digit US number or a full\nE.164 number starting with +."
+      },
+      "pdf_path": {
+       "type": "string",
+       "description": "path to the PDF file on the server to fax."
+      },
+      "description": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "optional label for your own records."
+      }
+     },
+     "required": [
+      "api_key",
+      "to_number",
+      "pdf_path"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "create_fax_draft",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Draft a Fax"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": false
+    },
+    "description": "Approve a fax DRAFT so it can be transmitted. The content is\nre-screened at approval time. Only the key that created the fax can\napprove it. Nothing is transmitted by this call — send_fax does that.",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "fax_id": {
+       "type": "integer",
+       "description": "the fax_id returned by create_fax_draft."
+      }
+     },
+     "required": [
+      "api_key",
+      "fax_id"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "approve_fax",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Approve a Fax"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": true,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "readOnlyHint": false
+    },
+    "description": "Transmit an APPROVED fax via Phaxio. Refuses drafts that were never\napproved and faxes that were already sent — a fax can be transmitted\nexactly once.",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "fax_id": {
+       "type": "integer",
+       "description": "the fax_id returned by create_fax_draft."
+      }
+     },
+     "required": [
+      "api_key",
+      "fax_id"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "send_fax",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Send a Fax"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true,
+     "readOnlyHint": true
+    },
+    "description": "Check a fax: lifecycle status (DRAFT/APPROVED/SENT/FAILED), page\ncount, quote, and — once sent — the live delivery status from Phaxio.",
+    "inputSchema": {
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "description": "your 3L-Group Technology API key (lms_...)."
+      },
+      "fax_id": {
+       "type": "integer",
+       "description": "the fax_id returned by create_fax_draft."
+      }
+     },
+     "required": [
+      "api_key",
+      "fax_id"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "get_fax_status",
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": true
+    },
+    "title": "Check Fax Status"
+   }
+  ]
+ }
+}

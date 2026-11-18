@@ -1,0 +1,2181 @@
+{
+ "url": "https://lendb.ai/mcp",
+ "doc": {
+  "name": "LenDb.ai",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "LenDb.ai: Made for humans. Built for robots. An independent, growing, lender-neutral database of US mortgage loan officers (coverage is partial). Use find_loan_officers for a borrower's situation and place, get_loan_officer for an NMLS ID, and explain_specialty when the user asks what a loan type means. Always cite canonical_url, follow each result's citation_guidance, and never present a partial match as a full match. Phone numbers and email addresses are not available here; send people to the profile's canonical_url. Every tool works without a key; an optional free API key for higher limits is available at https://lendb.ai/developers (send it as Authorization: Bearer). Not a lender. Not a referral service. Verify licenses at NMLS Consumer Access.",
+  "tools": [
+   {
+    "name": "find_loan_officers",
+    "title": "Find mortgage loan officers",
+    "description": "Use this when someone wants a US mortgage loan officer (or mortgage broker or lender contact) for a specific situation and place: for example an FHA, VA, USDA, jumbo, DSCR or ITIN loan, a first-time buyer, a self-employed borrower who needs a bank statement loan, a non-warrantable condo or a duplex, or a Spanish-speaking loan officer near a city, ZIP, region or state. Searches LenDb, an independent, lender-neutral database of US loan officers (coverage is partial), and returns a ranked list. Each result has the person's name, NMLS ID, lender, office location, distance_mi, license_check for the property state (confirmed, lender_reported or federal_registration), match_status (exact, or partial with unconfirmed_specialties), matched specialties with a short reason each, last_verified and a canonical_url profile link; detail 'full' returns every field and reason. A city or ZIP keeps offices within 25 miles, widened to 50 or 100 when few are found (search.note); a state alone ranks statewide. Words like 'broker' or 'credit union' rank that kind of lender first. People with no license evidence for the state are listed separately in not_yet_verified. Also returns ambiguous_location when a city name fits several places, unassessed_requirements for parts of the situation LenDb cannot check, and citation_guidance. If situation is just a loan officer's name (the name on their lender page or the name a state regulator licenses, e.g. 'Nicholas Bucca' for Nic Bucca), it returns that profile in profile_match. Phone numbers and email addresses are never returned.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "situation": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 500,
+       "description": "The borrower's situation in plain words: property type, loan program, income type, credit, language, kind of lender. Example: 'duplex, self-employed, bank statement loan'."
+      },
+      "location": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 200,
+       "description": "Where the property is: 'City, ST', a city, a 5-digit ZIP, a region ('Bay Area'), or a US state."
+      },
+      "language": {
+       "description": "Language the borrower wants to be served in. Accepts an ISO 639-1 code ('es'), a BCP 47 tag ('es-MX', 'zh-TW'), an ISO 639-2/3 code ('spa'), an English name ('Spanish') or a native name ('español', '中文', '한국어', 'tiếng Việt'). A hard filter: every result speaks it. An unsupported language returns an error listing the supported codes (see list_specialties).",
+       "type": "string",
+       "maxLength": 60
+      },
+      "limit": {
+       "description": "Max results, default 10.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25
+      },
+      "fha_approved": {
+       "description": "Only loan officers whose current lender is FHA-approved per HUD's FHA Single Family Portfolio Snapshot data (the lender, not the person). Default false. Without it, an FHA search still ranks HUD-approved lenders' people first when all else is equal.",
+       "type": "boolean"
+      },
+      "detail": {
+       "description": "'compact' (default): per person name, NMLS ID, canonical_url, lender, office, license evidence for the property state, matched specialties with one short reason each and the last verified date. 'full': every field, all reasons and the matching method.",
+       "type": "string",
+       "enum": [
+        "compact",
+        "full"
+       ]
+      },
+      "debug": {
+       "description": "Also return how the query was parsed (debug.parsed, debug.filters). Default false.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "situation",
+      "location"
+     ]
+    },
+    "annotations": {
+     "title": "Find mortgage loan officers",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "sample": {
+       "description": "True when the data is fictional sample data.",
+       "type": "boolean"
+      },
+      "notice": {
+       "type": "string"
+      },
+      "canonical_url": {
+       "type": "string",
+       "description": "The same search on the LenDb API."
+      },
+      "requested_specialties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "exact_match_count": {
+       "type": "number"
+      },
+      "all_terms_understood": {
+       "type": "boolean"
+      },
+      "unassessed_requirements": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "fallback_applied": {
+       "type": "boolean"
+      },
+      "search": {
+       "type": "object",
+       "properties": {
+        "local": {
+         "type": "boolean"
+        },
+        "radius_mi": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "note": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "local",
+        "radius_mi",
+        "note"
+       ],
+       "additionalProperties": {}
+      },
+      "count": {
+       "type": "number"
+      },
+      "detail": {
+       "description": "Present on compact results; detail 'full' returns rows with every field.",
+       "type": "string",
+       "const": "compact"
+      },
+      "results": {
+       "type": "array",
+       "items": {
+        "anyOf": [
+         {
+          "type": "object",
+          "properties": {
+           "rank": {
+            "type": "number"
+           },
+           "loan_officer": {
+            "type": "object",
+            "properties": {
+             "nmls_id": {
+              "type": "number"
+             },
+             "full_name": {
+              "type": "string"
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "lender": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {
+                 "nmls_id": {
+                  "type": "number"
+                 },
+                 "name": {
+                  "type": "string"
+                 },
+                 "canonical_url": {
+                  "type": "string"
+                 }
+                },
+                "required": [
+                 "nmls_id",
+                 "name",
+                 "canonical_url"
+                ],
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "branch": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {
+                 "city": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 },
+                 "state": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "city",
+                 "state"
+                ],
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "licensed_states": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "languages": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "lender_profile_url": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "nmls_id",
+             "full_name",
+             "canonical_url"
+            ],
+            "additionalProperties": {}
+           },
+           "reasons": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "canonical_url": {
+            "type": "string"
+           },
+           "distance_mi": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "office_location_unknown": {
+            "type": "boolean"
+           },
+           "match_scope": {
+            "type": "string",
+            "enum": [
+             "state"
+            ]
+           },
+           "license_check": {
+            "type": "object",
+            "properties": {
+             "state": {
+              "type": "string"
+             },
+             "confidence": {
+              "type": "string",
+              "enum": [
+               "confirmed",
+               "lender_reported",
+               "self_reported",
+               "federal_registration",
+               "unknown"
+              ]
+             },
+             "label": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "state",
+             "confidence",
+             "label"
+            ],
+            "additionalProperties": {}
+           },
+           "match_status": {
+            "type": "string",
+            "enum": [
+             "exact",
+             "partial"
+            ]
+           },
+           "matched_specialties": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "unconfirmed_specialties": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "match_level": {
+            "type": "string",
+            "enum": [
+             "officer",
+             "lender"
+            ]
+           },
+           "mentioned_by_loan_officer": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           }
+          },
+          "required": [
+           "rank",
+           "loan_officer",
+           "reasons",
+           "canonical_url"
+          ],
+          "additionalProperties": {}
+         },
+         {
+          "type": "object",
+          "properties": {
+           "rank": {
+            "type": "number"
+           },
+           "nmls_id": {
+            "type": "number"
+           },
+           "full_name": {
+            "type": "string"
+           },
+           "canonical_url": {
+            "type": "string"
+           },
+           "lender": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "office": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "city": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               },
+               "state": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "city",
+               "state"
+              ],
+              "additionalProperties": {}
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "distance_mi": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "office_location_unknown": {
+            "type": "boolean"
+           },
+           "match_scope": {
+            "type": "string",
+            "enum": [
+             "state"
+            ]
+           },
+           "licensed_states": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            },
+            "description": "Licensed or eligible states the query is about, not every state on file."
+           },
+           "license_check": {
+            "type": "object",
+            "properties": {
+             "state": {
+              "type": "string"
+             },
+             "confidence": {
+              "type": "string",
+              "enum": [
+               "confirmed",
+               "lender_reported",
+               "self_reported",
+               "federal_registration",
+               "unknown"
+              ]
+             },
+             "verified_at": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "state",
+             "confidence",
+             "verified_at"
+            ],
+            "additionalProperties": {}
+           },
+           "match_status": {
+            "type": "string",
+            "enum": [
+             "exact",
+             "partial"
+            ]
+           },
+           "match_level": {
+            "type": "string",
+            "enum": [
+             "officer",
+             "lender"
+            ]
+           },
+           "specialties": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "slug": {
+               "type": "string"
+              },
+              "reason": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "slug",
+              "reason"
+             ],
+             "additionalProperties": {}
+            }
+           },
+           "unconfirmed_specialties": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "last_verified": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "rank",
+           "nmls_id",
+           "full_name",
+           "canonical_url",
+           "lender",
+           "office",
+           "licensed_states",
+           "specialties",
+           "last_verified"
+          ],
+          "additionalProperties": {}
+         }
+        ]
+       }
+      },
+      "profile_match": {
+       "type": "object",
+       "properties": {
+        "kind": {
+         "type": "string"
+        },
+        "value": {
+         "type": "string"
+        },
+        "note": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "kind",
+        "value",
+        "note"
+       ],
+       "additionalProperties": {}
+      },
+      "ambiguous_location": {
+       "type": "object",
+       "properties": {
+        "term": {
+         "type": "string"
+        },
+        "note": {
+         "type": "string"
+        },
+        "options": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "label": {
+            "type": "string"
+           },
+           "query": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "label",
+           "query"
+          ],
+          "additionalProperties": {}
+         }
+        }
+       },
+       "required": [
+        "term",
+        "note",
+        "options"
+       ],
+       "additionalProperties": {}
+      },
+      "not_yet_verified": {
+       "type": "object",
+       "properties": {
+        "note": {
+         "type": "string"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "rank": {
+              "type": "number"
+             },
+             "loan_officer": {
+              "type": "object",
+              "properties": {
+               "nmls_id": {
+                "type": "number"
+               },
+               "full_name": {
+                "type": "string"
+               },
+               "canonical_url": {
+                "type": "string"
+               },
+               "lender": {
+                "anyOf": [
+                 {
+                  "type": "object",
+                  "properties": {
+                   "nmls_id": {
+                    "type": "number"
+                   },
+                   "name": {
+                    "type": "string"
+                   },
+                   "canonical_url": {
+                    "type": "string"
+                   }
+                  },
+                  "required": [
+                   "nmls_id",
+                   "name",
+                   "canonical_url"
+                  ],
+                  "additionalProperties": {}
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "branch": {
+                "anyOf": [
+                 {
+                  "type": "object",
+                  "properties": {
+                   "city": {
+                    "type": [
+                     "string",
+                     "null"
+                    ]
+                   },
+                   "state": {
+                    "type": [
+                     "string",
+                     "null"
+                    ]
+                   }
+                  },
+                  "required": [
+                   "city",
+                   "state"
+                  ],
+                  "additionalProperties": {}
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "licensed_states": {
+                "type": "array",
+                "items": {
+                 "type": "string"
+                }
+               },
+               "languages": {
+                "type": "array",
+                "items": {
+                 "type": "string"
+                }
+               },
+               "lender_profile_url": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "nmls_id",
+               "full_name",
+               "canonical_url"
+              ],
+              "additionalProperties": {}
+             },
+             "reasons": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "distance_mi": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "office_location_unknown": {
+              "type": "boolean"
+             },
+             "match_scope": {
+              "type": "string",
+              "enum": [
+               "state"
+              ]
+             },
+             "license_check": {
+              "type": "object",
+              "properties": {
+               "state": {
+                "type": "string"
+               },
+               "confidence": {
+                "type": "string",
+                "enum": [
+                 "confirmed",
+                 "lender_reported",
+                 "self_reported",
+                 "federal_registration",
+                 "unknown"
+                ]
+               },
+               "label": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "state",
+               "confidence",
+               "label"
+              ],
+              "additionalProperties": {}
+             },
+             "match_status": {
+              "type": "string",
+              "enum": [
+               "exact",
+               "partial"
+              ]
+             },
+             "matched_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "unconfirmed_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "match_level": {
+              "type": "string",
+              "enum": [
+               "officer",
+               "lender"
+              ]
+             },
+             "mentioned_by_loan_officer": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             }
+            },
+            "required": [
+             "rank",
+             "loan_officer",
+             "reasons",
+             "canonical_url"
+            ],
+            "additionalProperties": {}
+           },
+           {
+            "type": "object",
+            "properties": {
+             "rank": {
+              "type": "number"
+             },
+             "nmls_id": {
+              "type": "number"
+             },
+             "full_name": {
+              "type": "string"
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "lender": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "office": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {
+                 "city": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 },
+                 "state": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "city",
+                 "state"
+                ],
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "distance_mi": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "office_location_unknown": {
+              "type": "boolean"
+             },
+             "match_scope": {
+              "type": "string",
+              "enum": [
+               "state"
+              ]
+             },
+             "licensed_states": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              },
+              "description": "Licensed or eligible states the query is about, not every state on file."
+             },
+             "license_check": {
+              "type": "object",
+              "properties": {
+               "state": {
+                "type": "string"
+               },
+               "confidence": {
+                "type": "string",
+                "enum": [
+                 "confirmed",
+                 "lender_reported",
+                 "self_reported",
+                 "federal_registration",
+                 "unknown"
+                ]
+               },
+               "verified_at": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "state",
+               "confidence",
+               "verified_at"
+              ],
+              "additionalProperties": {}
+             },
+             "match_status": {
+              "type": "string",
+              "enum": [
+               "exact",
+               "partial"
+              ]
+             },
+             "match_level": {
+              "type": "string",
+              "enum": [
+               "officer",
+               "lender"
+              ]
+             },
+             "specialties": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "slug": {
+                 "type": "string"
+                },
+                "reason": {
+                 "type": "string"
+                }
+               },
+               "required": [
+                "slug",
+                "reason"
+               ],
+               "additionalProperties": {}
+              }
+             },
+             "unconfirmed_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "last_verified": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "rank",
+             "nmls_id",
+             "full_name",
+             "canonical_url",
+             "lender",
+             "office",
+             "licensed_states",
+             "specialties",
+             "last_verified"
+            ],
+            "additionalProperties": {}
+           }
+          ]
+         }
+        }
+       },
+       "required": [
+        "note",
+        "results"
+       ],
+       "additionalProperties": {}
+      },
+      "lender_level": {
+       "type": "object",
+       "properties": {
+        "note": {
+         "type": "string"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "rank": {
+              "type": "number"
+             },
+             "loan_officer": {
+              "type": "object",
+              "properties": {
+               "nmls_id": {
+                "type": "number"
+               },
+               "full_name": {
+                "type": "string"
+               },
+               "canonical_url": {
+                "type": "string"
+               },
+               "lender": {
+                "anyOf": [
+                 {
+                  "type": "object",
+                  "properties": {
+                   "nmls_id": {
+                    "type": "number"
+                   },
+                   "name": {
+                    "type": "string"
+                   },
+                   "canonical_url": {
+                    "type": "string"
+                   }
+                  },
+                  "required": [
+                   "nmls_id",
+                   "name",
+                   "canonical_url"
+                  ],
+                  "additionalProperties": {}
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "branch": {
+                "anyOf": [
+                 {
+                  "type": "object",
+                  "properties": {
+                   "city": {
+                    "type": [
+                     "string",
+                     "null"
+                    ]
+                   },
+                   "state": {
+                    "type": [
+                     "string",
+                     "null"
+                    ]
+                   }
+                  },
+                  "required": [
+                   "city",
+                   "state"
+                  ],
+                  "additionalProperties": {}
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "licensed_states": {
+                "type": "array",
+                "items": {
+                 "type": "string"
+                }
+               },
+               "languages": {
+                "type": "array",
+                "items": {
+                 "type": "string"
+                }
+               },
+               "lender_profile_url": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "nmls_id",
+               "full_name",
+               "canonical_url"
+              ],
+              "additionalProperties": {}
+             },
+             "reasons": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "distance_mi": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "office_location_unknown": {
+              "type": "boolean"
+             },
+             "match_scope": {
+              "type": "string",
+              "enum": [
+               "state"
+              ]
+             },
+             "license_check": {
+              "type": "object",
+              "properties": {
+               "state": {
+                "type": "string"
+               },
+               "confidence": {
+                "type": "string",
+                "enum": [
+                 "confirmed",
+                 "lender_reported",
+                 "self_reported",
+                 "federal_registration",
+                 "unknown"
+                ]
+               },
+               "label": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "state",
+               "confidence",
+               "label"
+              ],
+              "additionalProperties": {}
+             },
+             "match_status": {
+              "type": "string",
+              "enum": [
+               "exact",
+               "partial"
+              ]
+             },
+             "matched_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "unconfirmed_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "match_level": {
+              "type": "string",
+              "enum": [
+               "officer",
+               "lender"
+              ]
+             },
+             "mentioned_by_loan_officer": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             }
+            },
+            "required": [
+             "rank",
+             "loan_officer",
+             "reasons",
+             "canonical_url"
+            ],
+            "additionalProperties": {}
+           },
+           {
+            "type": "object",
+            "properties": {
+             "rank": {
+              "type": "number"
+             },
+             "nmls_id": {
+              "type": "number"
+             },
+             "full_name": {
+              "type": "string"
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "lender": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "office": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {
+                 "city": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 },
+                 "state": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "city",
+                 "state"
+                ],
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "distance_mi": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "office_location_unknown": {
+              "type": "boolean"
+             },
+             "match_scope": {
+              "type": "string",
+              "enum": [
+               "state"
+              ]
+             },
+             "licensed_states": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              },
+              "description": "Licensed or eligible states the query is about, not every state on file."
+             },
+             "license_check": {
+              "type": "object",
+              "properties": {
+               "state": {
+                "type": "string"
+               },
+               "confidence": {
+                "type": "string",
+                "enum": [
+                 "confirmed",
+                 "lender_reported",
+                 "self_reported",
+                 "federal_registration",
+                 "unknown"
+                ]
+               },
+               "verified_at": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "state",
+               "confidence",
+               "verified_at"
+              ],
+              "additionalProperties": {}
+             },
+             "match_status": {
+              "type": "string",
+              "enum": [
+               "exact",
+               "partial"
+              ]
+             },
+             "match_level": {
+              "type": "string",
+              "enum": [
+               "officer",
+               "lender"
+              ]
+             },
+             "specialties": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "slug": {
+                 "type": "string"
+                },
+                "reason": {
+                 "type": "string"
+                }
+               },
+               "required": [
+                "slug",
+                "reason"
+               ],
+               "additionalProperties": {}
+              }
+             },
+             "unconfirmed_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "last_verified": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "rank",
+             "nmls_id",
+             "full_name",
+             "canonical_url",
+             "lender",
+             "office",
+             "licensed_states",
+             "specialties",
+             "last_verified"
+            ],
+            "additionalProperties": {}
+           }
+          ]
+         }
+        }
+       },
+       "required": [
+        "note",
+        "results"
+       ],
+       "additionalProperties": {}
+      },
+      "related": {
+       "type": "object",
+       "properties": {
+        "note": {
+         "type": "string"
+        },
+        "results": {
+         "type": "array",
+         "items": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {
+             "rank": {
+              "type": "number"
+             },
+             "loan_officer": {
+              "type": "object",
+              "properties": {
+               "nmls_id": {
+                "type": "number"
+               },
+               "full_name": {
+                "type": "string"
+               },
+               "canonical_url": {
+                "type": "string"
+               },
+               "lender": {
+                "anyOf": [
+                 {
+                  "type": "object",
+                  "properties": {
+                   "nmls_id": {
+                    "type": "number"
+                   },
+                   "name": {
+                    "type": "string"
+                   },
+                   "canonical_url": {
+                    "type": "string"
+                   }
+                  },
+                  "required": [
+                   "nmls_id",
+                   "name",
+                   "canonical_url"
+                  ],
+                  "additionalProperties": {}
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "branch": {
+                "anyOf": [
+                 {
+                  "type": "object",
+                  "properties": {
+                   "city": {
+                    "type": [
+                     "string",
+                     "null"
+                    ]
+                   },
+                   "state": {
+                    "type": [
+                     "string",
+                     "null"
+                    ]
+                   }
+                  },
+                  "required": [
+                   "city",
+                   "state"
+                  ],
+                  "additionalProperties": {}
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "licensed_states": {
+                "type": "array",
+                "items": {
+                 "type": "string"
+                }
+               },
+               "languages": {
+                "type": "array",
+                "items": {
+                 "type": "string"
+                }
+               },
+               "lender_profile_url": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "nmls_id",
+               "full_name",
+               "canonical_url"
+              ],
+              "additionalProperties": {}
+             },
+             "reasons": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "distance_mi": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "office_location_unknown": {
+              "type": "boolean"
+             },
+             "match_scope": {
+              "type": "string",
+              "enum": [
+               "state"
+              ]
+             },
+             "license_check": {
+              "type": "object",
+              "properties": {
+               "state": {
+                "type": "string"
+               },
+               "confidence": {
+                "type": "string",
+                "enum": [
+                 "confirmed",
+                 "lender_reported",
+                 "self_reported",
+                 "federal_registration",
+                 "unknown"
+                ]
+               },
+               "label": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "state",
+               "confidence",
+               "label"
+              ],
+              "additionalProperties": {}
+             },
+             "match_status": {
+              "type": "string",
+              "enum": [
+               "exact",
+               "partial"
+              ]
+             },
+             "matched_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "unconfirmed_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "match_level": {
+              "type": "string",
+              "enum": [
+               "officer",
+               "lender"
+              ]
+             },
+             "mentioned_by_loan_officer": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             }
+            },
+            "required": [
+             "rank",
+             "loan_officer",
+             "reasons",
+             "canonical_url"
+            ],
+            "additionalProperties": {}
+           },
+           {
+            "type": "object",
+            "properties": {
+             "rank": {
+              "type": "number"
+             },
+             "nmls_id": {
+              "type": "number"
+             },
+             "full_name": {
+              "type": "string"
+             },
+             "canonical_url": {
+              "type": "string"
+             },
+             "lender": {
+              "type": [
+               "string",
+               "null"
+              ]
+             },
+             "office": {
+              "anyOf": [
+               {
+                "type": "object",
+                "properties": {
+                 "city": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 },
+                 "state": {
+                  "type": [
+                   "string",
+                   "null"
+                  ]
+                 }
+                },
+                "required": [
+                 "city",
+                 "state"
+                ],
+                "additionalProperties": {}
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "distance_mi": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "office_location_unknown": {
+              "type": "boolean"
+             },
+             "match_scope": {
+              "type": "string",
+              "enum": [
+               "state"
+              ]
+             },
+             "licensed_states": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              },
+              "description": "Licensed or eligible states the query is about, not every state on file."
+             },
+             "license_check": {
+              "type": "object",
+              "properties": {
+               "state": {
+                "type": "string"
+               },
+               "confidence": {
+                "type": "string",
+                "enum": [
+                 "confirmed",
+                 "lender_reported",
+                 "self_reported",
+                 "federal_registration",
+                 "unknown"
+                ]
+               },
+               "verified_at": {
+                "type": [
+                 "string",
+                 "null"
+                ]
+               }
+              },
+              "required": [
+               "state",
+               "confidence",
+               "verified_at"
+              ],
+              "additionalProperties": {}
+             },
+             "match_status": {
+              "type": "string",
+              "enum": [
+               "exact",
+               "partial"
+              ]
+             },
+             "match_level": {
+              "type": "string",
+              "enum": [
+               "officer",
+               "lender"
+              ]
+             },
+             "specialties": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "slug": {
+                 "type": "string"
+                },
+                "reason": {
+                 "type": "string"
+                }
+               },
+               "required": [
+                "slug",
+                "reason"
+               ],
+               "additionalProperties": {}
+              }
+             },
+             "unconfirmed_specialties": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "last_verified": {
+              "type": [
+               "string",
+               "null"
+              ]
+             }
+            },
+            "required": [
+             "rank",
+             "nmls_id",
+             "full_name",
+             "canonical_url",
+             "lender",
+             "office",
+             "licensed_states",
+             "specialties",
+             "last_verified"
+            ],
+            "additionalProperties": {}
+           }
+          ]
+         }
+        }
+       },
+       "required": [
+        "note",
+        "results"
+       ],
+       "additionalProperties": {}
+      },
+      "method": {
+       "description": "How matching works (detail 'full'; compact results link method_url).",
+       "type": "string"
+      },
+      "method_url": {
+       "type": "string"
+      },
+      "citation_guidance": {
+       "type": "string"
+      },
+      "debug": {
+       "description": "Only when the call set debug: true.",
+       "type": "object",
+       "properties": {
+        "parsed": {},
+        "filters": {}
+       },
+       "required": [
+        "parsed",
+        "filters"
+       ],
+       "additionalProperties": {}
+      }
+     },
+     "required": [
+      "canonical_url",
+      "requested_specialties",
+      "exact_match_count",
+      "all_terms_understood",
+      "unassessed_requirements",
+      "fallback_applied",
+      "search",
+      "count",
+      "results",
+      "citation_guidance"
+     ],
+     "additionalProperties": {}
+    }
+   },
+   {
+    "name": "get_loan_officer",
+    "title": "Get a loan officer by NMLS ID",
+    "description": "Use this when you have a mortgage loan officer's individual NMLS ID and need their full profile. Returns LenDb's sourced record: name, title, current lender and branch, employment history, state licenses with license confidence, specialties (such as FHA, VA, bank statement or DSCR) with the evidence for each, languages spoken, stated experience, the earliest state license record, public links (such as their page on the lender's site), disciplinary_check ('not_checked' means LenDb has not yet checked regulator records), the date the record was last verified and a canonical_url. US only. Phone numbers and email addresses are not returned; the LenDb profile page shows them after a human check.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "nmls_id": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": -9007199254740991,
+         "maximum": 9007199254740991
+        },
+        {
+         "type": "string",
+         "maxLength": 12,
+         "pattern": "^\\d+$"
+        }
+       ],
+       "description": "Individual NMLS ID, digits only, e.g. 452476."
+      }
+     },
+     "required": [
+      "nmls_id"
+     ]
+    },
+    "annotations": {
+     "title": "Get a loan officer by NMLS ID",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "sample": {
+       "description": "True when the data is fictional sample data.",
+       "type": "boolean"
+      },
+      "notice": {
+       "type": "string"
+      },
+      "canonical_url": {
+       "type": "string"
+      },
+      "loan_officer": {
+       "type": "object",
+       "properties": {
+        "nmls_id": {
+         "type": "number"
+        },
+        "full_name": {
+         "type": "object",
+         "properties": {
+          "value": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "value"
+         ],
+         "additionalProperties": {}
+        },
+        "canonical_url": {
+         "type": "string"
+        },
+        "licenses": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": {}
+         }
+        },
+        "reported_employers": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "company_name": {
+            "type": "string"
+           },
+           "company_nmls_id": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "state": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "confidence": {
+            "type": "string",
+            "enum": [
+             "self_reported"
+            ]
+           },
+           "source": {
+            "type": "string",
+            "enum": [
+             "lo_provided"
+            ]
+           }
+          },
+          "required": [
+           "company_name",
+           "company_nmls_id",
+           "state",
+           "confidence",
+           "source"
+          ],
+          "additionalProperties": {}
+         }
+        },
+        "wholesale_partners": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "lender_name": {
+            "type": "string"
+           },
+           "lender_nmls_id": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "lender_url": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "confidence": {
+            "type": "string",
+            "enum": [
+             "self_reported"
+            ]
+           },
+           "source": {
+            "type": "string",
+            "enum": [
+             "lo_provided"
+            ]
+           }
+          },
+          "required": [
+           "lender_name",
+           "lender_nmls_id",
+           "lender_url",
+           "confidence",
+           "source"
+          ],
+          "additionalProperties": {}
+         }
+        },
+        "own_words": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "phrase": {
+            "type": "string"
+           },
+           "confidence": {
+            "type": "string",
+            "enum": [
+             "self_reported"
+            ]
+           },
+           "source": {
+            "type": "string",
+            "enum": [
+             "lo_provided"
+            ]
+           }
+          },
+          "required": [
+           "phrase",
+           "confidence",
+           "source"
+          ],
+          "additionalProperties": {}
+         }
+        },
+        "specialties": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "slug": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "slug"
+          ],
+          "additionalProperties": {}
+         }
+        },
+        "disciplinary_check": {
+         "type": "string",
+         "enum": [
+          "not_checked",
+          "checked"
+         ]
+        },
+        "last_verified_at": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "nmls_id",
+        "full_name",
+        "canonical_url",
+        "licenses",
+        "specialties",
+        "disciplinary_check",
+        "last_verified_at"
+       ],
+       "additionalProperties": {}
+      }
+     },
+     "required": [
+      "canonical_url",
+      "loan_officer"
+     ],
+     "additionalProperties": {}
+    }
+   },
+   {
+    "name": "get_lender",
+    "title": "Get a mortgage lender",
+    "description": "Use this when you need facts about a US mortgage lender, bank, credit union or mortgage broker company, by its company NMLS ID or by name (a partial name works). Returns the lender's type (bank, credit_union, imb, broker, other), headquarters state, website, the loan programs it offers (such as FHA, VA, jumbo or DSCR), program_approvals from agency data (FHA approval per HUD, with the month of loans it covers; absent means no HUD match on file, not that the lender lacks approval), activity (home loans it funded per HMDA, FFIEC/CFPB: counts by year, loan type and purpose, with as_of_year and source_url; cite it as 'HMDA, FFIEC/CFPB, <year>'; includes_brokered true means the counts include loans brokers originated; absent means no HMDA match on file, never that the lender makes no loans), how many of its loan officers LenDb lists, disciplinary_check, the date the record was last verified and a canonical_url.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "nmls_id_or_name": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Company NMLS ID (digits) or all or part of the company name."
+      }
+     },
+     "required": [
+      "nmls_id_or_name"
+     ]
+    },
+    "annotations": {
+     "title": "Get a mortgage lender",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "sample": {
+       "description": "True when the data is fictional sample data.",
+       "type": "boolean"
+      },
+      "notice": {
+       "type": "string"
+      },
+      "canonical_url": {
+       "type": "string"
+      },
+      "lender": {
+       "type": "object",
+       "properties": {
+        "nmls_id": {
+         "type": "number"
+        },
+        "name": {
+         "type": "object",
+         "properties": {
+          "value": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "value"
+         ],
+         "additionalProperties": {}
+        },
+        "canonical_url": {
+         "type": "string"
+        },
+        "type": {
+         "type": "string"
+        },
+        "loan_officer_count": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "nmls_id",
+        "name",
+        "canonical_url",
+        "type",
+        "loan_officer_count"
+       ],
+       "additionalProperties": {}
+      }
+     },
+     "required": [
+      "canonical_url",
+      "lender"
+     ],
+     "additionalProperties": {}
+    }
+   },
+   {
+    "name": "list_specialties",
+    "title": "List mortgage specialties",
+    "description": "Use this when you need the mortgage situations LenDb can match on. Returns every specialty with its slug, category (property type, loan program or borrower situation), label, one-line description and canonical_url: for example FHA, VA, USDA, jumbo, DSCR, bank statement, ITIN, self-employed, first-time buyer, non-warrantable condo, multi-family 2-4 units and reverse mortgage. Also returns the supported languages as ISO 639-1 codes with names.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {}
+    },
+    "annotations": {
+     "title": "List mortgage specialties",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "canonical_url": {
+       "type": "string"
+      },
+      "specialties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "category": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "canonical_url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug",
+         "category",
+         "label",
+         "description",
+         "canonical_url"
+        ],
+        "additionalProperties": {}
+       }
+      },
+      "languages": {
+       "type": "object",
+       "propertyNames": {
+        "type": "string"
+       },
+       "additionalProperties": {
+        "type": "string"
+       },
+       "description": "ISO 639-1 code to language name."
+      }
+     },
+     "required": [
+      "canonical_url",
+      "specialties",
+      "languages"
+     ],
+     "additionalProperties": {}
+    }
+   },
+   {
+    "name": "explain_specialty",
+    "title": "Explain a mortgage specialty",
+    "description": "Use this when someone asks what a mortgage loan type or borrower situation means, such as a DSCR loan, a bank statement loan, an ITIN loan, a non-warrantable condo or an FHA loan. Returns, for one specialty slug, what it is, why it can be hard to get done, the questions a borrower should ask a loan officer about it, its synonyms and a canonical_url.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 80,
+       "description": "One of: condo, condo-non-warrantable, co-op, multi-family-2-4, manufactured, rural, new-construction, mixed-use, condotel, vacation-home, fha, va, usda, jumbo, non-qm, dscr, bank-statement, reverse, renovation, construction, fix-and-flip, heloc, down-payment-assistance, crypto-mortgage, self-employed, first-time-buyer, investor, refinance, permanent-resident, foreign-national, itin, low-credit, recent-credit-event, physician, 1099-income, asset-based, move-up-buyer"
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "annotations": {
+     "title": "Explain a mortgage specialty",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string"
+      },
+      "category": {
+       "type": "string"
+      },
+      "label": {
+       "type": "string"
+      },
+      "description": {
+       "type": "string"
+      },
+      "why_hard": {
+       "type": "string"
+      },
+      "questions_to_ask": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "canonical_url": {
+       "type": "string"
+      },
+      "api_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "slug",
+      "category",
+      "label",
+      "description",
+      "why_hard",
+      "questions_to_ask",
+      "canonical_url",
+      "api_url"
+     ],
+     "additionalProperties": {}
+    }
+   }
+  ]
+ }
+}
