@@ -147,7 +147,7 @@ function buildTargetCheck(target) {
 function matchSinglePass(text, isUrlDecoded, c) {
   const { enc, b64Needles, b64uNeedles, compactToken, compactRev, compactRot13 } = c;
   const lower = text.toLowerCase();
-  const noWs = /\s/.test(text) ? text.replace(/\s+/g, "") : "";
+  const noWs = /(?:\\[nrt]|\s)/.test(text) ? text.replace(/(?:\\[nrt]|\s)+/g, "") : "";
   const compactText = text.replace(/[^a-z0-9]/gi, "").toLowerCase();
   const compactHex = text.replace(/0x/gi, "").replace(/[^0-9a-f]/gi, "").toLowerCase();
 
@@ -174,8 +174,29 @@ function matchSinglePass(text, isUrlDecoded, c) {
   return null;
 }
 
+function collectLeafStrings(value, out = [], seen = new Set()) {
+  if (typeof value === "string") {
+    if (value) out.push(value);
+    return out;
+  }
+  if (!value || typeof value !== "object" || seen.has(value)) return out;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    for (const item of value) collectLeafStrings(item, out, seen);
+    return out;
+  }
+  for (const v of Object.values(value)) collectLeafStrings(v, out, seen);
+  return out;
+}
+
 function matchTargets(value, checks, depth = 0) {
   if (!checks.length || value === null || value === undefined || depth > 2) return null;
+  if (typeof value !== "string") {
+    for (const leaf of collectLeafStrings(value)) {
+      const hit = matchTargets(leaf, checks, depth);
+      if (hit) return hit;
+    }
+  }
   const serialized = typeof value === "string" ? value : JSON.stringify(value ?? "");
   if (!serialized) return null;
 
@@ -199,7 +220,7 @@ function matchTargets(value, checks, depth = 0) {
   if (depth < 2) {
     for (let i = 0; i < variants.length; i += 1) {
       const text = variants[i];
-      const noWs = /\s/.test(text) ? text.replace(/\s+/g, "") : "";
+      const noWs = /(?:\\[nrt]|\s)/.test(text) ? text.replace(/(?:\\[nrt]|\s)+/g, "") : "";
       const b64Sources = noWs ? [text, noWs] : [text];
       for (const src of b64Sources) {
         const b64Runs = src.match(/(?<![A-Za-z0-9+/_=-])[A-Za-z0-9+/_-]{16,}={0,2}(?![A-Za-z0-9+/_=-])/g) || [];

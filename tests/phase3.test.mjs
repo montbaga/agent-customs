@@ -128,6 +128,7 @@ test("Agent Customs Bench runs reproducibly, separates detection from self-tests
   assert.equal(saved.agentCustoms.round2Caught, res.agentCustoms.round2Caught);
   assert.equal(saved.agentCustoms.round3Caught, res.agentCustoms.round3Caught);
   assert.equal(saved.agentCustoms.heldoutCaught, res.agentCustoms.heldoutCaught);
+  assert.equal(saved.agentCustoms.externalQuotedCaught, res.agentCustoms.externalQuotedCaught);
   assert.equal(saved.agentCustoms.falseBlocks, res.agentCustoms.falseBlocks);
 });
 
