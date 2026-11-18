@@ -104,3 +104,20 @@ function sha256Fallback(bytes) {
   }
   return Array.from(h, (x) => x.toString(16).padStart(8, "0")).join("");
 }
+
+/**
+ * Validate an International Bank Account Number using ISO 7064 Mod-97 check digits.
+ *
+ * :param raw: Candidate IBAN string.
+ * :return: True when length and check digits validate cleanly.
+ */
+export function ibanValid(raw) {
+  const s = String(raw || "").replace(/\s+/g, "").toUpperCase();
+  if (s.length < 15 || s.length > 34 || !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(s)) return false;
+  let rest = 0;
+  for (const ch of s.slice(4) + s.slice(0, 4)) {
+    const v = ch >= "A" && ch <= "Z" ? ch.charCodeAt(0) - 55 : ch.charCodeAt(0) - 48;
+    rest = (rest * (v > 9 ? 100 : 10) + v) % 97;
+  }
+  return rest === 1;
+}

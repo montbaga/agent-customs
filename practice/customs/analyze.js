@@ -287,6 +287,13 @@ export async function analyzeNetwork(input) {
         severity = "medium";
         detail += " Found in tool/schema documentation rather than assistant instructions; verify it is reference docs rather than user coercion.";
       }
+    } else if (hit.rule.id === "C-EXFIL" && !/instructions|command/i.test(field.field || "")) {
+      const ex = hit.excerpt || "";
+      const hardLeak = /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|javascript:|vbscript:|data\s*:\s*text\/html|\bwebhook\b/i.test(ex);
+      if (!hardLeak) {
+        severity = "medium";
+        detail += " Found in a tool description referencing a configured deployment server without an embedded external URL.";
+      }
     }
     add({ rule: hit.rule.id, category: "contraband", severity, title: hit.rule.title,
       detail, evidence: hit.excerpt, where: { agent: field.agent, field: field.field }, why: hit.rule.why, fix: hit.rule.fix });

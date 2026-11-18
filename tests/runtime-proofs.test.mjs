@@ -55,6 +55,16 @@ test("detectCanaryLeak catches raw, URL, Base64, hex, and reversed encodings", (
   assert.equal(detectCanaryLeak(charCodes, token)?.encoding, "charcodes");
   assert.equal(detectCanaryLeak(`token_part=${token.slice(7)}`, token)?.encoding, "raw");
   assert.equal(detectCanaryLeak("totally unrelated data chunk", token), null);
+
+  // Wrapped MIME/64-column Base64 inside object fields across all 80 byte offsets.
+  for (const width of [64, 76]) {
+    let caught = 0;
+    for (let pad = 0; pad < 80; pad += 1) {
+      const wrapped = Buffer.from(`${"x".repeat(pad)}${token}`).toString("base64").replace(new RegExp(`(.{${width}})`, "g"), "$1\n");
+      if (detectCanaryLeak({ name: "tool", toolArgs: { note: wrapped } }, token)) caught += 1;
+    }
+    assert.equal(caught, 80, `wrapped Base64 inside toolArgs at width ${width} must catch 80/80`);
+  }
 });
 
 test("guard Lock 3 canary tripwire blocks encoded exfiltration and revokes partner approval", async () => {
