@@ -1,138 +1,213 @@
-# Agent Customs: Deterministic Port-of-Entry Inspection and Runtime Egress Locks for Multi-Protocol Web Agents
+<div align="center">
 
-> **Abstract.** As web assistants adopt the Open Agentic Web, Google Agent2Agent (A2A), and Model Context Protocol (MCP), client browsers routinely delegate user requests to external agent manifests loaded from third-party origins. Today, delegation relies on UI consent prompts that show a partner's name and URL while feeding its uninspected instructions, schemas, and downstream links directly into the caller's model context. **Agent Customs** interposes a zero-dependency, browser-first port-of-entry pipeline combining deterministic multi-protocol inspection, identifier- and schema-based capability analysis, ES256 provenance with SHA-256 pinning (for both agent configs and MCP tool lists), format-based & canary runtime locks, and CI/browser distribution. Across our separated reproducible evaluation suite ([`tools/bench.mjs`](tools/bench.mjs)), static pre-execution inspection blocks or holds **87.8%** (`86/98`, **90.8%** flagged including `CONDITIONS` across `42` Round-1 vectors, `24` frozen Round-2 red-team vectors up from `3/24`, `15` frozen Round-3 vectors up from `0/15`, `5/10` / **50.0%** internal un-tuned held-out vectors, and `3/7` / **42.9%** frozen verbatim third-party probes via format detectors; across the full 20-case third-party unseen wording set, independent re-checks measured `1/20` pre-format and `4/20` after format additions) at **$0 LLM cost** (`1.74 ms` detection median on a desktop Node.js v24 run) with **0% (`0/61`) false blocks** across offline benign controls (against **19.4%** caught and **8.2%** false blocks for a normalized regex baseline), while **25/25** runtime lock and tamper-detection self-tests pass separately and remaining semantic and single-origin trust boundaries are explicitly documented.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/page-banner-paper-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/page-banner-paper-light.svg">
+  <img src="docs/images/page-banner-paper-dark.svg" alt="Agent Customs paper: what it does, how it was tested, where it falls short" width="100%">
+</picture>
 
----
+<br><br>
 
-## 1. Problem & Threat Model
+[**README**](README.md) &nbsp;·&nbsp;
+[**How it works**](ARCHITECTURE.md) &nbsp;·&nbsp;
+[**Results**](#5--results) &nbsp;·&nbsp;
+[**Limits**](#6--limits) &nbsp;·&nbsp;
+[**Reproduce**](#7--reproduce-the-numbers) &nbsp;·&nbsp;
+[**License**](LICENSE.md)
 
-### 1.1 Cross-Site Delegation Hazard
-In client-side multi-agent runtimes such as Cognizant's [Open Agentic Web](https://github.com/cognizant-ai-labs/agentic-web), a host site connects to external partner networks via a consent prompt. That delegation creates three distinct security boundaries that traditional web SOP/CSP policies do not guard:
+<br>
 
-1. **Invisible & Non-Canonical Prompt Channels:** Attackers hide instructions in Unicode tag characters (`U+E0000`–`U+E007F`), zero-width splitters (`ZWSP`/`ZWJ`), bidirectional overrides (`RLO`), Cyrillic/Greek/Armenian/Cherokee homoglyphs, split multi-line phrases, or JSON Schema fields (`inputSchema`, `outputSchema`, `annotations.title`, `prompts[].messages`, `skills[].name`) never shown in standard consent cards.
-2. **Name & Schema Capability Combinations ("Lethal Trifecta"):** A manifest written in completely polite prose can combine untrusted external input, sensitive reads/parameters (`my_read_env`, `get_config`, `environment settings`, `sly_data`, sensitive schema keys, or a single tool reading environment variables into a `webhookUrl` argument), and external egress (`notify_team`, webhooks, cross-origin endpoints) to create an exfiltration path regardless of self-declared MCP annotations—while avoiding false alarms on benign typed parameters such as a travel tool's `destination` city string.
-3. **Post-Approval Drift & Novel Runtime Encodings:** Static pre-launch checks cannot stop a partner or third-party MCP server that clears inspection on Day 1 and silently adds harvesting instructions or tool-description mutations overnight (rug pull), nor can static wordlists stop a compromised turn from encoding secrets or canary tokens (e.g., MIME/64-column line-wrapped Base64 inside JSON tool argument leaves, spaced hex, comma char codes, ROT13, or prefix-stripped suffixes) past naive format filters.
+<img alt="Tests: 166 passing" src="https://img.shields.io/badge/tests-166_passing-ece4d3?labelColor=0c1d18">
+<img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18">
+<img alt="Unseen real tools: 5.5% false alarms" src="https://img.shields.io/badge/unseen_real_tools-5.5%25_false_alarms-f0a35e?labelColor=0c1d18">
+<img alt="Model tokens: 0" src="https://img.shields.io/badge/model_tokens-0-ece4d3?labelColor=0c1d18">
 
-### 1.2 Adversary Capabilities, Trust Boundaries & Out-of-Scope Threats
+</div>
 
-| Boundary | Trusted / Assumed Integrity | Adversary Controlled |
+<br>
+
+# Agent Customs: checking AI agents from other websites before they run in your browser
+
+> **Summary.** On the Open Agentic Web, and with Google A2A and MCP, one site's assistant can hand a request to an agent published by another site. Today the visitor sees a consent card with the partner's name and address, while the partner's instructions, tool schemas and links go straight into the calling model, unread.
+>
+> Agent Customs reads those files first, in the browser, with fixed rules. It stamps the partner, remembers the approved version, and keeps three locks on while it runs.
+>
+> In the benchmark it blocks or holds **86 of 98** attacks (87.8%) and blocks **none of 61** honest controls, at no model cost and a median of 1.74 ms. On **237 public MCP servers and A2A cards it had never seen**, 13 (5.5%) were held without a good reason. Attack wording the rules were never written for still gets through often (they held 4 of 20 outside wordings and 11 of 18 in the latest test), which is why the runtime locks exist.
+
+<br>
+
+## 1 · The problem
+
+When a partner network runs inside your page, three things can go wrong that the browser's usual protections (same-origin policy, CSP) do not cover:
+
+1. Hidden instructions. Text a person cannot see but a model reads: Unicode tag characters (`U+E0000` to `U+E007F`), zero-width characters, right-to-left overrides, look-alike letters from other alphabets, Base64, or orders tucked into schema fields that no consent card shows (`inputSchema`, `outputSchema`, `annotations.title`, `prompts[].messages`, A2A `skills[].name`).
+2. Dangerous combinations in polite wording. A tool that reads outside text, one that touches private data (environment settings, `sly_data`, a credential field) and one that sends data out (a webhook, another host) make a path for a leak, however the descriptions are worded. Self-declared MCP hints such as `readOnlyHint` cannot be trusted to rule that out.
+3. Changes after approval, and encoded leaks. A partner can pass on day 1 and add a harvesting instruction on day 2 (a rug pull). A compromised turn can encode a secret, for example line-wrapped Base64 inside a tool argument, past a simple word filter.
+
+## 2 · Threat model
+
+| | Trusted | Controlled by the attacker |
 | :--- | :--- | :--- |
-| **Host Origin & Runtime** | Host page HTML/DOM, CSP (`img-src 'self' data: blob:`), unmodified Cognizant `Engine`, single-purpose origin isolation | Partner manifests, `.network.json`, A2A Agent Cards, MCP `mcp.json`/`tools/list`/`server.json`, partner replies & tool payloads |
-| **Cryptographic Identity** | Published ECDSA P-256 public key (`.well-known/agent-customs-key.json`, `keyId: -DC99sDa-qJjBp2N`, mirrored out-of-band in `README.md`) | Client-downloaded `.svg`/`.html`/`.json`/`.pdf` artifacts presented to the **Verify** counter |
-| **Guard Hook (`engine._compile`)** | Wraps 8 runtime hooks (`_compile`, `runTurn`, `resetHistory`, `resolveRemote`, `resolveMcp`, `sandbox.invoke`, `actions.execute`, `submitActions`), failing closed if `_compile` is missing | Network definitions prior to compilation, external REST/MCP return payloads |
+| **Host page and runtime** | The host page and its CSP (`img-src 'self' data: blob:`), Cognizant's unmodified `Engine`, an origin used only for this site | Partner manifests, `.network.json`, A2A cards, MCP `tools/list` and `server.json`, partner replies and tool results |
+| **Signing key** | The published ECDSA P-256 key (`.well-known/agent-customs-key.json`, key id `-DC99sDa-qJjBp2N`, also printed in the README) | Any `.svg`, `.html`, `.json` or `.pdf` file dropped on the **Verify** tab |
+| **Guard hook** | The guard wraps eight runtime methods (`_compile`, `runTurn`, `resetHistory`, `resolveRemote`, `resolveMcp`, `sandbox.invoke`, `actions.execute`, `submitActions`) and refuses to run if `_compile` is missing | Network definitions before they are compiled; REST and MCP responses |
 
-**Out of scope:** A malicious host page itself, compromised same-origin scripts (which share browser `localStorage`), or a modified host `Engine` binary.
+**Out of scope:** a malicious host page, other scripts on the same origin (they share `localStorage`), or a modified runtime.
 
----
+## 3 · Design
 
-## 2. Architecture: Five Defense Layers
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-pipeline-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/architecture-pipeline-light.svg">
+  <img src="docs/images/architecture-pipeline-dark.svg" alt="One inspection: find the files, unhide the text, five checks, data paths, stamp" width="100%">
+</picture>
 
-```text
-  External Target (Open Agentic Web / Google A2A / MCP / server.json)
-       │
-       ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │ Layer 1 · Multi-Protocol Discovery & Canonicalization               │
-  │   protocols.js · canonical.js · unicode.js                          │
-  │   NFKC + skeleton homoglyph folding · U+E0000 decoder · AST mapping │
-  └────┬────────────────────────────────────────────────────────────────┘
-       ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │ Layer 2 · Deterministic Pre-LLM Gates & Capability Analysis         │
-  │   analyze.js · rules.js · languages.js · capabilities.js · inspect  │
-  │   5 Gates (Papers, Contraband, Itinerary, Privacy, Identity)        │
-  │   S-TRIFECTA name/schema/endpoint check · format-based rules        │
-  │   Optional opt-in AI semantic judge (semanticJudge: true, off default)│
-  └────┬────────────────────────────────────────────────────────────────┘
-       │  Verdict: CLEARED | CONDITIONS | HOLD | DENIED | INVALID
-       ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │ Layer 3 · Cryptographic Provenance & Version Pinning                │
-  │   receipts.js · pins.js · diff.js · certificate.js · locks.js (MCP) │
-  │   35-day ES256 stamps · persisted network & MCP tool-list pins      │
-  └────┬────────────────────────────────────────────────────────────────┘
-       │  (Admitted & Pinned in Host Runtime)
-       ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │ Layer 4 · Format-Based & Canary Runtime Locks                       │
-  │   locks.js · canary.js · CSP                                        │
-  │   Lock 1: Unicode-folded Luhn/IBAN/key/Base64/explicit egress gate  │
-  │   Lock 2: Reply quarantine + allow-listed fields + action click-gate│
-  │   Lock 3: Prompt-injected canary + leaf-walked offset-invariant trip │
-  └────┬────────────────────────────────────────────────────────────────┘
-       │
-       ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │ Layer 5 · Zero-Dependency CLI, CI & Browser Distribution            │
-  │   bin/agent-customs.mjs · action.yml · extension/                   │
-  │   Env-safe PR SARIF v2.1.0 gates · Scoped optional_host MV3 popup   │
-  └─────────────────────────────────────────────────────────────────────┘
-```
+| Layer | What it does | Code |
+| :--- | :--- | :--- |
+| **1 · Read and clean** | Maps Open Agentic Web, A2A (`agent.json`, `agent-card.json`) and MCP (`mcp.json`, `mcpServers`, `tools/list`, Registry `server.json`) into one model. Reads every model-visible field, then applies NFKC, reveals invisible characters, decodes tag characters, folds look-alike letters and decodes Base64, hex, reversed and ROT13 text. | `protocols.js`, `unicode.js`, `canonical.js` |
+| **2 · Five checks and data paths** | Fixed rules for Papers, Contraband, Itinerary, Privacy and Identity, and the read + private data + send-out check (`S-TRIFECTA`) on tool names, schemas and endpoints. Secret requests are read in 12 languages, takeover, leak and download-and-run orders in 14, and whole sentences in other languages are held. | `rules.js`, `languages.js`, `capabilities.js`, `analyze.js` |
+| **3 · Stamps and pins** | Remembers the SHA-256 fingerprint of an approved network and of each MCP server's tool list, and shows the difference when they change. Signs 35-day ES256 stamps for listed public networks. | `pins.js`, `diff.js`, `receipts.js`, `certificate.js` |
+| **4 · Runtime locks** | Lock 1 keeps card numbers, IBANs and keys from leaving. Lock 2 cleans replies and makes actions wait for a click. Lock 3 plants a canary word and stops the call if it leaks in any of ten encodings. | `locks.js`, `canary.js`, `guard.js` |
+| **5 · Everywhere else** | A command line tool with SARIF output, a GitHub Action and a Chrome/Edge extension, all without dependencies. | `bin/`, `action.yml`, `extension/` |
 
-### Layer 1: Unified Normalization (`protocols.js`, `unicode.js`, `canonical.js`)
-Incoming manifests from Open Agentic Web, Google A2A (`.well-known/agent.json`, `.well-known/agent-card.json`), and MCP (`/mcp.json`, `mcpServers`, `tools/list`, official Registry `server.json`) are mapped into a unified model. Text scanning covers `instructions`, runtime `command`, `outputSchema`, `annotations.title`, A2A `skills[].name`, `prompts[].messages`, identifier-split schema keys, and a recursive `rawDoc` fallback walk—normalized with NFKC, invisible stripping, tag decoding, confusable skeletons, ROT13/reverse/Base64/hex decoding.
+Two design choices matter more than the rest:
 
-### Layer 2: Five Inspection Gates & Optional AI Escalation (`analyze.js`, `capabilities.js`, `guard.js`)
-Fixed rules serve as a fast deterministic filter (`$0` LLM cost), prioritizing generalizable **format-based** checks alongside high-precision social-engineering gates:
-- **Papers / Contraband / Itinerary / Privacy / Identity:** Protocol conformance, instruction overrides (excluding benign few-shot dialogues, non-data formatting instructions, and short non-directive enum rules `<= 4` words), credential/ID/wallet-seed/OTP/bank-SMS/email-login phishing (requiring copy/recipient context on card scans, skipping `#d-N`/`#a-N` Kanban IDs, disallowing `nobody`/`no one` clause-prefix spoofs and third-party email-code relays, and treating own-service `Authorization: Bearer`/`Cookie`/`X-API-Key` header docs and own-service self-signup/invite OTP flows via `I-AUTH-DOC` while blocking visitor/third-party credential headers), remote-desktop & ClickFix/Run/DevTools coercion (`C-EXEC`, including 12 foreign-language download-and-run checks with Unicode word boundaries), gift-card coercion (`C-GIFT-CARD`), crypto-transfer / redirected-IBAN / QR-approval scams (`C-CRYPTO-QR`), scriptable link/data/query-leak URLs (`C-EXFIL` + `C-BEACON`), benign shipment tracking URL docs vs visitor-data beacons, OAuth `click Allow` sign-in flow docs vs permission-prompt coercion (`C-CONSENT`), concealment (`C-CONCEAL`, catching `"omit any mention..."` and alert-disabling while skipping `"enable or disable <x> alerts"` toggles), RFC 6901 JSON pointers/paths & JWS signature blobs (`C-ENCODED`), 10 checked secret languages, non-English holds (`C-LANGUAGE` + takeover/exfil/exec across 12 languages including bracketed/quoted imperatives and Unicode Turkish/Polish edges, stripping only short benign glosses and foreign company names inside parentheses), A2A `supportedInterfaces`/`additionalInterfaces`, and unbacked authority (`I-AUTHORITY`).
-- **Name- & Schema-Based Lethal Trifecta (`S-TRIFECTA`):** Splits `camelCase` and `snake_case` identifiers across tool names, descriptions, schema parameters (`SENSITIVE_PARAM`, failing closed on unknown third-party tokens like `dropbox_token`/`wallet_secret`/unlisted `api_key` and password-reuse descriptions while skipping `boolean` rotation flags, numeric token caps, explicit own-server result/retry handles propagated across sibling tools, and read-only metadata-only secret listings, plus flagging `SENSITIVE_TOOL` inbox/email readers paired with external egress hints when `openWorldHint: true && readOnlyHint: false` carries outward sharing/sending semantics rather than internal CRUD mutations), REST toolboxes, and off-origin tool URLs.
-- **Opt-In Layer 2 Semantic Judge (`guard.js`):** Off by default (`semanticJudge: false`) so production guards remain deterministic and zero-token; callers enabling `semanticJudge: true` run an isolated zero-tool spotlighted check (`judge.js`) over `CLEARED`/`CONDITIONS` outputs to cover unseen phrasing.
+- Rules decide, a model only explains. The same files always get the same stamp, at no cost. An optional AI check (`semanticJudge: true`, off by default) can make a verdict stricter, never softer.
+- Doubtful wording only softens a finding, it never removes it. Some honest tools sound like attacks ("we email you a 6-digit code", "the tracking link"). When the rules think a match is probably harmless, they keep it as a note, so the network gets *Cleared with conditions* instead of *Cleared*. Section 5.4 explains why this became a rule.
 
-### Layer 3: ES256 Receipts, Network & Persisted MCP Pinning (`receipts.js`, `pins.js`, `locks.js`)
-Approved partner manifests persist their canonical SHA-256 config hash in `PinStore` (`localStorage` in browsers). Third-party `listTools()` responses likewise pin canonical tool/schema digests (`mcp:<url>`) in `PinStore` (forgettable in the Desk Approvals tab, or session-scoped when no store is passed) and drop tools (`[]`) with a Lock 2 notice if definitions change later. Pre-vetted URLs in [`tools/receipt-sites.json`](tools/receipt-sites.json) receive 35-day ES256 stamps signed offline against key `-DC99sDa-qJjBp2N`. Exported `.svg`/`.html` certificates verify cleanly offline + live; printed `.pdf` files are labeled **`Unsigned`**.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-runtime-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/architecture-runtime-light.svg">
+  <img src="docs/images/architecture-runtime-dark.svg" alt="While a partner runs, the guard sits between the two assistants: pin check and three locks" width="100%">
+</picture>
 
-### Layer 4: Format-Based & Canary Runtime Locks (`locks.js`, `canary.js`)
-Because unseen wording can slip past any static filter, `installCustomsGuard(engine)` arms three wording-agnostic runtime defenses:
-- **Lock 1 (Format-Based Outbound Secrets):** Folds Unicode decimal digits (`\p{Nd}`), detects Luhn cards (1–4 char separators; bounded `IMEI`/`IMSI`/`ICCID` keyword+length exemptions apply to visitor-typed chat input only, never outbound traffic or `order`/`invoice`/`receipt`/`tracking` prefixes), ISO 7064 check-digit IBANs, API keys/tokens, explicit credential strings, and Base64-encoded secrets across user turns, partner calls, MCP/coded tool args, action plans, and clicked links.
-- **Lock 2 (Reply Quarantine & Action Gating):** Inspects individual and concatenated reply strings (reusing indirect email-login & targeted override rules), drops unapproved keys (`out` rebuilt strictly from `{ cruse, text, source, presentation }`), strips remote tracking images, full URLs, and bare external domains (with or without `/path`, e.g., `evil.invalid`), and holds state-changing actions after any external reply until human confirmation.
-- **Lock 3 (Armed Canary Tripwire):** Appends a session-unique token (`ac_cnr_<hex>`) to the top front agent's system instructions (`engine.top.network`) at install/turn and restores cleanly on `uninstall()`. `detectCanaryLeak()` recursively walks individual string leaves inside structured objects (preserving real newlines before whitespace/`\\[nrt]` collapse) and checks both the full token and its standalone high-entropy random suffix across `raw`, `url`, `reversed`, `rot13`, inline/spaced `hex`, separator-collapsed `spaced`, 3-offset `k ∈ {0,1,2}` `base64`/`base64url` slices, MIME/64-column wrapped Base64 (`depth <= 2`, catching `80/80` padding offsets inside `toolArgs`), and comma ASCII character codes, halting execution and revoking partner approvals on trip.
+## 4 · How it was tested
 
----
+Every number below follows the same routine. New test data is saved in its own commit **before** any rule is changed for it. That data is then used to find general causes, and the result is measured on data that played no part in the fixes. Rules may not contain phrases copied from the test data: a test checks for any 4-word phrase, or any 3-word phrase found in only one saved tool.
 
-## 3. Empirical Evaluation (`Agent Customs Bench`)
+| Test set | Size | Written | Used for |
+| :--- | ---: | :--- | :--- |
+| Round 1 | 42 attacks | With the first rules | Regression |
+| Round 2 | 24 attacks + 5 honest | By a red team, frozen in `a25e45a` | First look, then tuning |
+| Round 3 | 15 attacks + 4 honest | Fresh wordings, frozen in `4281300` | First look, then tuning |
+| Internal held-out | 10 attacks + 4 honest | After the Round 3 fixes (`66dbbf3`) | Never tuned |
+| External quoted | 7 of 20 outside wordings | Frozen in `5a0210d` | Tuned by format rules only |
+| probe6 to probe9 | 22, 19, 39, 38 cases | By a reviewer, each aimed at the newest exceptions | First look, then tuning |
+| Real tools, batches 1 to 5 | 135, 124, 138, 236, 237 | Public MCP servers and A2A cards, fetched read-only | First look, then tuning (batch 5 not yet tuned) |
 
-[`tools/bench.mjs`](tools/bench.mjs) (`npm run bench`, snapshot saved in [`site/bench.json`](site/bench.json), measured on Node.js v24.18.0 win32 desktop) separates **static adversarial detection + offline benign controls** from **unit self-tests** of runtime locks and certificate integrity. To isolate rule logic from character-level decoding, the **Normalized Regex Baseline** runs `credit card|card number|cvv|password|passcode|otp|iban|ignore previous|sk-...` **after** identical `normalizeForRules()` canonicalization (NFKC + tag decoding + invisible stripping).
+## 5 · Results
 
-| Suite / Category | Cases | Agent Customs | Normalized Regex Baseline | Avg Latency |
+### 5.1 Benchmark
+
+[`tools/bench.mjs`](tools/bench.mjs) (`npm run bench`, saved in [`site/bench.json`](site/bench.json), Node.js v24.18.0 on Windows). Detection is reported apart from the self-tests of the locks. The baseline is a plain word list (`credit card`, `cvv`, `password`, `ignore previous` and so on) run after the same Unicode cleaning, so the comparison is about the rules and not about decoding.
+
+| Set | Cases | Agent Customs | Word-list baseline | Avg time |
 | :--- | ---: | :--- | ---: | ---: |
-| **Round 1 · `unicode_obfuscation`** | 12 | **100.0%** blocked/held (`12/12`) | 58.3% | 10.76 ms |
-| **Round 1 · `prompt_and_phishing`** | 24 | **100.0%** blocked/held (`24/24`) | 16.7% | 3.07 ms |
-| **Round 1 · `a2a_mcp_supply_chain`** | 6 | **66.7%** blocked/held *(**100.0%** flagged incl. `CONDITIONS`)* | 33.3% | 4.90 ms |
-| **Round 2 · `round2_adversarial`** *(red team, pre-fix 3/24)* | 24 | **95.8%** blocked/held *(**100.0%** flagged)* | 20.8% | 2.66 ms |
-| **Round 3 · `round3_generalization`** *(pre-fix 0/15)* | 15 | **100.0%** blocked/held (`15/15`) | 0.0% | 1.45 ms |
-| **Held-out · `heldout_unseen`** *(internal, written post-fix)* | 10 | **50.0%** blocked/held (`5/10`) | 0.0% | 1.57 ms |
-| **External · `external_heldout_quoted`** *(7 quoted from 20-case third-party set; pre-format 0/7)* | 7 | **42.9%** blocked/held (`3/7` via format rules) | 14.3% | 1.37 ms |
-| **`benign_controls`** *(3 official demos, 14 MCP/A2A, Round-3, held-out & 22 re-check controls; see below for live Batches 1–3)* | 61 | **100.0%** unblocked (**0% false blocks on curated controls**; 57 `CLEARED`, 4 `CONDITIONS`) | 91.8% *(8.2% false blocks)* | 3.40 ms |
-| **Static Detection Total** | **159** | **86/98 (`87.8%`) blocked/held · 89/98 (`90.8%`) flagged · 0% FP (curated)** | **19/98 (`19.4%`) · 8.2% FP** | **1.74 ms detection median** |
-| Self-test · `runtime_exfil_locks` *(Lock 1/2/3)* | 21 | **100.0%** (`21/21` passing) | *N/A (runtime task)* | 0.97 ms |
-| Self-test · `integrity_tampering` *(pin & cert tamper)* | 4 | **100.0%** (`4/4` passing) | *N/A (integrity task)* | 0.99 ms |
+| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 10.76 ms |
+| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 3.07 ms |
+| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 4.90 ms |
+| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 2.66 ms |
+| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 1.45 ms |
+| Internal held-out (never tuned) | 10 | 5/10 | 0.0% | 1.57 ms |
+| External quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 1.37 ms |
+| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 3.40 ms |
+| **All detection** | 159 | **86/98 blocked or held, 89/98 flagged** | 19/98 | **1.74 ms median** |
+| Lock and tamper self-tests | 25 | 25/25 pass | not applicable | about 1 ms |
 
-*Transparency & generalization note:*
-- **Round 1** (`42` adversarial vectors + core lock/tamper self-tests) was authored alongside the analyzer as a regression suite.
-- **Round 2** ([`tools/round2-corpus.mjs`](tools/round2-corpus.mjs), `24` hostile probes + `5` benign counter-examples) consists of the red team's own inputs, committed frozen on branch `red-team-fixes` in commit `a25e45a` before fixes (since `main` carries squashed PR merge `9675295`): **`3/24` (`12.5%`) pre-fix → `23/24` (`95.8%`) blocked/held (`24/24` flagged)** post-fix.
-- **Round 3** ([`tools/round3-corpus.mjs`](tools/round3-corpus.mjs), `15` fresh phrasings for those categories + `4` false-alarm controls) was committed frozen on branch `round-3-fixes` in commit `4281300` before rule edits: **`0/15` held/denied (`1/15` `CONDITIONS`) pre-fix → `15/15` (`100%`) held/denied** and **`0/4` false blocks**.
-- **Internal Held-out** ([`tools/heldout-corpus.mjs`](tools/heldout-corpus.mjs), `10` adversarial + `4` benign) was written after the Round-3 rule edits (committed alongside those changes in `66dbbf3`) with zero rule tuning afterward: **`5/10` (`50.0%`) caught** (`0/4` false blocks; tightening QR false-positive rules dropped one QR fee wording cleanly without re-tuning rules).
-- **External Third-Party Held-out & Re-check Regressions:** Independent re-checks tested **20** third-party unseen scam wordings (recording `1/20` held before format additions, **`4/20` held** after `0x`/IBAN/`javascript:` format rules). The **7 verbatim quoted vectors** and **13 static controls** from the second re-check were committed frozen before fixes on `recheck-2-fixes` (`5a0210d`: **`0/7` → `3/7` (`42.9%`)** via general format rules with the remaining 13 unquoted probes left un-tuned); the **9 false-alarm controls** (bare `javascript:`/`data:text/html` mentions, bare `0x` contract queries including the live `mint_verifier_network` sample query, and business IBAN notices moved to `CONDITIONS`) and **6 Lock 1 prefix probes** from the third re-check were likewise frozen in [`tools/external-heldout.mjs`](tools/external-heldout.mjs) prior to edits (**`0/9` allowed → `9/9` unblocked**, **`0/6` → `6/6` Lock 1 checks passing**). Across `29` responsive Open Agentic Web contestant networks (vs `28` prior), only the two non-English `jennaira-store` product descriptions shifted from `HOLD [C-LANGUAGE]` to `CONDITIONS [C-LANGUAGE]` under documentation-field moderation (`0` unintended regressions). Three protocol cases (`Cross-origin A2A endpoint`, `MCP destructive unguarded payment tool`, `A2A additionalInterfaces off-origin`) intentionally return `CONDITIONS` by default and become `exit 2` under `--strict`.
-- **Live MCP/A2A Real-World & Registry Evaluation ([`tests/realworld.test.mjs`](tests/realworld.test.mjs)):** Snapshotting **135** live public targets (**Batch 1**: 17 well-known MCP servers, 83 anonymous MCP Registry servers, 35 Google A2A Agent Cards) prior to edits revealed **43/135 (`32%`)** false alarms on `17e8bc8` (and 6 debatable), which general root-cause fixes cut to **`0/135`** (**`0/17`** well-known MCP servers, `10/10` risky targets flagged, `0` regressions). After PR `#9` measured **`9/57` (`15.8%`)** unseen false alarms (`reg-urls.txt` lines 151–310), **Batch 2 (`124` targets: 94 MCP Registry + 30 A2A Agent Cards, now a tuning set)** measured **`23/124` (`18.5%`)** on `e080359` and **`5/124` (`4.0%`)** tuned (`5/5` CORRECT targets flagged, `22/22` `probe6` attacks caught). Next, a frozen unseen **Batch 3 (`138` fresh MCP Registry servers, now also a tuning set)** measured **`9/138` (`6.5%`)** true unseen false alarms on `02f0283` before fixes (`6/6` CORRECT targets held, `2` debatable), while `probe7` exposed `12` bypasses across `#10` exceptions (plus `C2` & `E1`). Removing all Batch-2 verbatim literals (enforced by an automated 4-word fixture overlap test across all `397` snapshots), hardening `languages.js` Unicode boundaries across 12 languages and quoted/bracketed foreign orders, and fixing general root causes closed **`19/19`** `probe7` exception-bypass attacks while reducing tuned Batch-3 false alarms to **`0/138`** (`6/6` CORRECT targets held). A fourth unseen **Batch 4** (`236`: 192 MCP Registry servers + 44 A2A cards) then measured **`26/236` (`11.0%`)** false alarms on `cae4a77`, flat against `#10`, while the unseen `probe8` suite held only **`7/27`** attacks (`#8`/`#9`: `17/27`): each round of wording exceptions had removed findings that attackers could imitate. The rule was therefore changed so that **a wording exception may only soften a finding to a visible note (`CONDITIONS`), never delete it**, Lethal-Trifecta exemptions produce a medium "possible data path" instead of nothing, JWS/JWT signatures and Base64 JSON are recognised by decoding rather than by field name, Dutch and Indonesian joined the checked languages and takeover, chat-leak and download-and-run orders are matched in 14 languages with a negation window. Tuned: Batch 4 **`3/236`**, `probe8` **`27/27`** (12/12 harmless). Measured once afterwards and **not** used for tuning: **Batch 5** (`237`: 190 MCP + 47 A2A) **`13/237` (`5.5%`)** false alarms versus about `25/237` (`10.5%`) on `cae4a77`, and `probe9` **`11/18`** natural attacks held, **`9/10`** exception-shaped attacks kept visible, **`10/10`** harmless cleared (`cae4a77`: `10/18`, `8/10`, `8/10`). `probe9` misses were fixed afterwards (`18/18`, `10/10`, `10/10`, tuned).
+### 5.2 Real MCP servers and A2A cards
 
----
+Each batch is a fresh random sample of public servers from the official MCP Registry, plus A2A cards found on the same hosts, from hosts that were in no earlier batch. They are fetched read-only (`initialize` and the list calls, never `tools/call`) and saved as files, so every run sees the same thing. A false alarm is a *Held* or *Denied* stamp on a tool a person judged harmless; each one is labelled by hand in `tests/fixtures/realworld/`.
 
-## 4. Honest Limitations & Open Boundaries
+| Batch | Tools | First look (never seen before) | After fixing |
+| :--- | ---: | :--- | :--- |
+| 1 · 17 well-known + 83 Registry MCP + 35 A2A | 135 | 43 false alarms (32%) on `17e8bc8` | 0 (`e080359`), all 10 risky tools still held |
+| 2 · 94 Registry MCP + 30 A2A | 124 | 23 (18.5%) on `e080359` | 5 (`02f0283`) |
+| 3 · 138 Registry MCP | 138 | 9 (6.5%) on `02f0283` | 0 (`cae4a77`) |
+| 4 · 192 Registry MCP + 44 A2A | 236 | 26 (11.0%) on `cae4a77` | 3 (`a247319`) |
+| **5 · 190 Registry MCP + 47 A2A** | **237** | **13 (5.5%) on `a247319`**; about 25 (10.5%) on `cae4a77` | Not tuned yet |
 
-1. **Static Unseen-Phrasing Ceiling (`4/20` external, `50%` internal), Live False Alarms & Exception-Bypass Tradeoff:** Category rules caught every Round-3 case, but on 20 independent third-party wordings static rules held **`1/20`** pre-format (**`4/20`** after general format rules, **`3/7`** on the frozen quoted subset, leaving unquoted sentence phrasing un-tuned); static rules can be talked around and serve only as a fast `$0` first filter, while runtime Locks 1–3 and opt-in `semanticJudge: true` cover unseen phrasing at execution time. Moreover, **every benign exception added to reduce false alarms risks opening bypasses**, which we continuously guard against using frozen `probe6` (`22/22`), `probe7` (`19/19`), `probe8` (`27/27`) and `probe9` bypass suites, automated 4-word and unique-3-word fixture anti-overfitting tests, and the rule that an exception can only soften a finding to `CONDITIONS`. Static rules still miss new wording: the honest unseen `probe9` measurement was `11/18` natural attacks held. The **`0%` false-block rate** in Section 3 reflects the **61** offline curated controls (and **`0/135`** on Batch 1 / **`0/17`** well-known MCP); on previously unseen MCP/A2A servers without per-site rules, general root-cause fixes measured **`9/57` (`15.8%`)** after `#9`, **`23/124` (`18.5%`) → `5/124` (`4.0%`)** tuned on Batch 2, and **`9/138` (`6.5%`)** true unseen on Batch 3 under `02f0283` prior to tuning down to **`0/138` tuned** (with both Batch 2 and Batch 3 now tuning sets).
-2. **Protocol Execution & Pinning Boundaries:** Open Agentic Web and MCP tool executions run with live Lock 1–3 guards; Google A2A is inspected statically only because Cognizant's runtime does not execute remote A2A transports directly. Persisted `mcp:<url>` tool pins protect against silent rug pulls and must be cleared in Desk Approvals (or storage cleared) after an intentional upstream tool update.
-3. **Encoding & Split-Secret Limits:** Lock 1 detects Luhn cards (1–4 char separators, Unicode `\p{Nd}` digits; bounded inbound-only visitor chat exemptions for `IMEI` 15-digit, `IMSI` 14–15-digit, and `ICCID` 19–20-digit identifiers within 3 words, with zero outbound exemptions in `findSensitiveData`), IBANs, keys, Base64 secrets, and explicit login/CVV strings; Lock 3 detects full and random-suffix canary leaks across raw, URL, ROT13, spaced, hex/spaced-hex, char codes, reversed, single-chunk Base64, and line-wrapped Base64 inside structured object leaves (`80/80` at columns 64 & 76). Written-out card words (`"four two four two..."`), 5+ char custom digit separators, and fragments split piece-by-piece across separate fields or turns remain out of band.
-4. **Runtime Hooks & Origin Isolation:** `guard.js` wraps 8 internal Cognizant `Engine` seams (`cognizant-kit.yml` tests compatibility weekly). On shared hosting such as `<user>.github.io`, all paths share `localStorage` pins and saved BYOK keys—host Agent Customs on a dedicated origin for production deployments.
-5. **Browser CORS, Auth-Gated Servers & Language Scope:** Sites omitting `Access-Control-Allow-Origin` cannot be read from the static web UI and require [`bin/agent-customs.mjs`](bin/agent-customs.mjs), [`action.yml`](action.yml), or the MV3 [`extension/`](extension/) (`optional_host_permissions` over `https://*/*`). Login-gated MCP/A2A servers (e.g., `HTTP 401/403` on OAuth-authenticated enterprise endpoints and ~103 of 160 registry URLs) cannot be inspected anonymously without credentials. Language heuristics skip non-prose metadata keys, inline short glosses, and common code/regex/URI tokens, and flag non-English tool/schema documentation at `CONDITIONS` (`C-LANGUAGE`) while still holding non-English `instructions`/`command` fields and foreign secret requests, though terse unusual English fragments can still false-hold occasionally.
+The rate on a first look fell from about one tool in three to about one in eighteen. Batch 4 came out higher than batch 3 (11% against 6.5%), and the rules before it scored about the same on it (24 of 236), so batch 3 was partly an easy sample. Batch 5 is the honest number for the current rules. A small extra sample of 57 Registry servers, taken after the batch-1 fixes, gave 9 false alarms (15.8%).
 
----
+### 5.3 Attacks aimed at the rules' own exceptions
 
-## 5. Reproducibility Commands
+| Set | Cases | First look | Now |
+| :--- | :--- | :--- | :--- |
+| probe6 | 22 attacks on the batch-1 exceptions | 4 got through | 22/22 held |
+| probe7 | 19 attacks on the batch-2 exceptions | 16 got through | 19/19 held |
+| probe8 | 27 attacks + 12 honest look-alikes | 7/27 held on `cae4a77`, 12/12 honest cleared | 27/27, 12/12 |
+| probe9 | 18 new wordings, 10 exception-shaped attacks, 10 honest lines | 11/18 held, 9/10 visible, 10/10 honest (`cae4a77`: 10/18, 8/10, 8/10) | 18/18, 10/10, 10/10 |
+
+probe9 was written after the batch-4 fixes and measured once before it was used, so its first-look column is the honest one.
+
+### 5.4 Why exceptions now only soften
+
+probe8 showed a pattern across three rounds. Each round added wording exceptions to stop false alarms, for example "a token returned by a previous call is the server's own" or "click Allow in an OAuth window is normal". Each exception removed a finding completely, so an attacker who copied that wording got a clean pass. The share of exception-aimed attacks caught fell from 11 of 12 to 1 of 12 over those rounds.
+
+Since `a247319`, an exception may only lower a finding to a note. The same change also:
+
+- recognises signatures and Base64 JSON by decoding them, whatever field they are in
+- reads Dutch and Indonesian word by word
+- checks a negation only near the words it negates
+
+On batch 4 this cut false alarms from 26 to 3, and probe8 went from 7 to 27 of 27.
+
+### 5.5 Other checks
+
+- Attack sentences (`tests/attacks.test.mjs`): 34 scams in English and the 12 checked languages are all blocked; 9 scams in other languages are all held; 27 honest English and 23 honest foreign sentences are not blocked.
+- Outside wordings: of 20 scam wordings written by others, the rules held 1 before format rules and 4 after.
+- Contest entries: 28 public Open Agentic Web networks from other entrants keep the same verdicts in this round. In an earlier round (#10), two non-English product descriptions moved from *Held* to *Cleared with conditions* on purpose, because the text was documentation.
+- Signed stamps: the 10 stamped networks keep the verdicts they were signed with.
+
+## 6 · Limits
+
+1. New wording gets past rules. The internal held-out set is at 5/10, the outside wordings at 4/20, and probe9's first look at 11/18. The rules are a fast, free first filter. The runtime locks, and the optional AI check, are there for what they miss.
+2. False alarms on new tools. About 1 in 18 brand-new tools is still held without a good reason (batch 5). The remaining causes include Persian text, which uses an invisible joining character, product names such as "God Mode", and protective sentences that quote an attack. The figure of 0 false blocks applies to the 61 curated controls only.
+3. A2A is inspected, not guarded. Cognizant's runtime does not run remote A2A agents itself, so A2A cards get the inspection but not the runtime locks.
+4. What Lock 1 cannot see. Card numbers written out in words, numbers broken up with five or more characters between digits, and secrets split across several fields or turns.
+5. Shared origins share storage. On a shared host such as `<user>.github.io`, every site on the origin shares the pins and saved AI keys. Run Agent Customs on its own origin.
+6. Servers that need a login or block cross-site reads. The web desk cannot read sites without `Access-Control-Allow-Origin`; the command line tool and the extension can. Servers behind a login cannot be inspected anonymously: about 103 of 160 sampled Registry servers needed one.
+7. Runtime internals. The guard wraps internal methods of Cognizant's runtime. A weekly workflow (`cognizant-kit.yml`) checks that they still exist.
+8. Intentional updates. After a partner updates on purpose, its old pin has to be cleared on the desk's Approvals tab.
+
+## 7 · Reproduce the numbers
 
 ```sh
-npm test                                    # 166 tests across attacks, Rounds 2–3, Batches 1–5 (135 + 124 + 138 + 236 tuning targets, 237 held-out ratchet), probe6–9, anti-overfit guards, locks, receipts, CLI, bench & extension
-npm run check                               # Validate site Open Agentic Web network with build_network.mjs
-npm run check:practice                      # Validate practice site mirror and manifest
-npm run bench -- --verbose                  # Reproduce separated Round 1–3, Held-out & quoted external detection + self-test scorecard
+npm test                      # 166 tests, including every frozen set and batch above
+npm run bench -- --verbose    # the benchmark table in section 5.1
+npm run check                 # the desk network passes Cognizant's build check
+npm run check:practice        # so does the practice site
 node bin/agent-customs.mjs check https://raw.githubusercontent.com/microsoft/playwright-mcp/main/server.json
 ```
+
+<details>
+<summary><b>Where each number comes from (commits)</b></summary>
+
+<br>
+
+| What | Frozen before the fix | Fixed in |
+| :--- | :--- | :--- |
+| Round 2 red-team set | `a25e45a` on branch `red-team-fixes` | `9675295` (#5) |
+| Round 3 fresh wordings | `4281300` on branch `round-3-fixes` | `66dbbf3`, merged as `e4b345b` (#6) |
+| External quoted set | `5a0210d` on branch `recheck-2-fixes` | `ab64ac5` (#7) |
+| Batch 1 (135 tools) | snapshots taken on `17e8bc8` | `e080359` (#9) |
+| Batch 2 (124 tools) and probe6 | `574b673` | `02f0283` (#10) |
+| Batch 3 (138 tools) and probe7 | `9787779` | `cae4a77` (#11) |
+| Batch 4 (236 tools) and probe8 | `6ee2850` | `a247319` |
+| Batch 5 (237 tools) and probe9 | measured once on `a247319` | not tuned yet |
+
+Commits on branches survive on those branches; `main` carries the squashed merges.
+
+</details>
+
+---
+
+<div align="center">
+
+<a href="https://montbaga.github.io/agent-customs/"><img src="site/favicon.svg" alt="Agent Customs" width="36"></a>
+
+<br>
+
+**Agent Customs** · Built by [**Monty Bagati**](https://www.linkedin.com/in/monty-bagati-90454626/) for the Open Agentic Web  
+<sub>[Apache License 2.0](LICENSE.md) · Copyright 2026 Monty Bagati · Runtime &amp; templates from <a href="https://github.com/cognizant-ai-labs/agentic-web">cognizant-ai-labs/agentic-web</a> (Apache 2.0)</sub>
+
+</div>
