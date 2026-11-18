@@ -253,11 +253,22 @@ export async function analyzeNetwork(input) {
   }
 
   // ---- Contraband: text rules ------------------------------------------------
+  const C_SECRETS_RULE = TEXT_RULES.find((r) => r.id === "C-SECRETS");
   const textFields = collectTextFields(manifest, config, rawDoc);
   const ruleHits = new Map();
   const agentRuleSeen = new Set();
   for (const field of textFields) {
-    for (const hit of scanText(field.text)) {
+    const fieldHits = field.schemaSecret && C_SECRETS_RULE
+      ? [{
+          rule: C_SECRETS_RULE,
+          match: field.schemaSecret.key,
+          excerpt: field.schemaSecret.path
+            ? `${field.schemaSecret.path} (parameter "${field.schemaSecret.key}")`
+            : `parameter "${field.schemaSecret.key}"${field.schemaSecret.description ? ` — ${clip(field.schemaSecret.description, 120)}` : ""}`,
+          detail: `Schema parameter "${field.schemaSecret.key}" asks for sensitive credentials or secrets.`,
+        }]
+      : scanText(field.text, { skipLanguage: Boolean(field.skipLanguage), targetHost: target.host });
+    for (const hit of fieldHits) {
       if (field.crossField && agentRuleSeen.has(`${hit.rule.id}|${field.agent || ""}`)) continue;
       const key = `${hit.rule.id}|${field.agent || ""}|${field.field}`;
       const prev = ruleHits.get(key);
@@ -275,7 +286,8 @@ export async function analyzeNetwork(input) {
     return /no website_\*? ?tools[\s\S]{0,400}?\b(do not|don'?t|never)\s+ask\s+for\s+(names|emails|personal)/i.test(text);
   };
   for (const { hit, field, count } of ruleHits.values()) {
-    let severity = hit.rule.severity;
+    let severity = hit.severity || hit.rule.severity;
+    const title = hit.title || hit.rule.title;
     const what = hit.detail || `Matched "${clip(hit.match, 60)}"${hit.language ? ` (${hit.language})` : ""}.`;
     let detail = `${count > 1 ? `${count} places. ` : ""}${what}`;
     if (hit.rule.id === "C-PERSONAL" && field.agent && peerGuarded(field.agent)) {
@@ -295,7 +307,7 @@ export async function analyzeNetwork(input) {
         detail += " Found in a tool description referencing a configured deployment server without an embedded external URL.";
       }
     }
-    add({ rule: hit.rule.id, category: "contraband", severity, title: hit.rule.title,
+    add({ rule: hit.rule.id, category: "contraband", severity, title,
       detail, evidence: hit.excerpt, where: { agent: field.agent, field: field.field }, why: hit.rule.why, fix: hit.rule.fix });
   }
 
@@ -817,31 +829,59 @@ function splitIdentifier(key) {
 
 const VISITOR_SECRET_PARAM = /\b(?:card ?numbers?|credit ?cards?|debit ?cards?|cvv2?|cvc|csc|passwords?|passcodes?|passphrases?|otp|seed ?phrases?|recovery ?phrases?|maiden ?name|pin ?codes?|ssn)\b/i;
 
-function collectSchemaProperties(node, emit) {
+const RASTER_DATA_URI_RE = /^data:image\/(?:png|jpeg|jpg|gif|webp|avif|bmp|ico|x-icon);base64,([A-Za-z0-9+/=\s]+)$/i;
+const SVG_DATA_URI_RE = /^data:image\/svg\+xml(;base64)?,([\s\S]+)$/i;
+
+function isBenignImageDataUri(text) {
+  const raster = text.match(RASTER_DATA_URI_RE);
+  if (raster) {
+    const b64 = raster[1].replace(/\s+/g, "");
+    try {
+      const head = typeof atob === "function"
+        ? atob(b64.slice(0, 64))
+        : Buffer.from(b64.slice(0, 64), "base64").toString("binary");
+      return /^\x89PNG|^\xff\xd8\xff|^GIF8|^RIFF.{4}WEBP|^BM|^\x00\x00\x01\x00/.test(head);
+    } catch {
+      return false;
+    }
+  }
+  const svgMatch = text.match(SVG_DATA_URI_RE);
+  if (!svgMatch) return false;
+  let svg = svgMatch[2].trim();
+  try {
+    svg = svgMatch[1]
+      ? (typeof atob === "function" ? atob(svg) : Buffer.from(svg, "base64").toString("utf8"))
+      : decodeURIComponent(svg);
+  } catch { /* inspect raw text if malformed */ }
+  if (/<script\b|\bon[a-z]+\s*=|(?:javascript|vbscript):|foreignObject|https?:\/\/(?!www\.w3\.org\/(?:2000\/svg|1999\/xlink)\b)|font-size\s*[:=]\s*["']?0(?:px|pt|em|rem)?\b|display\s*:\s*none|visibility\s*:\s*hidden/i.test(svg)) {
+    return false;
+  }
+  return /<svg\b/i.test(svg);
+}
+
+function collectSchemaProperties(node, emit, emitSecret) {
   if (!node || typeof node !== "object") return;
-  if (Array.isArray(node)) { node.forEach((item) => collectSchemaProperties(item, emit)); return; }
+  if (Array.isArray(node)) { node.forEach((item) => collectSchemaProperties(item, emit, emitSecret)); return; }
   if (node.properties && typeof node.properties === "object" && !Array.isArray(node.properties)) {
     for (const [k, spec] of Object.entries(node.properties)) {
       const splitKey = splitIdentifier(k);
-      if (VISITOR_SECRET_PARAM.test(splitKey)) emit(`ask the visitor for ${splitKey}`);
+      const desc = spec && typeof spec === "object" && typeof spec.description === "string" ? spec.description.trim() : "";
+      if (VISITOR_SECRET_PARAM.test(splitKey) && emitSecret) emitSecret(k, desc);
       if (spec && typeof spec === "object") {
         const parts = [splitKey];
-        for (const key of ["title", "description", "default"]) {
+        for (const key of ["title", "description"]) {
           if (typeof spec[key] === "string" && spec[key].trim()) parts.push(spec[key].trim());
-        }
-        if (Array.isArray(spec.enum)) {
-          for (const v of spec.enum) if (typeof v === "string" && v.trim()) parts.push(v.trim());
         }
         if (parts.length > 1) emit(parts.join(" "));
         else if (splitKey) emit(splitKey);
       } else if (splitKey) {
         emit(splitKey);
       }
-      collectSchemaProperties(spec, emit);
+      collectSchemaProperties(spec, emit, emitSecret);
     }
   }
   for (const [k, v] of Object.entries(node)) {
-    if (k !== "properties" && v && typeof v === "object") collectSchemaProperties(v, emit);
+    if (k !== "properties" && v && typeof v === "object") collectSchemaProperties(v, emit, emitSecret);
   }
 }
 
@@ -871,20 +911,51 @@ const RAW_SKIP_KEYS = new Set([
   "protocol", "type", "format", "transport", "registryType", "identifier", "sha256",
   "integrity", "role", "defaultInputModes", "defaultOutputModes", "mimeTypes",
 ]);
+const SCHEMA_NONPROSE_KEYS = new Set(["pattern", "format", "$ref", "$schema", "type", "const", "enum", "examples", "default"]);
+const RAW_LANG_SKIP_KEYS = new Set([
+  "name", "tags", "keywords", "categories", "contractAddress", "address",
+  "iconUrl", "logoUrl", "imageUrl", "resourceUri", "mimeType", "uriTemplate",
+  "type", "format", "pattern", "const", "enum", "examples", "default", "$ref", "$schema", "_meta",
+]);
+const TAG_LINE_RE = /^\s*tags\s*:/i;
+
+function isPipeTagList(text) {
+  if (text.includes("\n") || text.includes(".")) return false;
+  const parts = text.split("|");
+  return parts.length >= 3 && parts.every((p) => {
+    const t = p.trim();
+    return t.length > 0 && t.length <= 40;
+  });
+}
+
+function cleanPathKey(seg) {
+  return String(seg || "").replace(/^key:/, "");
+}
 
 function collectTextFields(manifest, config, rawDoc = null) {
   const out = [];
   const seenExact = new Set();
   const push = (text, field, agent = null, extra = {}) => {
-    if (typeof text === "string" && text.trim()) {
-      out.push({ text, field, agent, ...extra });
-      if (!extra.crossField) seenExact.add(text.trim());
-    }
+    if (typeof text !== "string") return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (!extra.schemaSecret && isBenignImageDataUri(trimmed)) return;
+    const autoSkipLang = !/\n/.test(trimmed) && (TAG_LINE_RE.test(trimmed) || isPipeTagList(trimmed));
+    out.push({ text, field, agent, ...extra, skipLanguage: Boolean(extra.skipLanguage || autoSkipLang) });
+    if (!extra.crossField) seenExact.add(trimmed);
+  };
+  const pushSchemaWalk = (root, fieldName, agentName) => {
+    walkStrings(root || {}, (text, p) => {
+      const last = p[p.length - 1];
+      const isKey = typeof last === "string" && last.startsWith("key:");
+      const skipLanguage = isKey || p.some((seg) => SCHEMA_NONPROSE_KEYS.has(cleanPathKey(seg)));
+      push(isKey ? splitIdentifier(text) : text, fieldName, agentName, { skipLanguage });
+    });
   };
   for (const agent of config.tools || []) {
     if (!agent || typeof agent !== "object") continue;
     if (typeof agent.name === "string" && agent.name.trim()) {
-      push(splitIdentifier(agent.name), "agent name", agent.name);
+      push(splitIdentifier(agent.name), "agent name", agent.name, { skipLanguage: true });
     }
     push(agent.instructions, "instructions", agent.name);
     push(agent.command, "command", agent.name);
@@ -897,17 +968,19 @@ function collectTextFields(manifest, config, rawDoc = null) {
     }
     push(agent.function?.description, "function.description", agent.name);
     // A calling model reads the whole input/output schema: property names, enums, titles and defaults.
-    walkStrings(agent.function?.parameters || {}, (text, p) => {
-      const last = p[p.length - 1];
-      push(typeof last === "string" && last.startsWith("key:") ? splitIdentifier(text) : text, "parameters", agent.name);
-    });
-    collectSchemaProperties(agent.function?.parameters, (text) => push(text, "parameters", agent.name, { crossField: true }));
+    pushSchemaWalk(agent.function?.parameters, "parameters", agent.name);
+    collectSchemaProperties(
+      agent.function?.parameters,
+      (text) => push(text, "parameters", agent.name, { crossField: true, skipLanguage: true }),
+      (key, description) => push(key, "parameters", agent.name, { crossField: true, skipLanguage: true, schemaSecret: { key, description } }),
+    );
     if (agent.outputSchema && typeof agent.outputSchema === "object") {
-      walkStrings(agent.outputSchema, (text, p) => {
-        const last = p[p.length - 1];
-        push(typeof last === "string" && last.startsWith("key:") ? splitIdentifier(text) : text, "outputSchema", agent.name);
-      });
-      collectSchemaProperties(agent.outputSchema, (text) => push(text, "outputSchema", agent.name, { crossField: true }));
+      pushSchemaWalk(agent.outputSchema, "outputSchema", agent.name);
+      collectSchemaProperties(
+        agent.outputSchema,
+        (text) => push(text, "outputSchema", agent.name, { crossField: true, skipLanguage: true }),
+        (key, description) => push(key, "outputSchema", agent.name, { crossField: true, skipLanguage: true, schemaSecret: { key, description } }),
+      );
     }
   }
   push(config.metadata?.description, "metadata.description");
@@ -921,16 +994,18 @@ function collectTextFields(manifest, config, rawDoc = null) {
   if (rawDoc && typeof rawDoc === "object") {
     walkStrings(rawDoc, (text, path) => {
       const last = path[path.length - 1];
+      const rawPath = path.map(cleanPathKey).join(".");
       if (typeof last === "string" && last.startsWith("key:")) {
         if (VISITOR_SECRET_PARAM.test(splitIdentifier(text))) {
-          push(`ask the visitor for ${splitIdentifier(text)}`, path.map((s) => String(s).replace(/^key:/, "")).join("."));
+          push(text, rawPath, null, { skipLanguage: true, schemaSecret: { key: text, path: rawPath } });
         }
         return;
       }
       if (RAW_SKIP_KEYS.has(String(last || ""))) return;
       const trimmed = String(text || "").trim();
-      if (!trimmed || /^https?:\/\/\S+$/i.test(trimmed) || seenExact.has(trimmed)) return;
-      push(trimmed, `rawDoc.${path.map((s) => String(s).replace(/^key:/, "")).join(".")}`);
+      if (!trimmed || /^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(trimmed) || seenExact.has(trimmed)) return;
+      const skipLanguage = path.some((seg) => RAW_LANG_SKIP_KEYS.has(cleanPathKey(seg)));
+      push(trimmed, `rawDoc.${rawPath}`, null, { skipLanguage });
     });
   }
   return out;

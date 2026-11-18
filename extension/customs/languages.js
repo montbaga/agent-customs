@@ -228,19 +228,31 @@ export const SECRET_LANGUAGES = [
 ];
 
 // Sentences end at these marks in the scripts above, or at a line break. A Latin full stop
-// ends a sentence only before a space or the end, so web addresses stay whole.
+// ends a sentence only before a space or the end, so web addresses and abbreviations stay whole.
+const ABBREV_DOT = /\b(?:e\.g|i\.e|etc|vs|incl|approx|et\s+al|fig|vol|rev|est|ref)\.(?=\s|$)|\bno\.(?=\s+\d)/gi;
 const SENTENCE_END = /[.!?;]+(?=\s|$)|[。！？；؟।\n]+/u;
 const PARA_END = /[.!?;]+(?=\s|$)|[。！？；؟।]+|\n\s*\n+|\n(?=\s*(?:[-*•+]|\d+[.)]|#)\s)/u;
 
+function maskAbbreviations(text) {
+  const dots = [];
+  const masked = text.replace(ABBREV_DOT, (m) => {
+    dots.push(m);
+    return `\u0000ABBR${dots.length - 1}\u0000`;
+  });
+  return { masked, unmask: (s) => s.replace(/\u0000ABBR(\d+)\u0000/g, (_, i) => dots[Number(i)]) };
+}
+
 function sentences(text) {
-  return text.split(SENTENCE_END).map((s) => s.trim()).filter(Boolean);
+  const { masked, unmask } = maskAbbreviations(text);
+  return masked.split(SENTENCE_END).map((s) => unmask(s).trim()).filter(Boolean);
 }
 
 // Soft-wrapped lines inside one paragraph (no blank line, no bullet) are joined so a
 // line break mid-sentence does not hide a foreign request or split a short sentence.
 function wrappedSentences(text) {
-  const joined = text.replace(/([^\n.!?;:。！？；؟।])\n(?!\s*(?:[-*•+]|\d+[.)]|#)\s)/gu, "$1 ");
-  return joined.split(PARA_END).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const { masked, unmask } = maskAbbreviations(text);
+  const joined = masked.replace(/([^\n.!?;:。！？；؟।])\n(?!\s*(?:[-*•+]|\d+[.)]|#)\s)/gu, "$1 ");
+  return joined.split(PARA_END).map((s) => unmask(s).replace(/\s+/g, " ").trim()).filter(Boolean);
 }
 
 /**
@@ -338,15 +350,30 @@ const LATIN_WORD = /\p{Script=Latin}[\p{Script=Latin}\p{M}]*/gu;
 // The name used for a sentence that is not English, in no language the lists know.
 export const UNRECOGNISED = "a language Agent Customs doesn't recognise";
 
-// Addresses, file names, e-mail addresses and code names (website_list_shops) are not
+// Addresses, URIs, regexes, JSON snippets, file names and code identifiers are not
 // words of any language.
-const NOT_WORDS = /https?:\/\/\S+|\b[\w.+-]+@[\w-]+\.[\w.-]+|\b[\w-]+\.(?:com|org|net|io|dev|app|ai|co|uk|json|html|js|md)\b|\b\w*_\w*\b/gi;
+const NOT_WORDS = new RegExp([
+  /[a-z][a-z0-9+.-]*:\/\/\S+/.source,
+  /\b[\w.+-]+@[\w-]+\.[\w.-]+/.source,
+  /\b[\w-]+\.(?:com|org|net|io|dev|app|ai|ae|de|fr|nl|uk|eu|ru|jp|cn|br|au|ca|me|co|edu|gov|info|xyz|cloud|agency|now|ad|ml|json|yaml|yml|toml|html|htm|xml|svg|png|jpg|jpeg|webp|js|mjs|ts|tsx|jsx|py|rb|go|rs|java|cpp|css|md|txt|csv|pdf|zip|sh|sql)\b/.source,
+  /\{[^{}\n"]{0,300}"[^"\n]{1,60}"\s*:[^}\n]{0,300}\}/.source,
+  /\[(?:[^\]\s\\]|\\.)+\]/.source,
+  /<\/?[a-zA-Z0-9_-]+[^>\n]{0,120}>|\{\{[^}\n]{1,120}\}\}/.source,
+  /`[a-z0-9_.:\/-]+`/.source,
+  /\b\w*_\w*\b|\b0x[0-9a-f]+\b/.source,
+  /\b(?:e\.g|i\.e|etc|vs|incl|approx|et\s+al)\.?(?=\s|,|;|:|\)|$)/.source,
+].join("|"), "gi");
+
+// Whitespace chunks containing digits, code operators/delimiters, dotted identifiers,
+// camelCase, or locale tags like "pt-PT" are technical tokens rather than prose words.
+const CODE_CHUNK = /\d|[\\/_:=+*^~@#$%&<>{}[\]]|\p{Ll}\p{Lu}|\p{L}\.\p{L}|^[a-z]{1,3}-[A-Z]{2,}$/u;
+const OUTER_PUNCT = /^[,.;:!?()'"“”‘’«»—–]+|[,.;:!?()'"“”‘’«»—–]+$/g;
 
 // A list of short items, such as "Menu: tapas, paella de marisco, churros con chocolate":
 // dish and product names are often foreign words, so lists are not judged as sentences.
 function looksLikeList(sentence) {
-  const items = sentence.split(/[,:;]|\s(?:and|or|&)\s/i).map((s) => s.trim()).filter(Boolean);
-  const separators = (sentence.match(/[,:;]/g) || []).length;
+  const items = sentence.split(/[,:;|\/]|\s(?:and|or|&)\s/i).map((s) => s.trim()).filter(Boolean);
+  const separators = (sentence.match(/[,:;|\/]/g) || []).length;
   return separators >= 2 && items.every((item) => item.split(/\s+/).length <= 4);
 }
 
@@ -358,10 +385,11 @@ function looksLikeList(sentence) {
  * - its Latin words include at least three common words of a listed language, a fifth of
  *   all its words, and more than twice as many as English ones: that language, so foreign
  *   names inside English sentences ("Café de la Paix") do not count;
- * - six or more words that are not a list, with no common English word ("the", "and",
- *   "with" ...), fewer than half of them English words, and a sign of another language
- *   (accented letters, or a common word of a listed language): that language, or one the
- *   lists don't know. Names, acronyms and code words don't count either way.
+ * - six or more words (or accented unknown words) that are not a list, with no common
+ *   English word ("the", "and", "with" ...), fewer than half of them English words, and
+ *   a sign of another language (accented letters, or a common word of a listed language):
+ *   that language, or one the lists don't know. Technical tokens, regexes, URIs and
+ *   acronyms don't count either way.
  *
  * :param sentence: One sentence of cleaned text.
  * :return: The language's name, or null for English or too little text to tell.
@@ -369,7 +397,8 @@ function looksLikeList(sentence) {
 export function otherLanguageOf(sentence) {
   // "I'm", "don't", "we're": the ending is part of an English word, not a word of its own.
   const text = sentence.replace(NOT_WORDS, " ").replace(/'(?:m|s|t|re|ve|ll|d)\b/gi, "");
-  const tokens = [...text.matchAll(LATIN_WORD)].map((m) => m[0]);
+  const prose = text.split(/\s+/).map((c) => c.replace(OUTER_PUNCT, "")).filter((c) => c && !CODE_CHUNK.test(c)).join(" ");
+  const tokens = [...prose.matchAll(LATIN_WORD)].map((m) => m[0]);
   const latin = tokens.map((w) => w.toLowerCase());
   let best = null;
   for (const script of SCRIPTS) {
@@ -380,14 +409,23 @@ export function otherLanguageOf(sentence) {
   }
   // Japanese mixes kana with Chinese characters: any kana makes it Japanese.
   if (best && best.name === "Chinese" && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(sentence)) best.name = "Japanese";
-  if (best && best.units >= 3 && best.units >= latin.length) return best.name;
+  if (best && best.units >= 3) return best.name;
   const english = latin.filter((w) => STRONG_ENGLISH.has(w)).length;
+  const candidateWords = [...new Set(tokens.filter((w) => !/^\p{Lu}{2,}$/u.test(w)).map((w) => w.toLowerCase()))];
   let top = null;
   for (const [name, set] of LATIN_WORDS) {
-    const count = latin.filter((w) => set.has(w)).length;
+    const count = candidateWords.filter((w) => set.has(w)).length;
     if (!top || count > top.count) top = { name, count };
   }
   const hasAccents = /[^\x00-\x7f]/.test(latin.join(""));
+  // Lists of short ASCII codes (e.g. locale tags "Locale (e.g. en, de, fr)") are not prose.
+  const twoCharCount = tokens.filter((w) => w.length <= 2).length;
+  if (!hasAccents && english === 0 && (text.match(/[,|\/]/g) || []).length >= 2 && twoCharCount >= 3 && tokens.length - twoCharCount <= 2) {
+    return null;
+  }
+  if (!hasAccents && english === 0 && looksLikeList(text) && tokens.length >= 2 && tokens.every((w) => w.length <= 3)) {
+    return null;
+  }
   // For 3-word Latin phrases with non-ASCII letters, hold only when clearly non-English prose
   // (>= 2 words from a known language list, or an explicit foreign request/secret term), leaving
   // short menu dishes ("Crème brûlée maison.") and brief greetings ("Grüße aus München!") clear.
@@ -403,7 +441,7 @@ export function otherLanguageOf(sentence) {
   if (latin.length < 4) return null;
   const minCount = latin.length < 12 ? 2 : 3;
   const minRatio = latin.length < 12 ? 0.3 : 0.2;
-  if (top.count >= minCount && top.count >= minRatio * latin.length && top.count > 2 * english) return top.name;
+  if (top.count >= minCount && top.count >= minRatio * Math.max(candidateWords.length, 1) && top.count > 2 * english) return top.name;
   // Not clearly English, whatever the language.
   if (english > 0 || looksLikeList(text)) return null;
   const judged = tokens.filter((word, i) => !(i > 0 && /^\p{Lu}/u.test(word)) && !/^\p{Lu}{2,}$/u.test(word) && !/\p{Ll}\p{Lu}/u.test(word))
@@ -412,9 +450,12 @@ export function otherLanguageOf(sentence) {
   const known = judged.filter((word) => ENGLISH.has(word) || isEnglishWord(word)).length;
   if (known >= 0.5 * judged.length) return null;
   const realKnown = judged.filter((word) => word.length > 1 && (ENGLISH.has(word) || isEnglishWord(word))).length;
-  const foreignSign = hasAccents || top.count >= 2 || (realKnown === 0 && judged.length >= 4);
+  const distinctJudged = new Set(judged).size;
+  const englishSuffixes = judged.filter((word) => /^[a-z]{4,}(?:ing|ed|tion|ment|ness|able|ible|ive|ize|ise)$/i.test(word)).length;
+  const foreignSign = hasAccents || top.count >= 2 || (realKnown === 0 && distinctJudged >= 6 && englishSuffixes < 2);
   if (!foreignSign) return null;
   if (judged.length < 6 && realKnown > 0) return null;
+  if (top.count < 2 && (distinctJudged < 6 || englishSuffixes >= 2) && !(hasAccents && known === 0 && realKnown === 0)) return null;
   return top.count >= 2 ? top.name : UNRECOGNISED;
 }
 

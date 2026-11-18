@@ -17,7 +17,8 @@ function splitWords(value) {
 
 const UNTRUSTED_TOOL = /\b(?:fetch|scrape|browse|crawl|search web|web search|read emails?|read mails?|get emails?|read pages?|fetch url|webhook listen|receive webhook)\b/i;
 const SENSITIVE_TOOL = /\b(?:read files?|list files?|read env|get env|get config|read config|dump config|env(?:ironment)? settings?|env(?:ironment)? variables?|secrets?|credentials?|wallet|bank accounts?|payment methods?|credit cards?|order history|inbox|messages?|db query|sql query|private data)\b/i;
-const SENSITIVE_PARAM = /\b(?:token|secret|password|passwd|cookie|session|auth(?:orization)?|auth header|credential|api key|private key|ssh key|ssn|iban)\b/i;
+const SENSITIVE_PARAM = /\b(?:token|secret|password|passwd|cookie|session (?:cookie|secret|key|data|state)|auth(?:orization)?|auth header|credential|api key|private key|ssh key|ssn|iban)\b/i;
+const NON_SECRET_PARAM = /\b(?:(?:session|delete|confirm(?:ation)?|status|cancel(?:lation)?|page(?:ination)?|next(?: page)?|cursor|continuation|resume|reset|idempotency|csrf|xsrf|job|task|run|upload|download|share|invite|signed) token|token (?:id|address|symbol|name|mint|decimals|amount|supply|balance|price|pair|type|standard|count|limit|budget|usage))\b/i;
 const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|access tokens?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|config(?:uration)?\s+files?|private\s+data))\b/i;
 const EGRESS_TOOL = /\b(?:http post|send email|send message|post message|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|send telemetry)\b/i;
 const EGRESS_PARAM_URL = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient)\s*(?:url|uri|webhook|hook|email))\b/i;
@@ -68,7 +69,14 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
       sensitiveAccess.push({ source: name, kind: "sensitive_tool", detail: `"${name}" accesses potentially sensitive data, config, or files` });
     }
 
-    const sensitiveParams = schemaInfo.keys.filter((k) => SENSITIVE_PARAM.test(splitWords(k)));
+    const sensitiveParams = schemaInfo.paramSpecs
+      .filter(({ key, description }) => {
+        const kw = splitWords(key);
+        if (!SENSITIVE_PARAM.test(kw) || NON_SECRET_PARAM.test(kw)) return false;
+        if (/^api ?key$/i.test(kw) && /\b(?:optional\s+partner|partner\s+api\s+key)\b/i.test(description || "")) return false;
+        return true;
+      })
+      .map((p) => p.key);
     if (sensitiveParams.length) {
       sensitiveAccess.push({
         source: name,
