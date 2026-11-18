@@ -388,14 +388,15 @@ export function otherLanguageOf(sentence) {
     if (!top || count > top.count) top = { name, count };
   }
   const hasAccents = /[^\x00-\x7f]/.test(latin.join(""));
-  // Even a 3-word sentence with non-ASCII letters and zero English words (e.g. short Turkish)
-  // cannot be verified by English rules and must be held for review unless it's a list/proper name.
+  // For 3-word Latin phrases with non-ASCII letters, hold only when clearly non-English prose
+  // (>= 2 words from a known language list, or an explicit foreign request/secret term), leaving
+  // short menu dishes ("Crème brûlée maison.") and brief greetings ("Grüße aus München!") clear.
   if (latin.length === 3) {
     if (english === 0 && !looksLikeList(text) && hasAccents) {
       const judged3 = tokens.filter((word, i) => !(i > 0 && /^\p{Lu}/u.test(word)) && !/^\p{Lu}{2,}$/u.test(word))
         .map((w) => w.toLowerCase());
       const known3 = judged3.filter((w) => ENGLISH.has(w) || isEnglishWord(w)).length;
-      if (judged3.length >= 2 && known3 === 0) return top.count >= 1 ? top.name : UNRECOGNISED;
+      if (judged3.length >= 2 && known3 === 0 && top.count >= 2) return top.name;
     }
     return null;
   }

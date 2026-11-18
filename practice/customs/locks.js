@@ -20,7 +20,7 @@
 // Remote image blocking is enforced by the page's CSP policy alongside Lock 2 reply quarantine.
 
 import { detectCanaryLeak, generateCanaryToken } from "./canary.js";
-import { canonicalJson, sha256Hex } from "./canonical.js";
+import { canonicalJson, ibanValid, sha256Hex } from "./canonical.js";
 import { EMAIL_LOGIN_INDIRECT_RE, INLINE_ROLE_OVERRIDE_RE, scanText } from "./rules.js";
 import { scanHidden, stripHiddenChars } from "./unicode.js";
 
@@ -100,15 +100,13 @@ function luhn(digits) {
   return sum % 10 === 0;
 }
 
-function ibanValid(raw) {
-  const s = raw.replace(/\s+/g, "").toUpperCase();
-  if (s.length < 15 || s.length > 34) return false;
-  let rest = 0;
-  for (const ch of s.slice(4) + s.slice(0, 4)) {
-    const v = ch >= "A" && ch <= "Z" ? ch.charCodeAt(0) - 55 : ch.charCodeAt(0) - 48;
-    rest = (rest * (v > 9 ? 100 : 10) + v) % 97;
-  }
-  return rest === 1;
+const NON_CARD_PREFIX = /\b(?:imei|imsi|iccid|serial|tracking|parcel|shipment|waybill|invoice|receipt|order)\s*(?:#|no\.?|number|id)?\s*[:=-]?\s*$/i;
+
+function isLuhnPaymentCard(text, match, offset) {
+  const digits = match.replace(/[\s.,_+:/-]+/g, "");
+  if (digits.length < 13 || !CARD_PREFIX.test(digits) || !luhn(digits)) return "";
+  if (NON_CARD_PREFIX.test(text.slice(Math.max(0, offset - 24), offset))) return "";
+  return digits;
 }
 
 const mask = (value) => `${value.slice(0, 4)}…${value.slice(-2)}`;
@@ -139,8 +137,8 @@ export function findSecrets(text) {
   const s = foldUnicodeDigits(raw);
   const found = [];
   for (const m of s.matchAll(CARD_CANDIDATE)) {
-    const digits = m[0].replace(/[\s.,_+:/-]+/g, "");
-    if (digits.length >= 13 && CARD_PREFIX.test(digits) && luhn(digits)) found.push({ kind: "card number", sample: mask(digits) });
+    const digits = isLuhnPaymentCard(s, m[0], m.index);
+    if (digits) found.push({ kind: "card number", sample: mask(digits) });
   }
   for (const m of s.matchAll(IBAN_CANDIDATE)) {
     if (ibanValid(m[0])) found.push({ kind: "IBAN", sample: mask(m[0].replace(/\s+/g, "").toUpperCase()) });
@@ -219,9 +217,10 @@ function walkObjectKeys(obj, fn, seen = new Set()) {
 export function redactSensitiveText(text) {
   if (typeof text !== "string" || !text) return { text: String(text ?? ""), found: [] };
   const found = [];
-  let out = foldUnicodeDigits(text).replace(CARD_CANDIDATE, (m) => {
-    const digits = m.replace(/[\s.,_+:/-]+/g, "");
-    if (digits.length >= 13 && CARD_PREFIX.test(digits) && luhn(digits)) {
+  const sFolded = foldUnicodeDigits(text);
+  let out = sFolded.replace(CARD_CANDIDATE, (m, offset) => {
+    const digits = isLuhnPaymentCard(sFolded, m, offset);
+    if (digits) {
       found.push({ kind: "card number", sample: mask(digits) });
       return "[card number kept safe by Agent Customs]";
     }
@@ -387,7 +386,7 @@ function sanitizePartnerText(text, partnerBase) {
     }
     return `${label} [external link removed by Agent Customs]`;
   });
-  // Check bare URLs too (including protocol-relative //host.tld/... and bare host.tld/path links).
+  // Check bare URLs too (including protocol-relative //host.tld/... and bare host.tld[/path] links).
   s = s.replace(/(?:https?:\/\/|(?<![A-Za-z0-9:])\/\/[a-z0-9.-]+\.[a-z]{2,})[^\s)"'<>]*/gi, (rawUrl) => {
     const url = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
     if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) {
@@ -395,8 +394,10 @@ function sanitizePartnerText(text, partnerBase) {
     }
     return "[external link removed by Agent Customs]";
   });
-  s = s.replace(/(?<![A-Za-z0-9._/@:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:invalid|example|online|com|org|net|app|dev|shop|club|info|site|test|local|biz|xyz|top|ai|co|uk|us|ca|de|fr|jp|in|io|me|au)(?:\.[a-z]{2})?(?:\/[^\s)"'<>\]]*[A-Za-z0-9/_?=#&-])(?![A-Za-z0-9_/-])/gi, (bare, offset, whole) => {
-    if (/^(?:[a-z0-9-]+\.)?(?:json|html?|mjs|js|css|md|txt|pdf|png|jpe?g|svg|ya?ml|xml)\//i.test(bare)) return bare;
+  s = s.replace(/(?<![A-Za-z0-9._/@:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:invalid|example|online|com|org|net|edu|gov|app|dev|shop|club|info|site|test|local|biz|xyz|top|io|ai|co|uk|us|ca|de|fr|jp|in|me|au)(?:\.[a-z]{2})?(?:\/[^\s)"'<>\]]*[A-Za-z0-9/_?=#&-])?(?![A-Za-z0-9_/-])/gi, (bare, offset, whole) => {
+    if (/^(?:[a-z0-9-]+\.)?(?:json|html?|mjs|js|css|md|txt|pdf|png|jpe?g|svg|ya?ml|xml)(?:\/|$)/i.test(bare)) return bare;
+    // Require /path for ambiguous 2-letter TLDs (.in, .me, .us, .co, .de, .fr, .uk, .ca, .jp, .au, .ai, .io) unless clearly multi-label or pathful.
+    if (!bare.includes("/") && /\.(?:uk|us|ca|de|fr|jp|in|me|au|co|ai|io)$/i.test(bare)) return bare;
     if (whole.slice(Math.max(0, offset - 3), offset).includes("://")) return bare;
     const url = `https://${bare}`;
     if (isSameDeclaredBase(url, partnerBase) && !SLOT_IN_URL.test(url) && !findSensitiveData(url).length) {

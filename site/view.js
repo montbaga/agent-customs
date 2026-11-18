@@ -1036,7 +1036,7 @@ async function wireBenchStrip() {
     const ac = bench.agentCustoms;
     const baseline = bench.naiveRegexBaseline;
     const items = [
-      [`${bench.hostileTotal} attack vectors + ${bench.benignTotal} benign`, `R1 ${ac.round1Caught}/${ac.round1Total} · R2 ${ac.round2Caught}/${ac.round2Total} · R3 ${ac.round3Caught}/${ac.round3Total} · Held-out ${ac.heldoutCaught}/${ac.heldoutTotal} · ${bench.selfTestPassed}/${bench.selfTestTotal} lock/cert checks`],
+      [`${bench.hostileTotal} attack vectors + ${bench.benignTotal} benign`, `R1 ${ac.round1Caught}/${ac.round1Total} · R2 ${ac.round2Caught}/${ac.round2Total} · R3 ${ac.round3Caught}/${ac.round3Total} · Held-out ${ac.heldoutCaught}/${ac.heldoutTotal} · Ext ${ac.externalQuotedCaught}/${ac.externalQuotedTotal} · ${bench.selfTestPassed}/${bench.selfTestTotal} lock/cert`],
       [`${ac.catchRate}% attacks blocked/held`, `${ac.flaggedRate}% flagged incl. conditions · vs. ${baseline.catchRate}% normalized regex`],
       [`${ac.falsePositiveRate}% benign false blocks`, `${ac.benignCleared}/${bench.benignTotal} clean cleared · vs. ${baseline.falsePositiveRate}% normalized regex`],
       [`~${ac.medianDetectionMs} ms median check`, `${ac.llmTokenCost} · reproducible via npm run bench`],

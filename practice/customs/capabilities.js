@@ -20,7 +20,9 @@ const SENSITIVE_TOOL = /\b(?:read files?|list files?|read env|get env|get config
 const SENSITIVE_PARAM = /\b(?:token|secret|password|passwd|cookie|session|auth(?:orization)?|auth header|credential|api key|private key|ssh key|ssn|iban)\b/i;
 const SENSITIVE_DESC = /\b(?:environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|access tokens?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|config(?:uration)?\s+files?|private\s+data))\b/i;
 const EGRESS_TOOL = /\b(?:http post|send email|send message|post message|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|send telemetry)\b/i;
-const EGRESS_PARAM = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|destination(?:\s*url)?|endpoint(?:\s*url)?|upload(?:\s*url)?|exfil(?:\s*url)?|forward(?:\s*to)?|recipient(?:\s*url)?)\b/i;
+const EGRESS_PARAM_URL = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient)\s*(?:url|uri|webhook|hook|email))\b/i;
+const EGRESS_PARAM_WEAK = /\b(?:destination|recipient|endpoint|callback|forward\s*to)\b/i;
+const EGRESS_PARAM_DESC_URL = /\b(?:url|uri|webhook|endpoint|https?|e-?mail)\b/i;
 const EGRESS_DESC = /\b(?:send|sends|post|posts|upload|uploads|transmit|transmits|forward|forwards|push|pushes|stream|streams|relay|relays|export|exports|ship|ships|submit|submits|deliver|delivers|exfiltrate|exfiltrates)\b[^.!?\n]{0,45}\b(?:webhook|callback|external\s+(?:url|endpoint|server|host|api)|remote\s+(?:url|endpoint|server|host)|https?:\/\/|url\s+you\s+(?:give|provide|pass|specify)|destination\s+url|configured\s+address|team|channel)\b|\b(?:telemetry\s+payload|notify\s+team|send\s+telemetry|webhook\s+url)\b/i;
 
 /**
@@ -79,7 +81,15 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
     // name/description/URL/REST egress findings when a server lies about readOnlyHint/openWorldHint.
     const hintRaisesEgress = ann.destructiveHint === true || (ann.openWorldHint === true && ann.readOnlyHint === false);
     const toolExternalUrl = toolOffOriginUrl(agent, targetOrigin);
-    const egressParams = schemaInfo.keys.filter((k) => EGRESS_PARAM.test(splitWords(k)));
+    const egressParams = schemaInfo.paramSpecs.filter(({ key, format, description }) => {
+      const kw = splitWords(key);
+      if (EGRESS_PARAM_URL.test(kw)) return true;
+      if (EGRESS_PARAM_WEAK.test(kw)) {
+        const fmt = String(format || "").toLowerCase();
+        return fmt === "uri" || fmt === "url" || fmt === "email" || EGRESS_PARAM_DESC_URL.test(splitWords(description));
+      }
+      return false;
+    }).map((p) => p.key);
     if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length) {
       externalEgress.push({
         sink: toolExternalUrl || (egressParams.length ? `${name}(${egressParams[0]})` : name),
@@ -187,11 +197,11 @@ function toolOffOriginUrl(agent, targetOrigin) {
   return "";
 }
 
-function collectSchemaInfo(node, keys = [], descs = []) {
-  if (!node || typeof node !== "object") return { keys, descWords: splitWords(descs.join(" ")) };
+function collectSchemaInfo(node, keys = [], descs = [], paramSpecs = []) {
+  if (!node || typeof node !== "object") return { keys, descWords: splitWords(descs.join(" ")), paramSpecs };
   if (Array.isArray(node)) {
-    for (const item of node) collectSchemaInfo(item, keys, descs);
-    return { keys, descWords: splitWords(descs.join(" ")) };
+    for (const item of node) collectSchemaInfo(item, keys, descs, paramSpecs);
+    return { keys, descWords: splitWords(descs.join(" ")), paramSpecs };
   }
   if (node.properties && typeof node.properties === "object" && !Array.isArray(node.properties)) {
     for (const [k, v] of Object.entries(node.properties)) {
@@ -199,12 +209,15 @@ function collectSchemaInfo(node, keys = [], descs = []) {
       if (v && typeof v === "object") {
         if (typeof v.title === "string") descs.push(v.title);
         if (typeof v.description === "string") descs.push(v.description);
+        paramSpecs.push({ key: k, format: v.format || "", description: v.description || "" });
+      } else {
+        paramSpecs.push({ key: k, format: "", description: "" });
       }
-      collectSchemaInfo(v, keys, descs);
+      collectSchemaInfo(v, keys, descs, paramSpecs);
     }
   }
   for (const [k, v] of Object.entries(node)) {
-    if (k !== "properties" && v && typeof v === "object") collectSchemaInfo(v, keys, descs);
+    if (k !== "properties" && v && typeof v === "object") collectSchemaInfo(v, keys, descs, paramSpecs);
   }
-  return { keys, descWords: splitWords(descs.join(" ")) };
+  return { keys, descWords: splitWords(descs.join(" ")), paramSpecs };
 }
