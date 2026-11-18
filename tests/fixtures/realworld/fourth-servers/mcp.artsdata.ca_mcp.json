@@ -1,0 +1,1133 @@
+{
+ "url": "https://mcp.artsdata.ca/mcp",
+ "doc": {
+  "name": "Artsdata MCP Server",
+  "version": "0.0.1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Access Artsdata's public APIs through a secure, lightweight, LLM-optimized layer designed for efficient querying by autonomous agents and users alike. SPARQL endpoint: https://query.artsdata.ca/query. To answer a question with SPARQL, call get_schema to learn the data model, write the query and run it with sparql_query, then use get_entity (details of a URI) or search_entities (URI from a name) as needed. When you mention an event, place, person or organization that has an Artsdata URI (http://kg.artsdata.ca/resource/K12-345), cite its Artsdata ID (the ID matching K\\d+-\\d+ at the end of the URI) on first mention, formatted as 'Name (K12-345)'. search_entities results include a ready-made markdown-link `label` showing that format; use it. Take IDs only from tool results, never invent them; entities with other URIs (e.g. Wikidata) have no Artsdata ID. To find the ID of an entity you only know by name, use search_entities. Sources: a property's asserted value is the answer; other sources may only claim a different value (see get_schema about.description). When asked who says or which sources claim a value (e.g. 'who says the name is...'), follow the sources convention of get_schema with sparql_query. Answer with the asserted value and its sources first, then differing claimed values with theirs; name each source by its dataset's schema:name and link its schema:maintainer (add https:// if it has no scheme).",
+  "tools": [
+   {
+    "name": "search_entities",
+    "description": "Tool to search for entities in the Artsdata knowledge graph by name, with optional filters on entity type and on the controlled vocabulary (skos:ConceptScheme) a concept belongs to. Each result has a markdown-link `label` like '[Name (K12-345)](https://kg.artsdata.ca/resource/K12-345)': use it verbatim when mentioning the entity.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "SearchQueryRequest",
+     "description": "Request schema for the search_entities tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Non-empty mandatory search query."
+      },
+      "types": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri",
+        "enum": [
+         "http://kg.artsdata.ca/ontology/Event",
+         "http://kg.artsdata.ca/ontology/Place",
+         "http://kg.artsdata.ca/ontology/Person",
+         "http://kg.artsdata.ca/ontology/Organization",
+         "http://dbpedia.org/ontology/Agent",
+         "http://www.w3.org/2004/02/skos/core#Concept"
+        ]
+       },
+       "uniqueItems": true,
+       "description": "Optional list of type filters; can be empty."
+      },
+      "in_scheme": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "uniqueItems": true,
+       "description": "Optional list of Artsdata controlled vocabulary (skos:ConceptScheme) URIs (e.g., ['http://kg.artsdata.ca/resource/ArtsdataEventTypes']). Paired with types: ['http://www.w3.org/2004/02/skos/core#Concept']. Use it to find a concept URI by its label (e.g., the event type for 'exhibition') for use in search_events under has_event_type_concept. Can be left empty."
+      },
+      "language": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "default": "en",
+       "description": "Language code, restricted to 'en' or 'fr'."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 25,
+       "description": "Number of results to return."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "SearchEntitiesResponse",
+     "description": "Response schema for the search_entities tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "required": [
+      "results"
+     ],
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "id",
+         "name",
+         "type",
+         "uri"
+        ],
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "type": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "required": [
+            "id",
+            "name"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uri"
+            },
+            "name": {
+             "type": "string"
+            }
+           },
+           "additionalProperties": false
+          }
+         },
+         "uri": {
+          "type": "string",
+          "format": "uri"
+         }
+        },
+        "additionalProperties": false
+       }
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_entity",
+    "description": "Tool to get entities details from Artsdata Knowledge Graph by entity URI. Entity URIs end in the Artsdata ID (K\\d+-\\d+, e.g. K12-345); cite it with the entity name. The result's `sources` lists the datasets the entity was built from: name them when you answer about the entity, linking `url` when present, else by `name`.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "GetEntityRequest",
+     "description": "Request schema for the get_entity tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {
+      "uri": {
+       "type": "string",
+       "format": "uri",
+       "description": "The Artsdata entity URI."
+      }
+     },
+     "required": [
+      "uri"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "GetEntityResponse",
+     "description": "Response schema for the get_entity tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Unique identifier of the entity."
+      },
+      "uri": {
+       "type": "string",
+       "format": "uri",
+       "description": "URI representing the entity."
+      },
+      "types": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/typeItem"
+       }
+      },
+      "name": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/multiLingualString"
+       }
+      },
+      "sources": {
+       "type": "array",
+       "description": "Datasets the entity was built from. A dataset with a maintainer is given by the maintainer's website (url), otherwise by name.",
+       "items": {
+        "type": "object",
+        "required": [
+         "uri"
+        ],
+        "properties": {
+         "uri": {
+          "type": "string",
+          "format": "uri"
+         },
+         "url": {
+          "type": "string",
+          "format": "uri"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "additionalProperties": false
+       }
+      },
+      "alternate_names": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/multiLingualString"
+       }
+      },
+      "description": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/multiLingualString"
+       }
+      },
+      "disambiguatingDescription": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/multiLingualString"
+       }
+      },
+      "main_entity_of_page": {
+       "type": "string",
+       "format": "uri",
+       "description": "URI of the main entity page."
+      },
+      "same_as": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       }
+      },
+      "start_date": {
+       "description": "Start date or start date-time of an event (ISO 8601).",
+       "oneOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "string",
+         "format": "date-time"
+        }
+       ]
+      },
+      "end_date": {
+       "description": "End date or end date-time of an event (ISO 8601).",
+       "oneOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "string",
+         "format": "date-time"
+        }
+       ]
+      },
+      "event_status": {
+       "type": "string",
+       "format": "uri",
+       "description": "Status of the event, it can one from the enumeration members of https://schema.org/EventStatusType"
+      },
+      "event_attendance_mode": {
+       "type": "string",
+       "format": "uri",
+       "description": "Attendance mode of the event, it can one from the enumeration members of https://schema.org/EventAttendanceModeEnumeration"
+      },
+      "organizer": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/entityDetails"
+       },
+       "description": "List of organizers, each with its Artsdata id, URI and name."
+      },
+      "performer": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/entityDetails"
+       },
+       "description": "List of performers, each with its Artsdata id, URI and name."
+      },
+      "location": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/entityDetails"
+       },
+       "description": "List of locations, each with its Artsdata id, URI and name."
+      },
+      "has_event_type_concept": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/stringList"
+       },
+       "description": "Concept URIs from the Artsdata Event Types vocabulary (adr:ArtsdataEventTypes)"
+      },
+      "additional_properties": {
+       "type": "array",
+       "items": {
+        "$ref": "#/$defs/additionalProperty"
+       }
+      }
+     },
+     "required": [
+      "id",
+      "uri",
+      "types",
+      "name"
+     ],
+     "additionalProperties": false,
+     "$defs": {
+      "typeItem": {
+       "type": "object",
+       "required": [
+        "uri",
+        "label"
+       ],
+       "properties": {
+        "uri": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": false
+      },
+      "stringList": {
+       "type": "string"
+      },
+      "entityDetails": {
+       "type": "object",
+       "required": [
+        "id",
+        "uri"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "description": "Artsdata identifier of the referenced entity."
+        },
+        "uri": {
+         "type": "string",
+         "format": "uri",
+         "description": "URI of the referenced entity."
+        },
+        "name": {
+         "type": "string",
+         "description": "Preferred label of the referenced entity, in the requested language when available."
+        }
+       },
+       "additionalProperties": false
+      },
+      "multiLingualString": {
+       "type": "object",
+       "required": [
+        "value"
+       ],
+       "properties": {
+        "value": {
+         "type": "string"
+        },
+        "language": {
+         "type": "string",
+         "description": "BCP 47 language tag (e.g., 'en', 'fr')."
+        }
+       },
+       "additionalProperties": false
+      },
+      "additionalProperty": {
+       "type": "object",
+       "required": [
+        "predicate",
+        "values"
+       ],
+       "properties": {
+        "predicate": {
+         "type": "object",
+         "required": [
+          "uri",
+          "label"
+         ],
+         "properties": {
+          "uri": {
+           "type": "string",
+           "format": "uri"
+          },
+          "label": {
+           "type": "string"
+          }
+         },
+         "additionalProperties": false
+        },
+        "values": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   {
+    "name": "search_events",
+    "description": "Tool to search for events in the Artsdata knowledge graph by place, artist, organization, has_event_type_concept and language. Places, artists and organizations are Artsdata entity URIs; the has_event_type_concept filter takes concept URIs from the Artsdata Event Types vocabulary (adr:ArtsdataEventTypes), not schema.org classes. Resolve any name or label to its URI with search_entities first. Places must be venues; for events in a city or region, use sparql_query (see the places parameter). At least one filter is required. Entity URIs end in the Artsdata ID (K\\d+-\\d+, e.g. K12-345); cite it with the entity name.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "SearchEventsRequest",
+     "description": "Request schema for the search_events tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {
+      "startDateFrom": {
+       "type": "string",
+       "description": "Optional lower bound filter. Includes events starting on or after this date/time. ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."
+      },
+      "startDateTo": {
+       "type": "string",
+       "description": "Optional upper bound filter. Includes events starting on or before this date/time. ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."
+      },
+      "places": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "uniqueItems": true,
+       "description": "Optional list of Artsdata VENUE URIs (e.g., [\"http://kg.artsdata.ca/resource/K11-2\"]) for a theatre, hall, auditorium, room or stage. Only venue URIs work: a city, region or country (e.g. 'Toronto', 'Ontario', 'Canada') is not a venue and returns no events. First find the venue's URI with search_entities (types: ['http://kg.artsdata.ca/ontology/Place']) using the venue name. A venue URI also covers the rooms and halls inside it (schema:containedInPlace). To find events in a city or region, use sparql_query. Can be left empty."
+      },
+      "artists": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "uniqueItems": true,
+       "description": "Optional list of Artsdata artist URIs (e.g., [\"http://kg.artsdata.ca/resource/K2-6574\"]). If you only have a name, use search_entities (types: ['http://kg.artsdata.ca/ontology/Person']) to find its URI first. Can be left empty."
+      },
+      "organizations": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "uniqueItems": true,
+       "description": "Optional list of Artsdata organization URIs (e.g., [\"http://kg.artsdata.ca/resource/K5-72\"]). If you only have a name, use search_entities (types: ['http://kg.artsdata.ca/ontology/Organization']) to find its URI first. Can be left empty."
+      },
+      "has_event_type_concept": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "uniqueItems": true,
+       "description": "Optional list of concept URIs from the Artsdata Event Types vocabulary (http://kg.artsdata.ca/resource/ArtsdataEventTypes). Must be valid concept URIs (e.g., http://kg.artsdata.ca/resource/ClassicalMusicPerformance). Non-matching inputs—such as text labels, schema.org classes, or external vocabularies—will return zero results without throwing an error. Resolve any name or label to its URI with search_entities first"
+      },
+      "language": {
+       "type": "string",
+       "description": "Language for the labels in the response (e.g. 'en', 'fr'); default is 'en'. This selects the output language only — it does NOT filter events by the language they are performed in.",
+       "default": "en"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 25,
+       "description": "Number of results to return."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "SearchEventsResponse",
+     "description": "Response schema for the search_events tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "required": [
+      "results"
+     ],
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "Unique identifier of the entity."
+         },
+         "uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI representing the entity."
+         },
+         "types": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/typeItem"
+          }
+         },
+         "name": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/multiLingualString"
+          }
+         },
+         "alternate_names": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/multiLingualString"
+          }
+         },
+         "description": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/multiLingualString"
+          }
+         },
+         "disambiguatingDescription": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/multiLingualString"
+          }
+         },
+         "main_entity_of_page": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI of the main entity page."
+         },
+         "same_as": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "start_date": {
+          "description": "Start date or start date-time of an event (ISO 8601).",
+          "oneOf": [
+           {
+            "type": "string",
+            "format": "date"
+           },
+           {
+            "type": "string",
+            "format": "date-time"
+           }
+          ]
+         },
+         "end_date": {
+          "description": "End date or end date-time of an event (ISO 8601).",
+          "oneOf": [
+           {
+            "type": "string",
+            "format": "date"
+           },
+           {
+            "type": "string",
+            "format": "date-time"
+           }
+          ]
+         },
+         "event_status": {
+          "type": "string",
+          "format": "uri",
+          "description": "Status of the event, it can one from the enumeration members of https://schema.org/EventStatusType"
+         },
+         "event_attendance_mode": {
+          "type": "string",
+          "format": "uri",
+          "description": "Attendance mode of the event, it can one from the enumeration members of https://schema.org/EventAttendanceModeEnumeration"
+         },
+         "organizer": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/entityDetails"
+          },
+          "description": "List of organizers, each with its Artsdata id, URI and name."
+         },
+         "performer": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/entityDetails"
+          },
+          "description": "List of performers, each with its Artsdata id, URI and name."
+         },
+         "location": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/entityDetails"
+          },
+          "description": "List of locations, each with its Artsdata id, URI and name."
+         },
+         "has_event_type_concept": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/stringList"
+          },
+          "description": "Concept URIs from the Artsdata Event Types vocabulary (adr:ArtsdataEventTypes)"
+         },
+         "additional_properties": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/additionalProperty"
+          }
+         }
+        },
+        "required": [
+         "id",
+         "uri",
+         "types",
+         "name"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "additionalProperties": false,
+     "$defs": {
+      "typeItem": {
+       "type": "object",
+       "required": [
+        "uri",
+        "label"
+       ],
+       "properties": {
+        "uri": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": false
+      },
+      "entityDetails": {
+       "type": "object",
+       "required": [
+        "id",
+        "uri"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "description": "Artsdata identifier of the referenced entity."
+        },
+        "uri": {
+         "type": "string",
+         "format": "uri",
+         "description": "URI of the referenced entity."
+        },
+        "name": {
+         "type": "string",
+         "description": "Preferred label of the referenced entity, in the requested language when available."
+        }
+       },
+       "additionalProperties": false
+      },
+      "stringList": {
+       "type": "string"
+      },
+      "multiLingualString": {
+       "type": "object",
+       "required": [
+        "value"
+       ],
+       "properties": {
+        "value": {
+         "type": "string"
+        },
+        "language": {
+         "type": "string",
+         "description": "BCP 47 language tag (e.g., 'en', 'fr')."
+        }
+       },
+       "additionalProperties": false
+      },
+      "additionalProperty": {
+       "type": "object",
+       "required": [
+        "predicate",
+        "values"
+       ],
+       "properties": {
+        "predicate": {
+         "type": "object",
+         "required": [
+          "uri",
+          "label"
+         ],
+         "properties": {
+          "uri": {
+           "type": "string",
+           "format": "uri"
+          },
+          "label": {
+           "type": "string"
+          }
+         },
+         "additionalProperties": false
+        },
+        "values": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   {
+    "name": "get_schema",
+    "description": "Returns the data model of the Artsdata Knowledge Graph: its entity classes (Event, Place, Organization, Person, LivePerformanceWork...), the properties of each with required/optional, cardinality, value types, linked classes and allowed values, the controlled vocabularies, the SPARQL prefixes, and conventions for querying. Derived from the Artsdata Ontology and the Artsdata CORE graph SHACL shapes. Call this before writing a SPARQL query to run with sparql_query against https://query.artsdata.ca/query, since Artsdata's model is not general knowledge. Takes no input.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "GetSchemaRequest",
+     "description": "Request schema for the get_schema tool. The tool takes no arguments.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "GetSchemaResponse",
+     "description": "Response schema for the get_schema tool: the Artsdata data model (ontology + CORE graph SHACL shapes) compiled into a class-centric digest. IRIs are CURIEs over `prefixes` (or <full-IRI> when no prefix fits); property paths are SPARQL 1.1 property paths.",
+     "version": "1.0.0",
+     "type": "object",
+     "required": [
+      "about",
+      "conventions",
+      "prefixes",
+      "classes",
+      "vocabularies"
+     ],
+     "properties": {
+      "about": {
+       "type": "object",
+       "required": [
+        "source",
+        "sparql_endpoint"
+       ],
+       "properties": {
+        "namespace": {
+         "type": "string",
+         "format": "uri"
+        },
+        "title": {
+         "type": "string"
+        },
+        "description": {
+         "type": "string"
+        },
+        "version": {
+         "type": "string"
+        },
+        "modified": {
+         "type": "string"
+        },
+        "source": {
+         "type": "string",
+         "format": "uri",
+         "description": "Turtle file the digest was compiled from."
+        },
+        "sparql_endpoint": {
+         "type": "string",
+         "format": "uri"
+        }
+       },
+       "additionalProperties": false
+      },
+      "conventions": {
+       "type": "array",
+       "description": "How to read the digest and write SPARQL against the graph.",
+       "items": {
+        "type": "string"
+       }
+      },
+      "prefixes": {
+       "type": "object",
+       "description": "Prefix name -> namespace IRI.",
+       "additionalProperties": {
+        "type": "string",
+        "format": "uri"
+       }
+      },
+      "classes": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "class",
+         "properties"
+        ],
+        "properties": {
+         "class": {
+          "type": "string",
+          "description": "Class to use with rdf:type / a."
+         },
+         "label": {
+          "type": "string"
+         },
+         "comment": {
+          "type": "string"
+         },
+         "alternate_names": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "equivalent_classes": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "subclass_of": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "shapes": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "SHACL node shapes merged into this entry."
+         },
+         "properties": {
+          "type": "array",
+          "items": {
+           "$ref": "#/$defs/property"
+          }
+         }
+        },
+        "additionalProperties": false
+       }
+      },
+      "vocabularies": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "property",
+         "scheme"
+        ],
+        "properties": {
+         "property": {
+          "type": "string"
+         },
+         "scheme": {
+          "type": "string",
+          "description": "skos:ConceptScheme the property's values are in."
+         },
+         "label": {
+          "type": "string"
+         },
+         "classes": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "additionalProperties": false
+       }
+      }
+     },
+     "additionalProperties": false,
+     "$defs": {
+      "curies": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "property": {
+       "type": "object",
+       "required": [
+        "path",
+        "required"
+       ],
+       "properties": {
+        "path": {
+         "type": "string",
+         "description": "SPARQL property path."
+        },
+        "label": {
+         "type": "string"
+        },
+        "required": {
+         "type": "boolean",
+         "description": "sh:minCount >= 1."
+        },
+        "min_count": {
+         "type": "integer",
+         "minimum": 2,
+         "description": "Only present when greater than 1."
+        },
+        "max_count": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "node_kind": {
+         "type": "string",
+         "enum": [
+          "IRI",
+          "Literal",
+          "BlankNode",
+          "BlankNodeOrIRI",
+          "BlankNodeOrLiteral",
+          "IRIOrLiteral"
+         ]
+        },
+        "datatypes": {
+         "$ref": "#/$defs/curies"
+        },
+        "classes": {
+         "$ref": "#/$defs/curies",
+         "description": "Class(es) of the linked node."
+        },
+        "in": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Allowed values."
+        },
+        "has_value": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "pattern": {
+         "type": "string",
+         "description": "Regex the value (as a string) matches."
+        },
+        "unique_lang": {
+         "type": "boolean"
+        },
+        "language_in": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "severity": {
+         "type": "string",
+         "description": "Omitted for sh:Violation."
+        },
+        "description": {
+         "type": "string"
+        },
+        "range": {
+         "$ref": "#/$defs/curies"
+        },
+        "sub_property_of": {
+         "$ref": "#/$defs/curies"
+        },
+        "equivalent_properties": {
+         "$ref": "#/$defs/curies"
+        },
+        "value_shape": {
+         "type": "object",
+         "required": [
+          "properties"
+         ],
+         "properties": {
+          "label": {
+           "type": "string"
+          },
+          "properties": {
+           "type": "array",
+           "items": {
+            "$ref": "#/$defs/property"
+           }
+          }
+         },
+         "additionalProperties": false
+        }
+       },
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   {
+    "name": "sparql_query",
+    "description": "Runs a read-only SPARQL 1.1 SELECT or ASK query against the Artsdata Knowledge Graph (https://query.artsdata.ca/query) and returns the result as SPARQL 1.1 Query Results JSON, exactly as the endpoint returns it: head.vars and results.bindings for SELECT, boolean for ASK. Call get_schema first and build the query from the classes, properties, prefixes and conventions it returns, since Artsdata's model is not general knowledge. Declare every PREFIX you use and always add a LIMIT: at most 1000 rows are returned (the rest is cut and truncated is true; page with OFFSET), and a query gets 25 seconds. If the endpoint rejects the query, its error message is returned so you can fix the query and retry. For the details of an entity URI in the results use get_entity; to find an entity's URI from its name use search_entities. Always SELECT the entity URI next to its label so its Artsdata ID can be cited. Entity URIs end in the Artsdata ID (K\\d+-\\d+, e.g. K12-345); cite it with the entity name. To find who claims a property value, see the sources guidance in the get_schema conventions.",
+    "inputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "SparqlQueryRequest",
+     "description": "Request schema for the sparql_query tool.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "description": "A complete SPARQL 1.1 SELECT or ASK query, with a PREFIX declaration for every prefix it uses. Build it from the classes, properties and prefixes returned by get_schema, and add a LIMIT."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "title": "SparqlQueryResponse",
+     "description": "Response schema for the sparql_query tool: the endpoint's SPARQL 1.1 Query Results JSON (https://www.w3.org/TR/sparql11-results-json/), as returned. A SELECT gives head.vars and results.bindings; an ASK gives boolean.",
+     "version": "1.0.0",
+     "type": "object",
+     "properties": {
+      "head": {
+       "type": "object",
+       "properties": {
+        "vars": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "The projected variable names, without the leading '?'."
+        },
+        "link": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "results": {
+       "type": "object",
+       "properties": {
+        "bindings": {
+         "type": "array",
+         "description": "One object per solution, keyed by variable name. Unbound variables (e.g. from OPTIONAL) are absent.",
+         "items": {
+          "type": "object",
+          "additionalProperties": {
+           "$ref": "#/$defs/rdfTerm"
+          }
+         }
+        }
+       },
+       "required": [
+        "bindings"
+       ]
+      },
+      "boolean": {
+       "type": "boolean",
+       "description": "The answer to an ASK query."
+      },
+      "truncated": {
+       "type": "boolean",
+       "description": "Present and true when the endpoint returned more rows than the server's row cap and only the first rows are included. Add or lower the LIMIT, or page with OFFSET."
+      }
+     },
+     "required": [
+      "head"
+     ],
+     "$defs": {
+      "rdfTerm": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "uri",
+          "literal",
+          "bnode",
+          "triple"
+         ],
+         "description": "'triple' is an RDF-star quoted triple, whose value is an object with subject, predicate and object terms."
+        },
+        "value": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "object"
+          }
+         ]
+        },
+        "xml:lang": {
+         "type": "string",
+         "description": "Language tag of a language-tagged literal."
+        },
+        "datatype": {
+         "type": "string",
+         "description": "Datatype IRI of a typed literal."
+        }
+       },
+       "required": [
+        "type",
+        "value"
+       ]
+      }
+     }
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "artsdata://dumps/core-minus-provenance/latest",
+    "name": "artsdata_dump",
+    "title": "Artsdata core minus provenance",
+    "description": "Manifest for the latest Artsdata core-minus-provenance dump (gzipped Turtle). Reading this resource returns JSON metadata (download URL, version, format) - not the dump itself. Download the file from `downloadUrl` to get the data.",
+    "mimeType": "application/ld+json"
+   }
+  ]
+ }
+}

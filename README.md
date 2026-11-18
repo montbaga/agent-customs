@@ -1,27 +1,29 @@
 <div align="center">
 
+<p align="center">
+<a href="README.md"><img src="docs/images/tab-readme-on.svg" alt="README (this page)" height="46"></a><a href="ARCHITECTURE.md"><img src="docs/images/tab-architecture-off.svg" alt="Architecture" height="46"></a><a href="PAPER.md"><img src="docs/images/tab-paper-off.svg" alt="Paper" height="46"></a><a href="LICENSE.md"><img src="docs/images/tab-license-off.svg" alt="License" height="46"></a>
+</p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-banner-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-banner-light.svg">
-  <img src="docs/images/hero-banner-dark.svg" alt="Agent Customs — safety checks for AI agents from other websites" width="100%">
+  <img src="docs/images/hero-banner-dark.svg" alt="Agent Customs, safety checks for AI agents from other websites" width="100%">
 </picture>
 
 <br><br>
 
-[**Live Inspection Desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
-[**Practice Site**](https://montbaga.github.io/agent-customs/practice/) &nbsp;·&nbsp;
-[**Test Range**](https://agent-customs-range.github.io/) &nbsp;·&nbsp;
-[**Threat Model (`PAPER.md`)**](PAPER.md) &nbsp;·&nbsp;
-[**Benchmark**](#5--agent-customs-bench-npm-run-bench--papermd) &nbsp;·&nbsp;
-[**Add Guard**](#add-the-guard-to-your-site) &nbsp;·&nbsp;
+[**Live desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
+[**Practice site**](https://montbaga.github.io/agent-customs/practice/) &nbsp;·&nbsp;
+[**Test range**](https://agent-customs-range.github.io/) &nbsp;·&nbsp;
+[**Add the guard**](#add-the-guard-to-your-site) &nbsp;·&nbsp;
 [**Contact**](#lets-talk)
 
 <br>
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
-<a href="#5--agent-customs-bench-npm-run-bench--papermd"><img alt="Bench: 87.8% blocked · 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Checks: 161 passing" src="https://img.shields.io/badge/tests-161_passing-ece4d3?labelColor=0c1d18"></a>
-<img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18">
+<a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 166 passing" src="https://img.shields.io/badge/tests-166_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
 
@@ -29,9 +31,9 @@
 
 <br>
 
-> **The problem in one minute:** On Cognizant's [Open Agentic Web](https://github.com/cognizant-ai-labs/agentic-web), one website's AI assistant can call another website's assistant. When it does, that partner runs **in your browser**, on **your API key**, reading **your request**. A dishonest site can hide orders in invisible Unicode characters that people cannot see — and today's consent card only shows the partner's name and URL, never what its instructions say.
+> **The problem in one minute.** On Cognizant's [Open Agentic Web](https://github.com/cognizant-ai-labs/agentic-web), one website's AI assistant can call another website's assistant. That partner then runs in your browser, on your API key, reading your request. A dishonest site can hide orders in characters people cannot see, and the consent card only shows the partner's name and address, never its instructions.
 >
-> **Agent Customs is passport control before execution.** Deterministic rules inspect the partner's compiled files at **\$0 LLM cost** and stamp every network **Cleared**, **Held for review**, or **Entry denied** — pin approved versions against silent rug pulls, and enforce runtime locks that cannot be talked out of a verdict.
+> **Agent Customs is passport control for those partners.** Fixed rules read the partner's files before they run, at no AI cost, and stamp them *Cleared*, *Held for review* or *Entry denied*. It remembers the version you approved, so a silent change gets caught, and it keeps runtime locks on that no clever wording can talk out of a verdict.
 
 <br>
 
@@ -45,22 +47,22 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 <tr>
 <td width="33.3%" valign="top">
   <strong>1 · Inspect any link</strong><br><br>
-  Paste an Open Agentic Web network, Google A2A Agent Card, or MCP catalog/<code>server.json</code> URL without an API key. Get a verdict, decoded invisible text, capability flow, and fixes.
+  Paste an Open Agentic Web network, a Google A2A agent card or an MCP server address. No API key needed. You get a stamp, the hidden text decoded, the data paths and how to fix each problem.
 </td>
 <td width="33.3%" valign="top">
-  <strong>2 · Pin against rug pulls</strong><br><br>
-  Approve a clean version to store its SHA-256 fingerprint in this browser (plus persisted MCP <code>listTools()</code> pins stored via <code>PinStore</code> / <code>localStorage</code>, forgettable from the Desk Approvals tab). If files drift later, the guard holds them and shows the diff.
+  <strong>2 · Catch silent changes</strong><br><br>
+  Approving a clean version saves its fingerprint in your browser, for networks and for MCP tool lists. If the files change later, the guard holds them and shows what changed, line by line.
 </td>
 <td width="33.3%" valign="top">
-  <strong>3 · Guard silently live</strong><br><br>
-  Drop two lines into any <code>agentify-website</code> app. Every partner call passes through checkpoint inspection and Lock 1–3 runtime guards automatically before running.
+  <strong>3 · Guard every call</strong><br><br>
+  Add one folder and two lines to any <code>agentify-website</code> site. Every partner call is then checked before it runs, and three locks stay on while it runs.
 </td>
 </tr>
 </table>
 
 <p align="center">
-  <img src="docs/images/hidden-sentence.jpg" alt="What people see vs what the AI model reads: 182 hidden Unicode tag characters decoded by Agent Customs" width="100%">
-  <br><sub><b>Shady Pizza</b> shows visitors one plain sentence. Beneath it sit 182 invisible tag characters demanding card numbers and CVVs — decoded and blocked on entry.</sub>
+  <img src="docs/images/hidden-sentence.jpg" alt="What people see and what the AI model reads: 182 hidden Unicode tag characters decoded by Agent Customs" width="100%">
+  <br><sub><b>Shady Pizza</b> shows visitors one plain sentence. Behind it sit 182 invisible characters asking for card numbers and CVVs. Agent Customs decodes them and refuses entry.</sub>
 </p>
 
 ---
@@ -72,28 +74,39 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 | At the airport | On the Open Agentic Web |
 | :--- | :--- |
 | A traveller arriving from abroad | Another website's AI assistant |
-| The country they want to enter | Your browser, your AI key, and your conversation |
-| The customs officer & X-ray desk | Agent Customs |
-| The passport stamp | **Cleared**, **Held for review**, or **Entry denied** |
+| The country they want to enter | Your browser, your AI key and your conversation |
+| The customs officer and the X-ray belt | Agent Customs |
+| The passport stamp | *Cleared*, *Held for review* or *Entry denied* |
 
 <details open>
-<summary><b>Who uses Agent Customs, and why</b></summary>
+<summary><b>Who uses it, and why</b></summary>
 
-| Who | Why it matters |
+| Who | Why |
 | :--- | :--- |
-| **Site owners linking to partners** | If a partner's assistant tricks people, your visitors get hurt and your site gets blamed. Inspect partners before linking, like checking references. |
-| **Sites needing 24/7 guardrails** | One pre-launch check isn't enough if a partner changes next week. The guard checks compiled partner files on every load and blocks rug pulls. |
-| **Publishers before shipping** | Like spell-check before launch: catches spec bugs, missing CORS headers, accidentally exposed keys, and overly broad `sly_data` permissions. |
-| **Directories & auditors** | Batch-inspect lists of agentic websites with `node bin/agent-customs.mjs check` / SARIF CI gates or verify tamper-evident ECDSA receipts. |
-| **Everyday visitors** | Protected transparently on any guarded site without installing extensions or ever visiting this desk. |
+| **Sites that link to partners** | If a partner's assistant tricks people, your visitors get hurt and your site gets the blame. Check partners before you link to them, the way you would check references. |
+| **Sites that need a guard all the time** | A check before launch is not enough if a partner changes next week. The guard checks the partner's files on every load. |
+| **Publishers, before they ship** | Like a spell-check: it finds spec mistakes, missing CORS headers, keys left in files and `sly_data` permissions that are wider than needed. |
+| **Directories and reviewers** | Check whole lists of agent sites from the command line or in CI, and verify signed stamps. |
+| **Visitors** | Protected on any guarded site, without installing anything. |
 
 </details>
 
 ---
 
+## What is new in this version
+
+This round fixed a weakness in how the rules handled their own exceptions, and it was measured on 237 real tools the rules had never seen.
+
+- An exception can only soften a warning, never remove it. Some honest tools sound like attacks: "we email you a 6-digit code", "the tracking link". Before, the rules removed the warning for such wording, and copied scams passed silently. Now the wording only turns a finding into a note, so the stamp becomes *Cleared with conditions* and the visitor still sees it.
+- Signatures and data are recognised by what they are. Standard signatures on agent cards and Base64-encoded JSON are decoded and checked, wherever they appear, instead of being matched by field name.
+- Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
+- Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
+
+---
+
 ## Add the guard to your site
 
-Any site built with Cognizant's `agentify-website` kit adds full protection in two steps — **no server, no build step, zero runtime edits**:
+Any site built with Cognizant's `agentify-website` kit can add it in two steps. There is no server and no build step, and the runtime stays unchanged.
 
 **1. Copy** [`site/customs/`](site/customs/) next to your `runtime/` folder.  
 **2. Add two lines** to your `site.js`:
@@ -112,30 +125,32 @@ installCustomsGuard(booted.engine);
   <img src="docs/images/checkpoint-flow-dark.svg" alt="Partner call checkpoint flow: consent card, customs guard inspection, and verdict outcomes" width="100%">
 </picture>
 
-- **Safe notices in chat:** Under every partner consent card, visitors see the verdict, issues found, and a **See the full report** link — written strictly in Agent Customs' own rule titles (`guard-notice.js`) so decoded payloads never leak into the LLM prompt.
-- **Same exact compiled objects:** The guard checks the exact network objects `engine._compile` just built, after visitor consent and before execution — so a server cannot show one file to a scanner and execute another (`tests/practice.test.mjs` verifies all 58 upstream kit files stay untouched).
+- Notices in the chat. Under every partner consent card, visitors see the stamp, the problems found and a *See the full report* link. The notice uses Agent Customs' own wording only, so a partner's hidden text never reaches the model through it.
+- It checks what will actually run. The guard inspects the network objects the runtime has just compiled, after the visitor agrees and before anything runs. A server cannot show one file to the scanner and run another. A test confirms that all 58 of Cognizant's kit files stay untouched.
+
+New to the design? [**How it works**](ARCHITECTURE.md) explains every step with diagrams.
 
 <details open>
-<summary><b>Guard options (strict mode, opt-in semanticJudge, custom dialogs, trusted actions)</b></summary>
+<summary><b>Guard options</b></summary>
 
-`installCustomsGuard(engine)` needs no options. Customize behavior with:
+`installCustomsGuard(engine)` works with no options. These change its behaviour:
 
 | Option | Default | What it does |
 | :--- | :--- | :--- |
-| `strict` | `false` | Enables zero-trust mode: asks before every partner, never auto-pins, ignores `trustedActions`, blocks outbound PII |
-| `semanticJudge` | `false` | Opt-in Layer 2 AI semantic escalation (`true` calls caller's configured provider over `CLEARED`/`CONDITIONS` outputs; default `false` keeps checks deterministic at `0` tokens) |
-| `locks` | `true` | `false` disables Lock 1–3 runtime protections (secrets redaction, reply quarantine, MCP tool pinning, action gate, canary) |
-| `canary` | `true` | Injects a synthetic session canary into the top front agent's instructions and revokes partner pins on leak |
-| `trustedActions` | `[]` | Harmless UI-only action names exempt from extra confirmation clicks after an external reply |
-| `store` | Origin `localStorage` | Custom `PinStore` backend for approved partner SHA-256 and MCP tool-list pins |
-| `policy` | Deny bad, ask held | Customize which verdicts block automatically vs prompt the user |
-| `confirmEntry` | Built-in modal | `async (report) => boolean` handles **Held for review** and drift decisions |
-| `notice` | Chat notice card | `false` disables notices; `(report) => true` renders your own UI notice |
-| `reportPage` | Public Desk URL | Target URL opened by **See the full report** |
-| `openReport` | None | `(url) => void` opens reports inside your own page |
-| `onReport` | None | Callback fired on every partner inspection for telemetry/logging |
-| `onLock` | None | Fires `{ lock, kind, where, reason }` whenever a runtime lock blocks sensitive data |
-| `onCanaryTrip` | None | Fires `{ encoding, where, partners, revoked }` when Lock 3 detects a canary leak |
+| `strict` | `false` | Asks before every partner, never pins on its own, ignores `trustedActions` and blocks personal details going out |
+| `semanticJudge` | `false` | Opt-in AI check of *Cleared* and *Cleared with conditions* results, using the site's own AI provider. It can only make a verdict stricter. Off means no tokens are used |
+| `locks` | `true` | `false` turns off the three runtime locks and MCP tool pinning |
+| `canary` | `true` | Plants a canary word in your assistant's instructions and withdraws a partner's approval if it leaks |
+| `trustedActions` | `[]` | Harmless page actions that do not need an extra click after a partner reply |
+| `store` | `localStorage` | Where approved fingerprints and MCP tool-list pins are kept |
+| `policy` | Deny bad, ask on held | Which stamps block on their own and which ask the visitor |
+| `confirmEntry` | Built-in dialog | `async (report) => boolean`, called for *Held for review* and for changed versions |
+| `notice` | Chat notice | `false` hides it, or pass a function to draw your own |
+| `reportPage` | The public desk | The page *See the full report* opens |
+| `openReport` | None | `(url) => void` to open reports inside your own page |
+| `onReport` | None | Called after every partner inspection |
+| `onLock` | None | Called with `{ lock, kind, where, reason }` when a lock stops something |
+| `onCanaryTrip` | None | Called with `{ encoding, where, partners, revoked }` when the canary leaks |
 
 </details>
 
@@ -143,37 +158,37 @@ installCustomsGuard(booted.engine);
 
 ## Try it yourself
 
-Three ways to explore Agent Customs, fastest first:
+Three ways in, fastest first:
 
 <table width="100%">
 <tr>
 <td width="33.3%" valign="top">
-  <strong>1 · Automatic Test Suite</strong><br><br>
-  No browser or API key needed:<br><br>
+  <strong>1 · The test suite</strong><br><br>
+  No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  Runs 161 tests across attacks, frozen Rounds 2–3 &amp; re-check controls, real-world MCP/A2A Batches 1–3, <code>probe6</code>/<code>probe7</code> &amp; anti-overfit guards, Unicode obfuscation, capability flow, canary tripwires, certificates, benchmarks, CLI, extension, and the practice site.
+  166 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension and the practice site.
 </td>
 <td width="33.3%" valign="top">
-  <strong>2 · Inspection Desk (No Key)</strong><br><br>
-  Open the <a href="https://montbaga.github.io/agent-customs/"><strong>Live Desk</strong></a>:<br>
+  <strong>2 · The inspection desk (no key)</strong><br><br>
+  Open the <a href="https://montbaga.github.io/agent-customs/"><strong>live desk</strong></a>:<br>
   • <strong>Shady Pizza</strong> → <em>Entry denied</em><br>
   • <strong>Sunny Bakery</strong> → <em>Cleared</em><br>
-  • <strong>A2A, MCP &amp; chains</strong> → 1-click samples<br>
-  • <strong>Verify</strong> receipt tab + <strong>Attack lab</strong> section<br>
+  • <strong>A2A, MCP and chains</strong> → one-click samples<br>
+  • <strong>Verify</strong> tab and <strong>Attack lab</strong><br>
   • <strong>Compare</strong> → <em>Try the rug-pull sample</em>
 </td>
 <td width="33.3%" valign="top">
-  <strong>3 · Officer / Practice Site</strong><br><br>
-  Paste a key (Google AI Studio &amp; Groq have free tiers) on <strong>Officer</strong> or <a href="https://montbaga.github.io/agent-customs/practice/"><strong>Practice Site</strong></a>:<br>
-  • Ask <code>Ask Shady Pizza what it offers.</code> → blocked safely<br>
-  • Ask <code>Ask Sunny Bakery what it offers.</code> → runs cleanly
+  <strong>3 · The Officer or the practice site</strong><br><br>
+  Paste a key (Google AI Studio and Groq have free tiers) on <strong>Officer</strong> or the <a href="https://montbaga.github.io/agent-customs/practice/"><strong>practice site</strong></a>:<br>
+  • <code>Ask Shady Pizza what it offers.</code> → blocked<br>
+  • <code>Ask Sunny Bakery what it offers.</code> → runs normally
 </td>
 </tr>
 </table>
 
-### The Practice Site: [Main Street Guide](https://montbaga.github.io/agent-customs/practice/)
+### The practice site: [Main Street Guide](https://montbaga.github.io/agent-customs/practice/)
 
-An ordinary town-guide app built with Cognizant's kit in a completely different palette ([`practice/`](practice/)), wired up using only the 2-line guard install:
+An ordinary town-guide site built with Cognizant's kit, in its own colours ([`practice/`](practice/)). The only change is the two-line guard install:
 
 <p align="center">
   <img src="docs/images/practice-home.jpg" alt="Main Street Guide practice site showing three shops and their guard stamps" width="100%">
@@ -181,22 +196,22 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
 
 <table>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/practice-change.jpg" alt="Only one folder and two lines added to site.js"><br><sub><b>1 · Minimal integration:</b> Copy <code>customs/</code> and add two lines in <code>site.js</code>. Zero edits to runtime code.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/practice-consent.jpg" alt="Runtime consent card before contact"><br><sub><b>2 · Visitor agrees first:</b> The runtime asks permission before fetching a single byte from the partner.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/practice-change.jpg" alt="Only one folder and two lines added to site.js"><br><sub><b>1 · The whole change:</b> copy <code>customs/</code> and add two lines to <code>site.js</code>. The runtime code is not touched.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/practice-consent.jpg" alt="Runtime consent card before contact"><br><sub><b>2 · The visitor agrees first:</b> the runtime asks before it fetches anything from the partner.</sub></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/practice-refused.jpg" alt="Shady Pizza refused before running"><br><sub><b>3 · Entry denied:</b> Shady Pizza is stopped cold before running; the chat lists all 9 problems safely.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/practice-held.jpg" alt="Loop Maze held for visitor decision"><br><sub><b>4 · Held for review:</b> Borderline sites like Loop Maze show findings and let the visitor decide.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/practice-refused.jpg" alt="Shady Pizza refused before running"><br><sub><b>3 · Entry denied:</b> Shady Pizza is stopped before it runs, and the chat lists its 9 problems.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/practice-held.jpg" alt="Loop Maze held for visitor decision"><br><sub><b>4 · Held for review:</b> borderline sites such as Loop Maze show what was found and let the visitor decide.</sub></td>
   </tr>
 </table>
 
 <details open>
-<summary><b>What <code>tests/practice.test.mjs</code> verifies automatically</b></summary>
+<summary><b>What <code>tests/practice.test.mjs</code> checks</b></summary>
 
-- `practice/customs/` and `practice/runtime/` stay byte-for-byte synced with `site/`.
-- `practice/site.js` contains only the two guard lines (`installCustomsGuard` import + call).
-- The network passes Cognizant's official `build_network.mjs --check`.
-- End-to-end execution clears `Sunny Bakery`, refuses `Shady Pizza`, and holds `Loop Maze`.
+- `practice/customs/` and `practice/runtime/` are exact copies of `site/`.
+- `practice/site.js` differs only by the two guard lines.
+- The network passes Cognizant's `build_network.mjs --check`.
+- Run for real, it clears Sunny Bakery, refuses Shady Pizza and holds Loop Maze.
 
 </details>
 
@@ -207,63 +222,61 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/five-checks-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/five-checks-light.svg">
-  <img src="docs/images/five-checks-dark.svg" alt="Five Inspection Gates: Papers, Contraband, Itinerary, Privacy, Identity" width="100%">
+  <img src="docs/images/five-checks-dark.svg" alt="Five inspection gates: Papers, Contraband, Itinerary, Privacy, Identity" width="100%">
 </picture>
 
 <br>
 
-| Verdict Stamp | Meaning | What the Guard Does |
+| Stamp | Meaning | What the guard does |
 | :--- | :--- | :--- |
-| **`Cleared`** | No known problems found | Admits partner and pins its SHA-256 fingerprint |
-| **`Cleared with conditions`** | Minor hygiene notes listed | Admits partner with visible conditions and pins it |
-| **`Held for review`** | Unusual limits, unfamiliar language, or post-approval drift | Pauses and asks the visitor to approve or turn it away |
-| **`Entry denied`** | Hidden commands, injection, phishing, or leak links | Blocks execution completely; explains why safely |
-| **`Papers not in order`** | Invalid Open Agentic Web, A2A, or MCP schema | Refuses broken manifest before execution |
-| **`Could not inspect`** | Unreachable host or missing CORS header | Nothing loads or executes |
+| **Cleared** | No known problem found | Lets the partner in and remembers this version |
+| **Cleared with conditions** | Only notes, nothing serious | Lets it in, shows the notes, remembers this version |
+| **Held for review** | Something a person should look at, a language it cannot check, or a change since approval | Pauses and asks the visitor |
+| **Entry denied** | Hidden orders, phishing or leak links | Blocks it and explains why |
+| **Papers not in order** | Broken Open Agentic Web, A2A or MCP files | Refuses it before it runs |
+| **Could not inspect** | The host cannot be reached or does not allow cross-site reads | Nothing loads |
 
-### Desk Gallery
+### Screens
 
 <p align="center">
-  <img src="docs/images/hero.jpg" alt="Agent Customs hero page replaying Shady Pizza inspection" width="100%">
-  <br><sub>Live landing experience: paste any agent network URL or replay an instant inspection.</sub>
+  <img src="docs/images/hero.jpg" alt="Agent Customs home page replaying the Shady Pizza inspection" width="100%">
+  <br><sub>The home page: paste any agent address, or watch a recorded inspection.</sub>
 </p>
 
 <table>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/report-denied.jpg" alt="Denied report for Shady Pizza with decoded hidden instructions"><br><sub><b>Report (Denied):</b> Every finding maps to its exact agent, why it matters, how to fix it, and red-highlighted decoded Unicode.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/report-cleared.jpg" alt="Cleared report for Sunny Bakery with 15/15 spec checks passing"><br><sub><b>Report (Cleared):</b> 15/15 spec checks tied to section numbers, plus a unique SHA-256 network fingerprint.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/report-denied.jpg" alt="Denied report for Shady Pizza with decoded hidden instructions"><br><sub><b>A denied report:</b> every finding names its agent, why it matters and how to fix it, with the decoded hidden text in red.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/report-cleared.jpg" alt="Cleared report for Sunny Bakery with 15/15 spec checks passing"><br><sub><b>A cleared report:</b> 15 of 15 spec checks, each tied to its spec section, and the network's fingerprint.</sub></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/compare.jpg" alt="Compare view showing diff of Sunny Bakery after a silent rug pull"><br><sub><b>Compare (Rug Pulls):</b> Highlights line-by-line diffs when a previously clean network adds data-harvesting prompts or new partners.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/officer.jpg" alt="Officer tab unified BYOK model picker"><br><sub><b>Officer:</b> Bring your own key (Claude, GPT, Gemini, Groq, OpenRouter, or custom) to inspect, explain, and test partners safely.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/compare.jpg" alt="Compare view showing what changed in Sunny Bakery after a silent rug pull"><br><sub><b>Compare:</b> shows line by line what changed when a clean network later adds data-harvesting text or new partners.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/officer.jpg" alt="Officer tab with the bring-your-own-key model picker"><br><sub><b>Officer:</b> bring your own key (Claude, GPT, Gemini, Groq, OpenRouter or any compatible service) to have reports explained in plain words.</sub></td>
   </tr>
 </table>
 
-### Phase 1–3 Showcase
-
 <table>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/phase1-mcp-trifecta.jpg" alt="Phase 1 MCP Lethal Trifecta held for review report"><br><sub><b>Phase 1 — MCP &amp; Lethal Trifecta:</b> Inspects <code>mcp.json</code> manifests, traces capability paths across tool names, schemas, and external sinks, and grades <code>Papers 3/7 pass</code>.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/phase2-verify.jpg" alt="Phase 2 ES256 Customs Certificate signature verification"><br><sub><b>Phase 2 — Signed Receipt Verification:</b> Verifies ES256 signatures on exported Customs Certificates locally and compares against the live endpoint fingerprint.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase1-mcp-trifecta.jpg" alt="An MCP server held for a data path"><br><sub><b>MCP servers:</b> reads <code>mcp.json</code> and tool lists and follows the data paths across tool names, schemas and outside addresses.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase2-verify.jpg" alt="Verify tab checking a signed certificate"><br><sub><b>Verify:</b> checks the signature on an exported certificate in your browser and compares it with the live network.</sub></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Phase 2 and 3 Attack Lab simulation paired with the Agent Customs Bench scorecard"><br><sub><b>Phase 2 &amp; 3 — Attack Lab &amp; Benchmark:</b> Side-by-side without/with Agent Customs simulation paired with the 184-case benchmark scorecard.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Phase 3 Builders panel showing CLI, Action, and Extension tabs"><br><sub><b>Phase 3 — For Builders (CLI, Action &amp; Extension):</b> Copy-ready integration tabs covering <code>site.js</code>, Node CLI, SARIF GitHub Action, and the browser extension.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Attack lab and benchmark scorecard"><br><sub><b>Attack lab and benchmark:</b> the same attacks with and without Agent Customs, next to the benchmark scorecard.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="For builders panel with CLI, Action and Extension tabs"><br><sub><b>For builders:</b> ready-to-copy setup for <code>site.js</code>, the command line tool, the GitHub Action and the extension.</sub></td>
   </tr>
 </table>
 
 <p align="center">
-  <img src="docs/images/phase3-extension.jpg" alt="Phase 3 Chrome/Edge browser extension inspecting io.github.microsoft/playwright-mcp" width="72%">
-  <br><sub><b>Phase 3 — Browser Extension:</b> One-click MV3 popup inspection over optional <code>https://*/*</code> origin grants (shown inspecting <code>io.github.microsoft/playwright-mcp</code>).</sub>
+  <img src="docs/images/phase3-extension.jpg" alt="Browser extension inspecting the Playwright MCP server" width="72%">
+  <br><sub><b>Browser extension:</b> inspects the page you are on with one click, asking for access to that site only (shown on <code>io.github.microsoft/playwright-mcp</code>).</sub>
 </p>
 
 <details open>
-<summary><b>Mobile views (Inspection Desk &amp; Practice Site)</b></summary>
+<summary><b>On a phone</b></summary>
 
 <table>
   <tr>
-    <td width="50%" align="center"><img src="docs/images/phone-report.jpg" alt="Shady Pizza report on mobile" width="300"><br><sub>Agent Customs on mobile</sub></td>
-    <td width="50%" align="center"><img src="docs/images/practice-phone.jpg" alt="Practice site on mobile" width="300"><br><sub>Practice site on mobile</sub></td>
+    <td width="50%" align="center"><img src="docs/images/phone-report.jpg" alt="Shady Pizza report on a phone" width="300"><br><sub>The desk on a phone</sub></td>
+    <td width="50%" align="center"><img src="docs/images/practice-phone.jpg" alt="Practice site on a phone" width="300"><br><sub>The practice site on a phone</sub></td>
   </tr>
 </table>
 
@@ -271,117 +284,121 @@ An ordinary town-guide app built with Cognizant's kit in a completely different 
 
 ---
 
-## Defense in depth: runtime locks & signed stamps
+## How well it works
 
-Static rules catch known obfuscations and phrasing, **while runtime locks limit damage when novel attacks get through**:
+Rules catch known tricks. The runtime locks limit the damage when a new trick gets past the rules. Both are measured here, and the [paper](PAPER.md) has the method behind each number.
 
-### 1 · Three runtime locks (`locks.js`, `canary.js` + CSP)
+### 1 · The runtime locks
 
-| Lock | What it blocks | Mechanism |
+| Lock | What it stops | How |
 | :--- | :--- | :--- |
-| **Lock 1 · Secrets stay home** | Sending card numbers, IBANs, keys, or explicit creds out | Format-based matching with `\p{Nd}` Unicode digit folding (full-width, Arabic-Indic), bounded 1–4 char separators (`" -- "`), Luhn/IBAN check digits (bounded inbound-only `IMEI`/`IMSI`/`ICCID` exemptions, zero outbound exemptions), Base64 chunk decoding, and explicit credential redaction (`"bank login is ..."`) across turns, partner calls, MCP/sandbox args, actions, forms, and clicked links. |
-| **Lock 2 · Actions &amp; replies** | *"Quietly place an order"* &amp; side-channel payloads | Quarantines unsafe replies (incl. inline `System:` overrides &amp; email-login phishing while allowing benign few-shot dialogues), allow-lists output keys (`{ cruse, text, source, presentation }`), drops remote images (backed by page CSP `img-src 'self' data: blob:`) and external bare/full domains (with or without `/path`), persists MCP `listTools()` digests in `PinStore`, and gates state-changing actions on a human click. |
-| **Lock 3 · Armed canary trap** | Hidden prompt dumps &amp; encoded leaks | Appends a synthetic session canary (`ac_cnr_...`) to the top front agent's instructions at install/turn (restored cleanly on `uninstall()`). Outbound sinks walk string leaves inside objects and scan full tokens + random suffixes across raw, URL, ROT13, spaced, hex/spaced-hex, comma char codes, reversed, and 3-offset / wrapped Base64 (`80/80` at width 64 &amp; 76), halting execution and revoking partner approvals on trip. |
+| **Lock 1 · Secrets stay home** | Card numbers, IBANs, keys and typed-out logins leaving in partner requests, tool calls, actions, forms or links | It checks number formats and check digits (Luhn for cards, ISO 7064 for IBANs), also in other digit scripts and in Base64 |
+| **Lock 2 · Replies and actions** | "Quietly place an order", and data hidden in reply fields | It keeps only the expected reply fields, drops remote images and unknown links, pins MCP tool lists, and makes page actions wait for the visitor's click |
+| **Lock 3 · The canary** | Instructions leaking out, even encoded | It plants a canary word in your assistant's instructions and stops the call if the word shows up in anything going out, in any of ten encodings, then withdraws the partner's approval |
 
-### 2 · How well it catches tricks (`tests/attacks.test.mjs`)
-
-Tested continuously across scam wording, multi-language phrasing, adversarial paraphrases, and honest edge cases so legitimate sites aren't false-flagged:
+### 2 · Attack sentences (`tests/attacks.test.mjs`)
 
 | What was tested | Sentences | Result |
 | --- | --- | --- |
 | A second review's sentences, written to get past the rules | 23 | All get the right verdict now |
-| Scam sentences in English and the 10 checked languages | 32 | All blocked |
-| Scam sentences in 11 other languages | 11 | All held for a person |
+| Scam sentences in English and the 12 checked languages | 34 | All blocked |
+| Scam sentences in 9 other languages | 9 | All held for a person |
 | Honest English sentences, many close to a scam's wording | 27 | None flagged |
 | Honest sentences in other languages | 23 | None blocked |
 
-- **10 checked languages** (card/OTP/password requests blocked immediately): Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi, Arabic. Non-English sentences outside clear English are held for human review (`C-LANGUAGE`), including short 3-word accented Turkish, Indonesian, Swedish, Norwegian, Danish, Zulu, and Somali requests (`tests/round3.test.mjs`).
-- **Official &amp; contestant sanity checks:** Cognizant's official demos (`3 CLEARED`, `1 CONDITIONS`), Agent Customs itself, and all **61** offline curated benign bench controls evaluate cleanly with **0 false blocks**; re-scanning live public Open Agentic Web contestant networks (`29` live endpoints vs `28` prior baseline) recorded **0 unintended verdict regressions** (the two non-English `jennaira-store` product catalog descriptions shifted from `HOLD` to `CONDITIONS [C-LANGUAGE]` under documentation-field moderation).
-- **Real-world MCP &amp; A2A evaluation ([`tests/realworld.test.mjs`](tests/realworld.test.mjs)):** On **135** public live targets (17 well-known MCP servers, 83 MCP Registry servers, 35 Google A2A cards; **Batch 1**) frozen prior to edits, root-cause fixes cut false alarms from **43/135 (`32%`)** to **0/135 (`0%`)** (including **0/17** on well-known MCP servers) with all **10** risky targets flagged and zero regressions. After PR `#9` measured **9/57 (`15.8%`)** unseen false alarms (`reg-urls.txt` lines 151–310), **Batch 2 (`124` targets: 94 MCP Registry + 30 A2A cards, now a tuning set)** measured **23/124 (`18.5%`)** on `e080359` and **5/124 (`4.0%`)** tuned (`5/5` CORRECT targets flagged, **22/22** `probe6` bypass probes held/denied). A third unseen **Batch 3 (`138` fresh MCP Registry servers, now also a tuning set)** measured **`9/138` (`6.5%`)** true unseen false alarms on `02f0283` before fixes; closing **19/19** `probe7` exception-bypass attacks, removing Batch-2 overfit literals (verified by an automated 4-word fixture overlap test), and fixing general causes brought tuned Batch-3 false alarms to **0/138** (all **6/6** foreign-instruction `CORRECT` servers still held).
+The 12 checked languages are Spanish, French, German, Portuguese, Italian, Russian, Chinese, Japanese, Hindi, Arabic, Dutch and Indonesian. Text in any other language is held for a person to read, including short three-word requests in Turkish, Swedish, Norwegian, Danish, Zulu and Somali (`tests/round3.test.mjs`).
 
-### 3 · Tamper-evident signed stamps (`ES256`) & key anchor
+### 3 · Real MCP servers and A2A cards (`tests/realworld.test.mjs`)
 
-Agent Customs publishes ECDSA P-256 signed inspection receipts ([`receipts/index.json`](https://montbaga.github.io/agent-customs/receipts/index.json)) verified against [`.well-known/agent-customs-key.json`](https://montbaga.github.io/agent-customs/.well-known/agent-customs-key.json) with a 35-day expiry and live SHA-256 fingerprint matching:
+Five batches of public tools, fetched read-only and saved, each one from hosts no earlier batch had used. A false alarm is a *Held* or *Denied* stamp on a tool a person judged harmless.
+
+| Batch | Tools | First look (never seen before) | After fixing |
+| :--- | ---: | :--- | :--- |
+| 1 · well-known and Registry MCP servers, A2A cards | 135 | 43 (32%) | 0, with all 10 risky tools still held |
+| 2 · Registry MCP and A2A | 124 | 23 (18.5%) | 5 |
+| 3 · Registry MCP | 138 | 9 (6.5%) | 0 |
+| 4 · Registry MCP and A2A | 236 | 26 (11%) | 3 |
+| **5 · Registry MCP and A2A** | **237** | **13 (5.5%), with the current rules** | not tuned yet |
+
+The attack sets that target the rules' own exceptions are now all held: probe6 22 of 22, probe7 19 of 19, probe8 27 of 27 (with 12 of 12 honest look-alikes cleared). The newest set, probe9, was written after this round's changes. On its first run it held 11 of 18 new attack wordings, kept 9 of 10 exception-shaped attacks visible and cleared 10 of 10 honest lines. That is the honest measure of how the rules handle wording they were never written for.
+
+### 4 · The benchmark (`npm run bench`)
+
+Measured on a desktop with Node.js v24.18.0 and no AI model. The baseline is a plain word list run after the same Unicode cleaning, so the comparison is about the rules, not the decoding.
+
+| Set | Cases | Agent Customs | Word-list baseline | Avg time |
+| :--- | ---: | :--- | ---: | ---: |
+| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 10.76 ms |
+| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 3.07 ms |
+| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 4.90 ms |
+| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 2.66 ms |
+| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 1.45 ms |
+| Held-out, never tuned | 10 | 5/10 | 0.0% | 1.57 ms |
+| Outside wordings, quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 1.37 ms |
+| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 3.40 ms |
+| **All detection** | 159 | **86/98 blocked or held, 89/98 flagged** | 19/98 | **1.74 ms median** |
+| Lock and tamper self-tests | 25 | 25/25 pass | not applicable | about 1 ms |
+
+### 5 · Signed stamps (ES256)
+
+Agent Customs publishes signed inspection stamps ([`receipts/index.json`](https://montbaga.github.io/agent-customs/receipts/index.json)) for the public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json). Each stamp is signed with an ECDSA P-256 key, lasts 35 days, and records the network's fingerprint, so anyone can check it is genuine and still matches the live network. A GitHub workflow signs fresh ones every month.
 
 ```sh
 npm run receipts -- verify https://montbaga.github.io/agent-customs/receipts/agent-customs-range.github.io/shady_pizza/shady_pizza.json --live
 ```
 
-- **Pinned Public Key Fingerprint (`-DC99sDa-qJjBp2N`):**
-  `crv: "P-256"`, `kty: "EC"`, `x: "Wzq2yNI2mFX6Iz-GBeV7LKacVokiI396oifQRocfzxo"`, `y: "qdaCQ4K-07HN5yiq8CfFVUgRVtJm5uszNMsjuBqWQic"` (mirrored at [`site/.well-known/agent-customs-key.json`](site/.well-known/agent-customs-key.json)).
+- The public key (`-DC99sDa-qJjBp2N`): `crv: "P-256"`, `kty: "EC"`, `x: "Wzq2yNI2mFX6Iz-GBeV7LKacVokiI396oifQRocfzxo"`, `y: "qdaCQ4K-07HN5yiq8CfFVUgRVtJm5uszNMsjuBqWQic"`, also at [`site/.well-known/agent-customs-key.json`](site/.well-known/agent-customs-key.json).
+- Joining the list: site owners can open a pull request that adds their public address to `tools/receipt-sites.json`. A network that is not on the list gets an unsigned browser snapshot instead, whose fingerprint can still be checked on the **Verify** tab.
 
-> **Origin isolation note:** Browser `localStorage` pins and saved BYOK keys are scoped per origin (`<account>.github.io`). Production deployments should host Agent Customs on its own dedicated origin rather than sharing an origin with unrelated static portfolios.
+### 6 · What else it reads
 
-Public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json) receive regularly refreshed, centrally signed stamps (`npm run receipts -- sign`). Website owners can open a pull request adding their public URL to [`tools/receipt-sites.json`](tools/receipt-sites.json) to join the signed directory; any site not on that list generates an **unsigned browser snapshot** whose recorded SHA-256 fingerprint can still be matched live on the **Verify** tab.
-
-### 4 · Multi-protocol adapters, capability flow & clearance certificates
-
-- **Open Agentic Web, Google A2A &amp; MCP (`protocols.js`):** Discovers `agent-manifest.json`/`.network.json`, Google A2A Agent Cards (`.well-known/agent.json`, `.well-known/agent-card.json`, including `supportedInterfaces` and `additionalInterfaces`), MCP catalogs/`mcpServers`/Streamable HTTP discovery endpoints, and official MCP Registry `server.json` (`packages` and `remotes`) — scanning instructions, `outputSchema`, `annotations.title`, `prompts[].messages`, A2A `skills[].name`, identifier-split schema keys, shell runners, and a generic `rawDoc` walk.
-- **Name- &amp; schema-based "Lethal Trifecta" (`capabilities.js`, `S-TRIFECTA`):** Splits `camelCase` and `snake_case` identifiers across tool names, descriptions, parameters, REST toolboxes, and off-origin URLs to flag untrusted input + sensitive access + external egress paths even in polite prose. Untrusted MCP `annotations` can raise risk, never suppress concrete name, schema, or off-origin signals.
-- **Bounded transitive checks (`R-TRANSITIVE`):** Follows same-origin partner references automatically (up to depth 2, 6 targets, cycle-safe) and supports opting in to cross-origin downstream checks on the Desk (`--transitive` in CLI).
-- **Clearance Certificates &amp; Verify dropzone (`certificate.js`):** Export standalone SVG, printable HTML (`Unsigned` notice on PDFs), or 2× PNG cards with embedded ES256 metadata, or drop `.svg`, `.json`, `.html`, or `.pdf` files on the **Verify** tab to check their signature and live SHA-256 fingerprint.
-- **Side-by-side Attack lab (`arena.js`):** Replay hidden Unicode theft, Lethal Trifecta MCP leaks, Base64 canary traps, and rug pulls without an API key (`#lab` section).
-
-### 5 · Agent Customs Bench (`npm run bench` — [PAPER.md](PAPER.md))
-
-Reproducible desktop benchmark (Node.js v24.18.0, win32, **`$0` model tokens**) cleanly separating **Static Detection (`98` hostile across Rounds 1–3, internal un-tuned Held-out, and quoted external probes + `61` benign controls)** from **Runtime Lock &amp; Integrity Self-Tests (`25` checks)**, compared against a **Normalized Regex Baseline** run *after* identical NFKC, tag-character decoding, and invisible-character stripping:
-
-| Suite / Category | Cases | Agent Customs | Normalized Regex Baseline | Avg Latency |
-| :--- | ---: | :--- | ---: | ---: |
-| **Round 1 · `unicode_obfuscation`** | 12 | **100.0%** blocked/held | 58.3% | 10.76 ms |
-| **Round 1 · `prompt_and_phishing`** | 24 | **100.0%** blocked/held | 16.7% | 3.07 ms |
-| **Round 1 · `a2a_mcp_supply_chain`** | 6 | **66.7%** blocked/held *(**100%** flagged)* | 33.3% | 4.90 ms |
-| **Round 2 · `round2_adversarial`** *(red team, pre-fix 3/24)* | 24 | **95.8%** blocked/held *(**100%** flagged)* | 20.8% | 2.66 ms |
-| **Round 3 · `round3_generalization`** *(pre-fix 0/15)* | 15 | **100.0%** blocked/held | 0.0% | 1.45 ms |
-| **Held-out · `heldout_unseen`** *(internal, post-fix)* | 10 | **50.0%** blocked/held | 0.0% | 1.57 ms |
-| **External · `external_heldout_quoted`** *(7 quoted from 20-case third-party set; `1/20` → `4/20` on full set)* | 7 | **42.9%** blocked/held *(via format rules)* | 14.3% | 1.37 ms |
-| **Benign controls** *(3 official demos, 14 MCP/A2A, Round 3, held-out &amp; re-check)* | 61 | **100.0%** unblocked (**0% false blocks** on curated controls; 57 `CLEARED`, 4 `CONDITIONS`) | 91.8% *(8.2% false blocks)* | 3.40 ms |
-| **Static Detection Total** | **159** | **86/98 (`87.8%`) blocked/held · 89/98 (`90.8%`) flagged** | **19/98 (`19.4%`) · 8.2% FP** | **1.74 ms detection median** |
-| Lock &amp; integrity self-tests (`locks` + `tampering`) | 25 | **25/25 (`100%`) passing** | *N/A* | 0.97–0.99 ms avg |
-
-See [**PAPER.md**](PAPER.md) for the full threat model, 5-layer diagram, commit provenance for frozen Round 2/3/external sets, and honest unseen-phrasing ceilings (`node tools/bench.mjs --verbose`).
+- Three protocols (`protocols.js`): Open Agentic Web networks, Google A2A cards (`agent.json`, `agent-card.json`, including other interfaces they list) and MCP (`mcp.json`, `mcpServers`, Streamable HTTP, Registry `server.json`). It reads every field a model sees, including output schemas, tool titles, prompt messages and A2A skill names.
+- Data paths (`capabilities.js`): it splits `camelCase` and `snake_case` names, so `getUserFiles` and `get_user_files` read the same, and it follows tools, schemas, REST toolboxes and outside addresses. A server's own hints can raise the risk, never lower it.
+- Partners of partners: it follows same-site partner links up to two levels deep, six targets at most, and can follow other sites too if you ask (`--transitive` on the command line).
+- Certificates (`certificate.js`): export an SVG, a printable page or a PNG, or drop one on the **Verify** tab to check it.
+- Attack lab (`arena.js`): replays hidden-text theft, an MCP data leak, the canary trap and a rug pull, without an API key.
 
 ---
 
 ## The test range
 
-The dedicated second-origin test site at https://agent-customs-range.github.io/ hosts deliberately unsafe sample networks (using non-resolving `.invalid` attacker domains):
+A second site, https://agent-customs-range.github.io/, hosts sample networks, some honest and some deliberately unsafe. The unsafe ones point at `.invalid` addresses that do not exist.
 
-| Network | What it demonstrates | Stamp |
+| Network | What it shows | Stamp |
 | :--- | :--- | :--- |
-| **`sunny_bakery`** | Honest reference network + clean spec | `Cleared` |
-| **`shady_pizza`** | Hidden Unicode tags, card theft, remote image leak, reviewer jailbreak | `Entry denied` |
-| **`bank_helper`** | Cyrillic homoglyph (`Marrow Point Sаvings`), OTP phishing, unpinned code | `Entry denied` |
-| **`loop_maze`** | Mutual recursion, self-URL call, 500-step budget, invisible/bidi text | `Held for review` |
-| **`rugpull/sunny_bakery`** | Silent post-approval update asking for contact details + new partner link | `Held for review` |
+| **`sunny_bakery`** | An honest reference network | *Cleared* |
+| **`shady_pizza`** | Hidden Unicode text, card theft, a remote image leak, a note aimed at reviewers | *Entry denied* |
+| **`bank_helper`** | A look-alike bank name (`Marrow Point Sаvings` with a Russian "а"), a request for a one-time code, unpinned code | *Entry denied* |
+| **`loop_maze`** | Agents calling each other in a loop, a 500-step budget, invisible and right-to-left text | *Held for review* |
+| **`rugpull/sunny_bakery`** | A later version of the bakery that asks for contact details and adds a new partner | *Held for review* |
 
 ---
 
-## Run it everywhere (CLI, GitHub Action, Chrome / Edge Extension)
+## Run it anywhere: command line, GitHub Action, browser extension
 
-Requires Node 22+ and zero npm packages.
+Needs Node 22 or newer and no npm packages.
 
 <table width="100%">
 <tr>
 <td width="33.3%" valign="top">
-  <strong>1 · CLI &amp; Benchmark</strong><br><br>
-  Scan URLs, local folders, MCP/A2A manifests, or verify ES256 receipts:<br><br>
+  <strong>1 · Command line and benchmark</strong><br><br>
+  Check addresses, folders, MCP and A2A files, or verify stamps:<br><br>
   <code>npm test</code><br>
   <code>npm run bench -- --verbose</code><br>
   <code>node bin/agent-customs.mjs check https://raw.githubusercontent.com/microsoft/playwright-mcp/main/server.json</code>
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · GitHub Action (<code>action.yml</code>)</strong><br><br>
-  Block PRs introducing hidden prompts, leaked keys, or toxic MCP configs with native SARIF uploads:<br><br>
+  Stops pull requests that add hidden prompts, leaked keys or risky MCP setups, with SARIF results in the Security tab:<br><br>
   <code>uses: montbaga/agent-customs@main</code><br>
-  Supports <code>strict</code>, <code>allow-hold</code>, <code>transitive</code>, and <code>sarif-file</code>.
+  Options: <code>strict</code>, <code>allow-hold</code>, <code>transitive</code>, <code>sarif-file</code>.
 </td>
 <td width="33.3%" valign="top">
-  <strong>3 · Chrome / Edge Extension</strong><br><br>
-  Inspect live <code>https://</code> websites past CORS using per-origin <code>optional_host_permissions</code> (<code>https://*/*</code> on click):<br><br>
+  <strong>3 · Chrome or Edge extension</strong><br><br>
+  Inspects live <code>https://</code> sites that block cross-site reads, asking for access to one site at a time:<br><br>
   1. Run <code>npm run extension</code><br>
   2. Open <code>chrome://extensions</code> (Developer mode)<br>
-  3. <strong>Load unpacked</strong> → select <a href="extension/"><code>extension/</code></a>
+  3. <strong>Load unpacked</strong> → pick <a href="extension/"><code>extension/</code></a>
 </td>
 </tr>
 </table>
@@ -389,14 +406,14 @@ Requires Node 22+ and zero npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 161 checks (attacks, Rounds 2–3, re-check controls, Batches 1–3, probe6/7, locks, CLI, bench & extension)
-npm run bench -- --verbose              # Print separated benchmark scorecard + flagged breakdown
-npm run check && npm run check:practice # Validate Agent Customs & practice networks with Cognizant's kit
+npm test                                # 166 tests
+npm run bench -- --verbose              # the benchmark, with every flagged case
+npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
 node bin/agent-customs.mjs verify site/receipts/agent-customs-range.github.io/sunny_bakery/sunny_bakery.json --live
 ```
 
-**GitHub Action usage (add `if: always()` so SARIF uploads even on non-zero `HOLD`/`DENIED` exits):**
+**In a GitHub workflow** (keep `if: always()` so the SARIF file uploads even when a check holds or denies):
 
 ```yaml
 - uses: montbaga/agent-customs@main
@@ -410,101 +427,107 @@ node bin/agent-customs.mjs verify site/receipts/agent-customs-range.github.io/su
     sarif_file: agent-customs.sarif
 ```
 
-### Watch the live server & rug-pull simulation
+### Try a rug pull on your own machine
 
 ```sh
-# Terminal 1 & Terminal 2
-npm run serve            # Serves site/ on port 8080
-npm run serve:range      # Serves range/ on port 8081 (logs headers to range-requests.jsonl)
+# Two terminals
+npm run serve            # the desk on port 8080
+npm run serve:range      # the test range on port 8081 (request headers logged to range-requests.jsonl)
 ```
-
-To simulate a live rug pull against `Sunny Bakery` mid-session:
 
 ```sh
 node tools/set-origins.mjs --range http://localhost:8081
-# 1. Inspect or ask Officer about Sunny Bakery (pins the clean fingerprint)
+# 1. Inspect Sunny Bakery, or ask the Officer about it (this pins the clean version)
 node tools/rugpull.mjs on
-# 2. Click "Check for changes" or ask Officer again -> held with line-by-line diff
+# 2. Click "Check for changes", or ask the Officer again: it is held, with the changes listed
 node tools/rugpull.mjs off
 node tools/set-origins.mjs --range https://agent-customs-range.github.io
 ```
 
-*(Note: `npm run smoke` drives Edge or Chrome headlessly against local servers to verify zero console errors and cross-origin behavior.)*
+`npm run smoke` drives Edge or Chrome headlessly against the local servers and fails on any page error.
 
 ---
 
-## Deep dive, hosting & architecture
+## More detail
 
 <details open>
-<summary><b>Host your own copy (GitHub Pages, Netlify, or Cloudflare Pages)</b></summary>
+<summary><b>Host your own copy (GitHub Pages, Netlify or Cloudflare Pages)</b></summary>
 
-The site and the test range must sit on **two separate origins** so partner calls exercise real cross-origin consent cards. On GitHub Pages, publish `range/` under a second account or organization:
+The desk and the test range must be on two different origins, so partner calls go through real cross-site consent cards. On GitHub Pages, publish `range/` under a second account or organization:
 
-1. Create a public repo `<organization>.github.io`.
-2. Point origins and rebuild everything:
+1. Create a public repository named `<organization>.github.io`.
+2. Point the sites at it and rebuild:
    ```sh
    node tools/set-origins.mjs --range https://<organization>.github.io
    ```
-3. Push `range/` (with an empty `.nojekyll`) to `<organization>.github.io`.
-4. Enable GitHub Actions in **Settings → Pages** for the main repo ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)).
+3. Push `range/`, with an empty `.nojekyll` file, to `<organization>.github.io`.
+4. In the main repository, turn on GitHub Actions under **Settings → Pages** ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)).
 
-> **Security note on origin isolation:** Browser storage (`localStorage` pins and saved BYOK keys) is scoped per origin (`<account>.github.io`). Use a dedicated origin/domain rather than sharing `<account>.github.io` with unrelated static portfolios, or deploy `site/` and `range/` separately to Netlify or Cloudflare Pages so `_headers` (`Content-Security-Policy` on `sandbox-worker.js`) is applied in production.
-
-</details>
-
-<details open>
-<summary><b>How it is built &amp; security architecture</b></summary>
-
-- **Zero model-decided verdicts by default:** Fixed rules decide every verdict identically on the report page, in chat, and inside the live guard (`semanticJudge` stays `false` unless explicitly opted in).
-- **Zero backend server:** Inspections read public files without cookies, keys, or referrers. Pins stay strictly in browser `localStorage`.
-- **Consent before contact:** Both Officer tool inspections and partner calls require explicit visitor consent cards before network contact.
-- **Prompt + `command` + schema coverage:** Reads `instructions`, runtime `command`, `outputSchema`, `annotations.title`, A2A `skills[].name`, `prompts[].messages`, identifier-split schema keys, and a generic `rawDoc` walk so model-visible fields don't escape scanning.
-- **Runtime hooks checked weekly:** Because `guard.js` wraps internal engine methods (`_compile`, `runTurn`, `resetHistory`, `resolveRemote`, `resolveMcp`, `sandbox.invoke`, `actions.execute`, `submitActions`), [`.github/workflows/cognizant-kit.yml`](.github/workflows/cognizant-kit.yml) tests weekly against Cognizant's upstream kit.
+> **Give it its own origin.** Browser storage, including approved fingerprints and saved AI keys, is shared by everything on one origin such as `<account>.github.io`. Use a domain of its own, or deploy `site/` and `range/` to Netlify or Cloudflare Pages, where `_headers` also adds a Content-Security-Policy to `sandbox-worker.js`.
 
 </details>
 
 <details open>
-<summary><b>Open Agentic Web MVP interoperability checks (Section 6)</b></summary>
+<summary><b>How it is built</b></summary>
 
-| Spec Check | Implementation Here |
+- Rules decide every stamp. The report page, the chat and the live guard give the same stamp for the same files. The optional AI check stays off unless you turn it on.
+- There is no server. Inspections read public files without cookies, keys or referrers. Approvals stay in the visitor's browser.
+- Consent comes before contact. The Officer's inspections and partner calls both wait for the visitor to agree.
+- Every model-visible field is read: `instructions`, the runtime `command`, input and output schemas, tool titles, A2A skill names, prompt messages, schema key names and anything else in the raw file.
+- Checked against Cognizant's kit every week. The guard wraps eight internal runtime methods, so [`.github/workflows/cognizant-kit.yml`](.github/workflows/cognizant-kit.yml) runs the tests against the latest kit every week.
+
+The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
+
+</details>
+
+<details open>
+<summary><b>Open Agentic Web MVP checks (spec section 6)</b></summary>
+
+| Spec check | Where it is done here |
 | :--- | :--- |
-| Two-agent network + manifest on HTTPS | `customs_officer` &amp; `instruction_analyst` (`site/agent-manifest.json`) |
-| Default router + BYOK | Otari default + multi-provider BYOK picker (`OpenRouter`, Google, Groq, OpenAI, Anthropic, Custom) |
-| Internal agent + grounded actions | `instruction_analyst` + 6 website tools (`inspect_agent_network`, `compare_networks`, `pin_network`, etc.) |
-| Cross-origin execution after approval | Officer queries `sunny_bakery` / `shady_pizza` across origins (`tests/guard.test.mjs`) |
-| Keys never forwarded to peers | Verified via `range-requests.jsonl` (`"authorization": false` on all peer requests) |
-| Fail closed on bad spec / denied partner | Runtime checks + deterministic Guard refusals |
+| A network of two agents and a manifest on HTTPS | `customs_officer` and `instruction_analyst` (`site/agent-manifest.json`) |
+| Default router and bring-your-own-key | Otari by default, plus a picker for OpenRouter, Google, Groq, OpenAI, Anthropic or any other service |
+| An internal agent with grounded actions | `instruction_analyst`, plus 6 website tools (`inspect_agent_network`, `compare_networks`, `pin_network` and others) |
+| Calls to other origins after approval | The Officer calls `sunny_bakery` and `shady_pizza` on the range (`tests/guard.test.mjs`) |
+| Keys are never sent to partners | Shown in `range-requests.jsonl`: `"authorization": false` on every partner request |
+| Fail closed on a bad spec or a denied partner | Runtime checks and the guard's refusals |
 
 </details>
 
 <details open>
-<summary><b>Repository file map</b></summary>
+<summary><b>Where things are</b></summary>
 
-| Path | Purpose |
+| Path | What it is |
 | :--- | :--- |
-| [`site/customs/`](site/customs/) | Core engine (`analyze.js`, `protocols.js`, `capabilities.js`, `canary.js`, `rules.js`, `languages.js`, `locks.js`, `unicode.js`, `canonical.js`, `diff.js`, `pins.js`, `inspect.js`, `guard.js`, `judge.js`, `receipts.js`) |
-| [`site/agent_customs.hocon`](site/agent_customs.hocon) | Officer + analyst network definition |
-| [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`certificate.js`](site/certificate.js), [`arena.js`](site/arena.js), [`site.js`](site/site.js) | Inspection desk UI, certificates, Attack lab, actions, and guard wiring |
-| [`site/runtime/`](site/runtime/) | Upstream Cognizant Open Agentic Web runtime (unmodified, Apache 2.0) |
-| [`practice/`](practice/) | Main Street Guide demo app generated by `tools/make-practice.mjs` |
-| [`extension/`](extension/) | Manifest V3 Chrome/Edge popup inspector generated by `tools/make-extension.mjs` |
-| [`bin/`](bin/) &amp; [`action.yml`](action.yml) | Zero-dependency CLI (`check`, `verify`, `bench`) with SARIF output and GitHub Composite Action |
-| [`PAPER.md`](PAPER.md) | 5-layer architecture note, formal threat model, benchmark scorecard &amp; honest limits |
-| [`tools/`](tools/) | CLI inspector, benchmark suite (`bench.mjs`, `round2-corpus.mjs`, `round3-corpus.mjs`, `heldout-corpus.mjs`, `external-heldout.mjs`), local server, range/practice/extension builders, smoke checks, receipt signer |
-| [`tests/`](tests/) | Node native test runner suite (`161` tests) + official, `135` Batch 1, `124` Batch 2 &amp; `138` Batch 3 tuning MCP/A2A fixtures |
-| [`vendor/agentify-website/`](vendor/agentify-website/) | Upstream kit scripts &amp; templates (unmodified) |
+| [`site/customs/`](site/customs/) | The engine and the guard: the folder other sites copy |
+| [`site/agent_customs.hocon`](site/agent_customs.hocon) | The Officer and analyst network |
+| [`site/desk.js`](site/desk.js), [`view.js`](site/view.js), [`certificate.js`](site/certificate.js), [`arena.js`](site/arena.js), [`site.js`](site/site.js) | The desk, the certificates, the Attack lab and the guard wiring |
+| [`site/runtime/`](site/runtime/) | Cognizant's Open Agentic Web runtime, unmodified |
+| [`practice/`](practice/) | Main Street Guide, built by `tools/make-practice.mjs` |
+| [`extension/`](extension/) | The Chrome and Edge extension, built by `tools/make-extension.mjs` |
+| [`bin/`](bin/) and [`action.yml`](action.yml) | The command line tool (`check`, `verify`, `bench`) and the GitHub Action |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | How it works, in plain words, with diagrams |
+| [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
+| [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
+| [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
+| [`tests/`](tests/) | 166 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>
 
 <details open>
-<summary><b>Honest limits &amp; FAQ</b></summary>
+<summary><b>Honest limits and questions</b></summary>
 
-- **Agent manifests, not general HTML:** Built for AI agent manifests and catalogs — Open Agentic Web (`agent-manifest.json`, `.network.json`), Google A2A Agent Cards (`.well-known/agent.json`, `agent-card.json`), and MCP (`mcp.json`, `server.json`, `mcpServers`, `tools/list`), not regular HTML websites.
-- **`Cleared` ≠ certified safe:** It means known attack vectors were not found — which is why version pinning + Luhn/IBAN/action/canary locks remain armed at runtime. Manifests naming third-party brands on generic hosts (such as `raw.githubusercontent.com`) surface an `I-AUTHORITY` hygiene notice (`Cleared with conditions`) because the host itself does not verify publisher identity.
-- **Static vs. runtime boundaries:** Open Agentic Web and MCP tool executions run with Lock 1–3 runtime guards and persisted `PinStore` MCP `listTools()` pins (forgettable from Desk Approvals after intentional updates); Google A2A is inspected statically because Cognizant's runtime does not execute remote A2A transports directly. Static rules can be talked around and every benign exception risks opening bypasses (`probe6` [`22/22`] &amp; `probe7` [`19/19`] verify known exception boundaries alongside an automated 4-word fixture anti-overfitting check): category rules caught Round 1–3 phrasing, but on 20 independent unseen wordings static rules held `1/20` pre-format and `4/20` after format additions (`50%` on internal held-out, `3/7` quoted externals after adding crypto/`javascript:`/IBAN format rules), confirming static rules act as a first filter backed by runtime Locks 1–3 and opt-in `semanticJudge: true`. The **0%** false-block rate applies to the 61 curated controls (and `0/135` on Batch 1 / `0/17` well-known MCP servers); on unseen live MCP/A2A endpoints without per-site rules, general root-cause fixes measured **`9/57` (`15.8%`)** after `#9`, **`23/124` (`18.5%`) → `5/124` (`4.0%`)** tuned on Batch 2, and **`9/138` (`6.5%`)** true unseen on Batch 3 under `02f0283` before tuning down to **`0/138` tuned** (with both Batch 2 and Batch 3 now tuning sets). Written-out card words, bounded inbound-only visitor-chat `IMEI`/`IMSI`/`ICCID` exemptions (15 / 14–15 / 19–20 digits within 3 words; never exempted outbound), 5+ char digit separators, and split-field secrets stay out of band.
-- **Language scope &amp; auth-gated endpoints:** English is checked in full; 10 additional languages check secret/card/password phishing; unfamiliar scripts/languages (including multi-token Turkish, Indonesian, Swedish, Norwegian, Danish, Zulu, and Somali requests, while leaving 3-word accented dishes, short English glosses, technical code/regex/URI tokens, and non-prose schema fields clear) hold for human review (`C-LANGUAGE`, surfacing at `CONDITIONS` when inside tool/schema documentation and `HOLD` in instructions/commands or foreign secret requests), though short unusual English technical docs can still occasionally trigger noise. Login-gated MCP/A2A servers (`HTTP 401/403` on OAuth-authenticated enterprise endpoints) cannot be inspected anonymously without credentials.
-- **CORS requirement:** Sites that omit `Access-Control-Allow-Origin` cannot be fetched directly from the static web desk — inspect those origins via [`bin/agent-customs.mjs`](bin/agent-customs.mjs), CI [`action.yml`](action.yml), or the MV3 browser [`extension/`](extension/) (`optional_host_permissions` over `https://*/*`).
-- **Similar tools:** Unlike CLI-only MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan), Agent Customs runs 100% inside the browser (plus optional CLI, SARIF GitHub Action, and browser extension) across Open Agentic Web, A2A, and MCP catalogs with no external backend, guards partner calls at runtime with armed canaries and MCP tool pinning, and pins SHA-256 versions against rug pulls.
+- It reads agent files, not web pages. Open Agentic Web networks, A2A cards and MCP servers. An ordinary HTML page is not what it checks.
+- Cleared does not mean certified safe. It means none of the checks found a known problem. That is why the version pins and the three locks stay on while a partner runs. A well-known brand on a generic host such as `raw.githubusercontent.com` gets a note, because the host does not prove who published it.
+- New wording gets past rules. On attack wording it was never written for, the rules held 4 of 20 outside examples and 11 of 18 in probe9. The locks are there for what the rules miss, and the optional AI check can help on top.
+- Some honest tools are still held. About 1 in 18 brand-new tools (5.5%) was held without a good reason on its first look. The figure of 0 false blocks is for the 61 curated controls only.
+- Notes are not clean passes. When honest wording looks like an attack (a sign-up code, an API-key header, a tool title, a parcel tracking link), the finding becomes a note and the stamp is *Cleared with conditions*. A scammer who copies that wording still gets a visible warning.
+- A2A is inspected, not guarded. Cognizant's runtime does not run remote A2A agents, so A2A cards get the inspection but not the runtime locks.
+- What Lock 1 cannot see: card numbers written in words, digits broken up by five or more characters, and secrets split across several fields or turns.
+- Languages. English is read fully and 12 more languages are read for secret requests (14 for takeover and leak orders). Other languages are held for a person; inside tool documentation, short glosses and a few words only add a note.
+- Cross-site reads and logins. The web desk cannot read sites without an `Access-Control-Allow-Origin` header; use the [command line tool](bin/agent-customs.mjs), the [GitHub Action](action.yml) or the [extension](extension/). Servers behind a login cannot be inspected without credentials.
+- Similar tools. Command-line MCP scanners such as [Snyk Agent Scan](https://github.com/snyk/agent-scan) check MCP setups on a developer's machine. Agent Customs runs in the browser for all three protocols, guards partner calls while they run, and pins versions against rug pulls, with no backend.
 
 </details>
 
@@ -517,18 +540,18 @@ The site and the test range must sit on **two separate origins** so partner call
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/contact-card-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/contact-card-light.svg">
-  <img src="docs/images/contact-card-dark.svg" alt="Direct line to Monty Bagati — security reviews, integrations, feedback, and roles" width="100%">
+  <img src="docs/images/contact-card-dark.svg" alt="Direct line to Monty Bagati for security reviews, integrations, feedback and roles" width="100%">
 </picture>
 
 <br><br>
 
-<a href="mailto:bagati.monty@gmail.com?subject=Agent%20Customs%20%E2%80%94%20Hello%20Monty"><img alt="Email Monty Bagati" src="https://img.shields.io/badge/Email-bagati.monty%40gmail.com-c8f03c?style=for-the-badge&logo=gmail&logoColor=c8f03c&labelColor=0c1d18"></a>
+<a href="mailto:bagati.monty@gmail.com?subject=Agent%20Customs%3A%20Hello%20Monty"><img alt="Email Monty Bagati" src="https://img.shields.io/badge/Email-bagati.monty%40gmail.com-c8f03c?style=for-the-badge&logo=gmail&logoColor=c8f03c&labelColor=0c1d18"></a>
 &nbsp;
 <a href="https://www.linkedin.com/in/monty-bagati-90454626/"><img alt="Connect on LinkedIn" src="https://img.shields.io/badge/LinkedIn-Monty_Bagati-ece4d3?style=for-the-badge&logo=linkedin&logoColor=ece4d3&labelColor=0c1d18"></a>
 &nbsp;
-<a href="https://github.com/montbaga"><img alt="GitHub Profile" src="https://img.shields.io/badge/GitHub-%40montbaga-8fd1a6?style=for-the-badge&logo=github&logoColor=8fd1a6&labelColor=0c1d18"></a>
+<a href="https://github.com/montbaga"><img alt="GitHub profile" src="https://img.shields.io/badge/GitHub-%40montbaga-8fd1a6?style=for-the-badge&logo=github&logoColor=8fd1a6&labelColor=0c1d18"></a>
 &nbsp;
-<a href="https://github.com/montbaga/agent-customs/issues/new"><img alt="Open an Issue or Feedback" src="https://img.shields.io/badge/Feedback-Report_a_Bypass_or_Idea-f0a35e?style=for-the-badge&logo=github&logoColor=f0a35e&labelColor=0c1d18"></a>
+<a href="https://github.com/montbaga/agent-customs/issues/new"><img alt="Report a bypass or an idea" src="https://img.shields.io/badge/Feedback-Report_a_Bypass_or_Idea-f0a35e?style=for-the-badge&logo=github&logoColor=f0a35e&labelColor=0c1d18"></a>
 
 <br><br>
 
@@ -537,6 +560,6 @@ The site and the test range must sit on **two separate origins** so partner call
 <br>
 
 **Agent Customs** · Built by [**Monty Bagati**](https://www.linkedin.com/in/monty-bagati-90454626/) for the Open Agentic Web  
-<sub>Apache License 2.0 · Copyright 2026 Monty Bagati · Runtime &amp; templates from <a href="https://github.com/cognizant-ai-labs/agentic-web">cognizant-ai-labs/agentic-web</a> (Apache 2.0)</sub>
+<sub>[Apache License 2.0](LICENSE.md) · Copyright 2026 Monty Bagati · Runtime &amp; templates from <a href="https://github.com/cognizant-ai-labs/agentic-web">cognizant-ai-labs/agentic-web</a> (Apache 2.0)</sub>
 
 </div>

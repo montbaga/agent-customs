@@ -339,12 +339,20 @@ export function stripHiddenChars(text) {
 export function findMixedScriptWords(text) {
   if (typeof text !== "string" || !text) return [];
   const found = [];
-  const tokens = text.split(/[\s_\-./:]+/u).filter(Boolean);
-  for (const raw of tokens) {
-    const word = raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
-    if (!word || !/\p{Script=Latin}/u.test(word)) continue;
+  const tokens = text.split(/[\s_\-./:]+/u).filter(Boolean)
+    .map((raw) => raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+    .filter(Boolean);
+  const latinWords = tokens.filter((w) => /\p{Script=Latin}/u.test(w) && !HAS_CONFUSABLE_SCRIPT.test(w)).length;
+  for (const word of tokens) {
     const scripts = CONFUSABLE_SCRIPTS.filter(([, re]) => re.test(word)).map(([name]) => name);
-    if (scripts.length) found.push({ word, scripts });
+    if (!scripts.length) continue;
+    if (/\p{Script=Latin}/u.test(word)) {
+      found.push({ word, scripts });
+    } else if (latinWords >= 2 && [...word].length >= 3 && isAllConfusableLetters(word)) {
+      // A whole word spelled only with look-alike letters among Latin words ("аррӏе ID") passes
+      // for English. Lone symbols such as β or γ in formulas are left alone.
+      found.push({ word, scripts });
+    }
   }
   // Fullwidth Latin letters (Ｐａｙ) and Mathematical styled letters (𝐩𝐚𝐬𝐬) look like ASCII.
   if (/[Ａ-Ｚａ-ｚ]/u.test(text)) found.push({ word: text, scripts: ["Fullwidth Latin"] });

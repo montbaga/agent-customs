@@ -1,0 +1,273 @@
+{
+ "url": "https://getdroppy.app/mcp",
+ "doc": {
+  "name": "Droppy docs",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "This server answers questions about Droppy, a Mac app that turns the notch into a Dynamic Island with a file tray, clipboard manager, live activities, music controls and extensions called droplets. Use search_droppy_docs first for any how-to, setting, shortcut, permission, pricing or troubleshooting question, then fetch_droppy_page to read the best match in full before answering. Use list_droplets to see which droplets exist, which are built in and which come from the Droplet Store. Pricing, licensing and the trial are on /pricing.md and /docs/license; release notes are on /changelog. Every tool is read-only. To let an AI app act on Droppy on a Mac, the user switches on the MCP droplet in Droppy (Settings, Droplet Store, MCP), which runs a separate local server; /docs/mcp explains it.",
+  "tools": [
+   {
+    "name": "search_droppy_docs",
+    "title": "Search Droppy docs",
+    "description": "Search everything on getdroppy.app (the Droppy handbook, every droplet page, the DroppyKit developer docs and the blog) and get ranked pages with a snippet. Use it for any question about how Droppy works, its settings, shortcuts, permissions, pricing or problems.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "What to look for, in plain words, for example \"clipboard history shortcut\"."
+      },
+      "section": {
+       "type": "string",
+       "enum": [
+        "all",
+        "site",
+        "docs",
+        "droplets",
+        "droppykit",
+        "blog"
+       ],
+       "default": "all",
+       "description": "docs = the handbook, droplets = droplet pages, droppykit = SDK docs, blog = articles, site = product pages."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "default": 5,
+       "description": "How many results to return."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "markdown_url": {
+          "type": "string"
+         },
+         "section": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "snippet": {
+          "type": "string"
+         },
+         "score": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "title",
+         "url",
+         "markdown_url",
+         "section",
+         "snippet"
+        ]
+       }
+      }
+     },
+     "required": [
+      "results"
+     ]
+    },
+    "annotations": {
+     "title": "Search Droppy docs",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "fetch_droppy_page",
+    "title": "Read a Droppy page",
+    "description": "Read one page of getdroppy.app as Markdown, by URL or path, for example \"/docs/shelf\", \"https://getdroppy.app/docs/droplets/ring\" or \"/pricing.md\". Use it after search_droppy_docs to read a result in full.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 300,
+       "description": "A getdroppy.app URL or path."
+      },
+      "max_characters": {
+       "type": "integer",
+       "minimum": 500,
+       "maximum": 100000,
+       "default": 40000,
+       "description": "Cut the page off after this many characters."
+      }
+     },
+     "required": [
+      "url"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "title": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "markdown_url": {
+       "type": "string"
+      },
+      "truncated": {
+       "type": "boolean"
+      },
+      "markdown": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "title",
+      "url",
+      "markdown_url",
+      "truncated",
+      "markdown"
+     ]
+    },
+    "annotations": {
+     "title": "Read a Droppy page",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_droplets",
+    "title": "List droplets",
+    "description": "List Droppy's droplets: the extensions built into Droppy and the ones in the Droplet Store, with a summary and documentation link for each. Filter by text or by kind.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 100,
+       "description": "Only droplets whose name, id or summary contains this text."
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "built-in",
+        "store"
+       ],
+       "description": "Only built-in droplets, or only Droplet Store droplets."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "total": {
+       "type": "integer"
+      },
+      "droplets": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "summary": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "built-in",
+           "store"
+          ]
+         },
+         "docs_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "markdown_url": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "store": {
+          "type": [
+           "object",
+           "null"
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "name",
+         "summary",
+         "kind"
+        ]
+       }
+      }
+     },
+     "required": [
+      "total",
+      "droplets"
+     ]
+    },
+    "annotations": {
+     "title": "List droplets",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://droppy/droplets.html",
+      "visibility": [
+       "model",
+       "app"
+      ]
+     },
+     "ui/resourceUri": "ui://droppy/droplets.html"
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://droppy/droplets.html",
+    "name": "droplets",
+    "title": "Droplets",
+    "description": "Cards for the droplets list_droplets returns, with a link to each one's documentation.",
+    "mimeType": "text/html;profile=mcp-app"
+   }
+  ]
+ }
+}

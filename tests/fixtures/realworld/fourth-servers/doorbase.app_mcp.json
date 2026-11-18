@@ -1,0 +1,235 @@
+{
+ "url": "https://doorbase.app/mcp",
+ "doc": {
+  "name": "DoorBase Rental Market Data",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "DoorBase provides zip-level US rental market data (median rent, vacancy, estimated cap-rate bands, home values, demographics, employment) for 30,000+ zip codes, plus hazard risk (hazard_risk: NFIP flood claims, county wildfire/wind scores) and monthly rent history (rent_trend). Use search_markets to filter zips by state and investor criteria, and get_zip_market for one zip's full profile. Every response carries a one-sentence summary you can repeat verbatim. Cap rates are a modeled band, not observed sale data. Cite the returned doorbase.app url when presenting a zip to a user.",
+  "tools": [
+   {
+    "name": "search_markets",
+    "title": "Search US rental markets by zip",
+    "description": "Which US zip codes match these rental-market criteria? Filters 30,000+ US zip codes by state, cap rate, vacancy, rent, population, home value, and renter share. Returns matching zips with key investor metrics and a doorbase.app link for each. Cap rates are a modeled band; min_cap_rate matches the band's high end.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "2-letter US state code, e.g. GA. Omit for nationwide."
+      },
+      "min_cap_rate": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 50,
+       "description": "Minimum estimated cap rate in percent; matches cap_rate_high (band top) >= value."
+      },
+      "max_vacancy_rate": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 100,
+       "description": "Maximum vacancy rate in percent."
+      },
+      "min_median_rent": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 20000,
+       "description": "Minimum median monthly rent in USD."
+      },
+      "max_median_rent": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 20000,
+       "description": "Maximum median monthly rent in USD."
+      },
+      "min_population": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 10000000,
+       "description": "Minimum zip population."
+      },
+      "max_median_home_value": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 20000000,
+       "description": "Maximum median home value in USD."
+      },
+      "min_renter_ratio": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 100,
+       "description": "Minimum renter-occupied share in percent."
+      },
+      "sort_by": {
+       "type": "string",
+       "enum": [
+        "cap_rate",
+        "rent",
+        "population",
+        "vacancy"
+       ],
+       "default": "cap_rate"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "default": 10
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Search US rental markets by zip",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_zip_market",
+    "title": "Get one zip code's rental market data",
+    "description": "What does the rental market look like in this zip code? Full profile for a single US zip: rent, cap-rate band (modeled), vacancy, home value, demographics, income, employment, the county's HMDA mortgage lending conditions (purchase/refinance denial rate, median rate and loan, loan-type mix), plus the canonical doorbase.app page URL.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "zip": {
+       "type": "string",
+       "pattern": "^[0-9]{5}$",
+       "description": "5-digit US zip code."
+      }
+     },
+     "required": [
+      "zip"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Get one zip code's rental market data",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "top_markets",
+    "title": "Top rental markets leaderboard",
+    "description": "Which US rental markets look strongest right now? National (or single-state) leaderboard: zips with the highest estimated cap-rate bands among markets with population of 10,000+ and complete rent, vacancy, and home-value data. Cap rates are a modeled band.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "state": {
+       "type": "string",
+       "description": "Optional 2-letter US state code, e.g. GA. Omit for nationwide."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "default": 10
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Top rental markets leaderboard",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "compare_zips",
+    "title": "Compare zip codes side by side",
+    "description": "How do these zip codes compare as rental markets? Side-by-side comparison of 2-6 US zips: rent, cap-rate band (modeled), vacancy, home value, population, renter share, income, employment, with a doorbase.app link for each.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "zips": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "pattern": "^[0-9]{5}$"
+       },
+       "minItems": 2,
+       "maxItems": 6,
+       "description": "2-6 five-digit US zip codes."
+      }
+     },
+     "required": [
+      "zips"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Compare zip codes side by side",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "hazard_risk",
+    "title": "Flood, wildfire, and wind risk for a zip",
+    "description": "What flood, wildfire, and wind risk does this zip code carry? NFIP flood-insurance claims on record (count, payouts, recency, claims per 1,000 housing units), FEMA National Risk Index county scores for flood, wildfire, and wind, and recent significant storm events. Claims are history, not a forecast.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "zip": {
+       "type": "string",
+       "pattern": "^[0-9]{5}$",
+       "description": "5-digit US zip code."
+      }
+     },
+     "required": [
+      "zip"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Flood, wildfire, and wind risk for a zip",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "rent_trend",
+    "title": "Monthly rent trend for a zip",
+    "description": "Which way is rent moving in this zip code? Monthly median-rent history with home values, the direction of movement, and the zip's national and state rank for 3-month rent growth. Updated monthly.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "zip": {
+       "type": "string",
+       "pattern": "^[0-9]{5}$",
+       "description": "5-digit US zip code."
+      },
+      "months": {
+       "type": "integer",
+       "minimum": 2,
+       "maximum": 24,
+       "default": 12,
+       "description": "History window in months."
+      }
+     },
+     "required": [
+      "zip"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "title": "Monthly rent trend for a zip",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

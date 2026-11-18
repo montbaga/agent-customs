@@ -1,0 +1,1462 @@
+{
+ "url": "https://mcp.refora.ai/mcp",
+ "doc": {
+  "name": "Refora",
+  "version": "1.30.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Refora measures how visible a brand is in AI answers. For each workspace, Refora asks a fixed set of prompts (questions a buyer would ask) to several AI models -- ChatGPT, Perplexity, Gemini, Claude, Mistral and Google AI Overviews -- on a schedule, and records which brands each answer mentions and which sources it cites.\n\nStart with list_workspaces: every other tool except get_top_cited_domains and audit_page needs a workspace_id from it. The id is for your next call; talk to the user about workspaces by name. Prompts are named by their text, which is also what get_prompt_performance takes.\n\nget_ai_answers returns the answers themselves -- what each model said, with the brands it mentions and the URLs it cites -- a page at a time. Use it to read or quote an answer; use the other tools for numbers.\n\naudit_page checks one web page's readiness for AI search (crawler access, llms.txt, structured data and more) for any public site.\n\nA workspace whose own questions are not tracked yet has market data instead: get_market_ai_presence, and a market_data block beside the (null) own numbers in the other tools. It is a different measurement (ChatGPT and Gemini answers and Google AI Overview citations from an external index): say which one a number comes from. get_account says what the plan includes.\n\nReading the numbers:\n- Visibility is the share of AI answers that mention a brand.\n- null means there was nothing to measure in the window (no answers, or no brand configured). Never report it as 0%.\n- The window defaults to the last 30 days. A change compares it with the window of the same length just before.\n- Every tool is read-only; nothing you call changes the account.",
+  "tools": [
+   {
+    "name": "list_workspaces",
+    "title": "List workspaces",
+    "description": "List the workspaces in the connected Refora organization. Call this first: every other workspace tool needs a workspace_id from here.\n\nUse this tool when the user asks about their workspaces, projects, or brands they're monitoring -- phrases like 'what am I tracking', 'list my projects', 'show me my brands', or 'which workspaces do I have'.\n\nReturns: workspace ID, name, primary brand domain, active prompt count, creation date, website, data_source (own_tracking, market_data or none) and a one-line summary for each workspace.\n\nExample question: 'What workspaces do I have set up in Refora?'",
+    "inputSchema": {
+     "properties": {},
+     "title": "list_workspacesArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_visibility_score",
+    "title": "Visibility score",
+    "description": "How visible the workspace's own brand is in AI answers: the share of AI answers that mention it, overall and per AI model (ChatGPT, Perplexity, Gemini, Claude, Mistral, Google AI Overviews), and the change from the window before.\n\nUse this tool when the user asks about current performance -- phrases like 'how are we doing', 'what's our score', 'how visible are we in AI', or 'current visibility'.\nDo NOT use for trends over time (use get_visibility_trend) or competitors (use get_competitor_comparison).\n\nReturns: visibility in percent (null means no answers to measure, not zero), the change in percentage points, one row per model with its visibility and number of answers, and a summary.\n\nExample: 'How is Kassaro doing in AI search right now?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_visibility_scoreArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_share_of_voice",
+    "title": "Share of voice",
+    "description": "The workspace's own brand's share of ALL brand mentions in AI answers, and which brands hold the rest -- every brand the models named, each marked as a tracked competitor or not.\n\nUse this tool when the user asks who the AI talks about -- phrases like 'share of voice', 'who gets mentioned most', 'which brands does AI recommend in our space', or 'who else shows up'.\nDo NOT use to rank against the competitors the user tracks (use get_competitor_comparison, which measures the share of answers that mention each tracked brand).\n\nReturns: own share in percent, own rank, and the top brands with their shares.\n\nExample: 'Which brands does AI mention most when people ask about our category?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      },
+      "competitor_limit": {
+       "default": 5,
+       "description": "How many other brands to list. Default 5, max 20.",
+       "maximum": 20,
+       "minimum": 1,
+       "title": "Competitor Limit",
+       "type": "integer"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_share_of_voiceArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_visibility_trend",
+    "title": "Visibility trend",
+    "description": "Visibility over time for the workspace's own brand.\n\nUse this tool when the user asks about changes over time -- phrases like 'how has it changed', 'trending', 'are we improving', 'show the trend', or 'over the last month'.\nDo NOT use for the current snapshot (use get_visibility_score) or competitors (use get_competitor_comparison).\n\nReturns one data point per period and a trend summary. A period with no AI answers has a null visibility, not 0. Max 90 days.\n\nExample: 'How has our AI visibility changed over the last 30 days?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      },
+      "resolution": {
+       "default": "week",
+       "description": "Length of each period. Default 'week': prompts run on a schedule, so 'day' leaves empty periods.",
+       "enum": [
+        "day",
+        "week",
+        "month"
+       ],
+       "title": "Resolution",
+       "type": "string"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_visibility_trendArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_competitor_comparison",
+    "title": "Competitor comparison",
+    "description": "Rank the workspace's own brand against the competitors the user tracks, by visibility: the share of AI answers that mention each brand.\n\nUse this tool when the user asks about competitive position -- phrases like 'how do we compare', 'who's winning', 'where do we rank', or 'vs competitors'.\nDo NOT use for the own score alone (use get_visibility_score), trends (use get_visibility_trend), or every brand the AI mentions, tracked or not (use get_share_of_voice).\n\nReturns: tracked brands ranked by visibility, the own brand among them. Brands with nothing to measure get no rank. To see WHY a competitor leads, follow up with get_competitor_visibility_gap.\n\nExample: 'How does Kassaro compare to its competitors?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "competitor_limit": {
+       "default": 5,
+       "description": "How many competitors to list. Default 5, max 20.",
+       "maximum": 20,
+       "minimum": 1,
+       "title": "Competitor Limit",
+       "type": "integer"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_competitor_comparisonArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_competitor_visibility_gap",
+    "title": "Competitor visibility gap",
+    "description": "The prompts where one tracked competitor is mentioned in AI answers more often than the workspace's own brand.\n\nUse this tool as a follow-up to get_competitor_comparison when the user wants to understand WHY a competitor is winning -- phrases like 'why is X beating us', 'where are we losing to X', 'what sources does AI cite for X', or 'how do we beat X'.\n\nReturns: prompts where the competitor leads by at least min_gap_percent percentage points, each with the gap, the AI models that favor the competitor, and the URLs AI cites in those answers (the brand's own pages left out). Use this data for content briefs.\n\nExample: 'Why is Sitoo beating Kassaro, and what sources does AI cite for them?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "competitor_name": {
+       "description": "A tracked competitor's name, as get_competitor_comparison lists it. Case does not matter.",
+       "minLength": 1,
+       "title": "Competitor Name",
+       "type": "string"
+      },
+      "prompt_limit": {
+       "default": 10,
+       "description": "How many prompts to return. Default 10, max 50.",
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Prompt Limit",
+       "type": "integer"
+      },
+      "min_gap_percent": {
+       "default": 5,
+       "description": "Smallest lead to report, in percentage points (0-100). Default 5, meaning the competitor appears in at least 5 points more of the answers.",
+       "maximum": 100,
+       "minimum": 0,
+       "title": "Min Gap Percent",
+       "type": "number"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id",
+      "competitor_name"
+     ],
+     "title": "get_competitor_visibility_gapArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_citation_sources",
+    "title": "Citation sources",
+    "description": "The domains and URLs that AI models cite in their answers for this workspace's prompts, each marked as the brand's own site, a competitor's, or other. Each URL also says what kind of page it is and how often each model cited it.\n\nUse this tool when the user asks which websites or sources AI references -- phrases like 'what sources does AI cite', 'which websites does ChatGPT reference', 'top cited domains', 'which comparison pages does AI cite', or 'where does AI get its information about us'. Prefer it to paging through get_ai_answers for any question about cited pages.\n\nWith brand_name, only answers that mention that brand count. Without it, every answer in the workspace counts.\n\nmodel, page_type, owner and last_runs narrow what counts, in one call: e.g. model=[\"openai\", \"google-aio\"], page_type=[\"comparison\", \"listicle\"], owner=\"competitor\" and last_runs=3 for the competitor comparison and best-of pages ChatGPT and Google AI Overviews cited in the last 3 runs. Every URL carries its page_type and citations_by_model, and per_model gives each model's runs and citations, so a count reads as 'N citations in M runs'. A URL is a page: tracking tags (utm_*) and #fragments are dropped, so a page two models cite is one row.\n\nFor one topic, use get_top_cited_urls_for_topic. Across every workspace in the organization, use get_top_cited_domains.\n\nExample: 'What sources does AI cite most when talking about Kassaro?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "brand_name": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional brand name: count only answers that mention this brand. Omit for all answers.",
+       "title": "Brand Name"
+      },
+      "domain_limit": {
+       "default": 10,
+       "description": "How many domains to list. Default 10, max 50.",
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Domain Limit",
+       "type": "integer"
+      },
+      "url_limit": {
+       "default": 15,
+       "description": "How many URLs to list. Default 15, max 50.",
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Url Limit",
+       "type": "integer"
+      },
+      "model": {
+       "anyOf": [
+        {
+         "enum": [
+          "openai",
+          "perplexity",
+          "gemini",
+          "anthropic",
+          "mistral",
+          "google-aio"
+         ],
+         "type": "string"
+        },
+        {
+         "items": {
+          "enum": [
+           "openai",
+           "perplexity",
+           "gemini",
+           "anthropic",
+           "mistral",
+           "google-aio"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only citations in these AI models' answers. One model, or a list such as [\"openai\", \"google-aio\"] to compare ChatGPT with Google AI Overviews. openai = ChatGPT, anthropic = Claude, mistral = Le Chat, google-aio = Google AI Overviews. Omit for every model. Each URL's count per model is returned either way.",
+       "title": "Model"
+      },
+      "page_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "homepage",
+          "product_page",
+          "category_page",
+          "article",
+          "how_to_guide",
+          "listicle",
+          "comparison",
+          "other"
+         ],
+         "type": "string"
+        },
+        {
+         "items": {
+          "enum": [
+           "homepage",
+           "product_page",
+           "category_page",
+           "article",
+           "how_to_guide",
+           "listicle",
+           "comparison",
+           "other"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only cited pages of this type, or a list of types. comparison = comparison and 'X vs Y' pages, listicle = best-of and top-X lists, plus article, how_to_guide, product_page, category_page, homepage, other. There is no review type: ask for comparison and listicle for review-style pages. A page not classified yet (page_type null) never matches. Omit for every page.",
+       "title": "Page Type"
+      },
+      "owner": {
+       "anyOf": [
+        {
+         "enum": [
+          "own",
+          "competitor",
+          "other"
+         ],
+         "type": "string"
+        },
+        {
+         "items": {
+          "enum": [
+           "own",
+           "competitor",
+           "other"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only pages on these sites. own = the workspace's own site, competitor = a tracked competitor's site, other = everyone else (media, forums, comparison sites). One value or a list. Omit for every site.",
+       "title": "Owner"
+      },
+      "last_runs": {
+       "anyOf": [
+        {
+         "maximum": 50,
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only the newest N runs of each prompt on each model inside the window, e.g. 3 for 'the last 3 runs'. A prompt with fewer runs in the window counts the ones it has; widen days to reach older runs. per_model says how many runs were counted. Omit to count every run in the window.",
+       "title": "Last Runs"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_citation_sourcesArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_top_cited_urls_for_topic",
+    "title": "Top cited URLs for a topic",
+    "description": "The URLs that AI models cite most for the workspace's prompts in one topic. Use this for content briefs -- it shows which sources AI treats as authoritative for that topic.\n\nUse when the user asks about sources for a topic -- phrases like 'what does AI cite for X topic', 'sources on X', 'content research for X', or 'authority sources for X'.\n\nTopics are the workspace's own; most are one of PROBLEM_AWARENESS, SOLUTION_COMPARISON, COMPETITOR_COMPARISON, EVALUATION, CATEGORY_DEEP_DIVE, HOW_TO. If the topic is not found, the response lists the topics that exist.\n\nmodel, page_type, owner and last_runs narrow what counts, in one call: e.g. model=[\"openai\", \"google-aio\"], page_type=[\"comparison\", \"listicle\"], owner=\"competitor\" and last_runs=3 for the competitor comparison and best-of pages ChatGPT and Google AI Overviews cited in the last 3 runs. Every URL carries its page_type and citations_by_model, and per_model gives each model's runs and citations, so a count reads as 'N citations in M runs'. A URL is a page: tracking tags (utm_*) and #fragments are dropped, so a page two models cite is one row.\n\nExample: 'What sources does AI cite for our EVALUATION prompts?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "topic": {
+       "description": "The topic, e.g. EVALUATION. Case does not matter. An unknown topic returns the list of topics that exist.",
+       "minLength": 1,
+       "title": "Topic",
+       "type": "string"
+      },
+      "url_limit": {
+       "default": 15,
+       "description": "How many URLs to list. Default 15, max 50.",
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Url Limit",
+       "type": "integer"
+      },
+      "model": {
+       "anyOf": [
+        {
+         "enum": [
+          "openai",
+          "perplexity",
+          "gemini",
+          "anthropic",
+          "mistral",
+          "google-aio"
+         ],
+         "type": "string"
+        },
+        {
+         "items": {
+          "enum": [
+           "openai",
+           "perplexity",
+           "gemini",
+           "anthropic",
+           "mistral",
+           "google-aio"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only citations in these AI models' answers. One model, or a list such as [\"openai\", \"google-aio\"] to compare ChatGPT with Google AI Overviews. openai = ChatGPT, anthropic = Claude, mistral = Le Chat, google-aio = Google AI Overviews. Omit for every model. Each URL's count per model is returned either way.",
+       "title": "Model"
+      },
+      "page_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "homepage",
+          "product_page",
+          "category_page",
+          "article",
+          "how_to_guide",
+          "listicle",
+          "comparison",
+          "other"
+         ],
+         "type": "string"
+        },
+        {
+         "items": {
+          "enum": [
+           "homepage",
+           "product_page",
+           "category_page",
+           "article",
+           "how_to_guide",
+           "listicle",
+           "comparison",
+           "other"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only cited pages of this type, or a list of types. comparison = comparison and 'X vs Y' pages, listicle = best-of and top-X lists, plus article, how_to_guide, product_page, category_page, homepage, other. There is no review type: ask for comparison and listicle for review-style pages. A page not classified yet (page_type null) never matches. Omit for every page.",
+       "title": "Page Type"
+      },
+      "owner": {
+       "anyOf": [
+        {
+         "enum": [
+          "own",
+          "competitor",
+          "other"
+         ],
+         "type": "string"
+        },
+        {
+         "items": {
+          "enum": [
+           "own",
+           "competitor",
+           "other"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only pages on these sites. own = the workspace's own site, competitor = a tracked competitor's site, other = everyone else (media, forums, comparison sites). One value or a list. Omit for every site.",
+       "title": "Owner"
+      },
+      "last_runs": {
+       "anyOf": [
+        {
+         "maximum": 50,
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: count only the newest N runs of each prompt on each model inside the window, e.g. 3 for 'the last 3 runs'. A prompt with fewer runs in the window counts the ones it has; widen days to reach older runs. per_model says how many runs were counted. Omit to count every run in the window.",
+       "title": "Last Runs"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id",
+      "topic"
+     ],
+     "title": "get_top_cited_urls_for_topicArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_top_cited_domains",
+    "title": "Top cited domains, all workspaces",
+    "description": "The domains AI models cite most across ALL workspaces in the organization. Aggregate view for multi-workspace orgs.\n\nUse when the user wants org-level source analysis -- phrases like 'across all workspaces', 'org-wide sources', 'top domains overall', or 'which sites dominate'. For one workspace, use get_citation_sources.\n\nExample: 'Which domains are cited most across all our brands?'",
+    "inputSchema": {
+     "properties": {
+      "domain_limit": {
+       "default": 15,
+       "description": "How many domains to list. Default 15, max 50.",
+       "maximum": 50,
+       "minimum": 1,
+       "title": "Domain Limit",
+       "type": "integer"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "title": "get_top_cited_domainsArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_prompt_performance",
+    "title": "Prompt performance",
+    "description": "Detailed performance for one prompt (one question Refora asks the AI models on a schedule): visibility over time, per-model visibility and answers, and the URLs cited in its answers.\n\nUse this tool when the user asks about a specific prompt -- phrases like 'how are we doing on the prompt about X', 'details on this prompt', or as drill-down after seeing prompts from get_competitor_visibility_gap.\n\nName the prompt by its text: the full text as another Refora tool returned it, or a distinctive part of it. Prompts with the same text are one question and are measured together. If several prompts match, the response lists them so the user can pick.\n\nExample: 'How are we doing on the prompt about enterprise CRM?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "prompt_text": {
+       "description": "The prompt's text, exactly as another Refora tool returned it, or a distinctive part of it. Matched case-insensitively.",
+       "minLength": 1,
+       "title": "Prompt Text",
+       "type": "string"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id",
+      "prompt_text"
+     ],
+     "title": "get_prompt_performanceArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_sentiment_breakdown",
+    "title": "Sentiment breakdown",
+    "description": "How AI models talk about a brand: sentiment scores overall and per model, with example excerpts showing tone and framing.\n\nUse when the user asks how AI talks about their brand -- phrases like 'how does AI describe us', 'what's the sentiment', 'is ChatGPT positive or negative about us', or 'how do AI engines talk about [brand]'.\n\nReturns: overall sentiment score (0-100, 50 is neutral), per-model breakdown, and up to 3 examples per label (positive/neutral/negative), each a short excerpt around the mention.\n\nExample: 'How does ChatGPT describe Kassaro -- positively or negatively?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "brand_name": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional brand to analyse, e.g. a tracked competitor. Omit for the workspace's own brand.",
+       "title": "Brand Name"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_sentiment_breakdownArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_ai_answers",
+    "title": "AI answers",
+    "description": "The answers themselves: what ChatGPT, Perplexity, Gemini, Claude, Mistral and Google AI Overviews said to this workspace's prompts, each with the brands it mentions and the URLs it cites.\n\nUse this tool when the user wants to read or quote what an AI said -- phrases like 'what does ChatGPT say about us', 'show me the answers to the prompt about X', 'how do AI models describe our competitor', 'show answers where we are not mentioned' -- or to explain a number another Refora tool returned. For numbers (visibility, share of voice, trends, sentiment, sources), use those tools: they count every answer, this one returns a page.\n\nFilter by prompt (its text or a distinctive part of it), model, brand (brand_mentioned=true for answers that mention it, false for answers that don't; without brand_name it is the workspace's own brand) and window. Answers come newest first, 10 per page; when next_offset is set, call again with offset=next_offset. An answer longer than 2,000 characters is cut (truncated: true); to read it whole, call again with its prompt_text, model, its date as start_date and end_date, and full_text=true.\n\nExample: 'What did Perplexity say when asked for the best CRM?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      },
+      "prompt_text": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: only answers to this prompt. Its text as another Refora tool returned it, or a distinctive part of it, matched case-insensitively. If several prompts match, the response lists them so the user can pick. Omit for every prompt.",
+       "title": "Prompt Text"
+      },
+      "model": {
+       "anyOf": [
+        {
+         "enum": [
+          "openai",
+          "perplexity",
+          "gemini",
+          "anthropic",
+          "mistral",
+          "google-aio"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: only this AI model's answers. openai = ChatGPT, anthropic = Claude, mistral = Le Chat, google-aio = Google AI Overviews. Omit for every model.",
+       "title": "Model"
+      },
+      "brand_name": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: a brand to filter on. Alone, it keeps the answers that mention it; with brand_mentioned=false, the ones that don't. Omit it and set brand_mentioned to filter on the workspace's own brand.",
+       "title": "Brand Name"
+      },
+      "brand_mentioned": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional: true for only answers that mention the brand, false for only answers that don't. The brand is brand_name, or the workspace's own brand. Omit for answers either way.",
+       "title": "Brand Mentioned"
+      },
+      "days": {
+       "default": 30,
+       "description": "How many days back to look, counted back from end_date (default today). Default 30, max 90. Ignored when start_date is given. Prompts are re-run on a schedule, so a window shorter than a week can be empty.",
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      },
+      "start_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional explicit start of the window, as an ISO date (YYYY-MM-DD). A full ISO datetime is accepted and its date is used. Overrides days.",
+       "title": "Start Date"
+      },
+      "end_date": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Optional end of the window, as an ISO date (YYYY-MM-DD). Default today. Cannot be in the future.",
+       "title": "End Date"
+      },
+      "offset": {
+       "default": 0,
+       "description": "How many matching answers to skip. Pass the previous page's next_offset. Default 0.",
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      },
+      "limit": {
+       "default": 10,
+       "description": "Answers per page. Default 10, max 25. A page can hold fewer when its answers are long.",
+       "maximum": 25,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      },
+      "full_text": {
+       "default": false,
+       "description": "true to return answers whole (up to 20,000 characters each) instead of cut at 2,000. Narrow the filters first: meant for reading one or a few answers. Default false.",
+       "title": "Full Text",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_ai_answersArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "audit_page",
+    "title": "Audit a page for AI search",
+    "description": "Check how ready one web page is to be read and cited by AI assistants: whether robots.txt lets the AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended and others) in, llms.txt, the sitemap, structured data, headings, trust signals, meta tags and a Wikidata entry. Returns a 0-100 score, an A-F grade, the score per category, the main issues and the raw signals.\n\nUse this tool when the user asks whether a website is ready for AI search, why AI might not cite a page, or what to fix on it -- phrases like 'audit our homepage for AI', 'can ChatGPT crawl our site', 'GEO check of example.com'.\n\nIt checks the page itself. It does not measure what AI assistants answer about the brand; that needs a Refora workspace.\n\nExample question: 'Is kassaro.se ready for AI search?'",
+    "inputSchema": {
+     "properties": {
+      "url": {
+       "description": "The page to check: a full URL or a bare domain such as example.com.",
+       "maxLength": 500,
+       "minLength": 4,
+       "title": "Url",
+       "type": "string"
+      }
+     },
+     "required": [
+      "url"
+     ],
+     "title": "audit_pageArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      },
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     },
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_market_ai_presence",
+    "title": "Market AI presence",
+    "description": "A market snapshot of the workspace's website from an external index of AI answers: ChatGPT's and Gemini's answers to the brand's buyer questions as users see them in its country (share of answers naming the brand and each competitor, who else they name, which sources they cite), and how often Google's AI Overviews cite the site next to its competitors, month by month, with the questions where a competitor is cited and the site is not.\n\nUse this tool when the user asks how visible they are in AI before their own questions are tracked, or wants the wider market picture next to their own tracking -- phrases like 'does ChatGPT recommend us', 'who does AI recommend instead of us', 'how do we compare in Google's AI answers'.\n\nThe snapshot is built once, when the account is created; status 'building' means it is not ready yet. Its numbers are not the workspace's own tracking: read each section's about.\n\nExample question: 'Does ChatGPT recommend Kassaro?'",
+    "inputSchema": {
+     "properties": {
+      "workspace_id": {
+       "description": "The workspace's numeric id, as returned by list_workspaces.",
+       "minimum": 1,
+       "title": "Workspace Id",
+       "type": "integer"
+      }
+     },
+     "required": [
+      "workspace_id"
+     ],
+     "title": "get_market_ai_presenceArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_account",
+    "title": "Account and plan",
+    "description": "What the connected Refora organization's plan includes (workspaces, tracked questions, AI models, how often they run) and what each workspace is measured with: its own tracking, a market snapshot, or nothing yet. Includes a link to set up tracking and one to the plans.\n\nUse this tool when the user asks what their plan covers, why a number comes from market data, or how to track their own questions -- phrases like 'what's included', 'can you track this weekly', 'how do I add my own questions'.\n\nExample question: 'What does my Refora plan include?'",
+    "inputSchema": {
+     "properties": {},
+     "title": "get_accountArguments",
+     "type": "object"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "mcp:read"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "mcp:read"
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

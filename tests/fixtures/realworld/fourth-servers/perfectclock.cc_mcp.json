@@ -1,0 +1,299 @@
+{
+ "url": "https://perfectclock.cc/mcp",
+ "doc": {
+  "name": "Perfect Clock",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Perfect Clock plans meetings between people in different time zones.\nUse these tools when the user asks to plan, schedule or find a time for a meeting, call or recurring event with people or places in different time zones.\nConvert the user's wording into the structured input: IANA time zones for every participant (from the cities or countries they name), the meeting time in the zone it is anchored to, and a recurrence rule.\nUse find_meeting_windows when the time is not decided yet, plan_meeting_schedule once it is.\nThe results already account for working hours, public holidays and daylight saving time: show each participant's local time from the result, and mention the notes (DST shifts, days off, outside working hours).\nBoth tools' results end with an \"Open in Perfect Clock\" link (for the windows, the suggested start on those days) - give it to the user as it is. Do not make up other links to Perfect Clock or to calendars.",
+  "tools": [
+   {
+    "name": "plan_meeting_schedule",
+    "title": "Plan a meeting schedule",
+    "description": "Plans a one-off or recurring meeting with people in other time zones when its time is known (e.g. \"every other Tuesday at 10:00 Berlin time with Anna in Tbilisi\"). Expands it into concrete dates and shows each one in every participant's local time, with working-hours checks, public holidays and daylight-saving shifts. Saves the schedule for 30 days and returns a private perfectclock.cc/s/... link that opens it in Perfect Clock; each call saves a new schedule with its own link.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "title": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Meeting title."
+      },
+      "tz": {
+       "type": "string",
+       "description": "Time zone the meeting time is fixed in (usually the organizer's)."
+      },
+      "time": {
+       "type": "string",
+       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+       "description": "Local start time in `tz`."
+      },
+      "durationMinutes": {
+       "default": 60,
+       "type": "integer",
+       "minimum": 5,
+       "maximum": 720
+      },
+      "rule": {
+       "type": "object",
+       "properties": {
+        "freq": {
+         "type": "string",
+         "enum": [
+          "once",
+          "daily",
+          "weekly",
+          "monthly"
+         ]
+        },
+        "interval": {
+         "description": "Every N days/weeks/months; default 1.",
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 12
+        },
+        "byDay": {
+         "description": "Weekdays for weekly rules; for monthly with setPos, the weekday.",
+         "type": "array",
+         "items": {
+          "type": "string",
+          "enum": [
+           "MO",
+           "TU",
+           "WE",
+           "TH",
+           "FR",
+           "SA",
+           "SU"
+          ]
+         }
+        },
+        "setPos": {
+         "description": "Monthly \"Nth weekday\": 1-4, or -1 for the last.",
+         "type": "integer",
+         "minimum": -1,
+         "maximum": 4
+        },
+        "start": {
+         "description": "First possible date in `tz`; default today.",
+         "type": "string",
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "count": {
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 500
+        },
+        "until": {
+         "type": "string",
+         "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+       },
+       "required": [
+        "freq"
+       ],
+       "description": "Recurrence of the meeting."
+      },
+      "participants": {
+       "minItems": 1,
+       "maxItems": 10,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "How the participant or place is called in the conversation, e.g. \"Anna\" or \"Tokyo office\"."
+         },
+         "tz": {
+          "type": "string",
+          "description": "IANA time zone of this participant, e.g. Asia/Tbilisi."
+         },
+         "workHours": {
+          "description": "Local working hours [start, end]; default [\"09:00\",\"17:00\"].",
+          "minItems": 2,
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+           "type": "string",
+           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+         }
+        },
+        "required": [
+         "label",
+         "tz"
+        ]
+       },
+       "description": "People or places the meeting must suit, each with their own time zone."
+      },
+      "maxOccurrences": {
+       "default": 8,
+       "description": "How many upcoming meetings to list.",
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20
+      }
+     },
+     "required": [
+      "title",
+      "tz",
+      "time",
+      "rule",
+      "participants"
+     ]
+    },
+    "annotations": {
+     "title": "Plan a meeting schedule",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ],
+     "openai/toolInvocation/invoking": "Planning the meetings…",
+     "openai/toolInvocation/invoked": "Meetings planned",
+     "ui": {
+      "resourceUri": "ui://perfect-clock/schedule-v4.html"
+     },
+     "openai/outputTemplate": "ui://perfect-clock/schedule-v4.html"
+    }
+   },
+   {
+    "name": "find_meeting_windows",
+    "title": "Find meeting windows",
+    "description": "Finds when people in other time zones can meet, when the time is not decided yet: the windows on each day when all participants are within their working hours, accounting for weekends, public holidays and daylight-saving changes, and one suggested start time that fits the most days. Saves that suggested time on those days for 30 days and returns a private perfectclock.cc/s/... link that opens it in Perfect Clock; each call saves a new schedule with its own link.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "title": {
+       "description": "Meeting title, if the user gave one.",
+       "type": "string",
+       "maxLength": 120
+      },
+      "tz": {
+       "type": "string",
+       "description": "Time zone whose calendar days are scanned (usually the organizer's)."
+      },
+      "from": {
+       "description": "First day in `tz`; default today.",
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "days": {
+       "default": 5,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 14
+      },
+      "durationMinutes": {
+       "default": 60,
+       "type": "integer",
+       "minimum": 15,
+       "maximum": 480
+      },
+      "participants": {
+       "minItems": 1,
+       "maxItems": 10,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "How the participant or place is called in the conversation, e.g. \"Anna\" or \"Tokyo office\"."
+         },
+         "tz": {
+          "type": "string",
+          "description": "IANA time zone of this participant, e.g. Asia/Tbilisi."
+         },
+         "workHours": {
+          "description": "Local working hours [start, end]; default [\"09:00\",\"17:00\"].",
+          "minItems": 2,
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+           "type": "string",
+           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+         }
+        },
+        "required": [
+         "label",
+         "tz"
+        ]
+       },
+       "description": "People or places the meeting must suit, each with their own time zone."
+      }
+     },
+     "required": [
+      "tz",
+      "participants"
+     ]
+    },
+    "annotations": {
+     "title": "Find meeting windows",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ],
+     "openai/toolInvocation/invoking": "Finding a time for everyone…",
+     "openai/toolInvocation/invoked": "Found the meeting windows",
+     "ui": {
+      "resourceUri": "ui://perfect-clock/windows-v1.html"
+     },
+     "openai/outputTemplate": "ui://perfect-clock/windows-v1.html"
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://perfect-clock/schedule-v4.html",
+    "name": "schedule-widget",
+    "title": "Meeting schedule",
+    "description": "Meetings in every participant's local time, with a button that opens them in Perfect Clock.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": []
+      },
+      "prefersBorder": true
+     }
+    }
+   },
+   {
+    "uri": "ui://perfect-clock/windows-v1.html",
+    "name": "windows-widget",
+    "title": "Meeting windows",
+    "description": "Times when everyone is within working hours, by day, with the suggested start and a button that opens it in Perfect Clock.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": []
+      },
+      "prefersBorder": true
+     }
+    }
+   }
+  ]
+ }
+}

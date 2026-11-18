@@ -1,0 +1,1234 @@
+{
+ "url": "https://api.last-price.ai/api/mcp/rpc?profile=lean",
+ "doc": {
+  "name": "lastprice-mcp",
+  "version": "0.10.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Last Price prices what you sell. To get a price now, call compute_price with what the work cost you, for example {\"unit_cost\":0.47,\"currency\":\"USD\"}, or with what you charge today, {\"current_price\":49,\"currency\":\"USD\"}. Missing an input? Call pricing_conversation with what you know and it asks for the rest. With no MCP client, POST JSON-RPC to this URL: initialize, then {\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"compute_price\",\"arguments\":{\"unit_cost\":0.47,\"currency\":\"USD\"}}}; you do not need tools/list first. This connection lists the 6 tools that reach a price, plus search_tools and call_tool: search_tools finds any of the other 356 tools by task and call_tool runs it. With no key, prices come from a public demo workspace, limited per address. For your own workspace, call register_agent with {\"name\":\"your-system/role-name\"}, or, holding a key already (a saved file or LASTPRICE_API_KEY), call use_api_key with it; this session then runs as that agent, no header to add. Check the changelog at https://last-price.ai/changelog before relying on behaviour you learned earlier.",
+  "tools": [
+   {
+    "name": "pricing_conversation",
+    "description": "Ask Last Price what pricing inputs are missing. Start with request: {}, return its questions to the caller, then send continuation.request and answers. Prepare is free and does not compute. When ready, action compute uses the existing authenticated pricing API; configure a credential first. Never invent answers or treat a continuation as authorization.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "action": {
+       "type": "string",
+       "enum": [
+        "prepare",
+        "compute"
+       ],
+       "default": "prepare",
+       "description": "prepare (free) returns the questions still open; compute prices once nothing is missing."
+      },
+      "request": {
+       "type": "object",
+       "description": "Partial REST PricingComputeRequest, including nested context, constraints, an explicit function selection and options. Reuse continuation.request on subsequent calls."
+      },
+      "answers": {
+       "type": "object",
+       "additionalProperties": false,
+       "description": "Answers to the questions the last call asked, by field, e.g. {\"currency\":\"USD\",\"unit_cost\":4}.",
+       "properties": {
+        "currency": {
+         "type": "string",
+         "pattern": "^[A-Z]{3}$"
+        },
+        "current_price": {
+         "type": "number",
+         "minimum": 0
+        },
+        "unit_cost": {
+         "type": "number",
+         "minimum": 0
+        },
+        "target_margin_pct": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 95
+        },
+        "min_price": {
+         "type": "number",
+         "minimum": 0
+        },
+        "max_price": {
+         "type": "number",
+         "minimum": 0
+        }
+       }
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "needs_input",
+        "ready",
+        "completed",
+        "unable_to_assess"
+       ]
+      },
+      "explanation": {
+       "type": "string"
+      },
+      "questions": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string"
+         },
+         "question": {
+          "type": "string"
+         },
+         "reason": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "assumptions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "continuation": {
+       "type": "object",
+       "properties": {
+        "request": {
+         "type": "object"
+        }
+       }
+      },
+      "result": {
+       "type": "object",
+       "properties": {
+        "computed_price": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        },
+        "confidence": {
+         "type": "number"
+        }
+       }
+      }
+     },
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Pricing conversation",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "compute_price",
+    "description": "Compute a price. Returns the price, the function that produced it, the metered cost and a `trace` of each stage. Send currency plus unit_cost (what the work costs you) or current_price. Missing inputs return an error naming them. For a competitor offer, put competitor_price, competitor_currency and competitive_action in metadata. To pay for this one call with x402, pass payment (call without it to read the price). A result with valid_until (RFC 3339) holds only until then. confidence is the function's own 0 to 1 score for its price, not a probability that a buyer accepts. price_statement says what the answer is: a third party's estimate for you, or the workspace's commitment when a signed quote is attached.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "product_id": {
+       "type": "string",
+       "description": "Optional identifier of what is being priced."
+      },
+      "product_type": {
+       "type": "string",
+       "enum": [
+        "saas",
+        "ecommerce",
+        "marketplace",
+        "digital",
+        "api",
+        "custom"
+       ],
+       "description": "Optional category. Defaults to \"custom\"."
+      },
+      "current_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "The current or reference price. Optional: functions that price relative to an incumbent need it, but lastprice/cost-plus prices from unit_cost instead."
+      },
+      "unit_cost": {
+       "type": "number",
+       "minimum": 0,
+       "description": "What the work costs you. It lets lastprice/cost-plus price with no current_price, which is the usual case when pricing a task you are about to run. Routing picks a function that can use it; to require cost-plus, pass its UUID from list_functions as function_id."
+      },
+      "target_margin_pct": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 95,
+       "description": "Margin on price for cost-plus, not markup on cost: price = unit_cost / (1 - margin). Defaults to 30."
+      },
+      "outcome_terms": {
+       "type": "object",
+       "description": "Optional, for a price charged per outcome: when the outcome counts as failed and what is owed then. The result echoes the terms normalised, with complete false until success_definition, resolve_by and on_timeout are all set.",
+       "properties": {
+        "success_definition": {
+         "type": "string",
+         "maxLength": 500,
+         "description": "What the buyer must see for the outcome to count."
+        },
+        "resolve_by": {
+         "type": "string",
+         "description": "The deadline: an ISO 8601 duration from the quote (P30D, PT48H) or an RFC 3339 time. After it, with no success, the outcome has failed."
+        },
+        "on_timeout": {
+         "type": "string",
+         "enum": [
+          "no_charge",
+          "partial",
+          "full"
+         ],
+         "description": "What is owed when the deadline passes without success."
+        },
+        "timeout_share": {
+         "type": "number",
+         "exclusiveMinimum": 0,
+         "exclusiveMaximum": 1,
+         "description": "With on_timeout \"partial\": the fraction of the price owed, e.g. 0.3 for 30%."
+        },
+        "evidence": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "maxItems": 10,
+         "description": "What proves the outcome, e.g. [\"delivery_receipt\"]."
+        }
+       }
+      },
+      "min_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "Optional minimum acceptable price. A competitive offer needs this or a declared unit_cost and target_margin_pct."
+      },
+      "max_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "Optional maximum acceptable price."
+      },
+      "currency": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 3,
+       "description": "Three-letter ISO currency code, e.g. USD."
+      },
+      "customer_segment": {
+       "type": "string",
+       "description": "Optional segment, e.g. enterprise."
+      },
+      "geo": {
+       "type": "string",
+       "description": "Optional geography hint, e.g. US."
+      },
+      "buyer_type": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "enum": [
+        "agent",
+        "person",
+        null
+       ],
+       "description": "Optional. Who the price is for: an AI agent or a person. Recorded with the quote only."
+      },
+      "buyer_agent": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 100,
+       "description": "Optional. The buying agent, e.g. chatgpt. A label recorded with the quote only."
+      },
+      "buyer_ceiling": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "exclusiveMinimum": 0,
+       "description": "Optional. The most the buyer says it will pay, in the request currency (its budget, spend limit or offer cap). Never reaches the pricing function, so it cannot set the price; the model layer reads it as evidence about the buyer and checks it against what the buyer then does. Echoed in price_object.evidence.declared_ceiling."
+      },
+      "payer": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "enum": [
+        "agent_wallet",
+        "person_card",
+        "company_invoice",
+        null
+       ],
+       "description": "Optional. Who pays, as distinct from who calls: an agent wallet, a person by card, or a company billed later."
+      },
+      "channel": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional. The sales channel, e.g. an agent marketplace. With a rate saved by set_channel_rates, the price covers the channel's cut."
+      },
+      "routing_preference": {
+       "type": "string",
+       "enum": [
+        "cheapest",
+        "fastest",
+        "explicit",
+        "round_robin",
+        "weighted",
+        "policy",
+        "default"
+       ],
+       "description": "How to route across pricing functions. Defaults to \"default\"."
+      },
+      "routing": {
+       "type": "object",
+       "description": "Optional. Which functions may answer this call, by UUID from list_functions. If none qualifies, the call is refused before any charge.",
+       "properties": {
+        "only_functions": {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "minItems": 1,
+         "maxItems": 50,
+         "description": "Only these may answer."
+        },
+        "excluded_functions": {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "maxItems": 50,
+         "description": "These may not answer, not even as a fallback."
+        },
+        "preferred_functions": {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "maxItems": 50,
+         "description": "Tried first, in this order."
+        },
+        "max_cost_per_unit": {
+         "type": "number",
+         "minimum": 0,
+         "description": "Most you will pay per metered unit (rate x multiplier)."
+        },
+        "max_latency_ms": {
+         "type": "integer",
+         "minimum": 1,
+         "description": "Skip functions slower than this on average, and stop waiting after it."
+        },
+        "allow_fallbacks": {
+         "type": "boolean",
+         "description": "false: fail instead of trying another function when the chosen one fails."
+        }
+       },
+       "additionalProperties": false
+      },
+      "learned_routing": {
+       "type": "boolean",
+       "description": "Optional. With routing_preference cheapest, fastest, round_robin or weighted, let the router learn from your own calls which function serves you best (see get_learned_routing). Ignored with a function_id."
+      },
+      "function_id": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Optional explicit pricing function UUID to use."
+      },
+      "include_explanation": {
+       "type": "boolean",
+       "description": "If true, ask for an explanation and confidence with the price."
+      },
+      "no_explore": {
+       "type": "boolean",
+       "description": "If true, give this price exactly as computed, without the small per-call variation a workspace may run so learned pricing can learn what buyers will pay (see get_price_exploration)."
+      },
+      "include_buyer_envelope": {
+       "type": "boolean",
+       "description": "If true, with metadata.category set, the result adds buyer_envelope: what buyers' spend limits allowed in that category (pooled over 5 or more buyers) and where this price sits. It never changes the price."
+      },
+      "metadata": {
+       "type": "object",
+       "description": "Optional context. Competitive pricing: competitor_price, competitor_currency and competitive_action (match, or undercut with undercut_pct); confirm the products are comparable. Or market_query (the job in plain words) to look up market prices instead."
+      },
+      "idempotency_key": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 255,
+       "description": "Optional. A new value (e.g. a UUID) for each call you mean to make; send the SAME value if you retry after a timeout or error you cannot interpret, and the call is computed and charged once. Ignored without a credential."
+      },
+      "intent": {
+       "type": "object",
+       "description": "Optional. The spending limit the buyer approved, e.g. a card network mandate. The result says whether the price fits it.",
+       "properties": {
+        "id": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 200,
+         "description": "The approval id from the rail or issuer."
+        },
+        "max_amount": {
+         "type": "number",
+         "minimum": 0,
+         "description": "The most the buyer approved."
+        },
+        "currency": {
+         "type": "string",
+         "minLength": 3,
+         "maxLength": 3,
+         "description": "Three-letter ISO code. Defaults to the price currency."
+        },
+        "merchant": {
+         "type": "string",
+         "maxLength": 253,
+         "description": "The merchant the approval names. Carried into the quote as sent."
+        },
+        "expires_at": {
+         "type": "string",
+         "format": "date-time",
+         "description": "When the approval stops being valid (RFC 3339)."
+        }
+       },
+       "required": [
+        "id",
+        "max_amount"
+       ]
+      },
+      "payment": {
+       "type": "string",
+       "minLength": 20,
+       "maxLength": 8192,
+       "description": "Optional. The signed x402 payment, base64, as sent in an X-PAYMENT or PAYMENT-SIGNATURE header; or, where the answer offers MPP tempo, the whole Payment-Authorization value (\"Payment \" and the credential). Omit it to read what the call costs and how to pay; nothing is charged until you send it."
+      }
+     },
+     "required": [
+      "currency"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "computed"
+       ],
+       "description": "What sort of claim the price is: an estimate by a pricing function, advice rather than a commitment. Term: lp:price-kind.computed."
+      },
+      "computed_price": {
+       "type": "number",
+       "description": "The price the function returned, after the caller's bounds and the workspace's guardrails. Term: lp:computed-price."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code of computed_price."
+      },
+      "confidence": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "minimum": 0,
+       "maximum": 1,
+       "description": "The function's own 0 to 1 score for this price; not a probability that a buyer accepts. Term: lp:confidence.quote."
+      },
+      "request_id": {
+       "type": "string",
+       "description": "This call's id; the receipt id unless receipt.id says otherwise."
+      },
+      "function_id": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "The pricing function that produced the price. Term: lp:pricing-function."
+      },
+      "function_name": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Its name, such as lastprice/cost-plus. Term: lp:pricing-function."
+      },
+      "explanation": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Why the function chose this price, in plain words; null when it gave none."
+      },
+      "alternatives": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Other prices the function considered, each with its confidence and a label."
+      },
+      "valid_until": {
+       "type": "string",
+       "description": "RFC 3339; the price holds only until then."
+      },
+      "price_object": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "What the price means beside the number: the expected acceptance at each price, the range it was chosen in, what it was conditioned on, the evidence behind it, what it cost to compute and whether it was an exploring draw. Term: lp:price-object."
+      },
+      "receipt": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "The usage event that records this call. Pass receipt.id to report_outcome only when it differs from request_id; when no usage event was recorded, receipt.id falls back to request_id and there is nothing to report against. Term: lp:usage-event."
+      },
+      "price_statement": {
+       "type": "object",
+       "properties": {
+        "speaker": {
+         "type": "string",
+         "enum": [
+          "seller",
+          "buyer",
+          "both",
+          "third_party",
+          "market"
+         ]
+        },
+        "standing": {
+         "type": "string",
+         "enum": [
+          "proposal",
+          "commitment",
+          "executed",
+          "estimate",
+          "constraint"
+         ]
+        },
+        "audience": {
+         "type": "string",
+         "enum": [
+          "public",
+          "one_counterparty",
+          "private"
+         ]
+        },
+        "interval_meaning": {
+         "type": "string",
+         "enum": [
+          "credible_interval",
+          "evidence_spread",
+          "acceptance_range",
+          "negotiation_room"
+         ]
+        }
+       },
+       "required": [
+        "speaker",
+        "standing",
+        "audience"
+       ],
+       "description": "What this answer is: a third party's estimate for you (standing estimate), or the workspace's commitment until valid_until when a signed quote is attached (speaker seller, standing commitment). Term: lp:price-statement."
+      }
+     },
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Compute price",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "verify_price",
+    "description": "Ask whether a price makes sense for its context, rather than what the price should be. Returns a verdict (within_band, too_high, too_low, or unknown), the band it was judged against, a signed deviation from the reference, a confidence, and the evidence behind it. A verdict of \"unknown\" means the price could not be judged, which is not the same as within_band. Act on next_step: buy (within band on confident, independent evidence), negotiate (too high), walk_away (far too high, confidently) or check_more (unknown, too low, or weak evidence); next_step_reason says why. Pass quote_valid_until from the compute_price result the price came from, and where quote expiry is switched on the answer says quote_expired when that quote is stale. Where paid verdicts are switched on, a caller with no key can pay for one verdict with x402: pass payment, a signed payment for the price and terms listed under payments.x402.verify_price in /.well-known/agents.json; a verdict of unknown is not charged. Where buyers' spend limits are switched on and metadata.category names a category, the evidence includes buyer_budget: what buyers' own spend checks allowed for it (buyer_envelope), reported and never counted in the verdict. price_statement says what the answer is: a third party's estimate whose band is an acceptance range around the reference, not an interval of value.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "proposed_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "The price to judge. This is the subject of the call."
+      },
+      "currency": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 3,
+       "description": "Three-letter ISO currency code, e.g. USD. Defaults to USD."
+      },
+      "product_id": {
+       "type": "string",
+       "description": "Optional identifier of what is being priced."
+      },
+      "product_type": {
+       "type": "string",
+       "enum": [
+        "saas",
+        "ecommerce",
+        "marketplace",
+        "digital",
+        "api",
+        "custom"
+       ],
+       "description": "Optional category of what is being priced."
+      },
+      "current_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "Optional incumbent price. Not required: asking whether a price is sensible does not presuppose an existing one."
+      },
+      "customer_segment": {
+       "type": "string",
+       "description": "Optional segment, e.g. enterprise."
+      },
+      "geo": {
+       "type": "string",
+       "description": "Optional geography hint, e.g. US."
+      },
+      "buyer_type": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "enum": [
+        "agent",
+        "person",
+        null
+       ],
+       "description": "Optional. Who the price is for: an AI agent or a person. Recorded with the quote only."
+      },
+      "buyer_agent": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "maxLength": 100,
+       "description": "Optional. The buying agent, e.g. chatgpt. A label recorded with the quote only."
+      },
+      "channel": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional. The sales channel, e.g. an agent marketplace. With a rate saved by set_channel_rates, the price covers the channel's cut."
+      },
+      "min_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "Optional hard floor. Binding: a verdict will never relax it."
+      },
+      "max_price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "Optional hard ceiling. Binding: a verdict will never relax it."
+      },
+      "metadata": {
+       "type": "object",
+       "description": "Optional free-form context."
+      },
+      "outcome_terms": {
+       "type": "object",
+       "description": "Optional, for a price charged per outcome: when the outcome counts as failed and what is owed then. The result echoes the terms normalised, with complete false until success_definition, resolve_by and on_timeout are all set.",
+       "properties": {
+        "success_definition": {
+         "type": "string",
+         "maxLength": 500,
+         "description": "What the buyer must see for the outcome to count."
+        },
+        "resolve_by": {
+         "type": "string",
+         "description": "The deadline: an ISO 8601 duration from the quote (P30D, PT48H) or an RFC 3339 time. After it, with no success, the outcome has failed."
+        },
+        "on_timeout": {
+         "type": "string",
+         "enum": [
+          "no_charge",
+          "partial",
+          "full"
+         ],
+         "description": "What is owed when the deadline passes without success."
+        },
+        "timeout_share": {
+         "type": "number",
+         "exclusiveMinimum": 0,
+         "exclusiveMaximum": 1,
+         "description": "With on_timeout \"partial\": the fraction of the price owed, e.g. 0.3 for 30%."
+        },
+        "evidence": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "maxItems": 10,
+         "description": "What proves the outcome, e.g. [\"delivery_receipt\"]."
+        }
+       }
+      },
+      "quote_valid_until": {
+       "type": "string",
+       "format": "date-time",
+       "description": "Optional. The valid_until of the compute_price result this price came from (RFC 3339). Where quote expiry is switched on, a time already past is answered with quote_expired: true."
+      },
+      "payment": {
+       "type": "string",
+       "minLength": 20,
+       "maxLength": 8192,
+       "description": "Optional. The signed x402 payment, base64, as sent in an X-PAYMENT or PAYMENT-SIGNATURE header; or, where the answer offers MPP tempo, the whole Payment-Authorization value (\"Payment \" and the credential). Omit it to read what the call costs and how to pay; nothing is charged until you send it."
+      }
+     },
+     "required": [
+      "proposed_price"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "verdict": {
+       "type": "string",
+       "enum": [
+        "within_band",
+        "too_high",
+        "too_low",
+        "unknown"
+       ],
+       "description": "unknown means nothing could judge the price, which is not within_band. Term: lp:verdict."
+      },
+      "proposed_price": {
+       "type": "number",
+       "description": "The price that was judged. Term: lp:proposed-price."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code of proposed_price and the band."
+      },
+      "reference_price": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "The price the evidence points at. Term: lp:reference-price."
+      },
+      "band": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "lower": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "upper": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       },
+       "description": "The range the price was judged against; a null bound is open on that side. Term: lp:band.verification."
+      },
+      "deviation_pct": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Percent from the reference price; positive is above it. Term: lp:deviation."
+      },
+      "confidence": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1,
+       "description": "The lowest evidence weight, halved when sources disagree. Term: lp:confidence.verdict."
+      },
+      "independent_evidence": {
+       "type": "boolean",
+       "description": "False means the verdict partly reasoned from the price itself. Term: lp:independent-evidence."
+      },
+      "evidence": {
+       "type": "array",
+       "description": "Each source's reference, band and weight. Term: lp:evidence."
+      },
+      "next_step": {
+       "type": "string",
+       "enum": [
+        "buy",
+        "negotiate",
+        "walk_away",
+        "check_more"
+       ],
+       "description": "What a buyer should do with this price. Term: lp:next-step."
+      },
+      "next_step_reason": {
+       "type": "string",
+       "description": "Why next_step was chosen, in one sentence."
+      },
+      "valid_until": {
+       "type": "string",
+       "description": "RFC 3339; the verdict holds only until then."
+      },
+      "price_statement": {
+       "type": "object",
+       "properties": {
+        "speaker": {
+         "type": "string",
+         "enum": [
+          "seller",
+          "buyer",
+          "both",
+          "third_party",
+          "market"
+         ]
+        },
+        "standing": {
+         "type": "string",
+         "enum": [
+          "proposal",
+          "commitment",
+          "executed",
+          "estimate",
+          "constraint"
+         ]
+        },
+        "audience": {
+         "type": "string",
+         "enum": [
+          "public",
+          "one_counterparty",
+          "private"
+         ]
+        },
+        "interval_meaning": {
+         "type": "string",
+         "enum": [
+          "credible_interval",
+          "evidence_spread",
+          "acceptance_range",
+          "negotiation_room"
+         ]
+        }
+       },
+       "required": [
+        "speaker",
+        "standing",
+        "audience"
+       ],
+       "description": "What this answer is: a third party's estimate whose band is an acceptance range around the reference (interval_meaning acceptance_range), not an interval of value. Term: lp:price-statement."
+      }
+     },
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Verify price",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "report_outcome",
+    "description": "Report whether a price from compute_price was used: once the buyer has accepted or turned down a price, report it. Pass receipt.id from that result as usage_event_id, or omit it to report the last price compute_price returned on this connection or tools instance, once (the hosted MCP endpoint remembers nothing, so pass it there). Outcomes are what later routing and confidence learn from. With outcome pricing on, a rejection within the call's outcome window gives back part of what it cost; the result says what was refunded. Needs a Last Price credential. Report only what actually happened. Needs a claimed workspace: a sandbox key from self-registration is refused (403) until a person claims the workspace.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "usage_event_id": {
+       "type": "string",
+       "description": "The usage event of the priced call: receipt.id on the compute_price result. Pass it whenever you priced more than one thing. Omitted, the last compute_price result on this connection is reported, once."
+      },
+      "outcome": {
+       "type": "string",
+       "enum": [
+        "accepted",
+        "rejected"
+       ],
+       "description": "Whether the price was used."
+      },
+      "quality_score": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1,
+       "description": "Optional: how good the price was, 0 to 1."
+      },
+      "evidence_reference": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "Optional evidence: an order, ticket or invoice id in your own system."
+      },
+      "evidence_url": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Optional evidence: an https link to the record."
+      },
+      "evidence_note": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Optional evidence: a short note on why."
+      }
+     },
+     "required": [
+      "outcome"
+     ]
+    },
+    "_meta": {
+     "ai.last-price/requires": "claimed_workspace"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "event": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "outcome": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "outcome_window": {
+       "type": "object"
+      },
+      "quote_expired": {
+       "type": "boolean"
+      },
+      "quote_expired_seconds_ago": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Report outcome",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_functions",
+    "description": "List the pricing functions registered for the authenticated tenant.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "draft",
+        "review",
+        "active",
+        "inactive",
+        "deprecated"
+       ],
+       "description": "Only functions in this status."
+      },
+      "execution_type": {
+       "type": "string",
+       "enum": [
+        "rule_based",
+        "ml_model",
+        "llm_prompt",
+        "external_api",
+        "composite"
+       ],
+       "description": "Only functions of this execution type."
+      },
+      "is_builtin": {
+       "type": "boolean",
+       "description": "True for built-in functions only, false for the tenant's own only."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "description": "Page size. Defaults to 50; the API caps it at 100."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "Rows to skip. Defaults to 0."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "functions": {
+       "type": "array"
+      },
+      "items": {
+       "type": "array"
+      }
+     },
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "List functions",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_receipt",
+    "description": "Get the receipt for one of your workspace's priced calls, by its usage event id (the id list_usage_events returns and report_outcome takes): what was priced, by which function and agent, when, the amount, how it was paid, and the outcome if one was reported. Receipts are made only when you ask, never sent for every call. For CSV or a printable page, call GET /api/receipts/{id} with format=csv or format=html. Needs a Last Price credential with price compute or billing read scope. Needs a claimed workspace: a sandbox key from self-registration is refused (403) until a person claims the workspace.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "usage_event_id": {
+       "type": "string",
+       "format": "uuid",
+       "description": "The priced call's usage event id, as list_usage_events returns it."
+      }
+     },
+     "required": [
+      "usage_event_id"
+     ]
+    },
+    "_meta": {
+     "ai.last-price/requires": "claimed_workspace"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "object": {
+       "type": "string",
+       "enum": [
+        "receipt"
+       ]
+      },
+      "issued_at": {
+       "type": "string"
+      },
+      "issuer": {
+       "type": "object"
+      },
+      "receipt": {
+       "type": "object",
+       "properties": {
+        "usage_event_id": {
+         "type": "string"
+        },
+        "amount": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        },
+        "payment": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "additionalProperties": true
+    },
+    "annotations": {
+     "title": "Get receipt",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "search_tools",
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      },
+      "query": {
+       "type": "string"
+      },
+      "tools": {
+       "type": "array"
+      },
+      "hint": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "description": "Find the Last Price tool for a task. This connection lists only the tools that reach a price; the server has over 300 more (pricing functions, routing, experiments, webhooks, billing, orders, the marketplace and more). Pass query, a few words for the job, and get back the best matching tools with their full input schemas. Then call one with call_tool, or by its name. With no query it lists every tool name.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "description": "What you want to do, in a few words, e.g. \"create a webhook\" or \"experiment results\"."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "description": "How many tools to return. Defaults to 5."
+      }
+     }
+    },
+    "annotations": {
+     "title": "Search tools",
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "call_tool",
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "message": {
+       "type": "string",
+       "description": "A short sentence about the result that an agent can show its person."
+      }
+     },
+     "additionalProperties": true
+    },
+    "description": "Run any Last Price tool by name, including one this connection does not list. Find the name and its arguments with search_tools first. What it does, and whether it changes anything, is what that tool says.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 100,
+       "description": "The tool to run, e.g. \"list_webhooks\"."
+      },
+      "arguments": {
+       "type": "object",
+       "description": "The arguments for that tool, as its input schema from search_tools describes. Defaults to {}."
+      }
+     },
+     "required": [
+      "name"
+     ]
+    },
+    "annotations": {
+     "title": "Call tool",
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "idempotentHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "register_agent",
+    "description": "Sign up with no key and no human: creates a sandbox workspace of your own and returns its API key (shown once), its daily limits and a claim link a person can open to take the workspace into their account. Pass name (2 to 64 characters, such as your-system/role-name), and optionally contact_email and intended_use. On the hosted MCP server this session goes on using the new key, so the tools that need a credential work at once with no header to add; elsewhere send the returned key as the x-api-key header. Public: needs no credential.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 64,
+       "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:@/+-]{1,63}$",
+       "description": "What to call this agent, such as your-system/role-name: letters, digits, spaces and . _ : @ / + -"
+      },
+      "contact_email": {
+       "type": "string",
+       "maxLength": 254,
+       "description": "Where a person can reach whoever runs this agent. Never used to send mail until a person claims the workspace."
+      },
+      "intended_use": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "What the agent will price, in a sentence."
+      }
+     },
+     "required": [
+      "name"
+     ]
+    },
+    "annotations": {
+     "title": "Register agent",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "use_api_key",
+    "description": "Use a Last Price API key you already hold (a saved file, LASTPRICE_API_KEY) in this MCP connection, when it was opened without one: pass api_key. On the hosted MCP server this session then runs as that key's agent, so the tools that need a credential work at once with no header to add; it lasts until the session ends or the key is revoked or rotated. The key is checked, never echoed back. A connection that already has a credential keeps it. Public: needs no other credential.",
+    "inputSchema": {
+     "additionalProperties": false,
+     "type": "object",
+     "properties": {
+      "api_key": {
+       "type": "string",
+       "pattern": "^lp_[0-9a-f]{40}$",
+       "description": "Your Last Price API key: lp_ and 40 lowercase hex characters."
+      }
+     },
+     "required": [
+      "api_key"
+     ]
+    },
+    "annotations": {
+     "title": "Use API key",
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

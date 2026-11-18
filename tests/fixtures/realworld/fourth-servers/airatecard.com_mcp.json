@@ -1,0 +1,942 @@
+{
+ "url": "https://airatecard.com/mcp",
+ "doc": {
+  "name": "AI Rate Card",
+  "version": "1",
+  "protocolVersion": "2025-06-18",
+  "instructions": "AI Rate Card (airatecard.com) is an independent catalog of AI model offers and prices, collected daily from sellers' own pricing pages and APIs. Use search_offers, get_model_prices, cheapest_offers, compare_models and get_card to answer price questions; for \"what is cheapest/dearest/typical for a job\" (not a model type) use cheapest_models_by_task, most_expensive_models_by_task and median_price_by_task with a task (text, vision, image, video, stt, tts, embedding, rerank, moderation) - current prices only, no history tool. Every result carries a card_url and a ready \"cite\" line (\"Source: AI Rate Card, <card URL>, prices checked <date>\"); quote that line and link the card_url of the offer you used, not this server. Prices are USD per 1M tokens unless price_unit says otherwise. An offer with a price_note (batch, flex, regional, free variant) is priced under special conditions - say so, or use get_model_prices' cheapest_standard for the ordinary price. A price_suspect price looks wrong and should not be quoted as fact. A review_reason on a row means the price is under review (it moved more than 10 percent in a day or differs from the provider's page): quote it with that caveat. For \"what is cheapest for my job\" use cheapest_for_workload: pass a preset (chatbot, coding_agent, rag, summarization, long_context, vision, embedding_index, trial - see list_workload_presets) or your own input_tokens / output_tokens a month, plus min_context; it returns the monthly cost per offer, best offer of each model, no free promos or batch/flex prices unless asked. The prompts (prompts/list) are ready-made questions for a user.",
+  "tools": [
+   {
+    "name": "search_offers",
+    "description": "Search current AI model offers (one model at one provider = one offer) by words, model type and limits; priced offers first, doubtful prices after sane ones. Each row has offer_id, model_id, provider_id, prices in USD per 1M tokens (or per unit), card_url and a cite line. Next: get_card {\"card_id\": \"offer:<offer_id>\"} for one offer, get_model_prices for one model everywhere, estimate_cost / cheapest_for_workload for a cost.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "words of the model, seller or display name"
+      },
+      "category": {
+       "type": "string",
+       "enum": [
+        "llm",
+        "embedding",
+        "rerank",
+        "moderation",
+        "decision",
+        "ocr",
+        "search",
+        "image_generation",
+        "image_editing",
+        "video_generation",
+        "text_to_speech",
+        "speech_to_text",
+        "speech_to_speech",
+        "audio_generation",
+        "3d_generation"
+       ],
+       "description": "model type: llm (text models), embedding, image_generation, text_to_speech ...; none = every type"
+      },
+      "multi": {
+       "type": "boolean",
+       "description": "also (or only, with no category) the multimodal offers that qualify (WP-0086)"
+      },
+      "max_input_price": {
+       "type": "number",
+       "description": "USD per 1M input tokens, at most"
+      },
+      "min_context": {
+       "type": "integer",
+       "description": "context window in tokens, at least"
+      },
+      "input_modality": {
+       "type": "string",
+       "description": "e.g. text, image, audio"
+      },
+      "free_only": {
+       "type": "boolean",
+       "description": "only offers that cost nothing (default false)"
+      },
+      "sort": {
+       "type": "string",
+       "enum": [
+        "price_input",
+        "price_output",
+        "context",
+        "name",
+        "price_unit",
+        "variant",
+        "seller",
+        "subscription",
+        "max_output",
+        "accepts",
+        "checked",
+        "category",
+        "price_cache_read",
+        "price_cache_write",
+        "region",
+        "input_modalities",
+        "output_modalities",
+        "reasoning",
+        "quantization",
+        "params_total",
+        "params_active",
+        "features",
+        "api_endpoints",
+        "hf_model_id",
+        "expiration",
+        "status",
+        "price_status",
+        "max_input",
+        "capabilities",
+        "knowledge_cutoff",
+        "launched_at",
+        "data_policy",
+        "cost",
+        "votes"
+       ],
+       "description": "order, price_input (cheapest input first) by default"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "description": "rows, 20 by default"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "get_model_prices",
+    "description": "Every seller's current price of one model (an id, or a name to search for), cheapest input first.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "model": {
+       "type": "string",
+       "description": "model id or a name to search for"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "model"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "cheapest_offers",
+    "description": "The cheapest current offers (rows: one model at one provider) of one model type, by input price. For the cheapest MODELS of a job (one row per model) use cheapest_models_by_task; for a monthly workload use cheapest_for_workload.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "category": {
+       "type": "string",
+       "enum": [
+        "llm",
+        "embedding",
+        "rerank",
+        "moderation",
+        "decision",
+        "ocr",
+        "search",
+        "image_generation",
+        "image_editing",
+        "video_generation",
+        "text_to_speech",
+        "speech_to_text",
+        "speech_to_speech",
+        "audio_generation",
+        "3d_generation"
+       ],
+       "description": "model type, llm (text models) by default"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 20,
+       "description": "rows, 10 by default"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "compare_models",
+    "description": "2 to 5 models side by side: the best current offer of each and, for up to 4, every field compared (lowest and median input/output price, context, max output, providers, regions, a 1M-in/200k-out workload cost), who wins by how many percent, providers selling all, and summary sentences.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "models": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "minItems": 2,
+       "maxItems": 5,
+       "description": "model ids (e.g. openai/gpt-4o-mini, as model_id in search_offers rows) or names to search for"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "models"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "estimate_cost",
+    "description": "The cost of a workload (input, output and cached input tokens, number of requests) at every current provider of one model, cheapest first, in USD - what the same job costs where.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "model": {
+       "type": "string",
+       "description": "model id or a name to search for"
+      },
+      "input_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "input tokens of the whole job, e.g. 1000000"
+      },
+      "output_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "output tokens of the whole job, e.g. 200000"
+      },
+      "cached_input_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "of the input, tokens read from the prompt cache"
+      },
+      "requests": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "number of calls (for per-request prices)"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "model"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "media_cost",
+    "description": "The cost of an images / video / voice job at every model that sells it by its own unit, the cheapest offer of each model, cheapest first, USD: kind image (quantity = images), video (seconds), tts (characters to speak), stt (minutes of audio to transcribe). Models priced per token are not in it (use estimate_cost). Each row has card_url and cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "image",
+        "video",
+        "tts",
+        "stt"
+       ],
+       "description": "what is made: image (pictures), video (seconds of video), tts (speech from text, by characters), stt (text from speech, by minutes)"
+      },
+      "quantity": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "images, seconds, characters or minutes; default 100 / 60 / 100000 / 60"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "description": "rows, 30 by default"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "kind"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "budget_fit",
+    "description": "What a monthly budget buys: for budget USD a month and a typical request (input and output tokens), how many requests a month and a day each model gives at its cheapest real-time seller (default: 13 usual models), most first, with each model's reasoning class. Rows have card_url and cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "budget": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "USD a month, default 50"
+      },
+      "input_tokens": {
+       "type": "number",
+       "minimum": 0,
+       "description": "per request, default 2000"
+      },
+      "output_tokens": {
+       "type": "number",
+       "minimum": 0,
+       "description": "per request, default 500"
+      },
+      "models": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 20,
+       "description": "model ids; default the usual models"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "budget"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "rag_cost",
+    "description": "What a RAG / document-search set-up costs in embeddings and reranking: pages of documents and tokens per page embedded once, the percent changed and re-embedded each month, queries a day embedded, and passages reranked per query - at the cheapest listed seller of every embedding and rerank model, USD, 30 days. The answer LLM is not included (use agent_cost / estimate_cost). Rows have card_url and cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "pages": {
+       "type": "number",
+       "minimum": 1,
+       "description": "pages of documents, default 10000"
+      },
+      "tokens_per_page": {
+       "type": "number",
+       "minimum": 1,
+       "description": "default 600"
+      },
+      "change_pct": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 100,
+       "description": "percent re-embedded a month, default 10"
+      },
+      "queries": {
+       "type": "number",
+       "minimum": 0,
+       "description": "queries a day, default 1000"
+      },
+      "query_tokens": {
+       "type": "number",
+       "minimum": 1,
+       "description": "tokens per query, default 30"
+      },
+      "rerank_docs": {
+       "type": "number",
+       "minimum": 0,
+       "description": "passages reranked per query, 0 = no rerank, default 20"
+      },
+      "doc_tokens": {
+       "type": "number",
+       "minimum": 1,
+       "description": "tokens per passage, default 400"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "description": "rows per table, 25 by default"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "agent_cost",
+    "description": "What a coding / tool-using agent costs a month on each model: tasks a day, model calls per task, context tokens per call, answer and reasoning tokens per call, percent of the context read from the prompt cache - priced at the cheapest real-time seller of each model (default: 13 usual coding models), cheapest first, USD, 30 days, with each model's reasoning class. Rows have card_url and cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "tasks": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "tasks a day, default 10"
+      },
+      "steps": {
+       "type": "number",
+       "minimum": 1,
+       "description": "model calls per task, default 30"
+      },
+      "context": {
+       "type": "number",
+       "minimum": 0,
+       "description": "input tokens per call (the resent context), default 30000"
+      },
+      "output": {
+       "type": "number",
+       "minimum": 0,
+       "description": "answer tokens per call, default 800"
+      },
+      "reasoning": {
+       "type": "number",
+       "minimum": 0,
+       "description": "reasoning tokens per call (billed as output), default 1500"
+      },
+      "cache_pct": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 100,
+       "description": "percent of context from the prompt cache, default 70"
+      },
+      "models": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 20,
+       "description": "model ids to compare; default the usual coding models"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "subscription_vs_api",
+    "description": "Is a chat subscription (e.g. Claude Pro) cheaper than the same use through the API? Messages a day and tokens per message priced at the cheapest real-time seller of a model and at the maker's own API, a month of 30 days, against the subscription's price, with the break-even messages a day. USD. preset claude-pro / mistral-pro takes the plan price from our plan tables; otherwise pass price.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "model": {
+       "type": "string",
+       "description": "model id; default the preset's model (claude-pro: anthropic/claude-sonnet-5-5)"
+      },
+      "preset": {
+       "type": "string",
+       "enum": [
+        "claude-pro",
+        "mistral-pro"
+       ],
+       "description": "a plan we collect the price of"
+      },
+      "price": {
+       "type": "number",
+       "minimum": 0,
+       "description": "subscription USD a month, when no preset"
+      },
+      "messages_per_day": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "default 40"
+      },
+      "input_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "per message incl. the resent chat, default 3000"
+      },
+      "output_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "per message, default 600"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "cache_batch_savings",
+    "description": "What prompt caching and batch / flex save on one model: monthly input and output tokens priced at every listed seller plain, with the given share of input read from the cache (the seller's own cache-read price) and, if can_wait, the seller's batch / flex offers. USD, cheapest first; cache write fees are not counted. Each row has card_url and cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "model": {
+       "type": "string",
+       "description": "model id, e.g. anthropic/claude-sonnet-5-5"
+      },
+      "input_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "input tokens a month, default 100000000"
+      },
+      "output_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "output tokens a month, default 10000000"
+      },
+      "cache_pct": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 100,
+       "description": "percent of input tokens read from the prompt cache, default 50"
+      },
+      "can_wait": {
+       "type": "boolean",
+       "description": "include batch / flex offers (results later, not real-time)"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "model"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "models_by_class",
+    "description": "Base models by class S/A/B/C/D in one direction (S best; today: reasoning), best score first: class (null = one source, score only), score 0-100, sources and each source's score (Arena, Epoch). A class needs two independent public sources. Method: https://airatecard.com/en/classes. Each row has card_url and cite.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "direction": {
+       "type": "string",
+       "enum": [
+        "reasoning"
+       ],
+       "description": "the direction scored; reasoning for now"
+      },
+      "min_class": {
+       "type": "string",
+       "enum": [
+        "S",
+        "A",
+        "B",
+        "C",
+        "D"
+       ],
+       "description": "keep this class or better, e.g. A gives S and A"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "description": "rows, 50 by default"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "get_card",
+    "description": "One card with its citation. card_id is '<kind>:<key>': offer:<provider>|<model id as the provider writes it> (e.g. offer:anthropic|claude-opus-4), model:<creator>/<model> (e.g. model:anthropic/claude-opus-4), seller:<provider key> (e.g. seller:anthropic). Ids come from search_offers (offer_id, model_id, provider_id) and from the card_url of every result. Works for every seller, a hidden test seller too.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "card_id": {
+       "type": "string",
+       "description": "offer:<provider>|<model>, model:<creator>/<model> or seller:<key>"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "card_id"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "validate_provider_files",
+    "description": "For a provider (seller) joining the catalog: check a models.yaml before putting it online - the same check as the wizard and POST /v1/provider/validate. Give the file's text in `models` (YAML, or the same structure as JSON text); `domain` (the provider's site) makes the model_page checks exact. Returns ok, the problems (file, line, model, path, value, code, message, hint - fix each and call again), the catalog's preview of the models and next_action. No account needed for this check. Publishing needs a signed-in person: the provider_* tools (provider_start -> provider_verify_domain -> provider_check_files -> provider_publish) are on the account server /mcp/account (OAuth sign-in, scope provider), not on this public server; or the wizard at /join, or POST /v1/provider/applications. Templates: /static/templates/models.min.yaml (required fields only) and models.yaml (every field with hints).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "models": {
+       "type": "string",
+       "description": "the models.yaml text"
+      },
+      "domain": {
+       "type": "string",
+       "description": "the provider's domain, e.g. example.ai"
+      },
+      "name": {
+       "type": "string",
+       "description": "the provider's name"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "models"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "cheapest_for_workload",
+    "description": "The cheapest offers for a whole monthly workload, ranked by monthly cost in USD: give a preset (a typical job; see list_workload_presets) and/or your own tokens a month. Best offer of each model; free promos and batch/flex/priority/regional prices left out unless asked. Each row: monthly_cost_usd, prices, context, checked_at, card_url and a ready cite line.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "preset": {
+       "type": "string",
+       "enum": [
+        "chatbot",
+        "coding_agent",
+        "rag",
+        "summarization",
+        "long_context",
+        "vision",
+        "embedding_index",
+        "trial"
+       ],
+       "description": "chatbot | coding_agent | rag | summarization | long_context | vision | embedding_index | trial - fills tokens, min_context, category; your own values win"
+      },
+      "input_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "input tokens a month, e.g. 10000000"
+      },
+      "output_tokens": {
+       "type": "integer",
+       "minimum": 0,
+       "description": "output tokens a month, e.g. 2000000"
+      },
+      "min_context": {
+       "type": "integer",
+       "minimum": 1,
+       "description": "context window needed, tokens, e.g. 128000"
+      },
+      "category": {
+       "type": "string",
+       "enum": [
+        "llm",
+        "embedding",
+        "rerank",
+        "moderation",
+        "decision",
+        "ocr",
+        "search",
+        "image_generation",
+        "image_editing",
+        "video_generation",
+        "text_to_speech",
+        "speech_to_text",
+        "speech_to_speech",
+        "audio_generation",
+        "3d_generation"
+       ],
+       "description": "model type, llm by default"
+      },
+      "input_modality": {
+       "type": "string",
+       "description": "the model must accept this input, e.g. image"
+      },
+      "tools": {
+       "type": "boolean",
+       "description": "the model must support tool/function calling"
+      },
+      "query": {
+       "type": "string",
+       "description": "only models or providers matching these words, e.g. claude"
+      },
+      "include_free": {
+       "type": "boolean",
+       "description": "also free / promo offers (default false)"
+      },
+      "include_special": {
+       "type": "boolean",
+       "description": "also batch, flex, priority, regional prices (default false)"
+      },
+      "one_per_model": {
+       "type": "boolean",
+       "description": "only the best offer of each model (default true)"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "description": "rows, 10 by default"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "list_workload_presets",
+    "description": "The ready-made workloads of cheapest_for_workload: name, what job it is, tokens a month, context needed, model type.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "list_articles",
+    "description": "AI Rate Card's articles on AI model prices (the cheapest models by task, price moves, costs), newest first, with their links - to quote or point a reader to.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "de",
+        "fr",
+        "es",
+        "pt",
+        "ru"
+       ],
+       "description": "language of the articles, en by default"
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "cheapest_models_by_task",
+    "description": "The n cheapest MODELS for a job (task): each model counted once at its own lowest current price (input tokens by default). One row per model with that price, where it is and card_url.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "enum": [
+        "decision",
+        "embedding",
+        "image",
+        "moderation",
+        "rerank",
+        "stt",
+        "text",
+        "tts",
+        "video",
+        "vision"
+       ],
+       "description": "what the buyer wants done: text (chat/LLM), vision, image, video, tts (speech from text), stt (text from speech), embedding, rerank, moderation - a job, not a model type (search_offers' category is the model type)"
+      },
+      "component": {
+       "type": "string",
+       "description": "input_tokens (default), output_tokens, or the task's own unit"
+      },
+      "scope": {
+       "type": "string",
+       "enum": [
+        "all",
+        "specialized",
+        "universal",
+        "multi"
+       ],
+       "description": "all (default), specialized (the task's own category) or multi/universal (qualifying llm models - the two names mean the same set, WP-0086)"
+      },
+      "n": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "description": "10 by default"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "task"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "most_expensive_models_by_task",
+    "description": "The n most expensive MODELS for a job (task): each model counted once at its own lowest current price, highest first - the top of the market. Same arguments as cheapest_models_by_task.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "enum": [
+        "decision",
+        "embedding",
+        "image",
+        "moderation",
+        "rerank",
+        "stt",
+        "text",
+        "tts",
+        "video",
+        "vision"
+       ],
+       "description": "what the buyer wants done: text (chat/LLM), vision, image, video, tts (speech from text), stt (text from speech), embedding, rerank, moderation - a job, not a model type (search_offers' category is the model type)"
+      },
+      "component": {
+       "type": "string",
+       "description": "input_tokens (default), output_tokens, or the task's own unit"
+      },
+      "scope": {
+       "type": "string",
+       "enum": [
+        "all",
+        "specialized",
+        "universal",
+        "multi"
+       ],
+       "description": "all (default), specialized (the task's own category) or multi/universal (qualifying llm models - the two names mean the same set, WP-0086)"
+      },
+      "n": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "description": "10 by default"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "task"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   },
+   {
+    "name": "median_price_by_task",
+    "description": "The typical (median) current price of a job (task) across models, and the n models closest to it - what a normal price for this job is. Same arguments as cheapest_models_by_task.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string",
+       "enum": [
+        "decision",
+        "embedding",
+        "image",
+        "moderation",
+        "rerank",
+        "stt",
+        "text",
+        "tts",
+        "video",
+        "vision"
+       ],
+       "description": "what the buyer wants done: text (chat/LLM), vision, image, video, tts (speech from text), stt (text from speech), embedding, rerank, moderation - a job, not a model type (search_offers' category is the model type)"
+      },
+      "component": {
+       "type": "string",
+       "description": "input_tokens (default), output_tokens, or the task's own unit"
+      },
+      "scope": {
+       "type": "string",
+       "enum": [
+        "all",
+        "specialized",
+        "universal",
+        "multi"
+       ],
+       "description": "all (default), specialized (the task's own category) or multi/universal (qualifying llm models - the two names mean the same set, WP-0086)"
+      },
+      "n": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "description": "10 by default"
+      }
+     },
+     "additionalProperties": false,
+     "required": [
+      "task"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "cheapest_for_my_job",
+    "title": "Cheapest model for my job",
+    "description": "The cheapest AI models for a typical job or your own monthly volume, with the monthly cost.",
+    "arguments": [
+     {
+      "name": "job",
+      "description": "chatbot, coding_agent, rag, summarization, long_context, vision, embedding_index or trial",
+      "required": false
+     },
+     {
+      "name": "input_tokens_per_month",
+      "description": "e.g. 10000000",
+      "required": false
+     },
+     {
+      "name": "output_tokens_per_month",
+      "description": "e.g. 2000000",
+      "required": false
+     },
+     {
+      "name": "min_context",
+      "description": "e.g. 128000",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "where_is_model_cheapest",
+    "title": "Where is a model cheapest",
+    "description": "Every provider's current price of one model, and the cost of your workload at each.",
+    "arguments": [
+     {
+      "name": "model",
+      "description": "e.g. claude-haiku-5-5 or deepseek-v4",
+      "required": true
+     },
+     {
+      "name": "input_tokens_per_month",
+      "description": "optional, e.g. 10000000",
+      "required": false
+     },
+     {
+      "name": "output_tokens_per_month",
+      "description": "optional, e.g. 2000000",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "compare_models",
+    "title": "Compare models",
+    "description": "2 to 5 models side by side: prices, context, providers and who wins by how much.",
+    "arguments": [
+     {
+      "name": "models",
+      "description": "comma-separated, e.g. gpt-6, claude-opus-5-5",
+      "required": true
+     }
+    ]
+   }
+  ]
+ }
+}

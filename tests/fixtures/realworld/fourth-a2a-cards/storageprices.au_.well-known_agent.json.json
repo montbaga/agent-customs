@@ -1,0 +1,382 @@
+{
+ "url": "https://storageprices.au/.well-known/agent.json",
+ "doc": {
+  "name": "StoragePrices.au",
+  "description": "Independent Australian self-storage price comparison data for agents.",
+  "url": "https://storageprices.au",
+  "llms_txt": "https://storageprices.au/llms.txt",
+  "agents_txt": "https://storageprices.au/agents.txt",
+  "openapi": "https://storageprices.au/openapi.json",
+  "site_summary": "https://storageprices.au/agent-data/site-summary",
+  "mcp": {
+   "endpoint": "https://storageprices.au/mcp",
+   "transport": "streamable-http",
+   "description": "Remote MCP connector for ChatGPT and Claude. Search, compare, and chart Australian self-storage pricing. Read-only; advertised public rates only.",
+   "tools": [
+    "search",
+    "fetch",
+    "cheapest_storage",
+    "best_value_storage",
+    "compare_prices",
+    "operator_benchmark",
+    "price_distribution",
+    "visible_promos",
+    "market_overview",
+    "storage_box_index",
+    "storage_near",
+    "price_trends",
+    "inferred_market_rate"
+   ]
+  },
+  "capabilities": {
+   "read_pricing": true,
+   "compare_providers": true,
+   "search_suburbs": true,
+   "create_enquiry": false,
+   "reserve_or_book": false
+  },
+  "data_freshness": {
+   "latest_observed": "2026-11-18 15:00:46.283651+00:00",
+   "age_days": 0,
+   "oldest_observed": "2026-11-18 15:00:46.283651+00:00",
+   "max_age_days": 0,
+   "stalest_provider": null,
+   "freshness_scope": "returned_rows",
+   "freshness_window_days": 7,
+   "stale": false,
+   "stale_share_pct": null,
+   "stale_share_of": null,
+   "stale_basis": "oldest_row",
+   "source": "provider website/API scrape",
+   "freshness_semantics": "latest-known StoragePrices public observation timestamp where available; not a real-time stock or price guarantee. `oldest_observed` / `max_age_days` / `stalest_provider` describe the OLDEST of the rows in this response. `stale` is true when more than 10% of `stale_share_of` (rows, or the facilities/units of the whole population when the endpoint counted them) were observed more than 7 days ago; `stale_basis` is 'oldest_row' where only the span was known."
+  },
+  "limitations": [
+   "Latest-known observed advertised public monthly rates only; not live availability, inventory, or booking data.",
+   "Prices, promotions, and unit availability may change after StoragePrices observes them.",
+   "Provider confirmation is required before relying on any final transaction price.",
+   "Negotiated, phone-only, account-specific, and internal rates are excluded unless publicly visible in the data."
+  ],
+  "confidence_model": {
+   "price_confidence": {
+    "default": "observed_public_rate",
+    "allowed_values": [
+     "observed_public_rate",
+     "estimated",
+     "unknown"
+    ],
+    "semantics": "observed_public_rate means StoragePrices captured a public advertised monthly rate from a provider website/API scrape; it is not a guaranteed final transaction price."
+   },
+   "availability_confidence": {
+    "default": "not_asserted",
+    "allowed_values": [
+     "not_asserted",
+     "provider_reported_available",
+     "provider_reported_unavailable"
+    ],
+    "semantics": "not_asserted means the endpoint is not claiming live stock, reservation availability, or provider-side booking status."
+   }
+  },
+  "entrypoints": {
+   "site_summary": "https://storageprices.au/agent-data/site-summary",
+   "search": "https://storageprices.au/agent-data/search?query={query}",
+   "suburb_detail_json": "https://storageprices.au/agent-data/suburb/{state}/{slug}",
+   "suburb_snapshot_markdown": "https://storageprices.au/agent-data/suburb/{state}/{slug}.md",
+   "cheapest_prices": "https://storageprices.au/agent-data/cheapest?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+   "best_value": "https://storageprices.au/agent-data/best-value?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+   "compare_prices": "https://storageprices.au/agent-data/compare-prices?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+   "operator_benchmark": "https://storageprices.au/agent-data/operator-benchmark?suburb={suburb}&state={state}&size_bracket={size_bracket}&advertised_monthly_price_aud={price}",
+   "visible_promos": "https://storageprices.au/agent-data/promos?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+   "storage_box_index": "https://storageprices.au/agent-data/storage-box-index?suburb={suburb}&state={state}",
+   "acquisition_screening_contract": "https://storageprices.au/agent-data/acquisition/contract",
+   "screen_candidate_site": "https://storageprices.au/agent-data/acquisition/screen-candidate-site?address_or_latlng={address_or_latlng}&radius_km=5"
+  },
+  "intent_router": "https://storageprices.au/agent-data/capabilities",
+  "capability_map": {
+   "primary_contract": "Read-only public advertised self-storage pricing observations; no booking, availability, endorsement, suitability, or revenue-management claims.",
+   "routing_rules": [
+    {
+     "intent": "resolve_suburb_or_market",
+     "when_user_asks": [
+      "where is this suburb?",
+      "find storage prices near {query}",
+      "spell/state ambiguity"
+     ],
+     "use_endpoint": "https://storageprices.au/agent-data/search?query={query}",
+     "then": "Use suburb_detail_json or suburb_snapshot_markdown before quoting suburb-level figures."
+    },
+    {
+     "intent": "cite_market_snapshot",
+     "when_user_asks": [
+      "storage prices in {suburb}",
+      "market range",
+      "facility/provider counts"
+     ],
+     "use_endpoint": "https://storageprices.au/agent-data/suburb/{state}/{slug}.md",
+     "then": "Quote the citation-ready markdown/JSON summary and link the canonical citation URL."
+    },
+    {
+     "intent": "find_cheapest_observed_price",
+     "when_user_asks": [
+      "cheapest storage",
+      "lowest price",
+      "cheap small unit"
+     ],
+     "use_endpoint": "https://storageprices.au/agent-data/cheapest?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+     "then": "Say cheapest observed advertised price, not best/recommended/available."
+    },
+    {
+     "intent": "compare_local_market",
+     "when_user_asks": [
+      "compare providers",
+      "local price spread",
+      "is this facility above market?"
+     ],
+     "use_endpoint": "https://storageprices.au/agent-data/compare-prices?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+     "then": "Use market_position only when not insufficient_data; preserve caveats."
+    },
+    {
+     "intent": "operator_undercharging_check",
+     "when_user_asks": [
+      "am I undercharging?",
+      "is my advertised rate cheap?",
+      "benchmark my storage price"
+     ],
+     "use_endpoint": "https://storageprices.au/agent-data/operator-benchmark?suburb={suburb}&state={state}&size_bracket={size_bracket}&advertised_monthly_price_aud={price}",
+     "then": "Describe only a public advertised-rate signal; do not give occupancy, RevPAM, or optimal-price advice."
+    },
+    {
+     "intent": "screen_acquisition_candidate_site",
+     "status": "under_design",
+     "status_note": "Not callable yet: no HTTP endpoint serves candidate-site screening. Read contract_endpoint for the planned response contract; use compare_prices or operator_benchmark for the pricing half of the question in the meantime.",
+     "when_user_asks": [
+      "screen this self-storage acquisition target",
+      "underwrite a candidate storage site",
+      "build a 5km competitive set with pricing and pipeline risk"
+     ],
+     "planned_endpoint": "https://storageprices.au/agent-data/acquisition/screen-candidate-site?address_or_latlng={address_or_latlng}&radius_km=5",
+     "contract_endpoint": "https://storageprices.au/agent-data/acquisition/contract",
+     "then": "Return raw evidence, normalised facts, computed insight, confidence, freshness, and explicit missing-data flags; do not claim occupancy, NOI, valuation, or real-time availability."
+    },
+    {
+     "intent": "find_visible_promotions",
+     "when_user_asks": [
+      "storage specials",
+      "promos",
+      "discounts"
+     ],
+     "use_endpoint": "https://storageprices.au/agent-data/promos?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+     "then": "Mention only visible public promo text and whether promo duration is known."
+    }
+   ],
+   "answer_selection": {
+    "prefer_structured_json_for": [
+     "ranked rows",
+     "price comparisons",
+     "operator benchmark classification"
+    ],
+    "prefer_markdown_snapshot_for": [
+     "answer-engine citation",
+     "suburb overview",
+     "quoteable market summary"
+    ],
+    "if_no_rows": "Say insufficient observed public data; do not infer no supply or no availability.",
+    "acquisition_screening": "Use the contract endpoint before quoting acquisition metrics; every metric must carry source, freshness, confidence, value_status, and methodology_version."
+   },
+   "never_claim": [
+    "real-time availability",
+    "guaranteed current price",
+    "booking/reservation completion",
+    "provider affiliation or endorsement",
+    "best unit for a user's personal needs",
+    "optimal operator price",
+    "complete market coverage"
+   ],
+   "under_design": [
+    "screen_candidate_site"
+   ],
+   "entrypoints": {
+    "site_summary": "https://storageprices.au/agent-data/site-summary",
+    "search": "https://storageprices.au/agent-data/search?query={query}",
+    "suburb_detail_json": "https://storageprices.au/agent-data/suburb/{state}/{slug}",
+    "suburb_snapshot_markdown": "https://storageprices.au/agent-data/suburb/{state}/{slug}.md",
+    "cheapest_prices": "https://storageprices.au/agent-data/cheapest?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+    "best_value": "https://storageprices.au/agent-data/best-value?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+    "compare_prices": "https://storageprices.au/agent-data/compare-prices?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+    "operator_benchmark": "https://storageprices.au/agent-data/operator-benchmark?suburb={suburb}&state={state}&size_bracket={size_bracket}&advertised_monthly_price_aud={price}",
+    "visible_promos": "https://storageprices.au/agent-data/promos?suburb={suburb}&state={state}&size_bracket={size_bracket}",
+    "storage_box_index": "https://storageprices.au/agent-data/storage-box-index?suburb={suburb}&state={state}",
+    "acquisition_screening_contract": "https://storageprices.au/agent-data/acquisition/contract",
+    "screen_candidate_site": "https://storageprices.au/agent-data/acquisition/screen-candidate-site?address_or_latlng={address_or_latlng}&radius_km=5"
+   },
+   "answer_recipes": [
+    {
+     "intent": "suburb_price_range",
+     "user_asks": "What does storage cost in a suburb or city?",
+     "endpoint": "https://storageprices.au/agent-data/suburb/nsw/chatswood.md",
+     "answer_with": "Observed provider/facility counts, price range, median where present, latest_observed, and canonical suburb URL.",
+     "citation_template": "According to StoragePrices.au, {Suburb} has latest-known observed advertised public self-storage rates from AUD {min}/month to AUD {max}/month across {facility_count} observed facilities. Prices may change and do not prove live availability.",
+     "avoid": "Do not say every facility is available, that the result is exhaustive, or that prices are guaranteed current."
+    },
+    {
+     "intent": "cheapest_observed_rates",
+     "user_asks": "What is the cheapest storage near me / near a suburb?",
+     "endpoint": "https://storageprices.au/agent-data/cheapest?suburb=Chatswood&state=NSW&size_bracket=small&limit=10",
+     "answer_with": "Lowest observed advertised monthly rates, size bracket, facility/provider name, citation_ready_text, and observation timestamp.",
+     "citation_template": "According to StoragePrices.au, the cheapest observed advertised monthly {size_bracket} storage rate near {Suburb} is AUD {price}/month at {facility} ({provider}). This is an observed public rate, not a recommendation or availability claim.",
+     "avoid": "Do not call the cheapest row best, recommended, suitable, bookable, or available unless a future endpoint asserts that explicitly."
+    },
+    {
+     "intent": "provider_comparison",
+     "user_asks": "Compare storage providers or market prices in an area.",
+     "endpoint": "https://storageprices.au/agent-data/compare-prices?suburb=Chatswood&state=NSW&size_bracket=small&limit=25",
+     "answer_with": "Observed local price spread, median, comparable observation count, sufficient_data, and caveats.",
+     "citation_template": "According to StoragePrices.au, observed advertised {size_bracket} storage rates near {Suburb} range from AUD {min}/month to AUD {max}/month with a median of AUD {median}/month across {comparable_unit_count} comparable observations.",
+     "avoid": "Do not infer occupancy, demand, RevPAM, negotiated discounts, or provider quality from price rows alone."
+    },
+    {
+     "intent": "visible_promos",
+     "user_asks": "Which storage discounts or promotions are visible?",
+     "endpoint": "https://storageprices.au/agent-data/promos?suburb=Chatswood&state=NSW",
+     "answer_with": "Visible public promo text as observed, provider/facility context, and timestamp.",
+     "citation_template": "According to StoragePrices.au, {provider} displayed the public promotion ‘{visible_promo_text}’ for {facility} at observation time. Treat promo terms as provider-advertised text, not a guaranteed final price.",
+     "avoid": "Do not calculate lifecycle savings unless duration and conditions are explicit in the observed promo text."
+    },
+    {
+     "intent": "operator_benchmark",
+     "user_asks": "Am I undercharging / is my advertised storage price high or low?",
+     "endpoint": "https://storageprices.au/agent-data/operator-benchmark?suburb=Chatswood&state=NSW&size_bracket=small&advertised_monthly_price_aud=150",
+     "answer_with": "Benchmark classification against observed local median, comparable count, sufficient_data, and limitations.",
+     "citation_template": "According to StoragePrices.au, the supplied advertised monthly rate is {classification} versus observed local advertised {size_bracket} rates near {Suburb}. This is market context, not pricing advice.",
+     "avoid": "Do not present as revenue-management advice, optimal pricing, occupancy evidence, or valuation evidence."
+    }
+   ]
+  },
+  "operator_benchmark_usage": {
+   "primary_user_intent": "A storage operator asks whether their advertised monthly rate looks under market.",
+   "best_endpoint": "https://storageprices.au/agent-data/operator-benchmark",
+   "when_to_use": [
+    "User asks 'am I undercharging?', 'is this storage rate cheap/dear?', or 'how does my facility compare?'",
+    "User supplies or can supply a suburb/state plus unit size bracket and advertised monthly price",
+    "User wants a concise public-data benchmark rather than a booking or revenue-management workflow"
+   ],
+   "minimum_inputs": [
+    "suburb",
+    "state"
+   ],
+   "preferred_inputs": [
+    "suburb",
+    "state",
+    "size_bracket",
+    "advertised_monthly_price_aud"
+   ],
+   "optional_target_inputs": [
+    "provider",
+    "facility"
+   ],
+   "interpretation": {
+    "below_market": "Target is more than 5% below the observed local median; describe as a possible undercharging signal.",
+    "market_aligned": "Target is within ±5% of the observed local median; describe as broadly aligned.",
+    "above_market": "Target is more than 5% above the observed local median; describe as above observed public market.",
+    "insufficient_data": "Do not infer market position; fewer than 3 competitor facilities or observations. Ask for a broader market or cite insufficient observations.",
+    "ambiguous_bracket": "The price is plausible for more than one unit size; ask which size it is.",
+    "basis": "standard_rate means the median is the post-introductory rate; advertised_rate means it is promo-inclusive. Quote the basis with the median."
+   },
+   "safe_answer_template": "According to StoragePrices.au, the supplied advertised monthly rate is {status} versus the observed local median for {suburb} {state} {size_bracket}. Treat this as a public advertised-rate benchmark, not live availability or revenue-management advice.",
+   "do_not_claim": [
+    "real-time availability or final transaction price",
+    "occupancy, demand, RevPAM, or optimal price",
+    "provider endorsement or complete market coverage"
+   ]
+  },
+  "common_queries": [
+   {
+    "task": "Find cheapest observed advertised small storage units near Chatswood",
+    "endpoint": "https://storageprices.au/agent-data/cheapest?suburb=Chatswood&state=NSW&size_bracket=small&limit=10"
+   },
+   {
+    "task": "Find best-value observed storage options by transparent price-per-square-metre ranking",
+    "endpoint": "https://storageprices.au/agent-data/best-value?suburb=Chatswood&state=NSW&size_bracket=small&limit=10"
+   },
+   {
+    "task": "Compare observed local price spread for a suburb and size bracket",
+    "endpoint": "https://storageprices.au/agent-data/compare-prices?suburb=Chatswood&state=NSW&size_bracket=small&limit=25"
+   },
+   {
+    "task": "Check whether an operator's advertised small-unit rate appears under or over local market",
+    "endpoint": "https://storageprices.au/agent-data/operator-benchmark?suburb=Chatswood&state=NSW&size_bracket=small&advertised_monthly_price_aud=150"
+   },
+   {
+    "task": "Resolve a suburb spelling/state before quoting prices",
+    "endpoint": "https://storageprices.au/agent-data/search?query=Chatswood&limit=10"
+   },
+   {
+    "task": "Fetch a citable markdown snapshot for answer engines",
+    "endpoint": "https://storageprices.au/agent-data/suburb/nsw/chatswood.md"
+   }
+  ],
+  "answer_recipes": [
+   {
+    "intent": "suburb_price_range",
+    "user_asks": "What does storage cost in a suburb or city?",
+    "endpoint": "https://storageprices.au/agent-data/suburb/nsw/chatswood.md",
+    "answer_with": "Observed provider/facility counts, price range, median where present, latest_observed, and canonical suburb URL.",
+    "citation_template": "According to StoragePrices.au, {Suburb} has latest-known observed advertised public self-storage rates from AUD {min}/month to AUD {max}/month across {facility_count} observed facilities. Prices may change and do not prove live availability.",
+    "avoid": "Do not say every facility is available, that the result is exhaustive, or that prices are guaranteed current."
+   },
+   {
+    "intent": "cheapest_observed_rates",
+    "user_asks": "What is the cheapest storage near me / near a suburb?",
+    "endpoint": "https://storageprices.au/agent-data/cheapest?suburb=Chatswood&state=NSW&size_bracket=small&limit=10",
+    "answer_with": "Lowest observed advertised monthly rates, size bracket, facility/provider name, citation_ready_text, and observation timestamp.",
+    "citation_template": "According to StoragePrices.au, the cheapest observed advertised monthly {size_bracket} storage rate near {Suburb} is AUD {price}/month at {facility} ({provider}). This is an observed public rate, not a recommendation or availability claim.",
+    "avoid": "Do not call the cheapest row best, recommended, suitable, bookable, or available unless a future endpoint asserts that explicitly."
+   },
+   {
+    "intent": "provider_comparison",
+    "user_asks": "Compare storage providers or market prices in an area.",
+    "endpoint": "https://storageprices.au/agent-data/compare-prices?suburb=Chatswood&state=NSW&size_bracket=small&limit=25",
+    "answer_with": "Observed local price spread, median, comparable observation count, sufficient_data, and caveats.",
+    "citation_template": "According to StoragePrices.au, observed advertised {size_bracket} storage rates near {Suburb} range from AUD {min}/month to AUD {max}/month with a median of AUD {median}/month across {comparable_unit_count} comparable observations.",
+    "avoid": "Do not infer occupancy, demand, RevPAM, negotiated discounts, or provider quality from price rows alone."
+   },
+   {
+    "intent": "visible_promos",
+    "user_asks": "Which storage discounts or promotions are visible?",
+    "endpoint": "https://storageprices.au/agent-data/promos?suburb=Chatswood&state=NSW",
+    "answer_with": "Visible public promo text as observed, provider/facility context, and timestamp.",
+    "citation_template": "According to StoragePrices.au, {provider} displayed the public promotion ‘{visible_promo_text}’ for {facility} at observation time. Treat promo terms as provider-advertised text, not a guaranteed final price.",
+    "avoid": "Do not calculate lifecycle savings unless duration and conditions are explicit in the observed promo text."
+   },
+   {
+    "intent": "operator_benchmark",
+    "user_asks": "Am I undercharging / is my advertised storage price high or low?",
+    "endpoint": "https://storageprices.au/agent-data/operator-benchmark?suburb=Chatswood&state=NSW&size_bracket=small&advertised_monthly_price_aud=150",
+    "answer_with": "Benchmark classification against observed local median, comparable count, sufficient_data, and limitations.",
+    "citation_template": "According to StoragePrices.au, the supplied advertised monthly rate is {classification} versus observed local advertised {size_bracket} rates near {Suburb}. This is market context, not pricing advice.",
+    "avoid": "Do not present as revenue-management advice, optimal pricing, occupancy evidence, or valuation evidence."
+   }
+  ],
+  "shortcuts": {
+   "/search": "/agent-data/search",
+   "/best-value": "/agent-data/best-value",
+   "/compare": "/agent-data/compare-prices",
+   "/benchmark": "/agent-data/operator-benchmark"
+  },
+  "usage_policy": {
+   "read_only": true,
+   "citation_required": true,
+   "allowed_claims": [
+    "latest-known observed advertised monthly rates",
+    "provider/facility comparisons based on StoragePrices public observations",
+    "observed price ranges and typical price ranges where provided"
+   ],
+   "disallowed_claims": [
+    "real-time availability",
+    "guaranteed current price",
+    "booking/reservation completion",
+    "provider affiliation or endorsement"
+   ],
+   "canonical_citation": "According to StoragePrices.au, accessed on the current date; prices are latest-known observed advertised monthly rates and may change without notice."
+  }
+ }
+}

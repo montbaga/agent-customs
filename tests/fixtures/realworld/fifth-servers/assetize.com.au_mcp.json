@@ -1,0 +1,465 @@
+{
+ "url": "https://assetize.com.au/mcp",
+ "doc": {
+  "name": "Assetize — Maximo knowledge",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Assetize is an evidence-grounded IBM Maximo knowledge base (assetize.com.au). Every answer from ask_maximo is built only from published, source-backed records and carries [R#] citations to the original sources; when the published evidence does not support an answer, the tool says so instead of guessing. Use search_records for fast keyword lookup, lookup_error_code for BMX/IJ error codes, get_record for a full record with sources, compare_maximo_versions for a cited deprecation/behaviour-change/gotcha report between two Maximo versions (same data as assetize.com.au/compare), maximo_changelog for the dated 9.x change log, change_watch for the curated feed of material 9.x changes (each with an explicit, labelled Assetize interpretation and its IBM + corpus evidence), list_gotchas for known traps/upgrade landmines, records_by_version for everything covered at a version, behaviour_history for lifecycle/behaviour-change/deprecation archaeology, support_lifecycle for end-of-support / Extended-Support dates, and corpus_stats for coverage figures. For upgrade planning use the Upgrade Desk tools: upgrade_plan(from, to) composes one move (clock, the staged route, what IBM says about the move with quotes and pages, breaks, landmines, gains, register rows, Change Watch) with record links; upgrade_checklist(from, to, phase?) is the phased checklist whose sourced items are resolved against the published corpus on every call, with the items only your own system can answer marked as such; fixes_gained(from, to, area?) lists the fixes and security changes a move carries; deprecation_register(kind?) lists what was deprecated, removed or renamed and what IBM says replaces it; lifecycle_dates(product?, version?) gives the structured end-of-support / Extended Support dates with days remaining. Catalogue releases: 7.6.1, 8.11, 9.0, 9.1, 9.2. For Maximo Mobile use maximo_mobile(version?, topic?): what IBM says about the mobile product — device requirements, shell and Graphite architecture, offline and sync, login and shared devices, MDM deployment, push notifications, the apps release by release (8.11 to 9.2), and the Anywhere / 7.6.1 exit — each with IBM's words and page; pair it with search_records for fixes and gotchas. Every tool returns only published, source-backed material; IBM statements come with IBM's words, page and read date. test_automation_script_evidence(source, lens) statically checks a WORKORDER Automation Script (Object launch point) against one MXAPIWODETAIL dictionary: which attributes it references, and whether each is evidenced on that lens — CLI-equivalent evidence, not execution (that needs a script host: the CLI or the browser runner at /test-stubs/automation-scripts); it also lists the published deprecation-register rows the script mentions, with lines. Lenses: 761, mas811, mas90, mas91, mas92. For discovery, read the MCP Resources first: assetize://corpus/capabilities describes the server, every tool and every resource; assetize://corpus/versions lists the Maximo versions covered (with record counts) and assetize://corpus/stats the coverage figures; the record/{slug}, version/{version} and error/{code} resource templates read individual published records — so an agent can learn what Assetize covers before calling a tool.",
+  "tools": [
+   {
+    "name": "ask_maximo",
+    "title": "Ask a Maximo question (evidence-cited)",
+    "description": "Answer a practical IBM Maximo question from Assetize’s published, source-backed knowledge. The answer cites its evidence ([R#] markers with source URLs) and DECLINES when the published record cannot support one — it never guesses. Best for how-to, troubleshooting, version-behaviour and error questions.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 2000,
+       "description": "The Maximo question, in plain language."
+      },
+      "version": {
+       "type": "string",
+       "description": "Optional version scope, e.g. \"9.2\", \"8.11\", \"7.6.1\"."
+      }
+     },
+     "required": [
+      "question"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "search_records",
+    "title": "Search published Maximo records",
+    "description": "Fast keyword search over published Assetize knowledge records. Returns slugs, titles and short answers with record URLs.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Keywords or an exact identifier (MXAPI..., BMX..., module name)."
+      },
+      "version": {
+       "type": "string",
+       "description": "Optional version label or family filter, e.g. \"9.2\"."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results, 1-25 (default 10)."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "lookup_error_code",
+    "title": "Look up a Maximo error code",
+    "description": "Find published records about a specific Maximo error or fix identifier (BMXAA1234E, IJ12345, APAR...).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "code": {
+       "type": "string",
+       "description": "The error/fix code, e.g. \"BMXAA4214E\"."
+      }
+     },
+     "required": [
+      "code"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "get_record",
+    "title": "Get a full record with sources",
+    "description": "Fetch one published record by slug: the established fact, claims, version scope, and every cited source URL.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "Record slug from search_records / lookup_error_code results."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "compare_maximo_versions",
+    "title": "Compare two Maximo versions",
+    "description": "Compare two Maximo versions/eras and get a cited upgrade-impact report per functional area: changes to absorb (deprecations, behaviour changes, API changes, gotchas), fixes/APARs since, and newly announced capability — the last two reported as context only, never scored as upgrade work. Same reviewed, source-backed comparison and ranking as assetize.com.au/compare. Accepts either a version label (\"7.6.1.3\", \"9.2\") or bucket id (\"9-2\"). Known buckets: 7.6.1.3, 7.6.x (classic Maximo 7.6/7.6.1/7.6.1.x), 8.x (Maximo Application Suite 8), 9.0, 9.1, 9.2.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "description": "Starting version, e.g. \"7.6.1.3\"."
+      },
+      "to": {
+       "type": "string",
+       "description": "Target version, e.g. \"9.2\"."
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "maximo_changelog",
+    "title": "Maximo 9.x change log",
+    "description": "The dated, source-cited log of what changed across IBM Maximo / MAS 9.x (9.1 onward): deprecations, behaviour changes, API/fixes, security, gotchas, upgrades, lifecycle and releases. Only real change records (never data-dictionary noise) and nothing the curator demoted. Same data as assetize.com.au/changelog. Optionally filter by version (\"9.1\", \"9.2\") and/or type.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "version": {
+       "type": "string",
+       "description": "Filter to a 9.x line, e.g. \"9.2\". Omit for all of 9.x."
+      },
+      "type": {
+       "type": "string",
+       "description": "Filter to one change type: DEPRECATION, BEHAVIOUR_CHANGE, FIX, SECURITY, GOTCHA, UPGRADE, LIFECYCLE, RELEASE."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max entries (default 200, max 1000)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "change_watch",
+    "title": "Curated Maximo Change Watch",
+    "description": "The curated feed of genuinely material IBM Maximo / MAS 9.x changes — security, upgrades, deprecations, releases, behaviour and migration breaks. Each carries What Changed / Why It Matters, previous behaviour, a version comparison, a clearly-labelled Assetize interpretation (never presented as IBM’s), the IBM sources, and the corpus records that grounded it. Pass a slug for one change in full; omit it to list, optionally filtered by category. Same data as assetize.com.au/change-watch.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "description": "A change slug for the full record. Omit to list."
+      },
+      "category": {
+       "type": "string",
+       "description": "Filter: SECURITY|UPGRADE|DEPRECATION|RELEASE|BEHAVIOUR|MIGRATION|INTEGRATION|SUPPORT."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max items when listing (default 30, max 60)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "list_gotchas",
+    "title": "Maximo gotchas & upgrade traps",
+    "description": "Known traps, upgrade landmines, installation issues, security and troubleshooting records — optionally scoped to a version. Same data as assetize.com.au/gotchas.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "version": {
+       "type": "string",
+       "description": "Optional version, e.g. \"9.2\"."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results (default 30, max 100)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "records_by_version",
+    "title": "What Assetize covers for a version",
+    "description": "Every published record scoped to a given Maximo version or family (e.g. \"9.2\", \"7.6.1\"). Same data as assetize.com.au/maximo/<version>.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "version": {
+       "type": "string",
+       "description": "Version label or family, e.g. \"9.2\"."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results (default 40, max 200)."
+      }
+     },
+     "required": [
+      "version"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "behaviour_history",
+    "title": "Maximo behaviour & lifecycle history",
+    "description": "Historical, lifecycle, behaviour-change, deprecation, architecture and API records — the \"how did this get here / when does it end\" archaeology. Same data as assetize.com.au/archaeology.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "version": {
+       "type": "string",
+       "description": "Optional version filter, e.g. \"9.2\"."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results (default 30, max 100)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "support_lifecycle",
+    "title": "Maximo support & end-of-support dates",
+    "description": "IBM Maximo / MAS support-lifecycle facts: end-of-support / Extended Support transitions and the 2026/2027 deadlines, drawn from source-backed lifecycle records and the curated Change Watch. Optionally scope to a version.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "version": {
+       "type": "string",
+       "description": "Optional version, e.g. \"8.11\", \"9.0\"."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results (default 30)."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "corpus_stats",
+    "title": "Assetize corpus coverage",
+    "description": "Coverage / transparency stats for the Assetize corpus: published records, unique source documents, versions represented, and raw evidence items.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "test_automation_script_evidence",
+    "title": "Check a WORKORDER Automation Script against a Maximo/MAS lens (Automation Script Test Harness)",
+    "description": "Statically check a WORKORDER Object launch point Automation Script (Jython or JavaScript) against one release lens's real MXAPIWODETAIL dictionary. Extracts every attribute the script references via mbo.getString/setValue/isNull/getInt/getDate/getBoolean, then reports which ones the named lens has evidence for. Static evidence only — it does not run the script. A missing attribute is reported NOT_ASSESSED, never claimed as a runtime failure; for a real pass/fail/skip verdict, run the CLI (mvn verify) or the browser runner at assetize.com.au/test-stubs/automation-scripts. Lenses: 761 (Maximo 7.6.1), mas811 (MAS 8.11), mas90 (MAS 9.0), mas91 (MAS 9.1), mas92 (MAS 9.2).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "source": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 65536,
+       "description": "The Automation Script source — Jython or JavaScript, a WORKORDER Object launch point. Up to 64 KiB."
+      },
+      "lens": {
+       "type": "string",
+       "enum": [
+        "761",
+        "mas811",
+        "mas90",
+        "mas91",
+        "mas92"
+       ],
+       "description": "The target release lens."
+      }
+     },
+     "required": [
+      "source",
+      "lens"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "upgrade_plan",
+    "title": "Plan a Maximo move (Upgrade Desk)",
+    "description": "One Maximo move from an earlier catalogue release to a later one (7.6.1, 8.11, 9.0, 9.1, 9.2), composed from the published record: the support clock on the source release, the staged route (IBM's n-1 policy), what IBM says about the move (route, platform, database, Java, users, add-ons, reports; each with IBM's words and page), the few items only the customer's own system can answer, break-class changes (deprecations, behaviour changes) and landmines (upgrade notes, gotchas) in range from the 9.x change log, fix and security counts, the deprecation-register rows touching the range, and the curated Change Watch entries. Every item links its record or IBM page. Same composition as assetize.com.au/upgrade/<from>/<to>.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "description": "Source release: \"7.6.1\", \"8.11\", \"9.0\", \"9.1\"."
+      },
+      "to": {
+       "type": "string",
+       "description": "Target release: \"8.11\", \"9.0\", \"9.1\", \"9.2\"."
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "upgrade_checklist",
+    "title": "Phased upgrade checklist for a move",
+    "description": "The phased checklist (before / during / after) for one Maximo move. Every item is CITED — its published records are resolved against the corpus on this call and an item whose records are not published is dropped — or VERIFY, a level-dependent question to settle against IBM. Optionally one phase.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "description": "Source release, e.g. \"8.11\"."
+      },
+      "to": {
+       "type": "string",
+       "description": "Target release, e.g. \"9.2\"."
+      },
+      "phase": {
+       "type": "string",
+       "description": "Optional: BEFORE, DURING or AFTER."
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "fixes_gained",
+    "title": "Fixes and security changes a move carries",
+    "description": "Every FIX and SECURITY record the 9.x change log holds for the releases inside a move (the 9.x log starts at 9.1). Optionally one functional area. Counted, never scored as upgrade weight.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "from": {
+       "type": "string",
+       "description": "Source release, e.g. \"9.1\"."
+      },
+      "to": {
+       "type": "string",
+       "description": "Target release, e.g. \"9.2\"."
+      },
+      "area": {
+       "type": "string",
+       "description": "Optional functional area, e.g. \"WORK_ORDERS\"."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max entries per section (default 40, max 200)."
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "deprecation_register",
+    "title": "Deprecation, removal and rename register",
+    "description": "What was deprecated, removed or renamed in Maximo / MAS, in which version, what IBM says replaces it (blank when IBM has not named one), and the published records that say so. Curated; rows publish only on evidence. Same data as assetize.com.au/upgrade/deprecations.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "description": "Optional: DEPRECATION, REMOVAL or RENAME."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "lifecycle_dates",
+    "title": "Structured Maximo support dates",
+    "description": "End-of-support, Extended Support and Dual Support dates for Maximo and MAS as structured rows: product, version, milestone, ISO date, days remaining, and the IBM page each comes from. Optionally scope by product or version. Same data as assetize.com.au/upgrade/deadlines.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "product": {
+       "type": "string",
+       "description": "Optional product substring, e.g. \"Application Suite\" or \"Asset Management\"."
+      },
+      "version": {
+       "type": "string",
+       "description": "Optional version, e.g. \"8.11\", \"7.6.1\", \"9.0\"."
+      }
+     },
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "maximo_mobile",
+    "title": "What IBM says about Maximo Mobile",
+    "description": "Researched IBM statements about Maximo Mobile, by topic: what it is, the shell and Graphite-app architecture, device requirements (OS levels, memory, WebView2, ARCore, shared devices), getting the app onto devices (stores, MSIX, QR server URL, MDM), login and shared devices, data sync and attachments, administration (Mobile Configuration app, properties), the apps release by release (8.11, 9.0, 9.1, 9.2), push notifications, and coming from Maximo Anywhere or 7.6.1. Every fact carries IBM's verbatim sentence, page and read date. Scope by release and/or topic. Same data as assetize.com.au/mobile. For fixes and gotchas use search_records.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "version": {
+       "type": "string",
+       "description": "Optional Maximo Mobile release: \"8.11\", \"9.0\", \"9.1\" or \"9.2\". Facts that hold for every release are always included."
+      },
+      "topic": {
+       "type": "string",
+       "description": "Optional topic: what, architecture, devices, deploy, auth, sync, admin, apps, notifications, classic."
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "assetize://corpus/capabilities",
+    "name": "corpus-capabilities",
+    "title": "What Assetize can answer",
+    "description": "Self-describing manifest — the server, every tool it exposes, and every discoverable resource. Read this first to learn the surface. JSON.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "assetize://corpus/stats",
+    "name": "corpus-stats",
+    "title": "Corpus coverage figures",
+    "description": "Published record count, unique source documents, versions represented, raw evidence items. JSON.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "assetize://corpus/versions",
+    "name": "corpus-versions",
+    "title": "Maximo versions covered",
+    "description": "Every Maximo version/family the corpus covers, with published record counts and a read URI per version. JSON — the discovery layer for version-scoped queries.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "assetize://corpus/changelog",
+    "name": "corpus-changelog",
+    "title": "Maximo 9.x change log",
+    "description": "The dated, source-cited 9.x change log (same data as the maximo_changelog tool and assetize.com.au/changelog).",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "assetize://corpus/gotchas",
+    "name": "corpus-gotchas",
+    "title": "Maximo gotchas & upgrade traps",
+    "description": "Known traps, upgrade landmines, install / security / troubleshooting records (same data as the list_gotchas tool).",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "assetize://corpus/change-watch",
+    "name": "corpus-change-watch",
+    "title": "Curated Maximo Change Watch",
+    "description": "Curated feed of materially important 9.x changes, each with a labelled Assetize interpretation and its evidence (same data as the change_watch tool).",
+    "mimeType": "text/markdown"
+   }
+  ]
+ }
+}

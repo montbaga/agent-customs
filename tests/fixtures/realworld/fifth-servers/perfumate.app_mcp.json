@@ -1,0 +1,3349 @@
+{
+ "url": "https://perfumate.app/mcp",
+ "doc": {
+  "name": "PerfuMate",
+  "version": "1.1.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "PerfuMate is a perfume formulation workbench. When the user wants to build, create or compose a perfume or accord, find_starting_formula gives a reference recipe already checked against IFRA. search_materials finds materials by name, scent or family; get_material says what one smells like and how much IFRA allows; check_formula checks any formula against IFRA Category 4 and lists the EU allergens to declare. Every result is a reference, not a certificate. find_starting_formula and check_formula return a link that opens the formula in the PerfuMate editor; offer it when the user wants to keep working on the formula. A user who links a PerfuMate account can work on their own bench: list_formulas, get_formula, list_shelf and the other account tools read it; create_formula, edit_formula, add_to_shelf and the rest change it, and every change appears in their PerfuMate apps within seconds. Read before you write, use the ids the reads return, and say what you changed. A change is written in place, with no new version; undo_last_change takes the last one back, save_version keeps a version when asked. For \"what can I make with what I own\" read list_shelf, then rebuild_from_shelf or find_substitutes. get_scent_profile, find_substitutes, rebuild_from_shelf, the accord tools and scale_to_concentration run PerfuMate's own engines, so their numbers are the app's. For a concentration-only request such as \"make it 20%\", use scale_to_concentration and omit totalGrams: it keeps the current weighed total and recomposes the recipe. Set totalGrams only for a final weight the user explicitly requested; never calculate a new weight by dividing the existing grams by the requested percentage. Physically adding solvent to an existing mixture is a different request: preserve its existing ingredient amounts and use edit_formula for the requested solvent addition. update_formula.targetConcentrationPct only saves a target; make_dilution records a stock bottle dilution, not a formula change. Deleting is two steps: delete_items shows exactly what would go and returns a token; call confirm_delete only after the user says yes to that list. Deleted items stay restorable for 30 days. On an AI Studio plan without Unlimited, the bench keeps the free account's limits; a write past them is refused with the reason and changes nothing.",
+  "tools": [
+   {
+    "name": "search_materials",
+    "title": "Search perfumery materials",
+    "description": "Use this when the user wants to find perfumery materials by scent, family, name or CAS number, for example musks, woods or citrus to put in a formula, or the catalog name of a material they typed loosely. Returns up to 10 catalog materials (aroma chemicals, essential oils, absolutes, bases) with CAS, family, note, impact, scent facets and a page link; a material IFRA prohibits or the EU bans is marked prohibited and ranked lower. For the full detail of one material use get_material; to check a whole formula use check_formula. Not for finished perfumes or shopping advice.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80,
+       "description": "A name, synonym, CAS number, family or facet, e.g. \"musk\"."
+      },
+      "limit": {
+       "default": 8,
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Search perfumery materials"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Searching the catalog",
+     "openai/toolInvocation/invoked": "Catalog searched",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "get_material",
+    "title": "Show a perfumery material",
+    "description": "Use this when the user asks what one perfumery material smells like, how it is used, how strong or long-lasting it is, or how much of it IFRA allows (its Category 4 fine-fragrance limit, e.g. \"how much Iso E Super can I use\"). Returns the odour description, family, note, impact, blotter life, synonyms, whether IFRA restricts it and its limit, whether the EU prohibits it, and a link to start a formula with it. The limit is the regulatory ceiling in the finished product, not a recommended dose. Without an exact match it returns the closest catalog names. To check a whole formula use check_formula.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "name": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 160,
+       "description": "Canonical name, synonym or CAS number."
+      }
+     },
+     "required": [
+      "name"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Show a perfumery material"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Reading the material",
+     "openai/toolInvocation/invoked": "Material read",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "check_formula",
+    "title": "Check a formula (IFRA and EU allergens)",
+    "description": "Use this when the user has a perfume or accord formula, pasted or drafted earlier in this conversation, and wants to know whether it is IFRA compliant, how much of the finished product it may be, which line to reduce, or which EU allergens the label must declare. Checks IFRA Category 4 (fine fragrance) at the concentration the user chooses, finds the highest safe concentration and says how far to reduce a line that is over a limit. Give the formula as pasted text (one material per line with an amount) or as structured lines, every line in grams or every line in percent. Lines that match no catalog material are listed and not counted. Does not save anything and does not change the amounts. Returns a link that opens the formula in PerfuMate. For one material's limit use get_material; for a starting recipe use find_starting_formula.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "description": "The formula as text, one line per material, e.g. \"Hedione 4 g\" or \"Ambroxan 10% in DPG 2 g\".",
+       "type": "string",
+       "maxLength": 20000
+      },
+      "lines": {
+       "maxItems": 200,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "material": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Material name as written, e.g. \"Iso E Super\"."
+         },
+         "amount": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100000
+         },
+         "unit": {
+          "default": "g",
+          "type": "string",
+          "enum": [
+           "g",
+           "mg",
+           "kg",
+           "%"
+          ]
+         },
+         "dilutionPct": {
+          "description": "Strength of the bottle used, e.g. 10 for a 10% dilution. Omit for neat.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+         }
+        },
+        "required": [
+         "material",
+         "amount"
+        ]
+       }
+      },
+      "concentrationPct": {
+       "default": 20,
+       "description": "How much of the finished product the formula is, e.g. 20 for an eau de parfum.",
+       "type": "number",
+       "minimum": 0.1,
+       "maximum": 100
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Check a formula (IFRA and EU allergens)"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Checking the formula",
+     "openai/toolInvocation/invoked": "Formula checked",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "find_starting_formula",
+    "title": "Find a starting formula",
+    "description": "Use this when the user wants to build, create, compose or formulate a perfume, fragrance or accord and needs a starting recipe (a rose, a citrus cologne, a clean musk, an amber), or asks what they could make with materials they list. Matches the idea to PerfuMate's reference accords, the vetted recipes published at perfumate.app/accords, and returns the closest match with its percentages and grams for a batch, already checked against IFRA Category 4 at the concentration given (verdict, highest safe concentration, allergens to declare), plus a link that opens it in PerfuMate and a few alternatives. The ratios are the library's own; nothing is invented, and an idea no accord fits returns the list of available accords instead. Re-check any edited version with check_formula. Not for copying a named commercial perfume. Does not save anything.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "idea": {
+       "description": "What the user wants to make, in their words, e.g. \"fresh citrus cologne\", \"rose\", \"clean laundry musk\".",
+       "type": "string",
+       "maxLength": 200
+      },
+      "haveMaterials": {
+       "description": "Materials the user already has; accords they can make with them rank first and the missing ones are listed.",
+       "maxItems": 60,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+       }
+      },
+      "concentrationPct": {
+       "default": 20,
+       "description": "How much of the finished product these lines would be, for the IFRA check, e.g. 20 for an eau de parfum.",
+       "type": "number",
+       "minimum": 0.1,
+       "maximum": 100
+      },
+      "batchGrams": {
+       "default": 100,
+       "description": "Batch size in grams for the amounts.",
+       "type": "number",
+       "minimum": 0.1,
+       "maximum": 100000
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Find a starting formula"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Finding a starting formula",
+     "openai/toolInvocation/invoked": "Starting formula found",
+     "securitySchemes": [
+      {
+       "type": "noauth"
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "noauth"
+     }
+    ]
+   },
+   {
+    "name": "my_account",
+    "title": "Your PerfuMate account",
+    "description": "Use this when the user asks about their PerfuMate account or how big their bench is. Returns the linked account's plan (\"unlimited\" or \"ai_studio\") and its counts of formulas, shelf materials and notebooks; says so when the bench has not synced from the app yet.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Your PerfuMate account"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_formulas",
+    "title": "List your formulas",
+    "description": "Use this when the user asks what formulas they have, wants to find one by name, folder or favourite, or before you read or change a formula (it returns the ids the other tools use). Lists the formulas on the user's PerfuMate bench, pinned first then most recently edited, with folders. Locked formulas show their name only.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 80
+      },
+      "folder": {
+       "description": "A folder name; \"\" for unfiled. Filtering by folder requires PerfuMate Unlimited.",
+       "type": "string",
+       "maxLength": 80
+      },
+      "favoritesOnly": {
+       "type": "boolean"
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "perfume",
+        "accord"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "List your formulas"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_formula",
+    "title": "Show one of your formulas",
+    "description": "Use this when the user wants to see one of their formulas: every line with material, bottle strength, amount, relative and absolute percent, flags and notes, plus totals, concentration, cost and the note pyramid. Optionally adds an IFRA Category 4 and EU allergen check of it (\"is my formula IFRA compliant\"). Can read a past version by number or id.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "version": {
+       "description": "A version number such as \"3\", or its id. Omit for the working copy.",
+       "type": "string",
+       "maxLength": 60
+      },
+      "checkIfra": {
+       "type": "boolean"
+      },
+      "ifraConcentrationPct": {
+       "description": "How much of the finished product the formula is, for the IFRA check. Default: its target, else 20.",
+       "type": "number",
+       "minimum": 0.1,
+       "maximum": 100
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Show one of your formulas"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_versions",
+    "title": "List a formula's versions",
+    "description": "Use this when the user asks about a formula's history: its version tree with notes and parents, which version is the working copy and which have batches.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "List a formula's versions"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "create_formula",
+    "title": "Create a formula on your bench",
+    "description": "Use this when the user wants a new formula on their PerfuMate bench, empty or with lines they give (structured, pasted text or an attached file), for example after building one together in this chat. Lines are matched to the catalog and the user's own materials; if any line does not match, nothing is saved and the unmatched names come back with suggestions. Bottles the user does not own are added off the shelf, as an import does. To only check a formula without saving it use check_formula.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "name": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "description": {
+       "type": "string",
+       "maxLength": 2000
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "perfume",
+        "accord"
+       ]
+      },
+      "targetConcentrationPct": {
+       "type": "number",
+       "minimum": 0.01,
+       "maximum": 100
+      },
+      "folder": {
+       "description": "Requires PerfuMate Unlimited, including an empty folder name.",
+       "type": "string",
+       "maxLength": 80
+      },
+      "lines": {
+       "maxItems": 200,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "material": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Name, trade name or CAS as written, e.g. \"Iso E Super\" or \"Ambroxan 10% in DPG\"."
+         },
+         "grams": {
+          "description": "Weighed amount in grams. Never send together with percent.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000
+         },
+         "percent": {
+          "description": "Weighed share of the formula, when every line is percent. Never send together with grams. Not the bottle dilution.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+         },
+         "dilutionPct": {
+          "description": "Strength of the bottle weighed, e.g. 10 for a 10% dilution.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+         },
+         "solvent": {
+          "description": "The dilution's solvent, e.g. DPG, IPM, ethanol.",
+          "type": "string",
+          "maxLength": 40
+         },
+         "newMaterial": {
+          "description": "Only for a material the catalog does not have: create it as the user's own material.",
+          "anyOf": [
+           {
+            "type": "boolean",
+            "const": true
+           },
+           {
+            "type": "object",
+            "properties": {
+             "family": {
+              "type": "string",
+              "maxLength": 40
+             },
+             "note": {
+              "type": "string",
+              "enum": [
+               "top",
+               "heart",
+               "base",
+               "none"
+              ]
+             },
+             "cas": {
+              "type": "string",
+              "maxLength": 40
+             },
+             "odor": {
+              "type": "string",
+              "maxLength": 500
+             },
+             "natural": {
+              "type": "boolean"
+             }
+            }
+           }
+          ]
+         },
+         "note": {
+          "type": "string",
+          "maxLength": 500
+         },
+         "flag": {
+          "type": "string",
+          "enum": [
+           "too_strong",
+           "too_weak",
+           "replace"
+          ]
+         }
+        },
+        "required": [
+         "material"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "text": {
+       "description": "The formula as pasted text, one material per line with an amount.",
+       "type": "string",
+       "maxLength": 20000
+      },
+      "file": {
+       "description": "A file the user attached in the chat: CSV, TSV, TXT, JSON or Excel (.xlsx).",
+       "type": "object",
+       "properties": {
+        "download_url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "file_id": {
+         "type": "string"
+        },
+        "mime_type": {
+         "type": "string"
+        },
+        "file_name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "download_url",
+        "file_id"
+       ]
+      },
+      "batchGrams": {
+       "description": "Batch size when lines are in percent. Default 10 g.",
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100000
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Create a formula on your bench"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ],
+     "openai/fileParams": [
+      "file"
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "edit_formula",
+    "title": "Edit a formula's lines",
+    "description": "Use this when the user wants to change a formula on their bench: add or remove a material, set an amount or a bottle strength, swap a material, flag or note a line, reorder, or scale the whole formula. Changes the working copy in place, as one hand edit in the editor does. No version is made; undo_last_change reverses the change, save_version keeps a version when the user asks. Only when a batch was made from the working copy does the first change start one new working version (the result says so). A formula open in the app updates within seconds. Lines are named by material or id. For add/set_amount always specify unit: g is a weighed amount; % is the final weighed share of the whole formula (including solvent, not the pure aromatic relative/absolute percent). Other weighed lines are held fixed; several % targets are solved together. Never copy relativePct or absolutePct as grams. Read get_formula first and use weighedPct for this kind of percentage edit. Whole-formula scale changes weight while preserving the recipe ratios; use scale_to_concentration to change finished concentration. Adding a specified solvent amount preserves existing ingredient amounts and increases the total weight.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "operations": {
+       "minItems": 1,
+       "maxItems": 100,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "op": {
+          "type": "string",
+          "enum": [
+           "add",
+           "remove",
+           "set_amount",
+           "set_dilution",
+           "swap",
+           "set_flag",
+           "set_note",
+           "reorder",
+           "scale"
+          ]
+         },
+         "line": {
+          "description": "The line: its material name or line id.",
+          "type": "string",
+          "maxLength": 200
+         },
+         "material": {
+          "type": "string",
+          "maxLength": 160
+         },
+         "amount": {
+          "description": "Amount in the explicit unit; never infer grams from a percentage.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000
+         },
+         "unit": {
+          "description": "For add/set_amount: g or % for a weighed formula, part/drop only for a line already in that native unit. Legacy omission keeps its native unit, never percent.",
+          "type": "string",
+          "enum": [
+           "g",
+           "%",
+           "part",
+           "drop"
+          ]
+         },
+         "dilutionPct": {
+          "description": "Strength of the stock bottle used by this line, not the finished formula concentration. This does not make a physical stock dilution.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+         },
+         "solvent": {
+          "type": "string",
+          "maxLength": 40
+         },
+         "newMaterial": {
+          "description": "Only for a material the catalog does not have: create it as the user's own material.",
+          "anyOf": [
+           {
+            "type": "boolean",
+            "const": true
+           },
+           {
+            "type": "object",
+            "properties": {
+             "family": {
+              "type": "string",
+              "maxLength": 40
+             },
+             "note": {
+              "type": "string",
+              "enum": [
+               "top",
+               "heart",
+               "base",
+               "none"
+              ]
+             },
+             "cas": {
+              "type": "string",
+              "maxLength": 40
+             },
+             "odor": {
+              "type": "string",
+              "maxLength": 500
+             },
+             "natural": {
+              "type": "boolean"
+             }
+            }
+           }
+          ]
+         },
+         "flag": {
+          "anyOf": [
+           {
+            "type": "string",
+            "enum": [
+             "too_strong",
+             "too_weak",
+             "replace"
+            ]
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "note": {
+          "type": "string",
+          "maxLength": 500
+         },
+         "lines": {
+          "description": "For reorder: lines in their new order.",
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+           "type": "string",
+           "maxLength": 200
+          }
+         },
+         "totalGrams": {
+          "description": "For scale: the explicitly requested final total weight in grams, preserving recipe ratios. Not a concentration percentage.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100000
+         },
+         "factor": {
+          "description": "For scale: the explicitly requested multiplier of all weighed amounts, not a concentration percentage.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000
+         }
+        },
+        "required": [
+         "op"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "required": [
+      "formula",
+      "operations"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Edit a formula's lines"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "update_formula",
+    "title": "Rename, describe or file a formula",
+    "description": "Use this when the user wants to rename a formula or change its description, bench notes, kind (perfume or accord), folder, favourite star, pin, target concentration, IFRA category or bottle size.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "name": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "description": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 2000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "personalNotes": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 5000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "perfume",
+        "accord"
+       ]
+      },
+      "folder": {
+       "description": "Requires PerfuMate Unlimited, including clearing or unfiling.",
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 80
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "favorite": {
+       "type": "boolean"
+      },
+      "pinned": {
+       "type": "boolean"
+      },
+      "targetConcentrationPct": {
+       "description": "Saved target only. This does not change ingredient amounts, actual concentration or shelf stock. Use scale_to_concentration to recompose the recipe.",
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0.01,
+         "maximum": 100
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "ifraCategory": {
+       "type": "string",
+       "maxLength": 4
+      },
+      "bottleSizeMl": {
+       "anyOf": [
+        {
+         "type": "number",
+         "exclusiveMinimum": 0,
+         "maximum": 100000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Rename, describe or file a formula"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "rename_folder",
+    "title": "Rename a formula folder",
+    "description": "Use this when the user wants to rename a formula folder: every formula filed in it moves (an empty name unfiles them). Requires PerfuMate Unlimited.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "from": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      },
+      "to": {
+       "type": "string",
+       "maxLength": 80
+      }
+     },
+     "required": [
+      "from",
+      "to"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Rename a formula folder"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "duplicate_formula",
+    "title": "Duplicate a formula",
+    "description": "Use this when the user wants a copy of a formula to try changes on: an independent copy of its working copy with the same bottles, named \"<name> copy\" unless named.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "name": {
+       "type": "string",
+       "maxLength": 120
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Duplicate a formula"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "save_version",
+    "title": "Save a version to the tree",
+    "description": "Use this when the user wants to keep the current state of a formula as a named version in its evolution tree and carry on editing on a fresh copy.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "note": {
+       "type": "string",
+       "maxLength": 120
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Save a version to the tree"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "branch_version",
+    "title": "Branch from a version",
+    "description": "Use this when the user wants to start a new line of work from a past version; the old working copy stays in the tree.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "version": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 60
+      }
+     },
+     "required": [
+      "formula",
+      "version"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Branch from a version"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "open_version",
+    "title": "Edit a past version in place",
+    "description": "Use this when the user wants to go back and edit a past version directly, without cloning it. Refused for a version a batch was made from.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "version": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 60
+      }
+     },
+     "required": [
+      "formula",
+      "version"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Edit a past version in place"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "rename_version",
+    "title": "Rename or renumber a version",
+    "description": "Use this when the user wants to change a version's note or the number it carries.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "version": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 60
+      },
+      "note": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 120
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "number": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100000
+      }
+     },
+     "required": [
+      "formula",
+      "version"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Rename or renumber a version"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_shelf",
+    "title": "List your shelf",
+    "description": "Use this when the user asks which materials they own, what is in stock or running low, or as the first step to suggest what they can make with their shelf. Lists the materials on the user's shelf, each with its bottles: strength, solvent, stock, price, supplier, lot and running low.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 80
+      },
+      "lowOnly": {
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "List your shelf"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_shelf_material",
+    "title": "Show one of your materials",
+    "description": "Use this when the user asks about one material they own: their notes, its bottles with recent stock movements, and the formulas that use it.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "material": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The material: name, CAS, or its id from list_shelf."
+      }
+     },
+     "required": [
+      "material"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Show one of your materials"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "add_to_shelf",
+    "title": "Add materials to your shelf",
+    "description": "Use this when the user says they have bought or own materials and wants them on their shelf. Adds catalog materials by name or CAS, or their own new ones; each item can carry the bottle strength, solvent, stock in grams, price per gram, supplier and lot. Without a strength, a catalog material gets its usual working dilution (in DPG unless a solvent is given), else neat. A list can also come as pasted text or an attached file: one material per line, or a table whose header row names the columns. Names that match nothing come back with suggestions.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "items": {
+       "maxItems": 300,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "material": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+         },
+         "cas": {
+          "type": "string",
+          "maxLength": 40
+         },
+         "dilutionPct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+         },
+         "solvent": {
+          "type": "string",
+          "maxLength": 40
+         },
+         "stockGrams": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+         },
+         "pricePerGram": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+         },
+         "supplier": {
+          "type": "string",
+          "maxLength": 80
+         },
+         "lot": {
+          "type": "string",
+          "maxLength": 80
+         },
+         "lowStockGrams": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+         },
+         "newMaterial": {
+          "description": "Only for a material the catalog does not have: create it as the user's own material.",
+          "anyOf": [
+           {
+            "type": "boolean",
+            "const": true
+           },
+           {
+            "type": "object",
+            "properties": {
+             "family": {
+              "type": "string",
+              "maxLength": 40
+             },
+             "note": {
+              "type": "string",
+              "enum": [
+               "top",
+               "heart",
+               "base",
+               "none"
+              ]
+             },
+             "cas": {
+              "type": "string",
+              "maxLength": 40
+             },
+             "odor": {
+              "type": "string",
+              "maxLength": 500
+             },
+             "natural": {
+              "type": "boolean"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "required": [
+         "material"
+        ]
+       }
+      },
+      "text": {
+       "type": "string",
+       "maxLength": 100000
+      },
+      "file": {
+       "description": "A list the user attached in the chat: CSV, TSV, TXT or Excel (.xlsx).",
+       "type": "object",
+       "properties": {
+        "download_url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "file_id": {
+         "type": "string"
+        },
+        "mime_type": {
+         "type": "string"
+        },
+        "file_name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "download_url",
+        "file_id"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Add materials to your shelf"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ],
+     "openai/fileParams": [
+      "file"
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "update_bottle",
+    "title": "Update a bottle",
+    "description": "Use this when the user wants to record stock for a bottle (a weighed count, or grams bought or used, through the stock ledger) or change its price per gram, supplier, lot, low-stock warning, strength, solvent or notes, take it on or off the shelf, or make it the preferred bottle.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "bottle": {
+       "description": "The bottle id from list_shelf.",
+       "type": "string",
+       "maxLength": 60
+      },
+      "material": {
+       "type": "string",
+       "maxLength": 160
+      },
+      "dilutionPct": {
+       "description": "With bottle: its new strength. Without bottle: which of the material's bottles to change.",
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100
+      },
+      "solvent": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 40
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "countGrams": {
+       "description": "What the bottle holds now, weighed.",
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1000000
+      },
+      "addGrams": {
+       "description": "Grams bought (positive) or used (negative).",
+       "type": "number",
+       "minimum": -1000000,
+       "maximum": 1000000
+      },
+      "reason": {
+       "type": "string",
+       "maxLength": 200
+      },
+      "pricePerGram": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 1000000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "supplier": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 80
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "lot": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 80
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "lowStockGrams": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 1000000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "notes": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 1000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "onShelf": {
+       "type": "boolean"
+      },
+      "makeDefault": {
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Update a bottle"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "make_dilution",
+    "title": "Make a dilution from stock",
+    "description": "Use this when the user has made, or wants to record, a dilution from a bottle they own; the material used is taken from the source bottle's stock. This makes a stock bottle, not a formula concentration change. The source bottle's existing strength determines the source and solvent grams; the target cannot be stronger than the source.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "material": {
+       "type": "string",
+       "maxLength": 160
+      },
+      "fromBottle": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "fromDilutionPct": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100
+      },
+      "targetPct": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100
+      },
+      "grams": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100000,
+       "description": "Total grams of the finished new stock dilution, not grams of solvent to add or a formula batch size."
+      },
+      "solvent": {
+       "type": "string",
+       "maxLength": 40
+      },
+      "deductFromSource": {
+       "description": "Whether to deduct the source grams used from shelf stock. Defaults to true; false records stock without that deduction.",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "targetPct",
+      "grams"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Make a dilution from stock"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "update_material",
+    "title": "Edit a material",
+    "description": "Use this when the user wants to change a material on their bench: their notes, odour description, families, note, impact, blotter hours, shelf life, synonyms, flash point, supplier IFRA limit or constituent breakdown; name and CAS only for their own materials.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "material": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The material: name, CAS or id."
+      },
+      "name": {
+       "type": "string",
+       "maxLength": 160
+      },
+      "cas": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 40
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "personalNotes": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 5000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "odor": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 2000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "families": {
+       "maxItems": 8,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 40
+       }
+      },
+      "note": {
+       "type": "string",
+       "enum": [
+        "top",
+        "heart",
+        "base",
+        "none"
+       ]
+      },
+      "tier": {
+       "description": "The pyramid band it is filed in; null to derive it from its blotter hours.",
+       "anyOf": [
+        {
+         "type": "string",
+         "enum": [
+          "top",
+          "top_heart",
+          "heart",
+          "heart_base",
+          "base"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "dropsPerGram": {
+       "anyOf": [
+        {
+         "type": "number",
+         "exclusiveMinimum": 0,
+         "maximum": 1000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "impact": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10
+      },
+      "blotterHours": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 10000
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "shelfLifeMonths": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 600
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "synonyms": {
+       "maxItems": 50,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 160
+       }
+      },
+      "natural": {
+       "type": "boolean"
+      },
+      "flashPointC": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": -100,
+         "maximum": 500
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "supplierIfraLimit": {
+       "description": "The supplier IFRA limit for this entry only; null removes it. It is not an IFRA Standard and never loosens one.",
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "cat4Pct": {
+           "anyOf": [
+            {
+             "type": "number",
+             "exclusiveMinimum": 0,
+             "maximum": 100
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "description": "The Category 4 (fine fragrance) maximum from the supplier's IFRA certificate, as a % of the finished product; null if it states no restriction (recorded, never clears anything)."
+          },
+          "supplier": {
+           "type": "string",
+           "maxLength": 80
+          },
+          "issued": {
+           "description": "Certificate date, YYYY-MM-DD.",
+           "type": "string",
+           "maxLength": 10
+          },
+          "docRef": {
+           "description": "Issuer, title and document ID.",
+           "type": "string",
+           "maxLength": 200
+          },
+          "note": {
+           "type": "string",
+           "maxLength": 500
+          }
+         },
+         "required": [
+          "cat4Pct"
+         ]
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "constituents": {
+       "maxItems": 300,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "maxLength": 160
+         },
+         "cas": {
+          "type": "string",
+          "maxLength": 40
+         },
+         "percent": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+         }
+        },
+        "required": [
+         "cas",
+         "percent"
+        ]
+       }
+      }
+     },
+     "required": [
+      "material"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Edit a material"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_batches",
+    "title": "List your batches",
+    "description": "Use this when the user asks about batches they have made, all or one formula's, with their maceration journal and days resting.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "List your batches"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "log_batch",
+    "title": "Log a batch",
+    "description": "Use this when the user has made a batch of a formula and wants it recorded: total weight, date, label and notes, optionally at a weaker strength, and optionally deducting what it used from stock. Works from the working copy or a version.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "version": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "totalGrams": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 1000000
+      },
+      "madeAt": {
+       "description": "ISO date, default today.",
+       "type": "string",
+       "maxLength": 30
+      },
+      "code": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "notes": {
+       "type": "string",
+       "maxLength": 2000
+      },
+      "concentrationPct": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100
+      },
+      "deductStock": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "formula",
+      "totalGrams"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Log a batch"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "journal_note",
+    "title": "Write in a batch's journal",
+    "description": "Use this when the user wants to add a dated line to a batch's maceration journal, or correct one.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "batch": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "noteId": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "text": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 2000
+      },
+      "date": {
+       "type": "string",
+       "maxLength": 30
+      }
+     },
+     "required": [
+      "text"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Write in a batch's journal"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_notes",
+    "title": "Read your notebooks",
+    "description": "Use this when the user asks to read their PerfuMate notebooks: titles and previews, or one notebook in full by id.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "query": {
+       "type": "string",
+       "maxLength": 80
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Read your notebooks"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "write_note",
+    "title": "Write in a notebook",
+    "description": "Use this when the user wants to create a notebook or change one: its title, body, appended text or pin.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "title": {
+       "type": "string",
+       "maxLength": 200
+      },
+      "body": {
+       "type": "string",
+       "maxLength": 100000
+      },
+      "append": {
+       "type": "string",
+       "maxLength": 20000
+      },
+      "pinned": {
+       "type": "boolean"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Write in a notebook"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_shopping",
+    "title": "Your shopping cart",
+    "description": "Use this when the user asks what they need to buy: the Shopping cart's lists and their items (with list and category), and the materials running low. Optionally one list only.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "list": {
+       "description": "A list name or id; omit for every list.",
+       "type": "string",
+       "maxLength": 120
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Your shopping cart"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "shopping_list",
+    "title": "Change your shopping cart",
+    "description": "Use this when the user wants to add materials or free text to a Shopping cart list (the default list unless one is named; a new name makes that list), tick items as received or back to needed, or remove them.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "add": {
+       "maxItems": 100,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 160
+       }
+      },
+      "done": {
+       "maxItems": 100,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 200
+       }
+      },
+      "undone": {
+       "maxItems": 100,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 200
+       }
+      },
+      "remove": {
+       "maxItems": 100,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 200
+       }
+      },
+      "list": {
+       "description": "The list to work in, by name or id. Omit for the default list.",
+       "type": "string",
+       "maxLength": 120
+      },
+      "category": {
+       "description": "A category for the items added, e.g. \"Naturals\".",
+       "type": "string",
+       "maxLength": 80
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Change your shopping cart"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "set_preferences",
+    "title": "Change account preferences",
+    "description": "Use this when the user wants to change the account's currency symbol or its default low-stock warning (grams; 0 turns it off).",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "currencySymbol": {
+       "type": "string",
+       "maxLength": 4
+      },
+      "lowStockDefaultGrams": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1000000
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Change account preferences"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "delete_items",
+    "title": "Prepare a deletion (step 1 of 2)",
+    "description": "Use this when the user asks to delete a formula, version, material, bottle, batch or note. It is step 1 of 2 and deletes NOTHING: it shows exactly what would be removed, with any protection, and returns a confirmation token valid for 10 minutes. Show the list to the user; only after they agree, call confirm_delete. Locked formulas cannot be deleted here.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "items": {
+       "minItems": 1,
+       "maxItems": 50,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "formula",
+           "version",
+           "material",
+           "bottle",
+           "batch",
+           "note",
+           "journal_note"
+          ]
+         },
+         "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Id or name."
+         },
+         "formula": {
+          "description": "For a version: its formula.",
+          "type": "string",
+          "maxLength": 200
+         },
+         "material": {
+          "type": "string",
+          "maxLength": 160
+         },
+         "dilutionPct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+         }
+        },
+        "required": [
+         "kind",
+         "ref"
+        ]
+       }
+      }
+     },
+     "required": [
+      "items"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Prepare a deletion (step 1 of 2)"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "confirm_delete",
+    "title": "Delete (step 2 of 2)",
+    "description": "Use this only after the user has said yes to the list delete_items showed. Deletes exactly that list, with its token. If the list included a protected item, confirmName must be the formula's name as the user typed it. Items stay restorable for 30 days.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "token": {
+       "type": "string",
+       "minLength": 10,
+       "maxLength": 20000
+      },
+      "confirmName": {
+       "type": "string",
+       "maxLength": 200
+      }
+     },
+     "required": [
+      "token"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": true,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Delete (step 2 of 2)"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "list_deleted",
+    "title": "Recently deleted",
+    "description": "Use this when the user wants to see what they deleted in the last 30 days and can still restore.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "formula",
+        "version",
+        "material",
+        "bottle",
+        "batch",
+        "note",
+        "journal_note",
+        "shopping_item"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Recently deleted"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "restore_deleted",
+    "title": "Restore deleted items",
+    "description": "Use this when the user wants something back from Recently deleted (deleted in the last 30 days).",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "items": {
+       "minItems": 1,
+       "maxItems": 50,
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "formula",
+           "version",
+           "material",
+           "bottle",
+           "batch",
+           "note",
+           "journal_note",
+           "shopping_item"
+          ]
+         },
+         "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+         }
+        },
+        "required": [
+         "kind",
+         "id"
+        ]
+       }
+      }
+     },
+     "required": [
+      "items"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Restore deleted items"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "undo_last_change",
+    "title": "Undo the last change",
+    "description": "Use this when the user wants to take back the last change made from the chat, to one formula or the last of any, from any chat. Pass the exact changeId from a write result or this tool's preview. Without changeId this only previews the latest change and changes nothing. Reuse the SAME changeId after an error or retry: a completed undo is idempotent and never steps farther back. Only preview/select another ID when the user asks for another step (20 changes per formula,30 days). A concurrent edit aborts the whole restore; newer app work is not overwritten.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Only changes to this formula: its id or exact name."
+      },
+      "changeId": {
+       "description": "Exact undo changeId. Omit for preview only; use the same ID for retries.",
+       "type": "string",
+       "pattern": "^\\d{1,20}$"
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Undo the last change"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "get_scent_profile",
+    "title": "Scent profile of a formula",
+    "description": "Use this when the user asks what a formula of theirs will smell like, how it evolves or how long it lasts, by PerfuMate's own scent model, exactly as the app's scent profile sheet shows it: families and sub-notes by weight and by perceived impact, the drydown at 0, 1, 4, 8 and 24 hours, the wear line (projection and longevity, e.g. \"Bold · moderate wear\") with its confidence, the genre, and the five-part note pyramid. Accords count by what they hold.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Scent profile of a formula"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "find_substitutes",
+    "title": "Find a stand-in on your shelf",
+    "description": "Use this when the user lacks a material in a formula, or asks what they could use instead from the materials they own: the app's Find on shelf for one line, with single bottles and two- or three-bottle blends from the shelf that can play that material's part, best first, with a match percent and what each carries or misses. Never offers an IFRA-prohibited material. Changes nothing; use_substitute swaps one in.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "line": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The line: its material name or line id."
+      }
+     },
+     "required": [
+      "formula",
+      "line"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Find a stand-in on your shelf"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "use_substitute",
+    "title": "Swap in a stand-in",
+    "description": "Use this when the user picks one of find_substitutes' suggestions: replaces the line with it (pass its member names), in place, with the app's own amounts, the same smell carried through each bottle's dilution, merged into a line that already holds that bottle.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "line": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The line: its material name or line id."
+      },
+      "members": {
+       "minItems": 1,
+       "maxItems": 3,
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+       },
+       "description": "The suggestion's member names."
+      }
+     },
+     "required": [
+      "formula",
+      "line",
+      "members"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Swap in a stand-in"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "rebuild_from_shelf",
+    "title": "Rebuild with materials you own",
+    "description": "Use this when the user asks what they can make with the materials they own, or wants a formula rebuilt using only their shelf: the app's Replace with materials I own, showing how the formula can stand entirely on the shelf (what stays, what a stand-in replaces, what has to go). Without apply it only shows the plan; with apply: true it rewrites the working copy in place (undo_last_change takes it back).",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "apply": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "formula"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Rebuild with materials you own"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "insert_accord",
+    "title": "Use a formula as an accord",
+    "description": "Use this when the user wants to use one of their saved formulas as a single ingredient inside another, as the app's accords do: a virtual material carrying the flattened composition (so IFRA, allergens, cost and the scent profile see what is inside) on a bottle at the accord's own aromatic strength. Optionally at an amount in grams.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula that receives the accord: its id or exact name."
+      },
+      "source": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula to use as the accord: its id or exact name."
+      },
+      "grams": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 100000
+      }
+     },
+     "required": [
+      "formula",
+      "source"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Use a formula as an accord"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "view_accord",
+    "title": "Show what an accord holds",
+    "description": "Use this when the user asks what is inside an accord line of a formula: its materials at the dose it is used in, each with its share of the accord, read live from its source formula, and whether it can be decomposed.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "line": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The line: its material name or line id."
+      }
+     },
+     "required": [
+      "formula",
+      "line"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": true,
+     "title": "Show what an accord holds"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "decompose_accord",
+    "title": "Decompose an accord",
+    "description": "Use this when the user wants an accord line replaced by the materials it holds, at the same dose, in place (undo_last_change takes it back).",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "line": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The line: its material name or line id."
+      }
+     },
+     "required": [
+      "formula",
+      "line"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Decompose an accord"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "resync_accord",
+    "title": "Re-sync an accord",
+    "description": "Use this when the source formula of an accord has changed and the user wants the accord line to follow: re-reads its composition, families and price as it is now, as the app's Re-sync does.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "line": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The line: its material name or line id."
+      }
+     },
+     "required": [
+      "formula",
+      "line"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Re-sync an accord"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "scale_to_concentration",
+    "title": "Scale to a concentration",
+    "description": "Use this when the user wants to change a formula's concentration (for example from an eau de parfum to an eau de toilette) or its finished weight: the app's Scale sheet. A concentration-only request keeps the existing weighed total weight: omit totalGrams. Recompose the recipe, rather than physically adding solvent to an existing mixture. The concentrate scales and the finishing alcohol makes up the rest, added from the catalog's perfumer's ethanol when there is none. Capped at the concentrate's own strength. In place.",
+    "inputSchema": {
+     "type": "object",
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "properties": {
+      "formula": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "The formula: its id (from list_formulas) or its exact name."
+      },
+      "concentrationPct": {
+       "type": "number",
+       "minimum": 0.01,
+       "maximum": 100,
+       "description": "Target aromatic percentage of the finished formula, accounting for the strengths of its stock bottles. 20 means 20%, not 0.2 or 20 grams."
+      },
+      "totalGrams": {
+       "description": "Final total weight in grams, only when the user explicitly requested it. Omit to keep the current weighed total. Never infer it by dividing existing grams by the concentration.",
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "maximum": 100000
+      }
+     },
+     "required": [
+      "formula",
+      "concentrationPct"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false,
+     "idempotentHint": false,
+     "title": "Scale to a concentration"
+    },
+    "_meta": {
+     "securitySchemes": [
+      {
+       "type": "oauth2",
+       "scopes": [
+        "openid",
+        "email",
+        "profile"
+       ]
+      }
+     ]
+    },
+    "securitySchemes": [
+     {
+      "type": "oauth2",
+      "scopes": [
+       "openid",
+       "email",
+       "profile"
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

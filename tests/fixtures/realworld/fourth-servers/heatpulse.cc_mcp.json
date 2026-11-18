@@ -1,0 +1,221 @@
+{
+ "url": "https://heatpulse.cc/mcp",
+ "doc": {
+  "name": "heatpulse",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "search_news",
+    "description": "Search or list AI news events. Pass `query` for semantic search, or omit it for the heat-ranked feed. Returns editorial summaries (safe to quote) with canonical /event/{slug} URLs.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "query": {
+       "description": "Natural-language search query",
+       "type": "string",
+       "maxLength": 200
+      },
+      "category": {
+       "description": "Category slug, one of: models, products, industry, papers, benchmarks, policy, tips",
+       "type": "string"
+      },
+      "region": {
+       "description": "Region key, one of: europe, dach",
+       "type": "string"
+      },
+      "order": {
+       "type": "string",
+       "enum": [
+        "heat",
+        "recent"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100
+      }
+     }
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "get_event",
+    "description": "One AI-news event by slug: full editorial summary plus its outbound coverage list (outlet name, link, language, time — no publisher headlines).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 300
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "related_stories",
+    "description": "Events most similar to a given event (centroid cosine KNN, max 5).",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "maxLength": 300
+      }
+     },
+     "required": [
+      "slug"
+     ]
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "daily_digest",
+    "description": "The daily editorial digest for a date (YYYY-MM-DD) or the latest one: intro paragraph, stats, and the day's featured events.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "date": {
+       "description": "YYYY-MM-DD, default latest",
+       "type": "string"
+      }
+     }
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "list_topics",
+    "description": "Extracted entities (companies, models, people, themes) ranked by coverage count.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200
+      }
+     }
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "llm_leaderboard",
+    "description": "Live LLM arena leaderboards (text/code/agent/document/vision/search). Rows carry arena score+votes, rank delta vs the previous daily snapshot, OpenRouter context length and USD-per-1M-token pricing. Agent board: score = net-improvement %, votes = sessions.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "board": {
+       "type": "string",
+       "enum": [
+        "text",
+        "code",
+        "agent",
+        "document",
+        "vision",
+        "search"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100
+      }
+     }
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "route_intent",
+    "description": "Describe what knowledge you need in natural language; get back the right HeatPulse endpoint(s) and authoritative external sources, each with a \"why\".",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {
+      "intent": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 300
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10
+      }
+     },
+     "required": [
+      "intent"
+     ]
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   },
+   {
+    "name": "list_datasets",
+    "description": "Bulk JSONL dataset manifest (events corpus, entities, leaderboard history, digests) for RAG/fine-tune pulls.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "research_ai_model",
+    "description": "Guided workflow: everything HeatPulse knows about an AI model — news, rankings, pricing, related coverage",
+    "arguments": [
+     {
+      "name": "name",
+      "description": "Model name, e.g. \"claude-opus-4.5\"",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "daily_briefing",
+    "description": "Summarize today's AI landscape: digest + top events + leaderboard movers"
+   }
+  ],
+  "resources": [
+   {
+    "uri": "heatpulse://knowledge-map",
+    "name": "knowledge-map",
+    "description": "Curated intent → route table (internal endpoints + external authoritative sources)",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "heatpulse://benchmarks",
+    "name": "benchmarks",
+    "description": "All six LLM arena boards as JSON (current snapshot)",
+    "mimeType": "application/json"
+   }
+  ]
+ }
+}

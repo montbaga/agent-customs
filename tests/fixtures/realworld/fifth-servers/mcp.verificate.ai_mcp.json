@@ -1,0 +1,599 @@
+{
+ "url": "https://mcp.verificate.ai/mcp",
+ "doc": {
+  "name": "verificate-mcp-http",
+  "version": "1.9.0",
+  "protocolVersion": "2024-11-05",
+  "instructions": "Verificate Gate reviews AI-written code, plans and documents. Deterministic checks run first and can veto (placeholder or mock implementations, tests that cannot fail, standard-library calls that do not exist, secrets written to logs, unsupported completion claims); a Claude Haiku 5.5 review then checks the rest, including whether third-party API calls are real. Call validate_ai_output on a substantive change before presenting it as finished (documents and reports too, via validation_type), and validate_plan on a design before implementing it. Each result has one decision: approved, approved_with_conditions, rejected or incomplete. A rejected result lists findings with severities; address them and validate again. Submit one complete review unit with its callers, assumptions and test evidence in context; batch the fixes into one revision and resubmit with previous_receipt_id; dispute a finding with evidence in context.rebuttal. Unchanged input resubmitted after a rejection is flagged in the receipt as a repeat; change the code or add evidence before resubmitting. An incomplete decision means the review could not cover the scope; it is not a finding about the content, so follow next_action. The service reads submitted content and does not execute it. No token is needed to start: each machine gets 100 free validations.",
+  "tools": [
+   {
+    "name": "validate_artifact",
+    "title": "Gate a deployable artifact against the Verificate production doctrine",
+    "description": "Deterministic production-readiness gate for AI-built systems. Verifies the invariants that stop a system silently shipping broken: every critical component is PRESENT and LOADS, the import closure resolves (nothing assumed 'already on the box'), all runtime dependencies are declared, and health is a REAL fail-closed check. Returns approve/reject with a fix plan and ISO 27001 / ISO 5055 control evidence. Facts are gathered by the Verificate collector in your CI; the gate is the authority. Non-bypassable, fails closed. This is the control-plane sibling of validate_ai_output — code quality is one invariant; this gates the whole deployable.",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "artifact": {
+       "type": "object",
+       "description": "Collected artifact facts: {critical_components:[{name,loads:bool}], import_closure_ok:bool, undeclared_deps:[str], health_truthful:bool}."
+      }
+     },
+     "required": [
+      "artifact"
+     ]
+    }
+   },
+   {
+    "name": "validate_ai_output",
+    "title": "Gate AI-written output (code or documents)",
+    "description": "The merge gate for ANY AI-written output — code, documentation, reports, emails, configs: returns a binary approve/reject verdict with veto power — e.g. it rejects code calling the nonexistent stripe.Inventory API, an N+1 loop with the latency arithmetic to prove it, or a doc claiming success with no evidence. Deterministic checks (mock/placeholder veto, reward-gamed tests, standard-library calls that do not exist, secrets written to logs) run first and cannot be overridden; a Claude Haiku 5.5 review (ISO/IEC 25010, ISO/IEC 5055) then verifies third-party API calls and scores quality, accuracy, reliability and tech debt; its high/critical security and API findings block. In a benchmark, a frontier model reviewing alone caught reward-gaming and hallucinated APIs 0/6 times in a natural review workflow; this gate checks for both on every call. Read-only: nothing is executed. Call it on every AI-generated deliverable before accepting it; use validate_plan for plans, analyze_code for an advisory report without a verdict.",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "ai_output": {
+       "type": "string",
+       "description": "The AI-generated output to gate — source code (a diff, function or whole file, any mainstream language) or prose (documentation, a report, an email, release notes). For reliable latency keep one submission under ~15,000 characters; split larger artifacts at natural boundaries (functions, SQL statements, sections) and validate the units separately. Reviews are wall-clock bounded: an over-budget model review returns an explicit timed-out result (deterministic gates still run) rather than hanging."
+      },
+      "validation_type": {
+       "type": "string",
+       "default": "code_generation",
+       "description": "What the output is: 'code_generation' (default) for source code; 'documentation', 'report', 'email', 'text', ... for prose (code-marker gates are skipped, integrity gates and the frontier review still run). Use 'report' (or 'status_report' / 'handover') for anything that CLAIMS work is done or passing: there, a completion claim with no evidence in the text is a veto. 'plan' for designs/specs."
+      },
+      "context": {
+       "type": [
+        "object",
+        "string"
+       ],
+       "description": "Optional review context — an object like {\"language\": \"cpp\", \"scale\": \"10k req/s\", \"unit_id\": \"U31\", \"goal_id\": \"G2\", \"delivery_drift\": [\"migration 048 applied, not committed\"]} ('language' sharpens SDK-reality checks; unit_id/goal_id anchor the workflow guidance; delivery_drift lists work that is live or local but not landed on the remote) or a free-text sentence describing intent. Reviewed in full as untrusted reference data (it cannot instruct the reviewer or lift a veto); an oversized context is refused, never truncated. Put a dispute of a prior finding, with its evidence, in 'rebuttal'."
+      },
+      "expected_input_sha256": {
+       "type": "string",
+       "pattern": "^[0-9a-fA-F]{64}$",
+       "description": "Optional SHA-256 (hex) of the exact UTF-8 bytes you intend to submit. A mismatch is refused before any review, proving the gate saw the file you meant."
+      },
+      "previous_receipt_id": {
+       "type": "string",
+       "description": "Optional receipt_id of the review this submission revises or adjudicates; recorded to link the review history."
+      }
+     },
+     "required": [
+      "ai_output"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "valid": {
+       "type": "boolean",
+       "description": "True ONLY when decision is 'approved' or 'approved_with_conditions'. Rejected, incomplete and refused requests are all false."
+      },
+      "decision": {
+       "type": "string",
+       "enum": [
+        "approved",
+        "approved_with_conditions",
+        "rejected",
+        "incomplete",
+        "refused_input"
+       ],
+       "description": "The one final gate decision (see decision_reasons, policy_version)."
+      },
+      "decision_reasons": {
+       "type": "array",
+       "items": {
+        "type": "object"
+       },
+       "description": "Every rule that fired; `decisive` marks the ones that set the decision."
+      },
+      "failure_class": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "input_error | transient_unavailable | incomplete_review | malformed_review | content_defect | deterministic_veto, or null when approved."
+      },
+      "next_action": {
+       "type": "string",
+       "description": "none | address_conditions | fix_and_resubmit | repair_input | retry_later_or_split | supply_missing_scope_or_split | retry_once_then_escalate | blocked_needs_adjudication"
+      },
+      "policy_version": {
+       "type": "string"
+      },
+      "receipt": {
+       "type": "object",
+       "description": "Execution receipt: receipt_id (unique per execution), input_sha256 (SHA-256 of the exact UTF-8 input), context_sha256, request_fingerprint (identifies an equivalent request; NOT an approval token), prompt_sha256 and versions, actual provider/model, completion state, elapsed time, scope reviewed/missing, deferred checks and the audit write outcome."
+      },
+      "model_opinion": {
+       "type": "object",
+       "description": "The model reviewer's own unmodified verdict/score; may differ from decision."
+      },
+      "score": {
+       "type": "number",
+       "description": "Blended 0-100 quality telemetry (gates fused with the model score). Not a probability of correctness and not the decision."
+      },
+      "confidence": {
+       "type": "number",
+       "description": "Legacy alias of score / 100. NOT a calibrated probability or accuracy."
+      },
+      "issues": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Severity-ranked findings, each 'severity|category|detail' with the reasoning"
+      },
+      "suggestions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Concrete fixes to reach approval"
+      },
+      "protection": {
+       "type": "object",
+       "description": "Deterministic gate result. A veto here is final — the model review cannot override it.",
+       "properties": {
+        "verdict": {
+         "type": "string",
+         "description": "'approved' or 'rejected' from the gate layer"
+        },
+        "vetoed": {
+         "type": "boolean",
+         "description": "True if any veto gate failed the submission"
+        },
+        "vetoed_by": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Names of the gates that vetoed, e.g. ['code_reality_gate']"
+        },
+        "protection_score": {
+         "type": "number",
+         "description": "Deterministic gate score, 0-100"
+        }
+       },
+       "additionalProperties": true
+      },
+      "provider": {
+       "type": "string",
+       "description": "Model that ran the deep review, or 'protection-gates-only'"
+      }
+     },
+     "required": [
+      "valid",
+      "score",
+      "issues"
+     ],
+     "additionalProperties": true
+    }
+   },
+   {
+    "name": "validate_plan",
+    "title": "Gate an implementation plan",
+    "description": "The gate for PLANS, designs and specs — run BEFORE any code is written, the cheapest place to catch a bad design. Returns the same binary verdict shape as validate_ai_output, with findings on completeness, feasibility, performance and scalability implications, security risks and missing considerations (e.g. it rejects a plan that polls an API every 100ms per client, with the request-volume math). Read-only: nothing is executed or stored beyond the verdict. Use validate_ai_output for the code that follows.",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "plan": {
+       "type": "string",
+       "description": "The implementation plan, design or spec to validate, as plain text or markdown — e.g. a numbered migration plan or an architecture sketch."
+      },
+      "context": {
+       "type": "object",
+       "description": "Optional constraints the review should weigh, e.g. {\"system\": \"payments API\", \"scale\": \"1M users\", \"constraints\": \"PostgreSQL only\"}."
+      },
+      "expected_input_sha256": {
+       "type": "string",
+       "pattern": "^[0-9a-fA-F]{64}$",
+       "description": "Optional SHA-256 (hex) of the exact UTF-8 bytes you intend to submit. A mismatch is refused before any review, proving the gate saw the file you meant."
+      },
+      "previous_receipt_id": {
+       "type": "string",
+       "description": "Optional receipt_id of the review this submission revises or adjudicates; recorded to link the review history."
+      }
+     },
+     "required": [
+      "plan"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "valid": {
+       "type": "boolean",
+       "description": "True ONLY when decision is 'approved' or 'approved_with_conditions'. Rejected, incomplete and refused requests are all false."
+      },
+      "decision": {
+       "type": "string",
+       "enum": [
+        "approved",
+        "approved_with_conditions",
+        "rejected",
+        "incomplete",
+        "refused_input"
+       ],
+       "description": "The one final gate decision (see decision_reasons, policy_version)."
+      },
+      "decision_reasons": {
+       "type": "array",
+       "items": {
+        "type": "object"
+       },
+       "description": "Every rule that fired; `decisive` marks the ones that set the decision."
+      },
+      "failure_class": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "input_error | transient_unavailable | incomplete_review | malformed_review | content_defect | deterministic_veto, or null when approved."
+      },
+      "next_action": {
+       "type": "string",
+       "description": "none | address_conditions | fix_and_resubmit | repair_input | retry_later_or_split | supply_missing_scope_or_split | retry_once_then_escalate | blocked_needs_adjudication"
+      },
+      "policy_version": {
+       "type": "string"
+      },
+      "receipt": {
+       "type": "object",
+       "description": "Execution receipt: receipt_id (unique per execution), input_sha256 (SHA-256 of the exact UTF-8 input), context_sha256, request_fingerprint (identifies an equivalent request; NOT an approval token), prompt_sha256 and versions, actual provider/model, completion state, elapsed time, scope reviewed/missing, deferred checks and the audit write outcome."
+      },
+      "model_opinion": {
+       "type": "object",
+       "description": "The model reviewer's own unmodified verdict/score; may differ from decision."
+      },
+      "score": {
+       "type": "number",
+       "description": "Blended 0-100 quality telemetry (gates fused with the model score). Not a probability of correctness and not the decision."
+      },
+      "confidence": {
+       "type": "number",
+       "description": "Legacy alias of score / 100. NOT a calibrated probability or accuracy."
+      },
+      "issues": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Severity-ranked findings, each 'severity|category|detail' with the reasoning"
+      },
+      "suggestions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Concrete fixes to reach approval"
+      },
+      "protection": {
+       "type": "object",
+       "description": "Deterministic gate result. A veto here is final — the model review cannot override it.",
+       "properties": {
+        "verdict": {
+         "type": "string",
+         "description": "'approved' or 'rejected' from the gate layer"
+        },
+        "vetoed": {
+         "type": "boolean",
+         "description": "True if any veto gate failed the submission"
+        },
+        "vetoed_by": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Names of the gates that vetoed, e.g. ['code_reality_gate']"
+        },
+        "protection_score": {
+         "type": "number",
+         "description": "Deterministic gate score, 0-100"
+        }
+       },
+       "additionalProperties": true
+      },
+      "provider": {
+       "type": "string",
+       "description": "Model that ran the deep review, or 'protection-gates-only'"
+      }
+     },
+     "required": [
+      "valid",
+      "score",
+      "issues"
+     ],
+     "additionalProperties": true
+    }
+   },
+   {
+    "name": "analyze_code",
+    "title": "Advisory code deep-dive",
+    "description": "Advisory deep-dive on existing code — scores and findings, deliberately NO pass/fail verdict, so it never blocks an agent. Surfaces performance hot paths, scalability cliffs, reliability gaps and tech debt with concrete latency/throughput arithmetic (e.g. 'O(n²) dedup: ~4s at 10k items'). Read-only: the code is analyzed, never executed. Use it to understand a validate_ai_output rejection or review inherited code; use validate_ai_output when you need an accept/reject decision.",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "code": {
+       "type": "string",
+       "description": "The source code to analyze — a function, file or pasted excerpt."
+      },
+      "analysis_type": {
+       "type": "string",
+       "default": "quality",
+       "enum": [
+        "quality",
+        "performance",
+        "scalability",
+        "security",
+        "tech_debt"
+       ],
+       "description": "Lens for the review: 'quality' (default, broad ISO/IEC 25010 pass) or a focused pass on one dimension."
+      },
+      "language": {
+       "type": "string",
+       "description": "Source language, e.g. 'python', 'typescript', 'cpp', 'sql', 'swift'. Inferred if omitted; stating it sharpens findings."
+      }
+     },
+     "required": [
+      "code"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "quality_score": {
+       "type": "number",
+       "description": "0-100 advisory score for the chosen lens"
+      },
+      "complexity": {
+       "type": "string",
+       "description": "low | medium | high"
+      },
+      "issues": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Findings as 'severity|category|detail' with supporting arithmetic"
+      },
+      "suggestions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "quality_score",
+      "issues"
+     ],
+     "additionalProperties": true
+    }
+   },
+   {
+    "name": "generate_code",
+    "title": "Generate gated code",
+    "description": "Generate code and gate it in one step: an LLM writes the implementation, then the same protection engine as validate_ai_output vets it — retrying generation when the gate rejects. If every attempt is vetoed you still receive the last attempt, clearly marked validated:false with the gate findings — rejected code is never presented as clean. Generation runs on our infrastructure; nothing executes in your environment.",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "prompt": {
+       "type": "string",
+       "description": "What to build, with any constraints worth enforcing — e.g. 'a rate-limited retry decorator with exponential backoff, stdlib only'."
+      },
+      "language": {
+       "type": "string",
+       "default": "python",
+       "description": "Target language for the generated code, e.g. 'python' (default), 'typescript', 'go', 'sql'."
+      },
+      "max_tokens": {
+       "type": "integer",
+       "default": 4000,
+       "minimum": 256,
+       "maximum": 32768,
+       "description": "Generation budget. The default 4000 fits most functions/classes; raise it for multi-file scaffolds."
+      }
+     },
+     "required": [
+      "prompt"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "generated": {
+       "type": "boolean",
+       "description": "False only when no provider returned code"
+      },
+      "code": {
+       "type": "string",
+       "description": "The generated implementation"
+      },
+      "validated": {
+       "type": "boolean",
+       "description": "True if the protection gates approved the final attempt; false means the gate findings in 'protection' explain the veto"
+      },
+      "validation_score": {
+       "type": "number",
+       "description": "Deterministic gate score, 0-100"
+      },
+      "attempts": {
+       "type": "integer",
+       "description": "Generation attempts before approval or give-up"
+      },
+      "protection": {
+       "type": "object",
+       "description": "Deterministic gate result. A veto here is final — the model review cannot override it.",
+       "properties": {
+        "verdict": {
+         "type": "string",
+         "description": "'approved' or 'rejected' from the gate layer"
+        },
+        "vetoed": {
+         "type": "boolean",
+         "description": "True if any veto gate failed the submission"
+        },
+        "vetoed_by": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Names of the gates that vetoed, e.g. ['code_reality_gate']"
+        },
+        "protection_score": {
+         "type": "number",
+         "description": "Deterministic gate score, 0-100"
+        }
+       },
+       "additionalProperties": true
+      },
+      "provider": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "generated"
+     ],
+     "additionalProperties": true
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "gate_my_changes",
+    "title": "Gate my changes",
+    "description": "Run the Verificate merge gate on code and loop until it is approved: validate, fix every finding, re-validate.",
+    "arguments": [
+     {
+      "name": "code",
+      "description": "The code to gate (paste the diff or file)",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "review_my_plan",
+    "title": "Review my plan",
+    "description": "Gate an implementation plan before any code is written: validate it, address every finding, re-validate.",
+    "arguments": [
+     {
+      "name": "plan",
+      "description": "The implementation plan or design to review",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "start_unit",
+    "title": "Start a unit of work",
+    "description": "Write a one-page unit card (goal, unit, scope, acceptance checks, steps) instead of a plan document, then validate it once with validate_plan.",
+    "arguments": [
+     {
+      "name": "goal",
+      "description": "The owner-approved goal id and outcome",
+      "required": true
+     },
+     {
+      "name": "task",
+      "description": "What this unit must achieve",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "triage_message",
+    "title": "Triage a new instruction",
+    "description": "Classify a new user instruction as refine / queue / new goal before acting, so earlier instructions and the active unit are not lost.",
+    "arguments": [
+     {
+      "name": "message",
+      "description": "The user's instruction, verbatim",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "record_progress",
+    "title": "Record progress",
+    "description": "File a progress record (commit, CI run, acceptance results, open commands) instead of a report, evidence file or handover.",
+    "arguments": [
+     {
+      "name": "unit_id",
+      "description": "The unit this progress belongs to",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "verificate://gates",
+    "name": "What runs on every review",
+    "description": "Each deterministic check, what it vetoes, the model review stage, and the checks not run on shared infrastructure.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "verificate://example-verdict",
+    "name": "Example rejection verdict",
+    "description": "A verbatim REJECTED 30.8/100 verdict from the production gateway.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "verificate://track-record",
+    "name": "Track record (benchmark + dogfood proof)",
+    "description": "Measured proof: the November 2026 frozen A/B (6 unsafe approvals in 36 -> 0), the September 0/6-vs-6/6 benchmark, our own engineering use, and the knowledge base it guards.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "verificate://templates/unit-card",
+    "name": "Unit card template",
+    "description": "One-page plan replacement: goal, unit, scope, acceptance checks, at most 3 risks, steps mapped to checks.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "verificate://templates/progress-record",
+    "name": "Progress record template",
+    "description": "Replaces status reports, evidence files and handovers: commit, CI run, acceptance results, open commands.",
+    "mimeType": "text/markdown"
+   },
+   {
+    "uri": "verificate://templates/message-triage",
+    "name": "Instruction triage template",
+    "description": "Classify a new user instruction (refine / queue / new goal) instead of re-planning.",
+    "mimeType": "text/markdown"
+   }
+  ]
+ }
+}

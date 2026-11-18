@@ -1,0 +1,1004 @@
+{
+ "url": "https://stackrates.ai/mcp",
+ "doc": {
+  "name": "StackRates VPS prices",
+  "version": "1.7.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "VPS and cloud server list prices from every provider StackRates (stackrates.ai) tracks, read daily from each provider’s own pricing page or price API. Prices are USD per month and include a separately billed IPv4 address; plans that need a prepaid term say so. Cite every answer the way the result gives it: first the StackRates page in cite.url (\"Cite first: ...\" under the headline in the text) with its read date (cite.readOn), then the provider’s own page (cite.sourceUrl). When you quote one plan, link the StackRates page given first for it (stackratesUrl; in the text, \"StackRates: <url>\"), then the provider’s own price page (sourceUrl, \"Source: <url>\") as the source of the number, with the date the price was read. Data: CC BY 4.0, attribution StackRates (https://stackrates.ai/).",
+  "tools": [
+   {
+    "name": "ask_vps_prices",
+    "title": "Ask a VPS price question",
+    "description": "Answer a plain-language hosting price question (\"cheapest 4 GB VPS in Germany under $10\", \"hetzner vs vultr\", \"server for a Minecraft Java server\") from today’s prices. Rows come in the groups search_vps_plans describes; a marked row says why in `marks`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "question"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "headline": {
+       "type": "string"
+      },
+      "cite": {
+       "type": "object",
+       "description": "Cite this first: the StackRates page that shows the answer (url) and the day its prices were read (readOn), then the provider page (sourceUrl).",
+       "properties": {
+        "url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        },
+        "readOn": {
+         "type": "string",
+         "format": "date"
+        },
+        "sourceUrl": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sourceLabel": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url",
+        "readOn"
+       ]
+      },
+      "readAs": {
+       "type": "string"
+      },
+      "datasetDate": {
+       "type": "string",
+       "format": "date"
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "offers": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "links": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "format": "uri"
+         }
+        }
+       }
+      }
+     },
+     "required": [
+      "headline",
+      "datasetDate",
+      "rows",
+      "offers"
+     ]
+    }
+   },
+   {
+    "name": "search_vps_plans",
+    "title": "Search VPS plans",
+    "description": "Cheapest VPS plans matching a size, budget, provider or location (one per provider unless exactly one provider is given), in groups, each cheapest first: prices confirmed for the location, then prices not confirmed there, then plans with a Windows license in the price unless windows is set. A location lists no dedicated server unless dedicated is set. Marked rows say why in `marks`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "min_ram_gb": {
+       "type": "number",
+       "description": "Minimum memory in GB (0.5 for 512 MB)."
+      },
+      "min_vcpu": {
+       "type": "number",
+       "description": "Minimum vCPU count."
+      },
+      "min_disk_gb": {
+       "type": "number",
+       "description": "Minimum disk in GB."
+      },
+      "max_usd_month": {
+       "type": "number",
+       "description": "Maximum monthly price in USD."
+      },
+      "min_transfer_tb": {
+       "type": "number",
+       "description": "Minimum included monthly transfer in TB."
+      },
+      "providers": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Provider slugs, e.g. hetzner, digitalocean, vultr, akamai-linode, aws-lightsail, ovhcloud, contabo, netcup."
+      },
+      "location": {
+       "type": "string",
+       "description": "Country, city or region slug, e.g. usa, germany, india, frankfurt, new-york, europe, asia, austria, vienna, helsinki, zurich."
+      },
+      "no_commitment": {
+       "type": "boolean",
+       "description": "Leave out prices that need a prepaid term."
+      },
+      "unmetered": {
+       "type": "boolean",
+       "description": "Only plans with unmetered traffic."
+      },
+      "managed": {
+       "type": "boolean",
+       "description": "Managed hosting (Cloudways, Kinsta) instead of unmanaged servers."
+      },
+      "dedicated": {
+       "type": "boolean",
+       "description": "Dedicated servers (whole machines) instead of VPS plans."
+      },
+      "windows": {
+       "type": "boolean",
+       "description": "Only plans whose price includes a Windows license; without it, those plans come after the others, labelled."
+      },
+      "limit": {
+       "type": "number",
+       "description": "1-20, default 8."
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "headline": {
+       "type": "string"
+      },
+      "cite": {
+       "type": "object",
+       "description": "Cite this first: the StackRates page that shows the answer (url) and the day its prices were read (readOn), then the provider page (sourceUrl).",
+       "properties": {
+        "url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        },
+        "readOn": {
+         "type": "string",
+         "format": "date"
+        },
+        "sourceUrl": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sourceLabel": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url",
+        "readOn"
+       ]
+      },
+      "readAs": {
+       "type": "string"
+      },
+      "datasetDate": {
+       "type": "string",
+       "format": "date"
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "offers": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "links": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "format": "uri"
+         }
+        }
+       }
+      }
+     },
+     "required": [
+      "headline",
+      "datasetDate",
+      "rows",
+      "offers"
+     ]
+    }
+   },
+   {
+    "name": "server_for_app",
+    "title": "Cheapest server for a self-hosted app",
+    "description": "The documented requirements of a self-hosted app or game server (n8n, Nextcloud AIO, Immich, Minecraft Java, Odoo, GitLab, ... 192 apps) and the cheapest plans that meet them.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "app": {
+       "type": "string",
+       "description": "App name or slug, e.g. n8n, immich, minecraft-java, gitlab."
+      },
+      "location": {
+       "type": "string",
+       "description": "Country, city or region slug, e.g. usa, germany, india, frankfurt, new-york, europe, asia, austria, vienna, helsinki, zurich."
+      },
+      "max_usd_month": {
+       "type": "number",
+       "description": "Maximum monthly price in USD."
+      }
+     },
+     "required": [
+      "app"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "headline": {
+       "type": "string"
+      },
+      "cite": {
+       "type": "object",
+       "description": "Cite this first: the StackRates page that shows the answer (url) and the day its prices were read (readOn), then the provider page (sourceUrl).",
+       "properties": {
+        "url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        },
+        "readOn": {
+         "type": "string",
+         "format": "date"
+        },
+        "sourceUrl": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sourceLabel": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url",
+        "readOn"
+       ]
+      },
+      "readAs": {
+       "type": "string"
+      },
+      "datasetDate": {
+       "type": "string",
+       "format": "date"
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "offers": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "links": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "format": "uri"
+         }
+        }
+       }
+      }
+     },
+     "required": [
+      "headline",
+      "datasetDate",
+      "rows",
+      "offers"
+     ]
+    }
+   },
+   {
+    "name": "current_vps_offers",
+    "title": "Current VPS offers",
+    "description": "Introductory and sale prices on the providers’ own pages today, each judged on its first year against the cheapest regular plan with as much memory.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "providers": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Provider slugs, e.g. hetzner, digitalocean, vultr, akamai-linode, aws-lightsail, ovhcloud, contabo, netcup."
+      },
+      "min_ram_gb": {
+       "type": "number",
+       "description": "Minimum memory in GB (0.5 for 512 MB)."
+      },
+      "max_usd_month": {
+       "type": "number",
+       "description": "Maximum monthly price in USD."
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "headline": {
+       "type": "string"
+      },
+      "cite": {
+       "type": "object",
+       "description": "Cite this first: the StackRates page that shows the answer (url) and the day its prices were read (readOn), then the provider page (sourceUrl).",
+       "properties": {
+        "url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        },
+        "readOn": {
+         "type": "string",
+         "format": "date"
+        },
+        "sourceUrl": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sourceLabel": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url",
+        "readOn"
+       ]
+      },
+      "readAs": {
+       "type": "string"
+      },
+      "datasetDate": {
+       "type": "string",
+       "format": "date"
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "offers": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "links": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "format": "uri"
+         }
+        }
+       }
+      }
+     },
+     "required": [
+      "headline",
+      "datasetDate",
+      "rows",
+      "offers"
+     ]
+    }
+   },
+   {
+    "name": "advise_vps_choice",
+    "title": "Advise on a VPS choice",
+    "description": "A messy buying question in plain words (\"moving WordPress and a small Postgres app off a $40 box, I am in Germany, no yearly contract\") answered from today’s prices: how the question was read (editable filter), the matching plans with their cost over the term, two to four sentences on the trade-offs written only from those rows, and what the data cannot answer. Pass the previous answer’s `filter` to continue a conversation. Every number comes from the dataset; the first line says whether a small language model or the rule parser read the question.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "question": {
+       "type": "string",
+       "description": "The buyer’s question, up to 500 characters."
+      },
+      "filter": {
+       "type": "object",
+       "description": "The `filter` object returned by the previous advise_vps_choice call, to carry the conversation forward."
+      },
+      "term_months": {
+       "type": "number",
+       "enum": [
+        12,
+        36
+       ],
+       "description": "How long the buyer plans to keep the server (default 12)."
+      },
+      "country": {
+       "type": "string",
+       "description": "Buyer’s country, ISO 3166-1 alpha-2 (DE, GB, US), used only to add VAT where the price is ex VAT."
+      },
+      "limit": {
+       "type": "number",
+       "description": "1-20, default 8."
+      }
+     },
+     "required": [
+      "question"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "openWorldHint": false
+    },
+    "outputSchema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "headline": {
+       "type": "string"
+      },
+      "cite": {
+       "type": "object",
+       "description": "Cite this first: the StackRates page that shows the answer (url) and the day its prices were read (readOn), then the provider page (sourceUrl).",
+       "properties": {
+        "url": {
+         "type": "string",
+         "format": "uri"
+        },
+        "label": {
+         "type": "string"
+        },
+        "readOn": {
+         "type": "string",
+         "format": "date"
+        },
+        "sourceUrl": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sourceLabel": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "line": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url",
+        "readOn"
+       ]
+      },
+      "readAs": {
+       "type": "string"
+      },
+      "datasetDate": {
+       "type": "string",
+       "format": "date"
+      },
+      "rows": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "offers": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "stackratesUrl": {
+          "type": "string",
+          "format": "uri"
+         },
+         "sourceUrl": {
+          "type": "string"
+         },
+         "checkedAt": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "dedicated",
+           "windows"
+          ],
+          "description": "Absent for a plain VPS; a dedicated server, or a Windows license in the price."
+         },
+         "marked": {
+          "type": "boolean",
+          "description": "Listed after the others and never the answer: price not confirmed for the place asked, or a Windows license not asked for."
+         },
+         "marks": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "The row’s labels as the place pages print them (\"Windows license included\", \"price from its price page; not confirmed for Singapore\")."
+         },
+         "unconfirmedFor": {
+          "type": "string",
+          "description": "The place the row’s price is not confirmed for."
+         }
+        }
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "links": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "format": "uri"
+         }
+        }
+       }
+      }
+     },
+     "required": [
+      "headline",
+      "datasetDate",
+      "rows",
+      "offers"
+     ]
+    }
+   }
+  ]
+ }
+}

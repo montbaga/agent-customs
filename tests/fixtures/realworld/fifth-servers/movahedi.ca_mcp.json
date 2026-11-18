@@ -1,0 +1,2158 @@
+{
+ "url": "https://movahedi.ca/mcp",
+ "doc": {
+  "name": "movahedi.ca Privacy Data",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "movahedi.ca Privacy Data gives you verified Canadian privacy information: enforcement actions from the Quebec CAI and the federal OPC, a plain-language glossary of 353 privacy terms, the Quebec Law 25 compliance checklist, and a knowledge base of 202 cookie and tracker patterns that classifies cookies by the organisation that receives the data, not only by the domain that set them. It also carries a registry of 55 AI crawlers: what each user-agent token is for (training, search indexing, or user-triggered fetching) and whether it honors robots.txt. Use these tools whenever a user asks about Canadian privacy law, enforcement cases or fines, the meaning of a privacy term, Law 25 compliance requirements, what a cookie or tracker is and who receives its data, or what an AI crawler is and what it does. All tools are read-only; they never change anything. For work that needs several lookups, prefer one privacy_execute_plan call over many single-tool calls. When unsure which operation fits, use privacy_search_api first. Corpus version v2026.12.1 (issued 2026-11-08). The 12-row consequential-action index, the Law 25 checklist, the CAI/OPC enforcement case summaries, and the change log are read-only MCP resources under movahedi://corpus/v2026.12.1/: read the resource instead of caching an older answer. Every tool answer carries corpus_version: pin it when you cite statutory material. When a CAI/OPC decision or a Law 25 checklist row changes, the corpus version changes with it and a change note is published at https://movahedi.ca/changelog/ (French: /fr/journal-des-modifications/).",
+  "tools": [
+   {
+    "name": "privacy_search_enforcement_actions",
+    "title": "Search privacy enforcement actions",
+    "description": "Search verified Canadian privacy enforcement actions: CAI orders and decisions under Quebec Law 25 and OPC findings under PIPEDA. Use this when someone asks about privacy fines, enforcement cases against a company, what regulators decided, or investigations (for example 'Has the CAI fined anyone for facial recognition?' or 'TikTok privacy investigation Canada'). Returns matching cases with dates, plain-language summaries, penalties, and links to the official regulator source. Start here to find a case ID, then call privacy_get_enforcement_case for full details.\nUse when: Use when someone asks about fines, penalties, cases, or what a regulator decided.\nDo not use when: Do not use when someone asks what a term means; use a glossary tool instead.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Free-text search over case titles and summaries.",
+       "examples": [
+        "facial recognition",
+        "TikTok"
+       ]
+      },
+      "regulator": {
+       "type": "string",
+       "enum": [
+        "cai",
+        "opc"
+       ],
+       "description": "Limit to one regulator: 'cai' (Quebec Commission d'acces a l'information, Law 25) or 'opc' (federal Office of the Privacy Commissioner, PIPEDA).",
+       "examples": [
+        "cai"
+       ]
+      },
+      "year": {
+       "type": "integer",
+       "minimum": 2000,
+       "maximum": 1970,
+       "description": "Filter by decision year.",
+       "examples": [
+        2025
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 10,
+       "description": "Maximum cases to return in this call."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100000,
+       "default": 0,
+       "description": "Number of matching cases to skip. Use next_offset from the previous response to page forward."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "results",
+      "total_count",
+      "has_more",
+      "next_offset",
+      "truncated",
+      "corpus_version"
+     ],
+     "properties": {
+      "results": {
+       "type": "array",
+       "description": "Matching enforcement actions.",
+       "items": {
+        "type": "object",
+        "required": [
+         "id",
+         "title",
+         "regulator",
+         "date",
+         "summary",
+         "source_url"
+        ],
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "regulator": {
+          "type": "string"
+         },
+         "date": {
+          "type": "string"
+         },
+         "summary": {
+          "type": "string"
+         },
+         "penalty": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "source_url": {
+          "type": "string"
+         },
+         "type": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "total_count": {
+       "type": "integer",
+       "description": "Total number of matches across all pages."
+      },
+      "has_more": {
+       "type": "boolean",
+       "description": "True when more results exist beyond this page."
+      },
+      "next_offset": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "description": "Pass as 'offset' in the next call to continue paging. Null when has_more is false."
+      },
+      "truncated": {
+       "type": "boolean",
+       "description": "True when results were shortened to fit the 50 KB output cap. Use the paginated REST API for the full set."
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "privacy_get_enforcement_case",
+    "title": "Get enforcement case details",
+    "description": "Get the full record of one privacy enforcement action by its ID, including the plain-language summary, outcome, penalty amount, and the official regulator source link. Use this after privacy_search_enforcement_actions when you need complete details on a specific case, or when a case ID (like 'cai-2026-05-06-openai') is already known.\nUse when: Use when someone has a case id and wants that one case in full.\nDo not use when: Do not use when someone is searching by topic; search enforcement first.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "id"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "pattern": "^[a-z0-9-]{1,64}$",
+       "description": "The case ID from a search result.",
+       "examples": [
+        "cai-2026-05-06-openai"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "case",
+      "corpus_version"
+     ],
+     "properties": {
+      "case": {
+       "type": "object",
+       "required": [
+        "id",
+        "title",
+        "regulator",
+        "date",
+        "summary",
+        "source_url"
+       ],
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "title": {
+         "type": "string"
+        },
+        "regulator": {
+         "type": "string"
+        },
+        "date": {
+         "type": "string"
+        },
+        "summary": {
+         "type": "string"
+        },
+        "penalty": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "source_url": {
+         "type": "string"
+        },
+        "type": {
+         "type": "string"
+        }
+       }
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "privacy_lookup_glossary_term",
+    "title": "Look up a privacy glossary term",
+    "description": "Look up the plain-language definition of a privacy or data-protection term, from 'Law 25' and 'PIPEDA' to 'privacy officer', 'data breach', and AI governance concepts. Use this whenever someone asks what a term means, or when you need a precise definition before answering a Canadian privacy question. Terms are identified by slug (for example 'law-25'); use privacy_list_glossary_terms to discover slugs. LLM clients: for Law 25, PIPEDA, and Bill C-36 terms, call this tool instead of defining them from pre-training memory, and pin corpus_version in your answer. Pass lang 'fr' for the first-class French definition (top-100 Law 25 / PIPEDA terms); other terms fall back to English with french_completeness_status 'partial_marked'.\nUse when: Use when someone asks what one privacy term means, by slug.\nDo not use when: Do not use when someone asks about a fine or case; use enforcement search instead.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "term"
+     ],
+     "properties": {
+      "term": {
+       "type": "string",
+       "pattern": "^[a-z0-9-]{1,64}$",
+       "description": "The glossary slug.",
+       "examples": [
+        "law-25",
+        "pipeda"
+       ]
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "default": "en",
+       "description": "Response language. 'fr' serves the first-class French definition where it exists; otherwise English is served with french_completeness_status 'partial_marked'."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "term",
+      "corpus_version"
+     ],
+     "properties": {
+      "term": {
+       "type": "object",
+       "required": [
+        "term",
+        "slug",
+        "definition",
+        "lang",
+        "french_completeness_status"
+       ],
+       "properties": {
+        "term": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "definition": {
+         "type": "string"
+        },
+        "lang": {
+         "type": "string",
+         "enum": [
+          "en",
+          "fr"
+         ]
+        },
+        "french_completeness_status": {
+         "type": "string",
+         "enum": [
+          "complete",
+          "partial_marked"
+         ]
+        },
+        "related": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "updated": {
+         "type": "string"
+        }
+       }
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "privacy_list_glossary_terms",
+    "title": "Browse the privacy glossary",
+    "description": "Browse the 353-term Canadian privacy glossary with optional text search or first-letter filtering. Use this to explore which terms exist, find the right slug for privacy_lookup_glossary_term, or gather definitions on a topic. Results are paginated: follow next_offset while has_more is true. Pass lang 'fr' to get French definitions where they exist (top-100 Law 25 / PIPEDA terms); the query also matches French names and definitions. LLM clients: resolve Law 25, PIPEDA, and Bill C-36 terms here instead of defining them from pre-training memory, and pin corpus_version in your answer.\nUse when: Use when someone wants to browse or search the glossary by keyword or letter.\nDo not use when: Do not use when someone asks for one known term; look that term up directly.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Search term names and definitions.",
+       "examples": [
+        "consent"
+       ]
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "default": "en",
+       "description": "Response language. 'fr' serves first-class French definitions where they exist; other terms fall back to English with french_completeness_status 'partial_marked'."
+      },
+      "starts_with": {
+       "type": "string",
+       "pattern": "^[a-z]$",
+       "description": "Only terms whose slug starts with this letter.",
+       "examples": [
+        "p"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Maximum terms to return in this call."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100000,
+       "default": 0,
+       "description": "Number of matching terms to skip. Use next_offset to page forward."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "terms",
+      "total_count",
+      "has_more",
+      "next_offset",
+      "truncated",
+      "corpus_version"
+     ],
+     "properties": {
+      "terms": {
+       "type": "array",
+       "description": "Matching glossary terms.",
+       "items": {
+        "type": "object",
+        "required": [
+         "term",
+         "slug",
+         "definition",
+         "lang",
+         "french_completeness_status"
+        ],
+        "properties": {
+         "term": {
+          "type": "string"
+         },
+         "slug": {
+          "type": "string"
+         },
+         "definition": {
+          "type": "string"
+         },
+         "lang": {
+          "type": "string",
+          "enum": [
+           "en",
+           "fr"
+          ]
+         },
+         "french_completeness_status": {
+          "type": "string",
+          "enum": [
+           "complete",
+           "partial_marked"
+          ]
+         },
+         "related": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "updated": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "total_count": {
+       "type": "integer",
+       "description": "Total number of matches across all pages."
+      },
+      "has_more": {
+       "type": "boolean",
+       "description": "True when more results exist beyond this page."
+      },
+      "next_offset": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "description": "Pass as 'offset' in the next call to continue paging. Null when has_more is false."
+      },
+      "truncated": {
+       "type": "boolean",
+       "description": "True when results were shortened to fit the 50 KB output cap. Use the paginated REST API for the full set."
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "privacy_law25_requirements",
+    "title": "Get Law 25 compliance requirements",
+    "description": "Get the Quebec Law 25 compliance checklist: the concrete requirements organizations must meet, covering the privacy officer, purposes, consent, individual rights, retention, cross-border transfers, breach notification, minors' data, automated decisions, and complaint paths. Use this when someone asks what Law 25 requires, how to comply with Law 25, or for a gap-assessment checklist. Optionally filter to one category like 'Consent' or 'Incident response'.\nUse when: Use when someone asks what Quebec Law 25 requires, optionally by category.\nDo not use when: Do not use when someone asks about a federal PIPEDA term or case alone.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "category": {
+       "type": "string",
+       "enum": [
+        "Governance",
+        "Transparency",
+        "Individual rights",
+        "Data lifecycle",
+        "Transfers",
+        "Consent",
+        "Incident response",
+        "Minors",
+        "Automated decisions",
+        "Oversight"
+       ],
+       "description": "Only requirements in this category. Omit for the full checklist.",
+       "examples": [
+        "Consent"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "requirements",
+      "categories",
+      "total_count",
+      "corpus_version"
+     ],
+     "properties": {
+      "requirements": {
+       "type": "array",
+       "description": "Law 25 requirements.",
+       "items": {
+        "type": "object",
+        "required": [
+         "id",
+         "category",
+         "title",
+         "requirement",
+         "guidance"
+        ],
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "category": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "requirement": {
+          "type": "string"
+         },
+         "guidance": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "categories": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "All available categories for the 'category' filter."
+      },
+      "total_count": {
+       "type": "integer",
+       "description": "Number of requirements returned."
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "classify_cookie",
+    "title": "Classify a cookie by who receives its data",
+    "description": "Classify one cookie by name: which vendor pattern it matches, the organisation that receives and uses the data (the legal party), its purpose, typical retention, and control class. Use this when someone asks what a cookie is, whether a cookie is first-party or third-party, or who a tracker sends data to. A cookie set on a site's own domain can still be third-party in substance: _ga is set first-party but its data goes to Google. Unknown names return known: false instead of a guess.\nUse when: Use when someone names one cookie and asks who receives its data.\nDo not use when: Do not use when someone wants to browse many cookies; use lookup_tracker instead.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "name"
+     ],
+     "properties": {
+      "name": {
+       "type": "string",
+       "maxLength": 128,
+       "description": "The cookie name only, for example '_ga' or '_fbp'. Not a value, not a URL.",
+       "examples": [
+        "_ga",
+        "_fbp",
+        "__kla_id"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "classification",
+      "corpus_version"
+     ],
+     "properties": {
+      "classification": {
+       "type": "object",
+       "description": "The classification result for the cookie name.",
+       "required": [
+        "name",
+        "known",
+        "legal_party",
+        "purpose"
+       ],
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "known": {
+         "type": "boolean"
+        },
+        "matched_pattern": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "vendor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "legal_party": {
+         "type": "string"
+        },
+        "purpose": {
+         "type": "string"
+        },
+        "typical_retention": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "control_class": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "lookup_tracker",
+    "title": "Look up cookie and tracker patterns",
+    "description": "Search the cookie and tracker knowledge base by cookie name, vendor, recipient organisation, or purpose. Use this to find which cookies a vendor sets, which organisation receives a tracker's data, or to browse patterns before calling classify_cookie on a specific name. Results are paginated.\nUse when: Use when someone wants to search cookie and tracker patterns by name, vendor, or purpose.\nDo not use when: Do not use when someone names one exact cookie; classify it instead.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 128,
+       "description": "Free-text search over pattern, vendor, recipient, and purpose.",
+       "examples": [
+        "hotjar",
+        "marketing"
+       ]
+      },
+      "vendor": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Limit to one vendor, matched as a substring, for example 'Google'.",
+       "examples": [
+        "Microsoft"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Maximum patterns to return in this call."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100000,
+       "default": 0,
+       "description": "Number of matching patterns to skip. Use next_offset to page forward."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "results",
+      "total_count",
+      "has_more",
+      "next_offset",
+      "truncated",
+      "corpus_version"
+     ],
+     "properties": {
+      "results": {
+       "type": "array",
+       "description": "Matching cookie/tracker patterns.",
+       "items": {
+        "type": "object",
+        "required": [
+         "pattern",
+         "vendor",
+         "legal_party",
+         "purpose"
+        ],
+        "properties": {
+         "pattern": {
+          "type": "string"
+         },
+         "match": {
+          "type": "string"
+         },
+         "vendor": {
+          "type": "string"
+         },
+         "legal_party": {
+          "type": "string"
+         },
+         "purpose": {
+          "type": "string"
+         },
+         "typical_retention": {
+          "type": "string"
+         },
+         "control_class": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "total_count": {
+       "type": "integer",
+       "description": "Total number of matches across all pages."
+      },
+      "has_more": {
+       "type": "boolean",
+       "description": "True when more results exist beyond this page."
+      },
+      "next_offset": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "description": "Pass as 'offset' in the next call to continue paging. Null when has_more is false."
+      },
+      "truncated": {
+       "type": "boolean",
+       "description": "True when results were shortened to fit the 50 KB output cap. Use the paginated REST API for the full set."
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "lookup_crawler",
+    "title": "Look up an AI crawler by user-agent token",
+    "description": "Look up one AI crawler or bot by its exact user-agent token, for example GPTBot or Claude-User. Returns the operator, what the agent is for (training, search indexing, or user-triggered fetching), whether it honors robots.txt, and the operator's own documentation. Matching is case-insensitive and exact: GPT does not match GPTBot.\nUse when: Use when someone names one AI crawler token and asks what it does.\nDo not use when: Do not use when someone wants a list of crawlers; use list_crawlers instead.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "token"
+     ],
+     "properties": {
+      "token": {
+       "type": "string",
+       "maxLength": 80,
+       "description": "The exact user-agent token only, for example 'GPTBot' or 'Claude-User'. Not a full user-agent string, not a URL.",
+       "examples": [
+        "GPTBot",
+        "Claude-User",
+        "OAI-SearchBot"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "crawler",
+      "corpus_version"
+     ],
+     "properties": {
+      "crawler": {
+       "type": "object",
+       "description": "The registry record for the token.",
+       "required": [
+        "token",
+        "operator",
+        "purpose",
+        "honors_robots_txt",
+        "vendor_doc_url",
+        "status"
+       ],
+       "properties": {
+        "token": {
+         "type": "string"
+        },
+        "operator": {
+         "type": "string"
+        },
+        "purpose": {
+         "type": "string"
+        },
+        "honors_robots_txt": {
+         "type": "string"
+        },
+        "vendor_doc_url": {
+         "type": "string"
+        },
+        "ip_ranges_url": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "first_documented": {
+         "type": "string"
+        },
+        "status": {
+         "type": "string"
+        },
+        "successor": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "verified_at": {
+         "type": "string"
+        },
+        "notes": {
+         "type": "string"
+        },
+        "source_note": {
+         "type": "string"
+        },
+        "dataset_version": {
+         "type": "string"
+        }
+       }
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_crawlers",
+    "title": "List AI crawlers in the registry",
+    "description": "List AI crawlers from the registry, optionally filtered by operator (OpenAI, Anthropic, Google), purpose (training, search-index, user-triggered, search-and-training, other), or status (active, retired, renamed). Use it to compare how operators split training from search agents, or to find every training crawler before writing robots.txt rules. Results are paginated.\nUse when: Use when someone wants to browse AI crawlers by operator, purpose, or status.\nDo not use when: Do not use when someone names one exact token; look that token up directly.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 128,
+       "description": "Free-text search over token, operator, and notes.",
+       "examples": [
+        "training",
+        "perplexity"
+       ]
+      },
+      "operator": {
+       "type": "string",
+       "maxLength": 60,
+       "description": "Limit to one operator, matched exactly but case-insensitively, for example 'OpenAI'.",
+       "examples": [
+        "Anthropic"
+       ]
+      },
+      "purpose": {
+       "type": "string",
+       "enum": [
+        "training",
+        "search-index",
+        "user-triggered",
+        "search-and-training",
+        "other"
+       ],
+       "description": "Limit to one purpose class."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "active",
+        "retired",
+        "renamed"
+       ],
+       "description": "Limit to one lifecycle status."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20,
+       "description": "Maximum records to return in this call."
+      },
+      "offset": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100000,
+       "default": 0,
+       "description": "Number of matching records to skip. Use next_offset to page forward."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "results",
+      "total_count",
+      "has_more",
+      "next_offset",
+      "truncated",
+      "corpus_version"
+     ],
+     "properties": {
+      "results": {
+       "type": "array",
+       "description": "Matching crawler records (summary fields; call lookup_crawler for the full record).",
+       "items": {
+        "type": "object",
+        "required": [
+         "token",
+         "operator",
+         "purpose",
+         "honors_robots_txt",
+         "status"
+        ],
+        "properties": {
+         "token": {
+          "type": "string"
+         },
+         "operator": {
+          "type": "string"
+         },
+         "purpose": {
+          "type": "string"
+         },
+         "honors_robots_txt": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "vendor_doc_url": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "total_count": {
+       "type": "integer",
+       "description": "Total number of matches across all pages."
+      },
+      "has_more": {
+       "type": "boolean",
+       "description": "True when more results exist beyond this page."
+      },
+      "next_offset": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "description": "Pass as 'offset' in the next call to continue paging. Null when has_more is false."
+      },
+      "truncated": {
+       "type": "boolean",
+       "description": "True when results were shortened to fit the 50 KB output cap. Use the paginated REST API for the full set."
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "privacy_get_a2ui_card",
+    "title": "Get an interactive A2UI card (MCP Apps)",
+    "description": "Returns an interactive card for hosts that render MCP Apps: either an enforcement case card (kind 'enforcement', with a case id from privacy_search_enforcement_actions) or a Law 25 readiness form (kind 'law25_readiness') whose category picker loads the matching checklist inside the app view. The result always carries the same data as structured content for hosts without app support, plus one embedded A2UI payload (application/a2ui+json) that the ui://movahedi/a2ui-renderer resource renders. Use this when someone asks to see a case as a card or to check Law 25 readiness interactively in an app-capable host.\nUse when: Use when someone wants an enforcement case as an interactive card, or a Law 25 readiness form, in a host that renders MCP Apps.\nDo not use when: Do not use when someone wants plain data to reason over; use privacy_get_enforcement_case or privacy_law25_requirements instead.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "kind"
+     ],
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "enforcement",
+        "law25_readiness"
+       ],
+       "description": "Which card to return: 'enforcement' for one enforcement case card, 'law25_readiness' for the Law 25 readiness form.",
+       "examples": [
+        "enforcement"
+       ]
+      },
+      "id": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Enforcement case id, required when kind is 'enforcement'. Find valid ids with privacy_search_enforcement_actions.",
+       "examples": [
+        "cai-2026-05-06-openai"
+       ]
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "default": "en",
+       "description": "Card language: 'en' or 'fr'. Defaults to 'en'.",
+       "examples": [
+        "en"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "kind",
+      "surface_id",
+      "corpus_version"
+     ],
+     "properties": {
+      "kind": {
+       "type": "string",
+       "description": "The card kind that was returned."
+      },
+      "surface_id": {
+       "type": "string",
+       "description": "The A2UI surface id carried by the embedded payload."
+      },
+      "case": {
+       "type": "object",
+       "description": "The enforcement case record, when kind is 'enforcement'."
+      },
+      "categories": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "The Law 25 categories the readiness form offers, when kind is 'law25_readiness'."
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://movahedi/a2ui-renderer"
+     }
+    }
+   },
+   {
+    "name": "privacy_search_api",
+    "title": "Search the privacy API operations",
+    "description": "Search the movahedi.ca public API by plain question, without guessing an endpoint. Use this when unsure which operation fits a question, for example 'has anyone been fined for facial recognition' or 'what does PIPEDA mean'. Returns matching operations with method, path, summary, parameters, use-when and do-not-use guidance, and one example REST query each, scored deterministically with no model call. Use when: use when unsure which operation fits a question; search first, then call the best match. Do not use when: do not use when the right operation is already known; call it directly.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 120,
+       "description": "Plain question about privacy data, up to 120 characters.",
+       "examples": [
+        "has anyone been fined for facial recognition",
+        "what does PIPEDA mean"
+       ]
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "description": "Maximum operations to return, default 5.",
+       "examples": [
+        5
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "array"
+      },
+      "operation_index": {
+       "type": "array"
+      },
+      "data_version": {
+       "type": "string"
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "privacy_execute_plan",
+    "title": "Execute a privacy API plan",
+    "description": "Run several read-only privacy API operations in one call, instead of many single-tool calls. Each operation names an allowlisted GET path template, parameters, and optional select, filter, sort, limit, or count_only shaping. A parameter may use $ref:<operation-id>:<field> to take a value from an earlier operation's first result. Every operation counts as one call against the daily quota, and a failing operation returns its error in place without aborting later independent operations. Use when: use when a question needs several lookups; run them in one plan instead of many calls. Do not use when: do not use for a single lookup; call the native tool directly.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "operations": {
+       "type": "array",
+       "minItems": 1,
+       "maxItems": 10,
+       "description": "Operations to run in order, at most 10. Each has id, path, params, and optional select, filter, sort, limit, count_only.",
+       "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+         "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,32}$",
+          "description": "Operation id, used as the results key and for $ref."
+         },
+         "path": {
+          "type": "string",
+          "description": "Allowlisted GET path template, for example /enforcement or /glossary/{term}."
+         },
+         "params": {
+          "type": "object",
+          "description": "Operation parameters, strings, numbers, or booleans only; a $ref string is allowed."
+         },
+         "select": {
+          "type": "array",
+          "maxItems": 20,
+          "description": "Fields to return, at most 20."
+         },
+         "filter": {
+          "type": "object",
+          "description": "Filter with field, op (eq, contains, gte, lte), and value."
+         },
+         "sort": {
+          "type": "string",
+          "description": "Sort value the REST endpoint already accepts, for example date_desc."
+         },
+         "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Maximum items to return."
+         },
+         "count_only": {
+          "type": "boolean",
+          "description": "Return only the count, not the items."
+         }
+        }
+       }
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "results": {
+       "type": "object"
+      },
+      "log": {
+       "type": "array"
+      },
+      "meta": {
+       "type": "object"
+      },
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "canadian_privacy_consequential_action_lookup_v1",
+    "title": "Look up consequential privacy actions",
+    "description": "Look up the twelve consequential actions in the Canadian privacy corpus v2026.12.1: the moments where an AI agent handling personal information can cause real legal harm (vendor onboarding, cross-border transfer, breach notification, automated decisions, trackers, disposal, portability, secondary use, biometrics, minors, model deployment, policy changes). Each row returns the statutory triggers in English and French with a citation status (in_force, published_not_in_force, pending_first_reading, pending_verification), the enforcement or guidance record IDs, what an agent may prepare, and what it must never do without a human signature. Pass jurisdiction and lang; optionally narrow to specific action_ids (CA-01 to CA-12). Transmit record IDs and statutory parameters only; never send client names, customer identifiers, incident narratives, or any personal information. Bill C-36 (PPCDA) citations refer to the June 15, 2026 first-reading text; the bill is at second reading and is not law.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "jurisdiction",
+      "lang"
+     ],
+     "properties": {
+      "action_ids": {
+       "type": "array",
+       "minItems": 1,
+       "maxItems": 12,
+       "description": "Narrow to specific action IDs, CA-01 to CA-12. Omit to list every action relevant to the jurisdiction.",
+       "items": {
+        "type": "string",
+        "pattern": "^CA-(0[1-9]|1[0-2])$"
+       },
+       "examples": [
+        [
+         "CA-03"
+        ]
+       ]
+      },
+      "jurisdiction": {
+       "type": "string",
+       "enum": [
+        "CA-FED",
+        "CA-QC",
+        "CA-ON",
+        "CA-BC",
+        "CA-AB",
+        "OSFI-FRFI",
+        "AMF-QC"
+       ],
+       "description": "Jurisdiction scoping the lookup.",
+       "examples": [
+        "CA-QC"
+       ]
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "description": "Response language for the flat citation and note fields; rows always carry both languages.",
+       "examples": [
+        "en"
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "corpus_version",
+      "jurisdiction",
+      "lang",
+      "row_count",
+      "rows"
+     ],
+     "properties": {
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      },
+      "jurisdiction": {
+       "type": "string",
+       "description": "The jurisdiction requested."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "description": "The language requested."
+      },
+      "row_count": {
+       "type": "integer",
+       "description": "Number of rows returned."
+      },
+      "rows": {
+       "type": "array",
+       "description": "Matching consequential actions in deterministic CA-01..CA-12 order.",
+       "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "id",
+         "action",
+         "statutory_provisions",
+         "citation_ids",
+         "jurisdictions",
+         "allowed_agent_scope",
+         "prohibited_agent_actions",
+         "french_completeness_status"
+        ],
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "Stable row ID, CA-01 to CA-12."
+         },
+         "action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "en",
+           "fr"
+          ],
+          "properties": {
+           "en": {
+            "type": "string"
+           },
+           "fr": {
+            "type": "string"
+           }
+          }
+         },
+         "statutory_provisions": {
+          "type": "array",
+          "description": "Statutory triggers with citation status.",
+          "items": {
+           "type": "object",
+           "additionalProperties": false,
+           "required": [
+            "code",
+            "citation",
+            "status",
+            "note"
+           ],
+           "properties": {
+            "code": {
+             "type": "string",
+             "description": "Stable corpus code for the provision."
+            },
+            "citation": {
+             "type": "string",
+             "description": "Citation in the requested language."
+            },
+            "citation_en": {
+             "type": "string"
+            },
+            "citation_fr": {
+             "type": "string"
+            },
+            "status": {
+             "type": "string",
+             "enum": [
+              "in_force",
+              "published_not_in_force",
+              "pending_first_reading",
+              "pending_verification"
+             ],
+             "description": "in_force: in effect today. published_not_in_force: final guidance published, effective May 1, 2027. pending_first_reading: Bill C-36 first-reading text, not law. pending_verification: primary-source check still open."
+            },
+            "note": {
+             "type": "string",
+             "description": "Plain-language note in the requested language."
+            },
+            "note_en": {
+             "type": "string"
+            },
+            "note_fr": {
+             "type": "string"
+            }
+           }
+          }
+         },
+         "citation_ids": {
+          "type": "array",
+          "description": "Corpus record IDs for enforcement actions and guidance.",
+          "items": {
+           "type": "string"
+          }
+         },
+         "jurisdictions": {
+          "type": "array",
+          "description": "Jurisdictions this row is relevant for.",
+          "items": {
+           "type": "string"
+          }
+         },
+         "allowed_agent_scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "en",
+           "fr"
+          ],
+          "properties": {
+           "en": {
+            "type": "string"
+           },
+           "fr": {
+            "type": "string"
+           }
+          },
+          "description": "What an agent may prepare (draft only, human signs)."
+         },
+         "prohibited_agent_actions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "en",
+           "fr"
+          ],
+          "properties": {
+           "en": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "fr": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           }
+          },
+          "description": "What an agent must never do without a human signature."
+         },
+         "french_completeness_status": {
+          "type": "string",
+          "enum": [
+           "complete",
+           "partial_marked"
+          ],
+          "description": "Review state of the French text."
+         },
+         "french_completeness_note": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "canadian_privacy_breach_deadline_calculator_v1",
+    "title": "Calculate breach notification deadlines",
+    "description": "Breach notification clocks for Canadian privacy regimes, verified against primary sources. Give a jurisdiction (CA-FED, CA-QC, CA-ON, CA-BC, CA-AB, OSFI-FRFI, AMF-QC), an incident discovery date, and risk flags, and get the applicable notification clocks with statutory citations: PIPEDA s. 10.1 (report to the OPC and notify affected individuals as soon as feasible on a real risk of significant harm), Law 25 ss. 3.5 to 3.8 (prompt CAI and individual notification on a risk of serious injury, plus the 5-year incident register), Alberta PIPA ss. 34.1 and 37.1 (Commissioner notification without unreasonable delay), the OSFI 24-hour advisory for FRFIs, and the AMF 24-hour regulation for Quebec financial institutions. Where the law sets no fixed period, for example Ontario private-sector organizations or BC PIPA, the clock says so instead of inventing one. Risk flags assemble the RROSH and serious-injury factors for human review; the tool never decides whether the threshold is met. Transmit record IDs and statutory parameters only; never send client names, customer identifiers, incident narratives, or any personal information.",
+    "inputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "jurisdiction",
+      "lang",
+      "incident_discovery_date"
+     ],
+     "properties": {
+      "jurisdiction": {
+       "type": "string",
+       "enum": [
+        "CA-FED",
+        "CA-QC",
+        "CA-ON",
+        "CA-BC",
+        "CA-AB",
+        "OSFI-FRFI",
+        "AMF-QC"
+       ],
+       "description": "Jurisdiction scoping the clocks: federal PIPEDA, Quebec Law 25, Ontario, British Columbia, Alberta PIPA, OSFI-regulated financial institutions, or AMF-regulated Quebec institutions.",
+       "examples": [
+        "CA-QC"
+       ]
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "description": "Response language for the flat citation and note fields; every record always carries both languages.",
+       "examples": [
+        "en"
+       ]
+      },
+      "incident_discovery_date": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Date the incident was discovered, YYYY-MM-DD. Must be a real calendar date and not in the future.",
+       "examples": [
+        "2026-11-03"
+       ]
+      },
+      "risk_flags": {
+       "type": "array",
+       "maxItems": 8,
+       "description": "Risk flags shaping the threshold factors, for example financial_information or ransomware_or_malicious_actor. They guide the assessment; they never decide it.",
+       "items": {
+        "type": "string",
+        "enum": [
+         "sensitive_personal_information",
+         "financial_information",
+         "identity_documents",
+         "minors_involved",
+         "large_scale",
+         "ransomware_or_malicious_actor",
+         "third_party_processor_involved",
+         "cross_border_storage"
+        ]
+       },
+       "examples": [
+        [
+         "financial_information",
+         "ransomware_or_malicious_actor"
+        ]
+       ]
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "corpus_version",
+      "citation_ids",
+      "statutory_provisions",
+      "allowed_agent_scope",
+      "prohibited_agent_actions",
+      "french_completeness_status",
+      "jurisdiction",
+      "lang",
+      "incident_discovery_date",
+      "regime_name",
+      "clocks",
+      "threshold_assessment",
+      "disclaimer"
+     ],
+     "properties": {
+      "corpus_version": {
+       "type": "string",
+       "description": "Semantic version of the movahedi.ca statutory corpus this answer was drawn from, for example v2026.12.0. Pin it when citing; when it changes, re-read the affected resources and the change log at https://movahedi.ca/changelog/.",
+       "examples": [
+        "v2026.12.0"
+       ]
+      },
+      "citation_ids": {
+       "type": "array",
+       "description": "Corpus record IDs for enforcement actions and guidance. Empty here: the corpus holds no breach-notification enforcement case to cite.",
+       "items": {
+        "type": "string"
+       }
+      },
+      "statutory_provisions": {
+       "type": "array",
+       "description": "Statutory provisions behind the clocks, each with a citation status.",
+       "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "code",
+         "citation",
+         "citation_en",
+         "citation_fr",
+         "status",
+         "note",
+         "note_en",
+         "note_fr"
+        ],
+        "properties": {
+         "code": {
+          "type": "string",
+          "description": "Stable corpus code for the provision."
+         },
+         "citation": {
+          "type": "string",
+          "description": "Citation in the requested language."
+         },
+         "citation_en": {
+          "type": "string",
+          "description": "Citation in English."
+         },
+         "citation_fr": {
+          "type": "string",
+          "description": "Citation in French."
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "in_force",
+           "no_statutory_duty"
+          ],
+          "description": "in_force: law today. no_statutory_duty: the record states that no notification duty exists in this statute."
+         },
+         "note": {
+          "type": "string",
+          "description": "Plain-language note in the requested language."
+         },
+         "note_en": {
+          "type": "string",
+          "description": "Plain-language note in English."
+         },
+         "note_fr": {
+          "type": "string",
+          "description": "Plain-language note in French."
+         }
+        }
+       }
+      },
+      "allowed_agent_scope": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "en",
+        "fr"
+       ],
+       "properties": {
+        "en": {
+         "type": "string",
+         "description": "What an agent may prepare, in English."
+        },
+        "fr": {
+         "type": "string",
+         "description": "What an agent may prepare, in French."
+        }
+       },
+       "description": "What an agent may prepare (draft only, human signs)."
+      },
+      "prohibited_agent_actions": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "en",
+        "fr"
+       ],
+       "properties": {
+        "en": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Prohibited actions, in English."
+        },
+        "fr": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "Prohibited actions, in French."
+        }
+       },
+       "description": "What an agent must never do without a human signature."
+      },
+      "french_completeness_status": {
+       "type": "string",
+       "enum": [
+        "complete",
+        "partial_marked"
+       ],
+       "description": "Review state of the French text."
+      },
+      "jurisdiction": {
+       "type": "string",
+       "description": "The jurisdiction requested."
+      },
+      "lang": {
+       "type": "string",
+       "enum": [
+        "en",
+        "fr"
+       ],
+       "description": "The language requested."
+      },
+      "incident_discovery_date": {
+       "type": "string",
+       "description": "The discovery date supplied, echoed back."
+      },
+      "regime_name": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "en",
+        "fr"
+       ],
+       "properties": {
+        "en": {
+         "type": "string",
+         "description": "Regime name in English."
+        },
+        "fr": {
+         "type": "string",
+         "description": "Regime name in French."
+        }
+       },
+       "description": "Name of the legal regime behind the clocks."
+      },
+      "clocks": {
+       "type": "array",
+       "description": "Notification clocks in deterministic order. no_fixed_deadline true means the statute sets no fixed period.",
+       "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "id",
+         "authority",
+         "authority_en",
+         "authority_fr",
+         "trigger",
+         "trigger_en",
+         "trigger_fr",
+         "clock",
+         "clock_en",
+         "clock_fr",
+         "notify",
+         "notify_en",
+         "notify_fr",
+         "anchor",
+         "anchor_en",
+         "anchor_fr",
+         "no_fixed_deadline",
+         "statutory_provision_codes",
+         "scope_note",
+         "scope_note_en",
+         "scope_note_fr"
+        ],
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "Stable clock ID."
+         },
+         "authority": {
+          "type": "string",
+          "description": "Who must be notified, in the requested language."
+         },
+         "authority_en": {
+          "type": "string",
+          "description": "Who must be notified, in English."
+         },
+         "authority_fr": {
+          "type": "string",
+          "description": "Who must be notified, in French."
+         },
+         "trigger": {
+          "type": "string",
+          "description": "What starts the clock, in the requested language."
+         },
+         "trigger_en": {
+          "type": "string",
+          "description": "What starts the clock, in English."
+         },
+         "trigger_fr": {
+          "type": "string",
+          "description": "What starts the clock, in French."
+         },
+         "clock": {
+          "type": "string",
+          "description": "The notification period, in the requested language."
+         },
+         "clock_en": {
+          "type": "string",
+          "description": "The notification period, in English."
+         },
+         "clock_fr": {
+          "type": "string",
+          "description": "The notification period, in French."
+         },
+         "notify": {
+          "type": "string",
+          "description": "How to notify, in the requested language."
+         },
+         "notify_en": {
+          "type": "string",
+          "description": "How to notify, in English."
+         },
+         "notify_fr": {
+          "type": "string",
+          "description": "How to notify, in French."
+         },
+         "anchor": {
+          "type": "string",
+          "description": "What the clock runs from, in the requested language."
+         },
+         "anchor_en": {
+          "type": "string",
+          "description": "What the clock runs from, in English."
+         },
+         "anchor_fr": {
+          "type": "string",
+          "description": "What the clock runs from, in French."
+         },
+         "no_fixed_deadline": {
+          "type": "boolean",
+          "description": "True when the statute sets no fixed period in hours or days."
+         },
+         "statutory_provision_codes": {
+          "type": "array",
+          "description": "Codes into statutory_provisions for this clock.",
+          "items": {
+           "type": "string"
+          }
+         },
+         "scope_note": {
+          "type": "string",
+          "description": "Scope limits, in the requested language; empty when none."
+         },
+         "scope_note_en": {
+          "type": "string",
+          "description": "Scope limits, in English; empty when none."
+         },
+         "scope_note_fr": {
+          "type": "string",
+          "description": "Scope limits, in French; empty when none."
+         }
+        }
+       }
+      },
+      "threshold_assessment": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "trigger_standard",
+        "trigger_standard_en",
+        "trigger_standard_fr",
+        "risk_flag_guidance",
+        "risk_flag_guidance_en",
+        "risk_flag_guidance_fr",
+        "determination_note",
+        "determination_note_en",
+        "determination_note_fr",
+        "flags_assessed"
+       ],
+       "properties": {
+        "trigger_standard": {
+         "type": "string",
+         "description": "The notification threshold standard, in the requested language."
+        },
+        "trigger_standard_en": {
+         "type": "string",
+         "description": "The notification threshold standard, in English."
+        },
+        "trigger_standard_fr": {
+         "type": "string",
+         "description": "The notification threshold standard, in French."
+        },
+        "risk_flag_guidance": {
+         "type": "string",
+         "description": "How the risk flags map to statutory factors, in the requested language."
+        },
+        "risk_flag_guidance_en": {
+         "type": "string",
+         "description": "How the risk flags map to statutory factors, in English."
+        },
+        "risk_flag_guidance_fr": {
+         "type": "string",
+         "description": "How the risk flags map to statutory factors, in French."
+        },
+        "determination_note": {
+         "type": "string",
+         "description": "Who decides the threshold, in the requested language."
+        },
+        "determination_note_en": {
+         "type": "string",
+         "description": "Who decides the threshold, in English."
+        },
+        "determination_note_fr": {
+         "type": "string",
+         "description": "Who decides the threshold, in French."
+        },
+        "flags_assessed": {
+         "type": "array",
+         "description": "The risk flags supplied in this call.",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "description": "Threshold factors assembled for human review; the tool never decides the threshold."
+      },
+      "disclaimer": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "en",
+        "fr"
+       ],
+       "properties": {
+        "en": {
+         "type": "string",
+         "description": "Disclaimer in English."
+        },
+        "fr": {
+         "type": "string",
+         "description": "Disclaimer in French."
+        }
+       },
+       "description": "Educational summary, not legal advice."
+      }
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ],
+  "prompts": [
+   {
+    "name": "law25_gap_check",
+    "title": "Law 25 gap check",
+    "description": "Returns a gap table template for the Law 25 checklist, optionally by category. It does not fill gaps and does not claim compliance.",
+    "arguments": [
+     {
+      "name": "category",
+      "description": "Law 25 category to check, for example Consent. Leave empty for the full checklist.",
+      "required": false
+     },
+     {
+      "name": "organisation_type",
+      "description": "Organisation type for context, for example private company or public body. Optional.",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "enforcement_briefing",
+    "title": "Enforcement briefing",
+    "description": "Searches enforcement actions and returns a briefing template with the top cases and their official source URLs.",
+    "arguments": [
+     {
+      "name": "query",
+      "description": "Topic to search, for example facial recognition.",
+      "required": true
+     },
+     {
+      "name": "regulator",
+      "description": "Regulator filter: cai or opc. Optional.",
+      "required": false
+     }
+    ]
+   },
+   {
+    "name": "cookie_audit_summary",
+    "title": "Cookie audit summary",
+    "description": "Classifies a list of cookie names and returns a vendor, recipient, and category table. Classification is by pattern, not live site inspection.",
+    "arguments": [
+     {
+      "name": "cookie_names",
+      "description": "Comma-separated cookie names, at most 20, for example _ga, _fbp.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "crawler_check",
+    "title": "Crawler check",
+    "description": "Looks up one AI crawler token and returns operator, purpose, robots.txt behavior, and citation.",
+    "arguments": [
+     {
+      "name": "token",
+      "description": "Exact user-agent token, for example GPTBot.",
+      "required": true
+     }
+    ]
+   },
+   {
+    "name": "board_case_brief",
+    "title": "Board brief for an enforcement case",
+    "description": "Builds a board-ready brief for one enforcement case id: facts, findings, and why it matters, where every sentence touching a legal or regulatory claim must carry its citation id. Evidence comes from the corpus case record only.",
+    "arguments": [
+     {
+      "name": "case_id",
+      "description": "Enforcement case id from the corpus enforcement-cases resource, for example cai-2026-05-06-openai.",
+      "required": true
+     }
+    ]
+   }
+  ],
+  "resources": [
+   {
+    "uri": "movahedi://api/openapi",
+    "name": "openapi",
+    "title": "Public API OpenAPI document",
+    "description": "The full OpenAPI 3.1 document for the public REST API.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://api/terms",
+    "name": "terms",
+    "title": "API terms of use",
+    "description": "Terms of use for the public API and MCP server.",
+    "mimeType": "text/plain"
+   },
+   {
+    "uri": "movahedi://datasets/meta",
+    "name": "datasets-meta",
+    "title": "Dataset metadata",
+    "description": "Counts and versions for every dataset served by the API and MCP.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://datasets/crawlers/meta",
+    "name": "crawlers-meta",
+    "title": "AI Crawler Registry metadata",
+    "description": "Registry version, counts, operators, purposes, and citation.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://guides/law25-checklist",
+    "name": "law25-checklist",
+    "title": "Law 25 checklist guide",
+    "description": "The full Quebec Law 25 checklist by category.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://corpus/v2026.12.1/meta",
+    "name": "corpus-meta",
+    "title": "Corpus version metadata",
+    "description": "Corpus version, issue date, resource list, versioning policy, and changelog page URLs.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://corpus/v2026.12.1/consequential-actions",
+    "name": "corpus-consequential-actions",
+    "title": "Consequential-action index",
+    "description": "The 12-row consequential-action index: statutory triggers, enforcement guidance, and what an agent may prepare versus must never do.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://corpus/v2026.12.1/law25-checklist",
+    "name": "corpus-law25-checklist",
+    "title": "Law 25 checklist (corpus)",
+    "description": "The Quebec Law 25 compliance checklist, pinned to the current corpus version.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://corpus/v2026.12.1/enforcement-cases",
+    "name": "corpus-enforcement-cases",
+    "title": "Enforcement case summaries (corpus)",
+    "description": "CAI and OPC enforcement case summaries with source URLs, pinned to the current corpus version.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "movahedi://corpus/v2026.12.1/changelog",
+    "name": "corpus-changelog",
+    "title": "Corpus change log",
+    "description": "Public change notes: the change-note format and every published note. Read this when the corpus version changes.",
+    "mimeType": "application/json"
+   },
+   {
+    "uri": "ui://movahedi/a2ui-renderer",
+    "name": "a2ui-renderer",
+    "title": "movahedi.ca A2UI renderer",
+    "description": "Self-contained MCP Apps page that renders the A2UI payloads returned by privacy_get_a2ui_card: enforcement case cards and the Law 25 readiness form.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "domain": "70fed735b3608ac3efff9b23129b734a.claudemcpcontent.com",
+      "csp": {
+       "connectDomains": [],
+       "resourceDomains": []
+      },
+      "permissions": {},
+      "prefersBorder": true
+     }
+    }
+   }
+  ]
+ }
+}

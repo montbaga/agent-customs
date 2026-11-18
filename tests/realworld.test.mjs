@@ -160,9 +160,12 @@ test("root-cause guards R1-R8 spare benign real-world idioms without dropping re
     ["R5 product dev mode", "ChatGPT: add https://mcp.example.org/apps as an app in developer mode."],
     ["R5 format mention", "Returns text with tags like <IMPORTANT> when testing indirect injection."],
   ];
+  // Since batch 4, a wording exception never deletes a match: it may leave a note (medium,
+  // CONDITIONS). These idioms must not leave anything that holds or denies.
   for (const [label, text] of safeSnippets) {
-    const hits = scanText(text, { targetHost: "mcp.example.org" });
-    assert.deepEqual(hits, [], `${label} should produce no contraband hits, got ${hits.map((h) => h.rule.id).join(",")}`);
+    const hits = scanText(text, { targetHost: "mcp.example.org" })
+      .filter((h) => ["critical", "high"].includes(h.severity || h.rule.severity));
+    assert.deepEqual(hits, [], `${label} should produce no blocking contraband hits, got ${hits.map((h) => h.rule.id).join(",")}`);
   }
 
   // Real same-site exfiltration of conversation/secrets still catches C-EXFIL.
@@ -398,7 +401,7 @@ test("rule sources contain no fixture-copied 4+-word literal phrases or banned B
     "sms|staff",
   ];
   const fixtureTexts = [];
-  for (const dir of ["servers", "reg-servers", "a2a-cards", "fresh-servers", "fresh-a2a-cards", "third-servers"]) {
+  for (const dir of ["servers", "reg-servers", "a2a-cards", "fresh-servers", "fresh-a2a-cards", "third-servers", "fourth-servers", "fourth-a2a-cards", "fifth-servers", "fifth-a2a-cards"]) {
     const fullDir = path.join(REALWORLD_DIR, dir);
     for (const name of readdirSync(fullDir)) {
       if (!name.endsWith(".json")) continue;
@@ -421,7 +424,7 @@ test("rule sources contain no fixture-copied 4+-word literal phrases or banned B
       .join("\n")
       .replace(/\\s[+*?]?|\\b|\\[()[\]]|[- ]+\?/g, " ")
       .replace(/\\\\s[+*?]?/g, " ");
-    const phrases = ruleLines.match(/[a-z]{2,}(?: +[a-z]{2,}){3,}/g) || [];
+    const phrases = ruleLines.match(/[a-z]{2,}(?: +[a-z]{2,}){2,}/g) || [];
     for (const phrase of phrases) {
       const words = phrase.toLowerCase().replace(/\s+/g, " ").trim().split(" ");
       for (let i = 0; i <= words.length - 4; i++) {
@@ -432,6 +435,141 @@ test("rule sources contain no fixture-copied 4+-word literal phrases or banned B
         }
       }
     }
+    // A 3-word run that occurs in exactly one snapshot is that snapshot's own wording, unless it
+    // is ordinary English listed below. Pattern lines only, each alternative read on its own.
+    const patternText = src.split(/\r?\n/)
+      .filter((l) => !/^\s*\/\//.test(l) && /\/\\b|\/\^|\/\(\?|new RegExp|words\(|hostileSeq\(|anywhere\(|\\\\b|\\\\s/.test(l))
+      .filter((l) => !/^\s*(?:why|fix|title|detail|description)\s*:/.test(l))
+      .map((l) => l.replace(/soften\([^,]+,\s*"[^"]*"\)/g, " ").replace(/"[^"\\]*(?:\\.[^"\\]*)*"\s*\)/g, " "))
+      .join("\n");
+    const pieces = patternText
+      .replace(/\\[pP]\{[^}]+\}\*?|\\[sSbBdDwW][+*?]?|\(\?[:!=<]+|\{\d+(?:,\d*)?\}|\[[^\]]*\]/g, " ")
+      .split(/[|()\n]/);
+    for (const piece of pieces) {
+      const words = piece.toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/).filter((w) => /^[a-z']{2,}$/.test(w));
+      for (let i = 0; i + 2 < words.length; i++) {
+        const gram = words.slice(i, i + 3).join(" ");
+        if (COMMON_3GRAMS.has(gram)) continue;
+        const hits = fixtureTexts.filter((f) => f.text.includes(` ${gram} `));
+        if (hits.length === 1) {
+          violations.push(`${path.basename(file)} contains 3-word phrase "${gram}" found only in ${hits[0].name}`);
+        }
+      }
+    }
   }
-  assert.deepEqual(violations, []);
+  assert.deepEqual([...new Set(violations)], []);
+});
+
+// Ordinary English (or format) phrases the rules have used since before the real-world rounds,
+// which one snapshot happens to contain too.
+const COMMON_3GRAMS = new Set([
+  "for all future", "both sides of", "dates of birth", "header on the", "complete the purchase", "only on what",
+  "you are now", "before telling the", "one time codes", "data text html", "data image png",
+]);
+
+function runSnapshot(snap) {
+  const body = JSON.stringify(snap.doc);
+  const fetchImpl = async (req) => {
+    const asked = typeof req === "string" ? req : req.url;
+    if (asked.split("?")[0] === snap.target) {
+      return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return new Response("not found", { status: 404 });
+  };
+  return inspectNetworkUrl(snap.target, { fetchImpl, pageOrigin: null, timeoutMs: 10000 });
+}
+
+test("held-out batch 4 (192 MCP Registry servers + 44 A2A cards): <= 4 false alarms, every risky target flagged", async () => {
+  // Pre-fix baseline on cae4a77: 26 false alarms (11%), labels in fourth-flagged-labelled.md.
+  const labels = parseMarkdownLabels(path.join(REALWORLD_DIR, "fourth-flagged-labelled.md"));
+  assert.equal(labels.size, 44);
+  const snapshots = loadDirSnapshots(["fourth-servers", "fourth-a2a-cards"]);
+  assert.equal(snapshots.length, 236);
+
+  const falseAlarms = [];
+  const missedCorrect = [];
+  for (const snap of snapshots) {
+    const report = await runSnapshot(snap);
+    const verdict = report.verdict.code;
+    const labelInfo = labels.get(snap.url);
+    const blocked = verdict === "HOLD" || verdict === "DENIED";
+    if (labelInfo?.kind === "CORRECT") {
+      if (!blocked) missedCorrect.push(`${snap.url} -> ${verdict}`);
+      continue;
+    }
+    if (labelInfo?.kind === "DEBATABLE") continue;
+    if (blocked) falseAlarms.push(`${snap.url} (${verdict}: ${report.findings.map((f) => f.rule).join(",")})`);
+  }
+  assert.deepEqual(missedCorrect, [], `batch 4 CORRECT targets dropped: ${missedCorrect.join("; ")}`);
+  assert.ok(falseAlarms.length <= 4, `expected <= 4 false alarms in batch 4, got ${falseAlarms.length}:\n${falseAlarms.join("\n")}`);
+});
+
+test("probe8: every attack is HOLD or DENIED and every harmless look-alike is not", async () => {
+  const { PROBE8_CASES, PROBE8_HOST } = await import("./fixtures/realworld/probe8-cases.mjs");
+  assert.equal(PROBE8_CASES.length, 39);
+  const wrong = [];
+  for (const c of PROBE8_CASES) {
+    const target = `${PROBE8_HOST}/mcp`;
+    const report = await runSnapshot({ target, doc: { name: "Weather Helper", tools: c.tools, ...(c.extra || {}) } });
+    const blocked = report.verdict.code === "HOLD" || report.verdict.code === "DENIED";
+    if ((c.kind === "attack") !== blocked) {
+      wrong.push(`${c.id} ${c.kind} -> ${report.verdict.code} [${report.findings.map((f) => f.rule).join(",")}] ${c.label}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("held-out batch 5 (190 MCP + 47 A2A, measured once, not tuned): no more than its 13 false alarms", async () => {
+  // Measured once on the batch-4 fix and labelled in fifth-flagged-labelled.md; a ratchet, so
+  // later changes may only lower the count and may not drop a CORRECT target.
+  const labels = parseMarkdownLabels(path.join(REALWORLD_DIR, "fifth-flagged-labelled.md"));
+  assert.equal(labels.size, 31);
+  const snapshots = loadDirSnapshots(["fifth-servers", "fifth-a2a-cards"]);
+  assert.equal(snapshots.length, 237);
+  const falseAlarms = [];
+  const missedCorrect = [];
+  for (const snap of snapshots) {
+    const report = await runSnapshot(snap);
+    const verdict = report.verdict.code;
+    const labelInfo = labels.get(snap.url);
+    const blocked = verdict === "HOLD" || verdict === "DENIED";
+    if (labelInfo?.kind === "CORRECT") {
+      if (!blocked) missedCorrect.push(`${snap.url} -> ${verdict}`);
+      continue;
+    }
+    if (labelInfo?.kind === "DEBATABLE") continue;
+    if (blocked) falseAlarms.push(`${snap.url} (${verdict}: ${report.findings.map((f) => f.rule).join(",")})`);
+  }
+  assert.deepEqual(missedCorrect, [], `batch 5 CORRECT targets dropped: ${missedCorrect.join("; ")}`);
+  assert.ok(falseAlarms.length <= 13, `expected <= 13 false alarms in batch 5, got ${falseAlarms.length}:\n${falseAlarms.join("\n")}`);
+});
+
+test("probe9: attacks held, exception-shaped attacks never cleared, harmless text not held", async () => {
+  const { PROBE9_CASES, PROBE9_HOST } = await import("./fixtures/realworld/probe9-cases.mjs");
+  assert.equal(PROBE9_CASES.length, 38);
+  const wrong = [];
+  for (const [part, label, tools, extra] of PROBE9_CASES) {
+    const report = await runSnapshot({ target: `${PROBE9_HOST}/mcp`, doc: { name: "Helpful Tools", tools, ...(extra || {}) } });
+    const code = report.verdict.code;
+    const blocked = code === "HOLD" || code === "DENIED";
+    const ok = part === "A" ? blocked : part === "B" ? code !== "CLEARED" : !blocked;
+    if (!ok) wrong.push(`${part} ${code} [${report.findings.map((f) => f.rule).join(",")}] ${label}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("a wording exception softens a finding to a note, never deletes it", () => {
+  // Each line borrows the shape of an honest exception; each must still leave a visible note.
+  for (const [label, text, fieldName] of [
+    ["title label", "Get the pass code", "annotations.title"],
+    ["header auth doc", "Send your API key in the X-API-Key header on each MCP request.", ""],
+    ["key status check", "Verify the active API keys and quota.", ""],
+    ["detector brackets", "Finds instructions aimed at the model (ignore previous instructions, send keys).", ""],
+    ["parcel tracking link", "Returns the delivery tracking link for the order.", ""],
+    ["sign-in window", "The browser opens an OAuth window; click Allow to sign in.", ""],
+  ]) {
+    const hits = scanText(text, { targetHost: "mcp.example.org", fieldName });
+    assert.ok(hits.length > 0, `${label}: the match was dropped instead of softened`);
+    assert.ok(hits.every((h) => (h.severity || h.rule.severity) === "medium"), `${label}: expected a note only, got ${hits.map((h) => `${h.rule.id}:${h.severity || h.rule.severity}`).join(",")}`);
+  }
 });

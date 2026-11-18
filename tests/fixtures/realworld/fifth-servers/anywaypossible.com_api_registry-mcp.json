@@ -1,0 +1,936 @@
+{
+ "url": "https://anywaypossible.com/api/registry-mcp",
+ "doc": {
+  "name": "Anyway Possible Agent Utilities",
+  "version": "1.4.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "recommend_tool",
+    "title": "Start Here: Choose a Tool (Free)",
+    "description": "Use this free tool before paying. Describe the decision you need and receive the best Anyway Possible tool, exact price, required inputs, alternatives, and next step. This tool never triggers payment or calls an external service.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "goal": {
+       "type": "string",
+       "minLength": 3,
+       "maxLength": 400,
+       "description": "Plain-language description of the decision or evidence the agent needs."
+      },
+      "maxPriceUsd": {
+       "type": "number",
+       "minimum": 0.001,
+       "maximum": 10,
+       "description": "Optional maximum price in USDC that the recommended paid tool may cost."
+      }
+     },
+     "required": [
+      "goal"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "paymentRequired": {
+       "type": "boolean"
+      },
+      "goal": {
+       "type": "string"
+      },
+      "maxPriceUsd": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "recommendedTool": {
+       "anyOf": [
+        {
+         "type": "object",
+         "additionalProperties": {}
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "alternatives": {
+       "type": "array",
+       "items": {
+        "$ref": "#/properties/recommendedTool/anyOf/0"
+       }
+      },
+      "clarificationNeeded": {
+       "type": "boolean"
+      },
+      "clarifyingQuestion": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "nextStep": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "paymentRequired",
+      "goal",
+      "maxPriceUsd",
+      "recommendedTool",
+      "alternatives",
+      "clarificationNeeded",
+      "clarifyingQuestion",
+      "nextStep"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "merchant_snapshot",
+    "title": "x402 Merchant Snapshot ($0.05 USDC)",
+    "description": "Score an x402 merchant's discovery, reliability, buyer signals, and observed Base USDC activity, then identify the largest revenue issue.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "payTo": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Merchant payment-recipient wallet address on Base."
+      },
+      "queries": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 100
+       },
+       "minItems": 1,
+       "maxItems": 3,
+       "description": "One to three buyer search phrases used to evaluate marketplace visibility."
+      },
+      "excludePayers": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$"
+       },
+       "maxItems": 10,
+       "description": "Optional wallet addresses to exclude from external-buyer activity signals, such as self-test wallets."
+      }
+     },
+     "required": [
+      "payTo",
+      "queries"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "snapshotId": {
+       "type": "string"
+      },
+      "merchant": {
+       "type": "string"
+      },
+      "network": {
+       "type": "string"
+      },
+      "observedAt": {
+       "type": "string"
+      },
+      "score": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100
+      },
+      "grade": {
+       "type": "string",
+       "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F"
+       ]
+      },
+      "signals": {
+       "type": "object",
+       "additionalProperties": {}
+      },
+      "visibility": {
+       "type": "array",
+       "items": {
+        "$ref": "#/properties/signals"
+       }
+      },
+      "biggestIssue": {
+       "type": "string"
+      },
+      "upgrade": {
+       "$ref": "#/properties/signals"
+      },
+      "limitations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "snapshotId",
+      "merchant",
+      "network",
+      "observedAt",
+      "score",
+      "grade",
+      "signals",
+      "visibility",
+      "biggestIssue",
+      "upgrade",
+      "limitations"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "merchant_audit",
+    "title": "x402 Merchant Audit ($0.25 USDC)",
+    "description": "Audit listings, semantic rank, competitor prices, payment reliability, buyer reach, and observed Base USDC activity. Repeated runs with the same wallet and queries return privacy-safe score history and change alerts.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "payTo": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Merchant payment-recipient wallet address on Base."
+      },
+      "queries": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 100
+       },
+       "minItems": 1,
+       "maxItems": 5,
+       "description": "One to five buyer search phrases used for listing rank and competitor analysis."
+      },
+      "excludePayers": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$"
+       },
+       "maxItems": 10,
+       "description": "Optional wallet addresses to exclude from buyer and revenue signals, such as self-test wallets."
+      }
+     },
+     "required": [
+      "payTo",
+      "queries"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "auditId": {
+       "type": "string"
+      },
+      "merchant": {
+       "type": "string"
+      },
+      "network": {
+       "type": "string"
+      },
+      "observedAt": {
+       "type": "string"
+      },
+      "score": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100
+      },
+      "grade": {
+       "type": "string",
+       "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F"
+       ]
+      },
+      "scoreBreakdown": {
+       "type": "object",
+       "additionalProperties": {}
+      },
+      "summary": {
+       "$ref": "#/properties/scoreBreakdown"
+      },
+      "listings": {
+       "type": "array",
+       "items": {
+        "$ref": "#/properties/scoreBreakdown"
+       }
+      },
+      "rankings": {
+       "type": "array",
+       "items": {
+        "$ref": "#/properties/scoreBreakdown"
+       }
+      },
+      "onchain": {
+       "$ref": "#/properties/scoreBreakdown"
+      },
+      "actions": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "monitoring": {
+       "$ref": "#/properties/scoreBreakdown"
+      },
+      "limitations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "auditId",
+      "merchant",
+      "network",
+      "observedAt",
+      "score",
+      "grade",
+      "scoreBreakdown",
+      "summary",
+      "listings",
+      "rankings",
+      "onchain",
+      "actions",
+      "monitoring",
+      "limitations"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "treasury_preflight",
+    "title": "Base Wallet Readiness ($0.02 USDC)",
+    "description": "Check Base wallet readiness, ETH and USDC funding, gas, chain intent, destination type, and common payment hazards before signing.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Base wallet address that will fund and sign the planned payment."
+      },
+      "destinationAddress": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Optional expected recipient address to screen for destination hazards."
+      },
+      "plannedSpendUsdc": {
+       "type": "string",
+       "pattern": "^[0-9]+(\\.[0-9]{1,6})?$",
+       "description": "Planned USDC spend as a decimal string with up to six fractional digits."
+      },
+      "minGasReserveEth": {
+       "type": "string",
+       "pattern": "^[0-9]+(\\.[0-9]{1,18})?$",
+       "description": "Minimum ETH balance to preserve for Base gas after the payment."
+      },
+      "expectedChainId": {
+       "type": "number",
+       "const": 8453,
+       "description": "Expected EVM chain ID; Anyway Possible currently supports Base mainnet 8453."
+      }
+     },
+     "required": [
+      "address"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string"
+      },
+      "destinationAddress": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "network": {
+       "type": "string"
+      },
+      "chainId": {
+       "type": "integer"
+      },
+      "safeToProceed": {
+       "type": "boolean"
+      },
+      "decision": {
+       "type": "string",
+       "enum": [
+        "safe_to_pay",
+        "needs_funding",
+        "needs_gas",
+        "review_destination",
+        "reject"
+       ]
+      },
+      "riskLevel": {
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "recommendedAction": {
+       "type": "string"
+      },
+      "eth": {
+       "type": "string"
+      },
+      "usdc": {
+       "type": "string"
+      },
+      "checks": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      },
+      "alerts": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "limitations": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "blockNumber": {
+       "type": "integer"
+      },
+      "observedAt": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "address",
+      "destinationAddress",
+      "network",
+      "chainId",
+      "safeToProceed",
+      "decision",
+      "riskLevel",
+      "recommendedAction",
+      "eth",
+      "usdc",
+      "checks",
+      "alerts",
+      "limitations",
+      "blockNumber",
+      "observedAt"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "payment_guard",
+    "title": "Agent Payment Safety ($0.01 USDC)",
+    "description": "Use for agent payment safety: validate a live x402 challenge, price, Base network, USDC asset, recipient, funding, gas reserve, and destination immediately before signing.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "payerAddress": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Base wallet address that would sign and fund the x402 payment."
+      },
+      "serviceUrl": {
+       "type": "string",
+       "format": "uri",
+       "description": "Public HTTPS endpoint whose live x402 payment challenge should be validated."
+      },
+      "maxAmountUsdc": {
+       "type": "string",
+       "pattern": "^[0-9]+(\\.[0-9]{1,6})?$",
+       "description": "Maximum acceptable USDC charge as a decimal string."
+      },
+      "expectedPayTo": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Optional recipient address that the payment challenge must match."
+      },
+      "minGasReserveEth": {
+       "type": "string",
+       "pattern": "^[0-9]+(\\.[0-9]{1,18})?$",
+       "description": "Optional minimum ETH balance to preserve for Base gas."
+      }
+     },
+     "required": [
+      "payerAddress",
+      "serviceUrl",
+      "maxAmountUsdc"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "decision": {
+       "type": "string",
+       "enum": [
+        "safe_to_sign",
+        "needs_funding",
+        "review_recipient",
+        "reject"
+       ]
+      },
+      "safeToSign": {
+       "type": "boolean"
+      },
+      "riskLevel": {
+       "type": "string",
+       "enum": [
+        "low",
+        "medium",
+        "high"
+       ]
+      },
+      "quotedAmountUsdc": {
+       "type": "string"
+      },
+      "quotedPayTo": {
+       "type": "string"
+      },
+      "network": {
+       "type": "string"
+      },
+      "asset": {
+       "type": "string"
+      },
+      "checks": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      },
+      "alerts": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "recommendedAction": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "decision",
+      "safeToSign",
+      "riskLevel",
+      "quotedAmountUsdc",
+      "quotedPayTo",
+      "network",
+      "asset",
+      "checks",
+      "alerts",
+      "recommendedAction"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "base_balance",
+    "title": "Base Wallet Balance ($0.001 USDC)",
+    "description": "Read native ETH and Circle USDC balances plus current block height for a Base wallet.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string",
+       "pattern": "^0x[a-fA-F0-9]{40}$",
+       "description": "Base wallet address whose native ETH and Circle USDC balances should be read."
+      }
+     },
+     "required": [
+      "address"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "address": {
+       "type": "string"
+      },
+      "network": {
+       "type": "string"
+      },
+      "chainId": {
+       "type": "integer"
+      },
+      "eth": {
+       "type": "string"
+      },
+      "usdc": {
+       "type": "string"
+      },
+      "ethAtomic": {
+       "type": "string"
+      },
+      "usdcAtomic": {
+       "type": "string"
+      },
+      "blockNumber": {
+       "type": "integer"
+      },
+      "observedAt": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "address",
+      "network",
+      "chainId",
+      "eth",
+      "usdc",
+      "ethAtomic",
+      "usdcAtomic",
+      "blockNumber",
+      "observedAt"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "check_url",
+    "title": "URL Check ($0.001 USDC)",
+    "description": "Check one public URL's reachability, HTTP status, latency, redirects, and content type before using it.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri",
+       "description": "Public HTTP or HTTPS URL to check."
+      },
+      "expectedStatus": {
+       "type": "integer",
+       "minimum": 100,
+       "maximum": 599,
+       "description": "Optional HTTP status code that the final response must match."
+      }
+     },
+     "required": [
+      "url"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "reachable": {
+       "type": "boolean"
+      },
+      "verified": {
+       "type": "boolean"
+      },
+      "status": {
+       "type": "integer"
+      },
+      "finalUrl": {
+       "type": "string",
+       "format": "uri"
+      },
+      "redirectChain": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       }
+      },
+      "responseTimeMs": {
+       "type": "integer"
+      },
+      "contentType": {
+       "type": "string"
+      },
+      "observedAt": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "reachable",
+      "verified",
+      "status",
+      "finalUrl",
+      "redirectChain",
+      "responseTimeMs",
+      "observedAt"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "verify_web_evidence",
+    "title": "Verify Web Evidence ($0.01 USDC)",
+    "description": "Verify one public URL and return timestamped status, redirects, metadata, content hash, and a receipt.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri",
+       "description": "Public HTTP or HTTPS URL whose current contents should be verified."
+      },
+      "expectedStatus": {
+       "type": "integer",
+       "minimum": 100,
+       "maximum": 599,
+       "description": "Optional HTTP status code that the final response must match."
+      },
+      "expectedText": {
+       "type": "string",
+       "maxLength": 500,
+       "description": "Optional case-insensitive text that must appear in the bounded response body."
+      }
+     },
+     "required": [
+      "url"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "verified": {
+       "type": "boolean"
+      },
+      "status": {
+       "type": "integer"
+      },
+      "title": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "finalUrl": {
+       "type": "string",
+       "format": "uri"
+      },
+      "redirectChain": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       }
+      },
+      "responseTimeMs": {
+       "type": "integer"
+      },
+      "contentSha256": {
+       "type": "string"
+      },
+      "receiptId": {
+       "type": "string"
+      },
+      "observedAt": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "verified",
+      "status",
+      "finalUrl",
+      "redirectChain",
+      "responseTimeMs",
+      "contentSha256",
+      "receiptId",
+      "observedAt"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   },
+   {
+    "name": "batch_check_urls",
+    "title": "Batch URL Check ($0.01 USDC)",
+    "description": "Check up to ten public URLs in one paid call with isolated results for partial failures.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "urls": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uri"
+       },
+       "minItems": 1,
+       "maxItems": 10,
+       "description": "One to ten public HTTP or HTTPS URLs to check independently."
+      },
+      "expectedStatus": {
+       "type": "integer",
+       "minimum": 100,
+       "maximum": 599,
+       "description": "Optional HTTP status code expected from every URL."
+      }
+     },
+     "required": [
+      "urls"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": false,
+     "openWorldHint": true
+    },
+    "execution": {
+     "taskSupport": "forbidden"
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "verified": {
+       "type": "boolean"
+      },
+      "count": {
+       "type": "integer"
+      },
+      "checkedAt": {
+       "type": "string"
+      },
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      }
+     },
+     "required": [
+      "verified",
+      "count",
+      "checkedAt",
+      "results"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+   }
+  ]
+ }
+}

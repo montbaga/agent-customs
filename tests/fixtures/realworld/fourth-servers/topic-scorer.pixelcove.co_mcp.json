@@ -1,0 +1,275 @@
+{
+ "url": "https://topic-scorer.pixelcove.co/mcp",
+ "doc": {
+  "name": "topic-scorer",
+  "version": "0.2.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Score a page or draft against 11,485 public taxonomy categories (Google Ads Topics, Google Merchant, IAB Content 3.1, IAB Audience 1.1, IAB Ad Product 2.0, LinkedIn Industries v2) by embedding similarity, rank it per taxonomy, and get the phrases that pull it toward a target category. Free. A topical-alignment check for content briefs and SEO/GEO audits, not a ranking predictor.",
+  "tools": [
+   {
+    "name": "topic_scorer_taxonomies",
+    "title": "List Taxonomies",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "List Taxonomies"
+    },
+    "description": "Lists the six taxonomies with their label and category count. Free. Call it first to pick the taxonomy for topic_scorer_find.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "_meta": {
+     "agent-stack/price": null,
+     "agent-stack/costClass": "cheap",
+     "agent-stack/freeTier": true
+    }
+   },
+   {
+    "name": "topic_scorer_find",
+    "title": "Find Categories",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Find Categories"
+    },
+    "description": "Finds categories whose path contains the query (case-insensitive substring), optionally within one taxonomy. Free. Returns up to `limit` hits with id and path; pass the id as `category` to the scoring tools.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Words to look for in category paths."
+      },
+      "taxonomy": {
+       "type": "string",
+       "enum": [
+        "google_ads_topics",
+        "google_merchant",
+        "iab_content",
+        "iab_audience",
+        "iab_ad_product",
+        "linkedin_industries"
+       ],
+       "description": "Taxonomy of the target category."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 25
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "_meta": {
+     "agent-stack/price": null,
+     "agent-stack/costClass": "cheap",
+     "agent-stack/freeTier": true
+    }
+   },
+   {
+    "name": "topic_scorer_score",
+    "title": "Score Text",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Score Text"
+    },
+    "description": "Scores text against every category in all six taxonomies (one embedding, cosine similarity) and returns the top `per` rows per taxonomy. With `taxonomy` and `category` it also returns the target's rank, score, gap to #1, and a phrase bank split into phrases the text already uses and phrases it does not. Read the rank and the gap, not the raw percent (scores compress into a 70 to 90 band). Free; read-only and safe to retry.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "text": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 32768,
+       "description": "The page or draft text to score, as plain text or HTML (tags are stripped). 1 to 32768 characters. URLs are not fetched; send the content."
+      },
+      "taxonomy": {
+       "type": "string",
+       "enum": [
+        "google_ads_topics",
+        "google_merchant",
+        "iab_content",
+        "iab_audience",
+        "iab_ad_product",
+        "linkedin_industries"
+       ],
+       "description": "Taxonomy of the target category."
+      },
+      "category": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Target category id, full path, or a unique path substring within the taxonomy (use topic_scorer_find to look one up)."
+      },
+      "per": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "default": 10,
+       "description": "Rows per taxonomy."
+      },
+      "phrases": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100,
+       "default": 30,
+       "description": "Phrase bank size for the target category (0 skips it)."
+      },
+      "full": {
+       "type": "boolean",
+       "default": false,
+       "description": "Score the whole text as the mean of 8,192-char chunks instead of only the first 8,192 chars."
+      }
+     },
+     "required": [
+      "text"
+     ],
+     "additionalProperties": false
+    },
+    "_meta": {
+     "agent-stack/price": null,
+     "agent-stack/costClass": "cheap",
+     "agent-stack/freeTier": true
+    }
+   },
+   {
+    "name": "topic_scorer_gate",
+    "title": "Gate Text",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Gate Text"
+    },
+    "description": "Pass/fail check: does the text rank within the top `min_rank` categories of its target taxonomy? Returns `pass`, the target's rank and gap to #1, the taxonomy's top five, and the unused phrases to work in. Use it as a content-pipeline gate. Free; read-only and safe to retry.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "text": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 32768,
+       "description": "The page or draft text to score, as plain text or HTML (tags are stripped). 1 to 32768 characters. URLs are not fetched; send the content."
+      },
+      "taxonomy": {
+       "type": "string",
+       "enum": [
+        "google_ads_topics",
+        "google_merchant",
+        "iab_content",
+        "iab_audience",
+        "iab_ad_product",
+        "linkedin_industries"
+       ],
+       "description": "Taxonomy of the target category."
+      },
+      "category": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Target category id, full path, or a unique path substring within the taxonomy (use topic_scorer_find to look one up)."
+      },
+      "min_rank": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 3,
+       "description": "Highest passing rank."
+      },
+      "phrases": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 100,
+       "default": 30,
+       "description": "Phrase bank size for the target category (0 skips it)."
+      },
+      "full": {
+       "type": "boolean",
+       "default": false,
+       "description": "Score the whole text as the mean of 8,192-char chunks instead of only the first 8,192 chars."
+      }
+     },
+     "required": [
+      "text",
+      "taxonomy",
+      "category"
+     ],
+     "additionalProperties": false
+    },
+    "_meta": {
+     "agent-stack/price": null,
+     "agent-stack/costClass": "cheap",
+     "agent-stack/freeTier": true
+    }
+   },
+   {
+    "name": "topic_scorer_phrases",
+    "title": "Phrase Bank",
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Phrase Bank"
+    },
+    "description": "Returns the ranked phrase bank for one category: 1 to 4 word phrases a page squarely about that category would contain, ordered by similarity to the category. Use it to seed a brief. Free; read-only and safe to retry.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "taxonomy": {
+       "type": "string",
+       "enum": [
+        "google_ads_topics",
+        "google_merchant",
+        "iab_content",
+        "iab_audience",
+        "iab_ad_product",
+        "linkedin_industries"
+       ],
+       "description": "Taxonomy of the target category."
+      },
+      "category": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Target category id, full path, or a unique path substring within the taxonomy (use topic_scorer_find to look one up)."
+      },
+      "n": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "default": 30,
+       "description": "Bank size."
+      }
+     },
+     "required": [
+      "taxonomy",
+      "category"
+     ],
+     "additionalProperties": false
+    },
+    "_meta": {
+     "agent-stack/price": null,
+     "agent-stack/costClass": "cheap",
+     "agent-stack/freeTier": true
+    }
+   }
+  ]
+ }
+}

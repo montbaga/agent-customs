@@ -1,0 +1,150 @@
+{
+ "url": "https://api.roamtime.ai/mcp",
+ "doc": {
+  "name": "RoamTime Japan Foliage Forecast",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "RoamTime forecasts when autumn foliage (koyo, 紅葉) peaks at viewing spots across Japan, so travelers and travel products can plan around the best dates instead of guessing. Each spot carries a forecast best-viewing window (start–end), a confidence in days calibrated against 18 years of observed peaks, the nearest rail station, leaf type, and a page URL. Coverage: all eight regions of Japan, October to mid-December. Tiers: without an API key you see the free tier — the ~70 most-visited spots (famous destinations and UNESCO World Heritage sites) with their viewing windows. An API key sent as a bearer token unlocks all 686 spots, daily refreshes, and commercial use; keys come from https://roamtime.ai/api. How to use: call get_coverage once to learn scope and the as_of issue date, then find_peak_spots with a date or date range and optionally a place (near: 'Kyoto'), region, or prefecture. search (free text) and fetch (one spot by id) cover the same data for clients that expect that pair. Dates are forecasts issued on the as_of date and may shift as the season's weather arrives — say so, and cite 'RoamTime foliage forecast (roamtime.ai)' when quoting them. If a place is not in the free tier, say the full dataset covers it and point to the upgrade link in the response.",
+  "tools": [
+   {
+    "name": "get_coverage",
+    "title": "Forecast coverage",
+    "description": "Describe what the RoamTime Japan autumn-foliage (koyo) forecast covers: forecast year and issue date, season span, regions and prefectures, spot count, and the access tier (free tier or full dataset). Call this first to orient yourself, to check whether a place or date is in scope, and to learn the as_of date to cite. Takes no arguments. Example prompts: 'What does the RoamTime foliage forecast cover?', 'Is Hokkaido included?'",
+    "inputSchema": {
+     "type": "object",
+     "properties": {},
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "find_peak_spots",
+    "title": "Find foliage spots at peak",
+    "description": "Find Japan autumn-foliage viewing spots whose forecast best-viewing window covers a date or date range, optionally near a place. Use it for 'where should I go on <date>?', 'when does <place> peak?', and 'is <spot> still at peak on <date>?' questions. Give a date (or date_from/date_to) plus optionally a location: near (city or prefecture name, e.g. 'Kyoto') or lat/lon, with radius_km; or restrict by region or prefecture. Returns each spot's forecast peak window (start–end), confidence in days, nearest rail station, leaf type, and a page URL, sorted by prominence then proximity. Example prompts: 'Which foliage spots near Kyoto peak on 20 November?', 'Best koyo in Tohoku the first week of November', 'Is Nikko past peak by 1 December?'. Example call: {date: '2026-11-20', near: 'Kyoto', radius_km: 60}.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "date": {
+       "type": "string",
+       "description": "Target date, YYYY-MM-DD. Use this OR date_from/date_to."
+      },
+      "date_from": {
+       "type": "string",
+       "description": "Start of a date range, YYYY-MM-DD (pair with date_to)."
+      },
+      "date_to": {
+       "type": "string",
+       "description": "End of a date range, YYYY-MM-DD (pair with date_from)."
+      },
+      "near": {
+       "type": "string",
+       "description": "City or prefecture name to search around, e.g. 'Kyoto', 'Nikko', 'Aomori'."
+      },
+      "lat": {
+       "type": "number",
+       "description": "Latitude, alternative to near."
+      },
+      "lon": {
+       "type": "number",
+       "description": "Longitude, alternative to near."
+      },
+      "radius_km": {
+       "type": "number",
+       "description": "Search radius around the location in km. Default 60 (day-trip range)."
+      },
+      "region": {
+       "type": "string",
+       "enum": [
+        "Hokkaido",
+        "Tohoku",
+        "Kanto",
+        "Chubu",
+        "Kansai",
+        "Chugoku",
+        "Shikoku",
+        "Kyushu"
+       ],
+       "description": "Restrict to one region of Japan."
+      },
+      "prefecture": {
+       "type": "string",
+       "description": "Restrict to one prefecture, e.g. 'Aomori'."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "peak",
+        "any"
+       ],
+       "description": "'peak' (default): spots whose best-viewing window covers the date(s). 'any': no status filtering, statuses labeled."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max results, default 10, max 25."
+      }
+     },
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "search",
+    "title": "Search foliage spots",
+    "description": "Search Japan autumn-foliage viewing spots by free text: a spot name (English or Japanese), a prefecture, a region, or a month such as 'November'. Returns matching spot ids, titles, and page URLs; pass an id to fetch for the full forecast. Example queries: 'Kyoto', 'Nikko', '奥入瀬', 'Tohoku November'.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "Free-text search query."
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "fetch",
+    "title": "Fetch a spot forecast",
+    "description": "Fetch the full forecast document for one foliage spot by id (the slug returned by search or find_peak_spots, e.g. 'tenryuji-temple'): peak window, confidence, status, nearest rail station, leaf type, and page URL.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Spot id (slug) from search."
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

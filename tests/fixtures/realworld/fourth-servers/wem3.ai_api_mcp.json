@@ -1,0 +1,4925 @@
+{
+ "url": "https://wem3.ai/api/mcp",
+ "doc": {
+  "name": "WEM Price Compare",
+  "version": "1.0.4",
+  "protocolVersion": "2025-06-18",
+  "instructions": "WEM Price Compare looks up retailer prices and checks a claimed price against its catalogue. Prices returned are indicative — refreshed regularly from partner feeds, not live quotes — and the retailer sets the final price at checkout. WEM is free for shoppers and funded by disclosed affiliate commission; it never takes payment, so send users to the merchant to buy. Which WEM tool fits: compare_offers lists the retailer offers WEM holds for one product, found by barcode, WEM slug or wem3.ai/pl/ URL, WEM ID, or a model name or part number passed as title. verify_offer checks a price someone claimed for one product at one retailer. lookup_products checks up to 20 barcodes, ASINs, WEM IDs or product URLs at once. search_products finds products from a name or an identifier; semantic_search from a plain-language description of what the shopper needs. find_lowest_price picks one listing for a kind of product within the shopper's constraints, and does not resolve a specific model name. `verified: true` means WEM recently observed that price at the retailer for a catalogue product. `verified: false` means the price is indicative (from a partner feed or an older reading) or the row is a live listing not resolved to a catalogue product, so do not call it verified; an unverified row can still be the best candidate, reported as unverified. How the product was identified is a separate field, `identity`, where a tool returns one: `exact` (barcode), `catalogued` (a WEM key or listing id) or `inferred` (matched by name, MPN or SKU, and not a confirmed identity). Each offer's `url` opens that retailer's page for the offer WEM priced, and `links` lists them cheapest first. A price named from a result is named with its line in `links`, the page that price was read on. A retailer URL found elsewhere may be a different listing or price. Rows with `affiliate: false` earn WEM nothing, and `disclosure` says whether all, some or none of the links do. When there are no rows, a returned `search` link is WEM's results page for the query. Those links are in the text payload as well as in a rendered card.",
+  "tools": [
+   {
+    "name": "search_products",
+    "title": "Search products across retailers",
+    "description": "Searches WEM's catalogue and its connected retailer sources for products matching a query. The query can be a product name or an identifier: a barcode (EAN/UPC/GTIN), an Amazon ASIN, an MPN, a merchant SKU that names one catalogue product, a WEM ID or a wem3.ai/pl/{slug} URL, and several identifiers may be comma-separated. When the query identifies a product WEM holds, a `catalogMatch` block (`catalogMatches` for several) gives that product's retailer offers; a barcode, ASIN, WEM ID or URL match skips the live retailer search, so `products` then holds catalogue offers only. Barcode, ASIN and slug matches are identity-resolved; MPN, SKU and title matches are inferred. Accessories, bundles, other models and listings priced far below the product's other offers are withheld and counted by reason in `filtered`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "A product name, or an identifier: barcode (EAN/UPC/GTIN), ASIN, MPN, merchant SKU, WEM ID or wem3.ai/pl URL. Several identifiers may be comma-separated."
+      },
+      "category": {
+       "type": "string",
+       "description": "Optional. Keeps only live retailer listings whose own category name matches this text exactly; catalogue matches ignore it. Leave it out unless the shopper names a retailer's category."
+      },
+      "min_price": {
+       "type": "number",
+       "description": "Lowest price to include, in `currency`. Applies to retailer listings, not to `catalogMatch`."
+      },
+      "max_price": {
+       "type": "number",
+       "description": "Highest price to include, in `currency`. Applies to retailer listings, not to `catalogMatch`."
+      },
+      "sort_by": {
+       "type": "string",
+       "enum": [
+        "relevance",
+        "price_asc",
+        "price_desc",
+        "rating"
+       ],
+       "description": "Order of the live retailer listings (default relevance). Not applied when the query identifies a product."
+      },
+      "providers": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Retailer sources to search live, e.g. [\"amazon\", \"awin\"]. Omit for all. Catalogue matches are not limited by it."
+      },
+      "limit": {
+       "type": "number",
+       "description": "How many listings to request from each retailer source (default 10, max 30). The combined list can hold more."
+      },
+      "gtin": {
+       "type": "string",
+       "description": "A product barcode (EAN/UPC/GTIN) the host already has. When given, retailer sources are searched by this barcode instead of by the query words."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code for the shopper's market. Default GBP. Results and price filters use this currency."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "catalogMatch": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Offers WEM holds under one catalogue product. Check `identityBasis`: on `barcode` the product carries a GTIN and every offer here is that same item, so prefer them and cite their prices over anything in `products`. On `curated-grouping` the product carries no barcode, the grouping is an inference like any title match, and a cheaper row in `products` may well be the same item — see `cheaperElsewhere`. Whether the shopper’s words reached this product by barcode or by name is `identity`, a separate question: on `inferred`, say WEM matched it by name.",
+       "properties": {
+        "title": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "productPage": {
+         "type": "string"
+        },
+        "offers": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string",
+            "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+           },
+           "title": {
+            "type": "string"
+           },
+           "price": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+           },
+           "priceNote": {
+            "type": "string",
+            "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+           },
+           "priceQualifier": {
+            "type": "string",
+            "enum": [
+             "from"
+            ],
+            "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "rating": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "reviewCount": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "brand": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "seller": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "inStock": {
+            "type": [
+             "boolean",
+             "null"
+            ]
+           },
+           "shipping": {
+            "type": [
+             "object",
+             "null"
+            ],
+            "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+            "properties": {
+             "free": {
+              "type": "boolean"
+             },
+             "cost": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "estimate": {
+              "type": [
+               "string",
+               "null"
+              ],
+              "description": "Delivery window when the feed stated one."
+             }
+            }
+           },
+           "url": {
+            "type": "string",
+            "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+           },
+           "affiliate": {
+            "type": "boolean",
+            "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+           },
+           "channel": {
+            "type": "string",
+            "enum": [
+             "retailer",
+             "marketplace"
+            ],
+            "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+           },
+           "image": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "priceStatus": {
+            "type": "string",
+            "enum": [
+             "current",
+             "stale",
+             "undated"
+            ],
+            "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+           },
+           "unitPrice": {
+            "type": "object",
+            "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+            "properties": {
+             "amount": {
+              "type": "number"
+             },
+             "currency": {
+              "type": "string",
+              "description": "ISO 4217 code."
+             },
+             "per": {
+              "type": "string",
+              "enum": [
+               "100ml",
+               "litre",
+               "100g",
+               "kg",
+               "item"
+              ]
+             }
+            }
+           },
+           "verified": {
+            "type": "boolean",
+            "description": "True when WEM has recently observed this price on the retailer’s own surface. False means the identity is still catalogue-resolved but the price is indicative (partner feed or stale) — do not present it as verified."
+           },
+           "lastSeenAt": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "When WEM last READ this price from the retailer or a datafeed — the same reading `priceAgeDays` counts from, so the two always agree. Null means WEM cannot date the price: it is undated, not current."
+           },
+           "priceAgeDays": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Calendar days (UK time) since WEM last READ this price: 0 read today, 1 yesterday. Null means WEM cannot say. Null is undated, not current."
+           },
+           "priceRefresh": {
+            "type": "string",
+            "enum": [
+             "live-api",
+             "feed",
+             "none"
+            ],
+            "description": "What re-reads this retailer’s prices: `live-api` a product-lookup API, `feed` a partner datafeed, `none` nothing on a schedule. `none` means the figure will not move on its own however long it sits ; `priceAgeDays` dates it."
+           }
+          }
+         }
+        },
+        "lowPrice": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Lowest CURRENT price in `offers` (priceStatus `current`) from a shop not out of stock when last checked. Null when there is none: never fill it from an older or undated row or a row with `inStock: false`."
+        },
+        "currency": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "unpriced": {
+         "type": "array",
+         "description": "Listings whose price WEM may not show — today, Amazon rows Amazon’s API did not price just now. The row carries `priceNote` (e.g. \"See price at Amazon\") in place of a figure. No price is stated, estimated or compared for one; it is not the cheapest and is not counted in a lowest price or a saving.",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string",
+            "description": "WEM tracked link. The full URL; a shortened form is a different link."
+           },
+           "priceNote": {
+            "type": "string",
+            "description": "What stands where a price would be, e.g. \"See price at Amazon\"."
+           },
+           "channel": {
+            "type": "string",
+            "enum": [
+             "retailer",
+             "marketplace"
+            ]
+           }
+          }
+         }
+        },
+        "lastConfirmedAt": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "When WEM last actually read any price in this block. Null means none of them can be dated — say so rather than implying the block is current."
+        },
+        "identityBasis": {
+         "type": "string",
+         "enum": [
+          "barcode",
+          "curated-grouping"
+         ],
+         "description": "What this block’s identity rests on. `barcode` — the canonical product carries a GTIN and these offers are the same physical item. `curated-grouping` — it carries none, so the grouping is an inference of the same kind a title match is; do not describe it to the user as barcode-confirmed, and do not let it outrank a cheaper row in `products` on price alone. This is how the offers are grouped, not how the query matched the product — see `identity`."
+        },
+        "identity": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "How the shopper’s words reached this product. On `inferred`, WEM matched it by name (not by barcode) and the identity is not confirmed, even when `identityBasis` is `barcode`; on `exact`, the barcode itself resolved it.",
+         "properties": {
+          "method": {
+           "type": "string",
+           "enum": [
+            "gtin",
+            "slug",
+            "listing",
+            "title"
+           ]
+          },
+          "strength": {
+           "type": "string",
+           "enum": [
+            "exact",
+            "catalogued",
+            "inferred"
+           ],
+           "description": "exact = barcode; catalogued = a WEM key or listing id; inferred = matched on the product name, MPN or SKU and still a guess."
+          }
+         }
+        },
+        "cheaperElsewhere": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Present only on a `curated-grouping` block that a live row in `products` undercuts. WEM is telling you its own catalogue block is not the best price it found. Quote this row as the cheaper option with its identity stated as unconfirmed; never present the catalogMatch price as the lowest when this is set.",
+         "properties": {
+          "identity": {
+           "type": "string",
+           "enum": [
+            "inferred"
+           ],
+           "description": "Always `inferred` — matched on title, not barcode. Say so when quoting it."
+          },
+          "verified": {
+           "type": "boolean",
+           "description": "Always false."
+          },
+          "savingVsCatalogue": {
+           "type": "number",
+           "description": "How much cheaper this row is than the block’s lowest offer."
+          },
+          "note": {
+           "type": "string",
+           "description": "Plain-language restatement, safe to relay."
+          }
+         }
+        },
+        "source": {
+         "type": "string"
+        }
+       }
+      },
+      "catalogMatches": {
+       "type": "array",
+       "description": "Present when the query was a comma-separated batch of identifiers and more than one catalogue product resolved. Each entry has the same shape as `catalogMatch`. Prefer barcode-basis blocks; treat MPN/SKU/title blocks as inferred.",
+       "items": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "description": "Offers WEM holds under one catalogue product. Check `identityBasis`: on `barcode` the product carries a GTIN and every offer here is that same item, so prefer them and cite their prices over anything in `products`. On `curated-grouping` the product carries no barcode, the grouping is an inference like any title match, and a cheaper row in `products` may well be the same item — see `cheaperElsewhere`. Whether the shopper’s words reached this product by barcode or by name is `identity`, a separate question: on `inferred`, say WEM matched it by name.",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "slug": {
+          "type": "string"
+         },
+         "productPage": {
+          "type": "string"
+         },
+         "offers": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "provider": {
+             "type": "string",
+             "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+            },
+            "title": {
+             "type": "string"
+            },
+            "price": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+            },
+            "priceNote": {
+             "type": "string",
+             "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+            },
+            "priceQualifier": {
+             "type": "string",
+             "enum": [
+              "from"
+             ],
+             "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+            },
+            "currency": {
+             "type": "string",
+             "description": "ISO 4217 code."
+            },
+            "rating": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "reviewCount": {
+             "type": [
+              "number",
+              "null"
+             ]
+            },
+            "brand": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "seller": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "inStock": {
+             "type": [
+              "boolean",
+              "null"
+             ]
+            },
+            "shipping": {
+             "type": [
+              "object",
+              "null"
+             ],
+             "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+             "properties": {
+              "free": {
+               "type": "boolean"
+              },
+              "cost": {
+               "type": [
+                "number",
+                "null"
+               ]
+              },
+              "estimate": {
+               "type": [
+                "string",
+                "null"
+               ],
+               "description": "Delivery window when the feed stated one."
+              }
+             }
+            },
+            "url": {
+             "type": "string",
+             "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+            },
+            "affiliate": {
+             "type": "boolean",
+             "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+            },
+            "channel": {
+             "type": "string",
+             "enum": [
+              "retailer",
+              "marketplace"
+             ],
+             "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+            },
+            "image": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "priceStatus": {
+             "type": "string",
+             "enum": [
+              "current",
+              "stale",
+              "undated"
+             ],
+             "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+            },
+            "unitPrice": {
+             "type": "object",
+             "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+             "properties": {
+              "amount": {
+               "type": "number"
+              },
+              "currency": {
+               "type": "string",
+               "description": "ISO 4217 code."
+              },
+              "per": {
+               "type": "string",
+               "enum": [
+                "100ml",
+                "litre",
+                "100g",
+                "kg",
+                "item"
+               ]
+              }
+             }
+            },
+            "verified": {
+             "type": "boolean",
+             "description": "True when WEM has recently observed this price on the retailer’s own surface. False means the identity is still catalogue-resolved but the price is indicative (partner feed or stale) — do not present it as verified."
+            },
+            "lastSeenAt": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "When WEM last READ this price from the retailer or a datafeed — the same reading `priceAgeDays` counts from, so the two always agree. Null means WEM cannot date the price: it is undated, not current."
+            },
+            "priceAgeDays": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Calendar days (UK time) since WEM last READ this price: 0 read today, 1 yesterday. Null means WEM cannot say. Null is undated, not current."
+            },
+            "priceRefresh": {
+             "type": "string",
+             "enum": [
+              "live-api",
+              "feed",
+              "none"
+             ],
+             "description": "What re-reads this retailer’s prices: `live-api` a product-lookup API, `feed` a partner datafeed, `none` nothing on a schedule. `none` means the figure will not move on its own however long it sits ; `priceAgeDays` dates it."
+            }
+           }
+          }
+         },
+         "lowPrice": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Lowest CURRENT price in `offers` (priceStatus `current`) from a shop not out of stock when last checked. Null when there is none: never fill it from an older or undated row or a row with `inStock: false`."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "unpriced": {
+          "type": "array",
+          "description": "Listings whose price WEM may not show — today, Amazon rows Amazon’s API did not price just now. The row carries `priceNote` (e.g. \"See price at Amazon\") in place of a figure. No price is stated, estimated or compared for one; it is not the cheapest and is not counted in a lowest price or a saving.",
+          "items": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string"
+            },
+            "provider": {
+             "type": "string"
+            },
+            "title": {
+             "type": "string"
+            },
+            "url": {
+             "type": "string",
+             "description": "WEM tracked link. The full URL; a shortened form is a different link."
+            },
+            "priceNote": {
+             "type": "string",
+             "description": "What stands where a price would be, e.g. \"See price at Amazon\"."
+            },
+            "channel": {
+             "type": "string",
+             "enum": [
+              "retailer",
+              "marketplace"
+             ]
+            }
+           }
+          }
+         },
+         "lastConfirmedAt": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "When WEM last actually read any price in this block. Null means none of them can be dated — say so rather than implying the block is current."
+         },
+         "identityBasis": {
+          "type": "string",
+          "enum": [
+           "barcode",
+           "curated-grouping"
+          ],
+          "description": "What this block’s identity rests on. `barcode` — the canonical product carries a GTIN and these offers are the same physical item. `curated-grouping` — it carries none, so the grouping is an inference of the same kind a title match is; do not describe it to the user as barcode-confirmed, and do not let it outrank a cheaper row in `products` on price alone. This is how the offers are grouped, not how the query matched the product — see `identity`."
+         },
+         "identity": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "How the shopper’s words reached this product. On `inferred`, WEM matched it by name (not by barcode) and the identity is not confirmed, even when `identityBasis` is `barcode`; on `exact`, the barcode itself resolved it.",
+          "properties": {
+           "method": {
+            "type": "string",
+            "enum": [
+             "gtin",
+             "slug",
+             "listing",
+             "title"
+            ]
+           },
+           "strength": {
+            "type": "string",
+            "enum": [
+             "exact",
+             "catalogued",
+             "inferred"
+            ],
+            "description": "exact = barcode; catalogued = a WEM key or listing id; inferred = matched on the product name, MPN or SKU and still a guess."
+           }
+          }
+         },
+         "cheaperElsewhere": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Present only on a `curated-grouping` block that a live row in `products` undercuts. WEM is telling you its own catalogue block is not the best price it found. Quote this row as the cheaper option with its identity stated as unconfirmed; never present the catalogMatch price as the lowest when this is set.",
+          "properties": {
+           "identity": {
+            "type": "string",
+            "enum": [
+             "inferred"
+            ],
+            "description": "Always `inferred` — matched on title, not barcode. Say so when quoting it."
+           },
+           "verified": {
+            "type": "boolean",
+            "description": "Always false."
+           },
+           "savingVsCatalogue": {
+            "type": "number",
+            "description": "How much cheaper this row is than the block’s lowest offer."
+           },
+           "note": {
+            "type": "string",
+            "description": "Plain-language restatement, safe to relay."
+           }
+          }
+         },
+         "source": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "products": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string",
+          "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+         },
+         "title": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+         },
+         "priceQualifier": {
+          "type": "string",
+          "enum": [
+           "from"
+          ],
+          "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+         },
+         "currency": {
+          "type": "string",
+          "description": "ISO 4217 code."
+         },
+         "rating": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "reviewCount": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "brand": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "seller": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "inStock": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "shipping": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+          "properties": {
+           "free": {
+            "type": "boolean"
+           },
+           "cost": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "estimate": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Delivery window when the feed stated one."
+           }
+          }
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ],
+          "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+         },
+         "image": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "priceStatus": {
+          "type": "string",
+          "enum": [
+           "current",
+           "stale",
+           "undated"
+          ],
+          "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+         },
+         "unitPrice": {
+          "type": "object",
+          "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+          "properties": {
+           "amount": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "per": {
+            "type": "string",
+            "enum": [
+             "100ml",
+             "litre",
+             "100g",
+             "kg",
+             "item"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "links": {
+       "type": "array",
+       "description": "The prices in this result as lines, cheapest first. Give these to the user when you name a price from this result. Each line opens the retailer page for that price; a retailer URL found elsewhere may be a different listing or price.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "retailer": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Null when the row has no figure. The markdown then says where to see the price."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+         }
+        }
+       }
+      },
+      "unpriced": {
+       "type": "array",
+       "description": "Listings whose price WEM may not show — today, Amazon rows Amazon’s API did not price just now. The row carries `priceNote` (e.g. \"See price at Amazon\") in place of a figure. No price is stated, estimated or compared for one; it is not the cheapest and is not counted in a lowest price or a saving.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "description": "WEM tracked link. The full URL; a shortened form is a different link."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "What stands where a price would be, e.g. \"See price at Amazon\"."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ]
+         }
+        }
+       }
+      },
+      "totalResults": {
+       "type": "number",
+       "description": "Count of products returned, after weak matches were withheld."
+      },
+      "query": {
+       "type": "string"
+      },
+      "filtered": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Withheld candidates tallied by reason (e.g. accessories, another model, a bundle or multipack, a replica, a listing priced far below the product’s other offers). Report this count rather than implying the search was exhaustive, and never quote a withheld listing’s price as the cheapest or as a deal.",
+       "additionalProperties": {
+        "type": "number"
+       }
+      },
+      "sizeSpread": {
+       "type": "object",
+       "description": "Present when the returned rows are different sizes and the query named none, so price ordering is meaningless: the cheapest row is cheapest because it is less of the product. Do NOT name a cheapest, a lowest price, or a best deal across these rows. The size belongs beside every price. Where rows carry `unitPrice`, that is the like-for-like figure, and it is the figure to rank on when the question is which is better value. The rows are real listings, each with its url.",
+       "properties": {
+        "comparable": {
+         "type": "boolean",
+         "enum": [
+          false
+         ]
+        },
+        "sizes": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "The distinct sizes found, as the listings wrote them."
+        },
+        "note": {
+         "type": "string"
+        }
+       }
+      },
+      "coverage": {
+       "type": "object",
+       "description": "Present when surviving rows include a marketplace cluster at similar prices. That is not a retail floor — the cheapest marketplace listing is not the deal. The listings stay in the payload, each with its url. `next`, when present, is the Chrome extension page for shops WEM does not yet hold as partners.",
+       "properties": {
+        "kind": {
+         "type": "string",
+         "enum": [
+          "marketplace_only"
+         ]
+        },
+        "provider": {
+         "type": "string",
+         "description": "The marketplace (e.g. aliexpress), or marketplace when mixed."
+        },
+        "listings": {
+         "type": "number"
+        },
+        "low": {
+         "type": "number"
+        },
+        "high": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        }
+       }
+      },
+      "search": {
+       "type": "object",
+       "description": "Present when this result names no offer. `url` is WEM's results page for the query and `markdown` is the same link, pre-formatted. WEM searches retailers live on that page, including shops it holds no affiliate programme with, so an empty or withheld result here is not evidence the product is unavailable or unpriced.",
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "markdown": {
+         "type": "string",
+         "description": "The same link, pre-formatted."
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "degraded": {
+       "type": "object",
+       "description": "Present when this call hit its time budget and skipped enrichment. The offers returned are COMPLETE — only the extras were dropped. A missing catalogue block or missing observed retailers does not mean WEM holds nothing, and no retry is needed.",
+       "properties": {
+        "skipped": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "note": {
+         "type": "string"
+        }
+       }
+      },
+      "next": {
+       "type": "object",
+       "description": "Present when WEM's set of offers is thin. chrome_extension is a page that compares the same product on any retailer page, including shops without an affiliate programme.",
+       "properties": {
+        "surface": {
+         "type": "string",
+         "enum": [
+          "chrome_extension"
+         ]
+        },
+        "url": {
+         "type": "string"
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "partial": {
+       "type": "boolean",
+       "description": "True when the live retailer fan-out hit its 3-second budget and some providers had not answered. The rows returned are real; the market may be wider. Ask again for the rest."
+      },
+      "pending_providers": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Providers still running when the budget expired. Present only with partial."
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "products",
+      "totalResults",
+      "query",
+      "disclosure"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "semantic_search",
+    "title": "Find products by description",
+    "description": "Searches WEM's products by meaning, for a plain-language need such as \"comfortable shoes for standing all day\" or \"gift for a 10 year old who likes science\". If vector ranking is unavailable or has no safe match, it falls back to keyword search across WEM's catalogue and connected retailer sources; those rows have `semantic: false`, and `reason` describes the vector path rather than the fallback rows. The reason is `index_empty`, `no_embedding_key`, `no_catalogue_client`, `embedding_failed`, `query_failed` or `timed_out`; an empty answer means neither path produced a safe match. If the description is a product identifier (a barcode, ASIN, MPN, merchant SKU or wem3.ai/pl URL), that product is looked up instead and the reply takes the keyword-search shape.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "description": {
+       "type": "string",
+       "description": "Plain-language description of what the shopper needs."
+      },
+      "category": {
+       "type": "string",
+       "description": "Optional. Keeps only products whose feed category matches this text exactly."
+      },
+      "provider": {
+       "type": "string",
+       "description": "Optional. Keeps only products from this partner feed, e.g. \"awin\"."
+      },
+      "min_price": {
+       "type": "number",
+       "description": "Optional lower price bound, compared with each product's listed price (currencies are not converted)."
+      },
+      "max_price": {
+       "type": "number",
+       "description": "Optional upper price bound, compared with each product's listed price (currencies are not converted)."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max products to return (default 10, max 20)."
+      }
+     },
+     "required": [
+      "description"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "Returns vector-ranked products when `semantic` is true. If that path is unavailable, relevant keyword-search rows may still be returned with `semantic: false` and `reason`; an empty result means neither path produced a safe match.",
+     "properties": {
+      "products": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string",
+          "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+         },
+         "title": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+         },
+         "priceQualifier": {
+          "type": "string",
+          "enum": [
+           "from"
+          ],
+          "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+         },
+         "currency": {
+          "type": "string",
+          "description": "ISO 4217 code."
+         },
+         "rating": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "reviewCount": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "brand": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "seller": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "inStock": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "shipping": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+          "properties": {
+           "free": {
+            "type": "boolean"
+           },
+           "cost": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "estimate": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Delivery window when the feed stated one."
+           }
+          }
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ],
+          "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+         },
+         "image": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "priceStatus": {
+          "type": "string",
+          "enum": [
+           "current",
+           "stale",
+           "undated"
+          ],
+          "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+         },
+         "unitPrice": {
+          "type": "object",
+          "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+          "properties": {
+           "amount": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "per": {
+            "type": "string",
+            "enum": [
+             "100ml",
+             "litre",
+             "100g",
+             "kg",
+             "item"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "links": {
+       "type": "array",
+       "description": "The prices in this result as lines, cheapest first. Give these to the user when you name a price from this result. Each line opens the retailer page for that price; a retailer URL found elsewhere may be a different listing or price.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "retailer": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Null when the row has no figure. The markdown then says where to see the price."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+         }
+        }
+       }
+      },
+      "totalResults": {
+       "type": "number"
+      },
+      "semantic": {
+       "type": "boolean",
+       "description": "True only when pgvector ranked these products. False products passed WEM keyword relevance checks instead."
+      },
+      "reason": {
+       "type": "string",
+       "description": "Present when semantic is false; it describes the vector path, not the fallback rows or shopper query. `index_empty` — the vector query ran and matched nothing. `no_catalogue_client` / `no_embedding_key` — WEM is misconfigured, not the catalogue empty. `embedding_failed` / `query_failed` — an upstream call failed; retrying later may succeed. `timed_out` — an upstream call did not answer in time; this says nothing about the catalogue."
+      },
+      "query": {
+       "type": "string"
+      },
+      "catalogMatch": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Offers WEM holds under one catalogue product. Check `identityBasis`: on `barcode` the product carries a GTIN and every offer here is that same item, so prefer them and cite their prices over anything in `products`. On `curated-grouping` the product carries no barcode, the grouping is an inference like any title match, and a cheaper row in `products` may well be the same item — see `cheaperElsewhere`. Whether the shopper’s words reached this product by barcode or by name is `identity`, a separate question: on `inferred`, say WEM matched it by name.",
+       "properties": {
+        "title": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "productPage": {
+         "type": "string"
+        },
+        "offers": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string",
+            "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+           },
+           "title": {
+            "type": "string"
+           },
+           "price": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+           },
+           "priceNote": {
+            "type": "string",
+            "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+           },
+           "priceQualifier": {
+            "type": "string",
+            "enum": [
+             "from"
+            ],
+            "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "rating": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "reviewCount": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "brand": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "seller": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "inStock": {
+            "type": [
+             "boolean",
+             "null"
+            ]
+           },
+           "shipping": {
+            "type": [
+             "object",
+             "null"
+            ],
+            "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+            "properties": {
+             "free": {
+              "type": "boolean"
+             },
+             "cost": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "estimate": {
+              "type": [
+               "string",
+               "null"
+              ],
+              "description": "Delivery window when the feed stated one."
+             }
+            }
+           },
+           "url": {
+            "type": "string",
+            "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+           },
+           "affiliate": {
+            "type": "boolean",
+            "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+           },
+           "channel": {
+            "type": "string",
+            "enum": [
+             "retailer",
+             "marketplace"
+            ],
+            "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+           },
+           "image": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "priceStatus": {
+            "type": "string",
+            "enum": [
+             "current",
+             "stale",
+             "undated"
+            ],
+            "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+           },
+           "unitPrice": {
+            "type": "object",
+            "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+            "properties": {
+             "amount": {
+              "type": "number"
+             },
+             "currency": {
+              "type": "string",
+              "description": "ISO 4217 code."
+             },
+             "per": {
+              "type": "string",
+              "enum": [
+               "100ml",
+               "litre",
+               "100g",
+               "kg",
+               "item"
+              ]
+             }
+            }
+           },
+           "verified": {
+            "type": "boolean",
+            "description": "True when WEM has recently observed this price on the retailer’s own surface. False means the identity is still catalogue-resolved but the price is indicative (partner feed or stale) — do not present it as verified."
+           },
+           "lastSeenAt": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "When WEM last READ this price from the retailer or a datafeed — the same reading `priceAgeDays` counts from, so the two always agree. Null means WEM cannot date the price: it is undated, not current."
+           },
+           "priceAgeDays": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Calendar days (UK time) since WEM last READ this price: 0 read today, 1 yesterday. Null means WEM cannot say. Null is undated, not current."
+           },
+           "priceRefresh": {
+            "type": "string",
+            "enum": [
+             "live-api",
+             "feed",
+             "none"
+            ],
+            "description": "What re-reads this retailer’s prices: `live-api` a product-lookup API, `feed` a partner datafeed, `none` nothing on a schedule. `none` means the figure will not move on its own however long it sits ; `priceAgeDays` dates it."
+           }
+          }
+         }
+        },
+        "lowPrice": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Lowest CURRENT price in `offers` (priceStatus `current`) from a shop not out of stock when last checked. Null when there is none: never fill it from an older or undated row or a row with `inStock: false`."
+        },
+        "currency": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "unpriced": {
+         "type": "array",
+         "description": "Listings whose price WEM may not show — today, Amazon rows Amazon’s API did not price just now. The row carries `priceNote` (e.g. \"See price at Amazon\") in place of a figure. No price is stated, estimated or compared for one; it is not the cheapest and is not counted in a lowest price or a saving.",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string",
+            "description": "WEM tracked link. The full URL; a shortened form is a different link."
+           },
+           "priceNote": {
+            "type": "string",
+            "description": "What stands where a price would be, e.g. \"See price at Amazon\"."
+           },
+           "channel": {
+            "type": "string",
+            "enum": [
+             "retailer",
+             "marketplace"
+            ]
+           }
+          }
+         }
+        },
+        "lastConfirmedAt": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "When WEM last actually read any price in this block. Null means none of them can be dated — say so rather than implying the block is current."
+        },
+        "identityBasis": {
+         "type": "string",
+         "enum": [
+          "barcode",
+          "curated-grouping"
+         ],
+         "description": "What this block’s identity rests on. `barcode` — the canonical product carries a GTIN and these offers are the same physical item. `curated-grouping` — it carries none, so the grouping is an inference of the same kind a title match is; do not describe it to the user as barcode-confirmed, and do not let it outrank a cheaper row in `products` on price alone. This is how the offers are grouped, not how the query matched the product — see `identity`."
+        },
+        "identity": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "How the shopper’s words reached this product. On `inferred`, WEM matched it by name (not by barcode) and the identity is not confirmed, even when `identityBasis` is `barcode`; on `exact`, the barcode itself resolved it.",
+         "properties": {
+          "method": {
+           "type": "string",
+           "enum": [
+            "gtin",
+            "slug",
+            "listing",
+            "title"
+           ]
+          },
+          "strength": {
+           "type": "string",
+           "enum": [
+            "exact",
+            "catalogued",
+            "inferred"
+           ],
+           "description": "exact = barcode; catalogued = a WEM key or listing id; inferred = matched on the product name, MPN or SKU and still a guess."
+          }
+         }
+        },
+        "cheaperElsewhere": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Present only on a `curated-grouping` block that a live row in `products` undercuts. WEM is telling you its own catalogue block is not the best price it found. Quote this row as the cheaper option with its identity stated as unconfirmed; never present the catalogMatch price as the lowest when this is set.",
+         "properties": {
+          "identity": {
+           "type": "string",
+           "enum": [
+            "inferred"
+           ],
+           "description": "Always `inferred` — matched on title, not barcode. Say so when quoting it."
+          },
+          "verified": {
+           "type": "boolean",
+           "description": "Always false."
+          },
+          "savingVsCatalogue": {
+           "type": "number",
+           "description": "How much cheaper this row is than the block’s lowest offer."
+          },
+          "note": {
+           "type": "string",
+           "description": "Plain-language restatement, safe to relay."
+          }
+         }
+        },
+        "source": {
+         "type": "string"
+        }
+       }
+      },
+      "filtered": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Withheld candidates tallied by reason (e.g. accessories, another model, a bundle or multipack, a replica, a listing priced far below the product’s other offers). Report this count rather than implying the search was exhaustive, and never quote a withheld listing’s price as the cheapest or as a deal.",
+       "additionalProperties": {
+        "type": "number"
+       }
+      },
+      "search": {
+       "type": "object",
+       "description": "Present when this result names no offer. `url` is WEM's results page for the query and `markdown` is the same link, pre-formatted. WEM searches retailers live on that page, including shops it holds no affiliate programme with, so an empty or withheld result here is not evidence the product is unavailable or unpriced.",
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "markdown": {
+         "type": "string",
+         "description": "The same link, pre-formatted."
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "next": {
+       "type": "object",
+       "description": "Present when WEM's set of offers is thin. chrome_extension is a page that compares the same product on any retailer page, including shops without an affiliate programme.",
+       "properties": {
+        "surface": {
+         "type": "string",
+         "enum": [
+          "chrome_extension"
+         ]
+        },
+        "url": {
+         "type": "string"
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "products",
+      "totalResults",
+      "disclosure"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "get_categories",
+    "title": "List shopping categories",
+    "description": "Lists the six broad shopping categories WEM covers (electronics, fashion, beauty, home, sports, collectibles), each with example products, the shops WEM has read a price from in the last 14 days (busiest first, with how many shops there are in all) and the default currency (GBP). Use it to help a shopper narrow a vague request. It returns no prices, the category names are labels for the shopper, not filter values, and a shop on the list is not a promise that WEM holds a given product there: compare_offers says which shops WEM has for one product.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "categories": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "examples": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "providers": {
+       "type": "array",
+       "description": "Shops WEM has read a price from in the last 14 days, busiest first, at most 40: one row per shop, with how many of its products WEM read. Say which shops WEM covers from this list, never from a shop's absence: it is not every shop WEM has ever held, and a shop on it may not sell the product the shopper wants (compare_offers says which shops WEM holds for one product).",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "displayName": {
+          "type": "string"
+         },
+         "products": {
+          "type": "integer",
+          "description": "Products WEM read a price for at this shop in the last 14 days."
+         }
+        }
+       }
+      },
+      "shopCount": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "description": "How many shops WEM read a price from in the last 14 days, listed or not. Null with an empty `providers` means the list could not be read just now, not that WEM has no shops."
+      },
+      "currency": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "categories",
+      "providers",
+      "currency"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_product",
+    "title": "Get one product",
+    "description": "Provide at least one of: wem_id, or provider and product_id. Returns one product's details. Given `provider` and `product_id` from a search result, it returns that listing as its retailer source supplies it (title, price and link, with rating, shipping or features where the source has them); when the source cannot be reached it falls back to WEM's catalogue record of the listing, and an unknown listing is an error. Given `wem_id`, it returns that catalogue product with the retailer offers WEM holds for it.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "provider": {
+       "type": "string",
+       "description": "Retailer source of the listing, as given in the search result (e.g. \"amazon\", \"awin\")."
+      },
+      "product_id": {
+       "type": "string",
+       "description": "The listing's `id` from the search result."
+      },
+      "wem_id": {
+       "type": "string",
+       "description": "WEM ID (W + 10 Crockford characters + check). Active catalogue products only."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "Full provider record for one product, plus a WEM tracked link.",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "provider": {
+       "type": "string",
+       "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+      },
+      "title": {
+       "type": "string"
+      },
+      "price": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+      },
+      "priceNote": {
+       "type": "string",
+       "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+      },
+      "priceQualifier": {
+       "type": "string",
+       "enum": [
+        "from"
+       ],
+       "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code."
+      },
+      "rating": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "reviewCount": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "brand": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "seller": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "inStock": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
+      "shipping": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+       "properties": {
+        "free": {
+         "type": "boolean"
+        },
+        "cost": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "estimate": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Delivery window when the feed stated one."
+        }
+       }
+      },
+      "url": {
+       "type": "string",
+       "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+      },
+      "affiliate": {
+       "type": "boolean",
+       "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+      },
+      "channel": {
+       "type": "string",
+       "enum": [
+        "retailer",
+        "marketplace"
+       ],
+       "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+      },
+      "image": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "priceStatus": {
+       "type": "string",
+       "enum": [
+        "current",
+        "stale",
+        "undated"
+       ],
+       "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+      },
+      "unitPrice": {
+       "type": "object",
+       "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+       "properties": {
+        "amount": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string",
+         "description": "ISO 4217 code."
+        },
+        "per": {
+         "type": "string",
+         "enum": [
+          "100ml",
+          "litre",
+          "100g",
+          "kg",
+          "item"
+         ]
+        }
+       }
+      },
+      "description": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "features": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "items": {
+        "type": "string"
+       }
+      },
+      "badges": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "items": {
+        "type": "string"
+       }
+      },
+      "links": {
+       "type": "array",
+       "description": "The prices in this result as lines, cheapest first. Give these to the user when you name a price from this result. Each line opens the retailer page for that price; a retailer URL found elsewhere may be a different listing or price.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "retailer": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Null when the row has no figure. The markdown then says where to see the price."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+         }
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "url",
+      "disclosure"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "compare_products",
+    "title": "Compare several products",
+    "description": "Lays 2 to 5 listings from earlier search results side by side in `comparison`: each listing's price and currency, and its rating, shipping and features where the retailer source supplies them (many listings carry none). Each item needs the listing's `provider` and its `id` as `product_id`. Listings that cannot be found are left out, and fewer than two found is an error. Prices stay in each listing's own currency.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "products": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "provider": {
+          "type": "string"
+         },
+         "product_id": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "provider",
+         "product_id"
+        ]
+       },
+       "description": "2 to 5 listings, each with `provider` and `product_id` as given in a search result.",
+       "minItems": 2,
+       "maxItems": 5
+      }
+     },
+     "required": [
+      "products"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "comparison": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string",
+          "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+         },
+         "title": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+         },
+         "priceQualifier": {
+          "type": "string",
+          "enum": [
+           "from"
+          ],
+          "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+         },
+         "currency": {
+          "type": "string",
+          "description": "ISO 4217 code."
+         },
+         "rating": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "reviewCount": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "brand": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "seller": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "inStock": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "shipping": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+          "properties": {
+           "free": {
+            "type": "boolean"
+           },
+           "cost": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "estimate": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Delivery window when the feed stated one."
+           }
+          }
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ],
+          "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+         },
+         "image": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "priceStatus": {
+          "type": "string",
+          "enum": [
+           "current",
+           "stale",
+           "undated"
+          ],
+          "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+         },
+         "unitPrice": {
+          "type": "object",
+          "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+          "properties": {
+           "amount": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "per": {
+            "type": "string",
+            "enum": [
+             "100ml",
+             "litre",
+             "100g",
+             "kg",
+             "item"
+            ]
+           }
+          }
+         },
+         "features": {
+          "type": [
+           "array",
+           "null"
+          ],
+          "items": {
+           "type": "string"
+          }
+         },
+         "badges": {
+          "type": [
+           "array",
+           "null"
+          ],
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "count": {
+       "type": "number"
+      },
+      "links": {
+       "type": "array",
+       "description": "The prices in this result as lines, cheapest first. Give these to the user when you name a price from this result. Each line opens the retailer page for that price; a retailer URL found elsewhere may be a different listing or price.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "retailer": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Null when the row has no figure. The markdown then says where to see the price."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+         }
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "comparison",
+      "count",
+      "disclosure"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "find_lowest_price",
+    "title": "Find the lowest listed price",
+    "description": "Picks one listing for a kind of product within the shopper's constraints, from WEM's catalogue and a live retailer search (a current catalogue match answers without the live search). Candidates are first filtered to plausible matches, so an accessory, another size, an out-of-stock listing or one priced far below the product's other offers is not picked. With no `priorities`, or with `cheapest` first, the lowest price wins; `best_rated`, `free_shipping` and `fastest` (has a delivery estimate) are weighed in the order given, where listings carry ratings or delivery details, and can outrank a lower price. WEM's commission is not a factor. `recommendation` is null with a reason when nothing matched confidently, when the matches differ in size, or when only stale prices remain; when `coverage.kind` is `marketplace_only` it is null but `alternatives` still lists the listings. `recommendation.verified` is true when WEM has recently observed that price at the retailer.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "One kind of product or product: a name, barcode, ASIN, WEM ID or wem3.ai/pl URL. A single query, not a list."
+      },
+      "max_price": {
+       "type": "number",
+       "description": "Budget cap, in `currency`."
+      },
+      "priorities": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "cheapest",
+         "best_rated",
+         "free_shipping",
+         "fastest"
+        ]
+       },
+       "description": "What matters most, in order. cheapest: lowest price. best_rated: higher rating. free_shipping: free delivery. fastest: states a delivery estimate. Weighed only where listings carry those details."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code to quote in. Default GBP. Offers in other currencies are withheld, never converted. Pass the shopper's market explicitly — WEM does not infer currency or retailer market from IP."
+      },
+      "include_used": {
+       "type": "boolean",
+       "description": "If true, include used and refurbished listings. Default false — a used item is a different good, not a cheaper one."
+      },
+      "condition": {
+       "type": "string",
+       "description": "Same effect as include_used: \"any\", \"used\" or \"refurbished\" also includes used and refurbished listings; any other value means new only."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "A null `recommendation` with `coverage.kind` marketplace_only still has listings in `alternatives`. A null with no alternatives is a genuine miss. A genuine miss is not a suggestion.",
+     "properties": {
+      "recommendation": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "The single lowest-priced plausible match, or null when nothing matched confidently.",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "provider": {
+         "type": "string",
+         "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+        },
+        "title": {
+         "type": "string"
+        },
+        "price": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+        },
+        "priceNote": {
+         "type": "string",
+         "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+        },
+        "priceQualifier": {
+         "type": "string",
+         "enum": [
+          "from"
+         ],
+         "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+        },
+        "currency": {
+         "type": "string",
+         "description": "ISO 4217 code."
+        },
+        "rating": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "reviewCount": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "brand": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "seller": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "inStock": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "shipping": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+         "properties": {
+          "free": {
+           "type": "boolean"
+          },
+          "cost": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "estimate": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "Delivery window when the feed stated one."
+          }
+         }
+        },
+        "url": {
+         "type": "string",
+         "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+        },
+        "affiliate": {
+         "type": "boolean",
+         "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+        },
+        "channel": {
+         "type": "string",
+         "enum": [
+          "retailer",
+          "marketplace"
+         ],
+         "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+        },
+        "image": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "priceStatus": {
+         "type": "string",
+         "enum": [
+          "current",
+          "stale",
+          "undated"
+         ],
+         "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+        },
+        "unitPrice": {
+         "type": "object",
+         "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+         "properties": {
+          "amount": {
+           "type": "number"
+          },
+          "currency": {
+           "type": "string",
+           "description": "ISO 4217 code."
+          },
+          "per": {
+           "type": "string",
+           "enum": [
+            "100ml",
+            "litre",
+            "100g",
+            "kg",
+            "item"
+           ]
+          }
+         }
+        },
+        "verified": {
+         "type": "boolean",
+         "description": "True when WEM resolved this offer’s identity AND recently observed its price on the retailer’s surface. A recommendation can be unverified and still the best candidate — report it as such."
+        }
+       }
+      },
+      "reason": {
+       "type": "string",
+       "description": "Why this was picked, or why nothing was."
+      },
+      "score": {
+       "type": "number",
+       "description": "Internal ranking score. Not a price and not a rating — do not quote it."
+      },
+      "alternatives": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string",
+          "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+         },
+         "title": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+         },
+         "priceQualifier": {
+          "type": "string",
+          "enum": [
+           "from"
+          ],
+          "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+         },
+         "currency": {
+          "type": "string",
+          "description": "ISO 4217 code."
+         },
+         "rating": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "reviewCount": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "brand": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "seller": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "inStock": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "shipping": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+          "properties": {
+           "free": {
+            "type": "boolean"
+           },
+           "cost": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "estimate": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Delivery window when the feed stated one."
+           }
+          }
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ],
+          "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+         },
+         "image": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "priceStatus": {
+          "type": "string",
+          "enum": [
+           "current",
+           "stale",
+           "undated"
+          ],
+          "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+         },
+         "unitPrice": {
+          "type": "object",
+          "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+          "properties": {
+           "amount": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "per": {
+            "type": "string",
+            "enum": [
+             "100ml",
+             "litre",
+             "100g",
+             "kg",
+             "item"
+            ]
+           }
+          }
+         }
+        }
+       },
+       "description": "Listings still worth showing, including when recommendation is null."
+      },
+      "links": {
+       "type": "array",
+       "description": "The prices in this result as lines, cheapest first. Give these to the user when you name a price from this result. Each line opens the retailer page for that price; a retailer URL found elsewhere may be a different listing or price.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "retailer": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Null when the row has no figure. The markdown then says where to see the price."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+         }
+        }
+       }
+      },
+      "catalogMatch": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Offers WEM holds under one catalogue product. Check `identityBasis`: on `barcode` the product carries a GTIN and every offer here is that same item, so prefer them and cite their prices over anything in `products`. On `curated-grouping` the product carries no barcode, the grouping is an inference like any title match, and a cheaper row in `products` may well be the same item — see `cheaperElsewhere`. Whether the shopper’s words reached this product by barcode or by name is `identity`, a separate question: on `inferred`, say WEM matched it by name.",
+       "properties": {
+        "title": {
+         "type": "string"
+        },
+        "slug": {
+         "type": "string"
+        },
+        "productPage": {
+         "type": "string"
+        },
+        "offers": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string",
+            "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+           },
+           "title": {
+            "type": "string"
+           },
+           "price": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+           },
+           "priceNote": {
+            "type": "string",
+            "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+           },
+           "priceQualifier": {
+            "type": "string",
+            "enum": [
+             "from"
+            ],
+            "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "rating": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "reviewCount": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "brand": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "seller": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "inStock": {
+            "type": [
+             "boolean",
+             "null"
+            ]
+           },
+           "shipping": {
+            "type": [
+             "object",
+             "null"
+            ],
+            "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+            "properties": {
+             "free": {
+              "type": "boolean"
+             },
+             "cost": {
+              "type": [
+               "number",
+               "null"
+              ]
+             },
+             "estimate": {
+              "type": [
+               "string",
+               "null"
+              ],
+              "description": "Delivery window when the feed stated one."
+             }
+            }
+           },
+           "url": {
+            "type": "string",
+            "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+           },
+           "affiliate": {
+            "type": "boolean",
+            "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+           },
+           "channel": {
+            "type": "string",
+            "enum": [
+             "retailer",
+             "marketplace"
+            ],
+            "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+           },
+           "image": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "priceStatus": {
+            "type": "string",
+            "enum": [
+             "current",
+             "stale",
+             "undated"
+            ],
+            "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+           },
+           "unitPrice": {
+            "type": "object",
+            "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+            "properties": {
+             "amount": {
+              "type": "number"
+             },
+             "currency": {
+              "type": "string",
+              "description": "ISO 4217 code."
+             },
+             "per": {
+              "type": "string",
+              "enum": [
+               "100ml",
+               "litre",
+               "100g",
+               "kg",
+               "item"
+              ]
+             }
+            }
+           },
+           "verified": {
+            "type": "boolean",
+            "description": "True when WEM has recently observed this price on the retailer’s own surface. False means the identity is still catalogue-resolved but the price is indicative (partner feed or stale) — do not present it as verified."
+           },
+           "lastSeenAt": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "When WEM last READ this price from the retailer or a datafeed — the same reading `priceAgeDays` counts from, so the two always agree. Null means WEM cannot date the price: it is undated, not current."
+           },
+           "priceAgeDays": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Calendar days (UK time) since WEM last READ this price: 0 read today, 1 yesterday. Null means WEM cannot say. Null is undated, not current."
+           },
+           "priceRefresh": {
+            "type": "string",
+            "enum": [
+             "live-api",
+             "feed",
+             "none"
+            ],
+            "description": "What re-reads this retailer’s prices: `live-api` a product-lookup API, `feed` a partner datafeed, `none` nothing on a schedule. `none` means the figure will not move on its own however long it sits ; `priceAgeDays` dates it."
+           }
+          }
+         }
+        },
+        "lowPrice": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Lowest CURRENT price in `offers` (priceStatus `current`) from a shop not out of stock when last checked. Null when there is none: never fill it from an older or undated row or a row with `inStock: false`."
+        },
+        "currency": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "unpriced": {
+         "type": "array",
+         "description": "Listings whose price WEM may not show — today, Amazon rows Amazon’s API did not price just now. The row carries `priceNote` (e.g. \"See price at Amazon\") in place of a figure. No price is stated, estimated or compared for one; it is not the cheapest and is not counted in a lowest price or a saving.",
+         "items": {
+          "type": "object",
+          "properties": {
+           "id": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string",
+            "description": "WEM tracked link. The full URL; a shortened form is a different link."
+           },
+           "priceNote": {
+            "type": "string",
+            "description": "What stands where a price would be, e.g. \"See price at Amazon\"."
+           },
+           "channel": {
+            "type": "string",
+            "enum": [
+             "retailer",
+             "marketplace"
+            ]
+           }
+          }
+         }
+        },
+        "lastConfirmedAt": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "When WEM last actually read any price in this block. Null means none of them can be dated — say so rather than implying the block is current."
+        },
+        "identityBasis": {
+         "type": "string",
+         "enum": [
+          "barcode",
+          "curated-grouping"
+         ],
+         "description": "What this block’s identity rests on. `barcode` — the canonical product carries a GTIN and these offers are the same physical item. `curated-grouping` — it carries none, so the grouping is an inference of the same kind a title match is; do not describe it to the user as barcode-confirmed, and do not let it outrank a cheaper row in `products` on price alone. This is how the offers are grouped, not how the query matched the product — see `identity`."
+        },
+        "identity": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "How the shopper’s words reached this product. On `inferred`, WEM matched it by name (not by barcode) and the identity is not confirmed, even when `identityBasis` is `barcode`; on `exact`, the barcode itself resolved it.",
+         "properties": {
+          "method": {
+           "type": "string",
+           "enum": [
+            "gtin",
+            "slug",
+            "listing",
+            "title"
+           ]
+          },
+          "strength": {
+           "type": "string",
+           "enum": [
+            "exact",
+            "catalogued",
+            "inferred"
+           ],
+           "description": "exact = barcode; catalogued = a WEM key or listing id; inferred = matched on the product name, MPN or SKU and still a guess."
+          }
+         }
+        },
+        "cheaperElsewhere": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Present only on a `curated-grouping` block that a live row in `products` undercuts. WEM is telling you its own catalogue block is not the best price it found. Quote this row as the cheaper option with its identity stated as unconfirmed; never present the catalogMatch price as the lowest when this is set.",
+         "properties": {
+          "identity": {
+           "type": "string",
+           "enum": [
+            "inferred"
+           ],
+           "description": "Always `inferred` — matched on title, not barcode. Say so when quoting it."
+          },
+          "verified": {
+           "type": "boolean",
+           "description": "Always false."
+          },
+          "savingVsCatalogue": {
+           "type": "number",
+           "description": "How much cheaper this row is than the block’s lowest offer."
+          },
+          "note": {
+           "type": "string",
+           "description": "Plain-language restatement, safe to relay."
+          }
+         }
+        },
+        "source": {
+         "type": "string"
+        }
+       }
+      },
+      "filtered": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Withheld candidates tallied by reason (e.g. accessories, another model, a bundle or multipack, a replica, a listing priced far below the product’s other offers). Report this count rather than implying the search was exhaustive, and never quote a withheld listing’s price as the cheapest or as a deal.",
+       "additionalProperties": {
+        "type": "number"
+       }
+      },
+      "coverage": {
+       "type": "object",
+       "description": "Present when surviving rows include a marketplace cluster at similar prices. That is not a retail floor — the cheapest marketplace listing is not the deal. The listings stay in the payload, each with its url. `next`, when present, is the Chrome extension page for shops WEM does not yet hold as partners.",
+       "properties": {
+        "kind": {
+         "type": "string",
+         "enum": [
+          "marketplace_only"
+         ]
+        },
+        "provider": {
+         "type": "string",
+         "description": "The marketplace (e.g. aliexpress), or marketplace when mixed."
+        },
+        "listings": {
+         "type": "number"
+        },
+        "low": {
+         "type": "number"
+        },
+        "high": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        }
+       }
+      },
+      "search": {
+       "type": "object",
+       "description": "Present when this result names no offer. `url` is WEM's results page for the query and `markdown` is the same link, pre-formatted. WEM searches retailers live on that page, including shops it holds no affiliate programme with, so an empty or withheld result here is not evidence the product is unavailable or unpriced.",
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "markdown": {
+         "type": "string",
+         "description": "The same link, pre-formatted."
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "next": {
+       "type": "object",
+       "description": "Present when WEM's set of offers is thin. chrome_extension is a page that compares the same product on any retailer page, including shops without an affiliate programme.",
+       "properties": {
+        "surface": {
+         "type": "string",
+         "enum": [
+          "chrome_extension"
+         ]
+        },
+        "url": {
+         "type": "string"
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "liveSearchSkipped": {
+       "type": "boolean",
+       "description": "True when a catalogue hit answered the question without spending retailer API quota."
+      },
+      "partial": {
+       "type": "boolean",
+       "description": "True when the live retailer fan-out hit its 3-second budget and some providers had not answered. The recommendation is the lowest among those that did. Do not call it the market floor, and do not retry automatically."
+      },
+      "pending_providers": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Providers still running when the budget expired. Present only with partial. Their prices are not in this answer."
+      },
+      "degraded": {
+       "type": "object",
+       "description": "Present when this call hit its time budget and skipped enrichment. The offers returned are COMPLETE — only the extras were dropped. A missing catalogue block or missing observed retailers does not mean WEM holds nothing, and no retry is needed.",
+       "properties": {
+        "skipped": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "note": {
+         "type": "string"
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "recommendation",
+      "reason"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   },
+   {
+    "name": "compare_offers",
+    "title": "Compare retailer offers for one product",
+    "description": "Provide at least one of: gtin, slug, wem_id, or title. Lists the retailer offers WEM's catalogue holds for one product: available current prices cheapest first, then current offers last seen out of stock and older prices, with WEM's 90-day price low (null when the product is held only in another currency). The product is found by barcode, catalogue slug or wem3.ai/pl/ URL, WEM ID, or a title (a model name, ASIN, MPN or merchant SKU) that must pass a relevance check; there is no live retailer search. A barcode, slug or WEM ID match is the product itself; a title match is inferred and marked so in `identity`. A marketplace offer priced far below the product's other offers is withheld and counted in `filtered`. When WEM does not hold the product, `found` is false and `nextTool` names search_products with a query.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "gtin": {
+       "type": "string",
+       "description": "Product barcode: EAN-13, UPC-A, EAN-8 or GTIN-14. The strongest identifier."
+      },
+      "slug": {
+       "type": "string",
+       "description": "WEM catalogue slug, or a wem3.ai/pl/{slug} URL / host path. Hosts may pass either form."
+      },
+      "wem_id": {
+       "type": "string",
+       "description": "WEM ID (W + 10 Crockford characters + check). Active catalogue products only."
+      },
+      "title": {
+       "type": "string",
+       "description": "Product or model name, or an ASIN, MPN or merchant SKU (e.g. AF400UK). The weakest identifier: used only when no barcode, slug or WEM ID is given, and only if it passes a relevance check; otherwise `found` is false rather than a guess."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code for the shopper's market. Default GBP. Decides which market's offers WEM returns from its catalogue, not just how the answer reads ; WEM does not infer the market from IP. When WEM holds the product only in another currency it says so rather than presenting a foreign listing as the answer."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "The retailer offers WEM holds for one catalogue product: available current prices cheapest first, then current offers last seen out of stock, then older prices. When `found` is false WEM simply does not hold this product yet — that is a normal answer, not a failure, and it says nothing about whether the product exists or what it costs. `nextTool` then names `search_products` and the query. An empty catalogue result is not a statement that the product is unavailable or unpriced.",
+     "properties": {
+      "found": {
+       "type": "boolean",
+       "description": "False when the product is not in WEM’s catalogue. The rest of the fields below are then absent ; that does not mean the product is unavailable or unpriced. `unavailable` distinguishes an outage from a miss. `nextTool`, when present, names the next lookup."
+      },
+      "unavailable": {
+       "type": "boolean",
+       "description": "Present and true only when WEM could not reach its catalogue at all. `found` is false for the same reason it is on an ordinary miss, so the two are indistinguishable without this flag. When it is set, WEM does not know whether it holds the product. The lookup could not be completed; it does not mean WEM has no offers or no price for it. `nextTool` is still present."
+      },
+      "reason": {
+       "type": "string",
+       "description": "Present only when `found` is false: which identifier missed, and why. When `unavailable` is true this describes the outage rather than a missing product ; it is the reason the lookup failed, not a fact about the product."
+      },
+      "search": {
+       "type": "object",
+       "description": "Present when this result names no offer. `url` is WEM's results page for the query and `markdown` is the same link, pre-formatted. This tool reads the catalogue only, so an empty result here is not evidence the product is unavailable or unpriced.",
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "markdown": {
+         "type": "string",
+         "description": "The same link, pre-formatted."
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "nextTool": {
+       "type": "object",
+       "description": "Present only when `found` is false. It names `search_products` and the query. A named model that misses the catalogue is the ordinary case.",
+       "properties": {
+        "tool": {
+         "type": "string",
+         "enum": [
+          "search_products"
+         ]
+        },
+        "query": {
+         "type": "string"
+        }
+       }
+      },
+      "product": {
+       "type": "object",
+       "properties": {
+        "slug": {
+         "type": "string"
+        },
+        "title": {
+         "type": "string"
+        },
+        "brand": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "gtin": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "The barcode identity was resolved on."
+        },
+        "wem_id": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "WEM ID of this active product. Null when unknown."
+        },
+        "image": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Product photo, served from wem3.ai. Null when none is available."
+        }
+       },
+       "required": [
+        "slug",
+        "title"
+       ]
+      },
+      "offers": {
+       "type": "array",
+       "description": "Current prices first (`priceStatus`), then current prices from a shop out of stock when last checked (`inStock: false`), then stale or undated rows, each group ascending by price. Only the first group is compared: an out-of-stock, stale or undated row is listed, never the cheapest. Barcode, slug and WEM ID rows are the product. A title match is inferred; `identity.strength` says which.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string",
+          "description": "Retailer slug, e.g. \"amazon\", \"currys\"."
+         },
+         "title": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Indicative price. The retailer sets the final price at checkout. Null, with `priceNote`, when WEM may not show this listing’s price: the note stands in place of a figure."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "Present only when `price` is null: the words that stand in its place, e.g. \"See price at Amazon\". An Amazon price is shown only when Amazon’s API supplied it just now."
+         },
+         "priceQualifier": {
+          "type": "string",
+          "enum": [
+           "from"
+          ],
+          "description": "Present when `price` is the OPENING price of a range, not the price of this item: a multi-variation listing where the seller advertises its cheapest variant and the shopper picks a size on the page. It reads as \"from £X\"; it is not the item's price or the cheapest. Absent means the price is firm for the row as described."
+         },
+         "currency": {
+          "type": "string",
+          "description": "ISO 4217 code."
+         },
+         "rating": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "reviewCount": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "brand": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "seller": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "inStock": {
+          "type": [
+           "boolean",
+           "null"
+          ]
+         },
+         "shipping": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "Delivery as the retailer stated it: `free`, or `cost` in the offer currency. Absent or null means not stated: say delivery is shown at the shop, never that it is free. Offers are ordered by item price; add a stated cost before calling one cheaper delivered.",
+          "properties": {
+           "free": {
+            "type": "boolean"
+           },
+           "cost": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "estimate": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Delivery window when the feed stated one."
+           }
+          }
+         },
+         "url": {
+          "type": "string",
+          "description": "The page this price was read on. Give this url to the user when you name the price; a different url can be a different listing or price. The full URL; a shortened form is a different link. WEM never takes payment."
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ],
+          "description": "retailer is a named shop (Boots, Currys). marketplace is AliExpress/Temu-style parallel listings. A marketplace cluster is not a set of competing authorised retailers."
+         },
+         "image": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "priceStatus": {
+          "type": "string",
+          "enum": [
+           "current",
+           "stale",
+           "undated"
+          ],
+          "description": "`current`: WEM read this price within the last 14 days; only a current price may lead, be called the cheapest or lowest, be compared or enter a saving. `stale`: read longer ago. `undated`: WEM cannot say when. Those two read as \"last seen £X on 8 Sep\" or \"price not dated\", come after the current ones, and are not compared. Absent on a row a provider answered just now."
+         },
+         "unitPrice": {
+          "type": "object",
+          "description": "Price per 100ml, 100g, litre, kg or item, from the size this row's title states. Present only when the rows differ in size, in one unit across all of them, and only for things bought by the amount (beauty, food, supplements), never an appliance's capacity. Across sizes, value is compared on these, not on the prices: a smaller size is not cheaper because its price is lower. It reads beside the price (\"£29.95, £99.83 per 100ml\"). Absent does not mean the price is per unit.",
+          "properties": {
+           "amount": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+           },
+           "per": {
+            "type": "string",
+            "enum": [
+             "100ml",
+             "litre",
+             "100g",
+             "kg",
+             "item"
+            ]
+           }
+          }
+         },
+         "lastSeenAt": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "When WEM last READ this price from the retailer or a datafeed — the same reading `priceAgeDays` counts from, so the two always agree. Null means WEM cannot date the price: it is undated, not current."
+         },
+         "priceAgeDays": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Calendar days (UK time) since WEM last READ this price: 0 read today, 1 yesterday. Null means WEM cannot say. Null is undated, not current."
+         },
+         "priceRefresh": {
+          "type": "string",
+          "enum": [
+           "live-api",
+           "feed",
+           "none"
+          ],
+          "description": "What re-reads this retailer’s prices: `live-api` a product-lookup API, `feed` a partner datafeed, `none` nothing on a schedule. `none` means the figure will not move on its own however long it sits ; `priceAgeDays` dates it."
+         }
+        }
+       }
+      },
+      "unpriced": {
+       "type": "array",
+       "description": "Listings whose price WEM may not show — today, Amazon rows Amazon’s API did not price just now. The row carries `priceNote` (e.g. \"See price at Amazon\") in place of a figure. No price is stated, estimated or compared for one; it is not the cheapest and is not counted in a lowest price or a saving.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "provider": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "description": "WEM tracked link. The full URL; a shortened form is a different link."
+         },
+         "priceNote": {
+          "type": "string",
+          "description": "What stands where a price would be, e.g. \"See price at Amazon\"."
+         },
+         "channel": {
+          "type": "string",
+          "enum": [
+           "retailer",
+           "marketplace"
+          ]
+         }
+        }
+       }
+      },
+      "lowPrice": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Lowest CURRENT price in `offers` (read within 14 days) from a shop not out of stock when last checked. Null when there is none, or WEM holds no price it may quote; it is never taken from a stale or undated row, a row with `inStock: false`, or `unpriced`."
+      },
+      "highPrice": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Highest current price in `offers`; null with lowPrice."
+      },
+      "currency": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "priceHistory": {
+       "type": "object",
+       "description": "The 90-day low, for telling a real discount from a repackaged one.",
+       "properties": {
+        "days": {
+         "type": "number"
+        },
+        "low": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       }
+      },
+      "lastConfirmedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "When WEM last actually read any price in this answer. Null means none of them can be dated, so the answer is not current."
+      },
+      "links": {
+       "type": "array",
+       "description": "The links from `offers` in the same order, pre-formatted: current prices cheapest first, then any out of stock when last checked or not current, each saying so in its markdown. Give these to the user when you name a price from this result. Each opens the retailer’s page for the offer WEM priced; a retailer URL found elsewhere may be a different listing or price. The same links are in this array and, when a host renders one, in the card.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "retailer": {
+          "type": "string"
+         },
+         "price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Null for a listing in `unpriced`. The markdown says \"see price at Amazon\" in place of a figure."
+         },
+         "currency": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "url": {
+          "type": "string",
+          "description": "WEM tracked redirect. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+         }
+        }
+       }
+      },
+      "ranking": {
+       "type": "object",
+       "description": "Why the offers are in this order. Available current offers are ordered by price, lowest first; current offers last seen out of stock and older prices follow. Affiliate commission is not an input.",
+       "properties": {
+        "reason": {
+         "type": "string"
+        },
+        "basis": {
+         "type": "string"
+        },
+        "parameters": {
+         "type": "string",
+         "description": "The published ranking parameters."
+        }
+       }
+      },
+      "identity": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "How the shopper’s words reached this product. On `inferred`, WEM matched it by name (not by barcode) and the identity is not confirmed, even when `identityBasis` is `barcode`; on `exact`, the barcode itself resolved it.",
+       "properties": {
+        "method": {
+         "type": "string",
+         "enum": [
+          "gtin",
+          "slug",
+          "listing",
+          "title"
+         ]
+        },
+        "strength": {
+         "type": "string",
+         "enum": [
+          "exact",
+          "catalogued",
+          "inferred"
+         ],
+         "description": "exact = barcode; catalogued = a WEM key or listing id; inferred = matched on the product name, MPN or SKU and still a guess."
+        }
+       }
+      },
+      "identityBasis": {
+       "type": "string",
+       "enum": [
+        "barcode",
+        "curated-grouping"
+       ],
+       "description": "How this product’s offers are grouped — NOT how the shopper’s words found the product; that is `identity`. `barcode`: the product carries a GTIN, so every offer here is that same item. `curated-grouping`: it carries none, and the grouping is an inference. This field does not make a result a barcode match: when `identity.strength` is `inferred`, WEM matched the product by name."
+      },
+      "source": {
+       "type": "string"
+      },
+      "coverage": {
+       "type": "object",
+       "description": "Present when surviving rows include a marketplace cluster at similar prices. That is not a retail floor — the cheapest marketplace listing is not the deal. The listings stay in the payload, each with its url. `next`, when present, is the Chrome extension page for shops WEM does not yet hold as partners.",
+       "properties": {
+        "kind": {
+         "type": "string",
+         "enum": [
+          "marketplace_only"
+         ]
+        },
+        "provider": {
+         "type": "string",
+         "description": "The marketplace (e.g. aliexpress), or marketplace when mixed."
+        },
+        "listings": {
+         "type": "number"
+        },
+        "low": {
+         "type": "number"
+        },
+        "high": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        }
+       }
+      },
+      "next": {
+       "type": "object",
+       "description": "Present when WEM's set of offers is thin. chrome_extension is a page that compares the same product on any retailer page, including shops without an affiliate programme.",
+       "properties": {
+        "surface": {
+         "type": "string",
+         "enum": [
+          "chrome_extension"
+         ]
+        },
+        "url": {
+         "type": "string"
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "filtered": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Offers of this product WEM held back, tallied by reason. \"Priced far below this product’s other offers\" is a marketplace listing under 40% of what the product sells for elsewhere — the shape of a counterfeit, a part or a mislisted variant. Those prices are not in `offers`, `lowPrice`, `links`, `summary` or `priceHistory.low`: none is the cheapest, a deal or the 90-day low. The tally says how many were held back.",
+       "additionalProperties": {
+        "type": "number"
+       }
+      },
+      "sameModel": {
+       "type": "array",
+       "description": "Present only when the maker's own page says another model code is this product and a person at WEM has checked it. These are NOT offers for the product asked about: they are not part of `offers`, and none is this product's lowest price or the best deal. On verify_offer they are not part of the check: `verdict`, `cheapest`, `betterBy`, `summary` and the receipt are about the product asked about, and a cheaper sister code never makes the claimed price wrong. `summary` is written to be quoted as it is. `maker.host` is the source of the claim. `url` is WEM's comparison for that model, not a shop. When `relation` is `differs`, the `differences` are what the maker says differs, and its price is not a saving. Absent is not evidence that no equivalent exists.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "model": {
+          "type": "string",
+          "description": "The other model code, as the maker writes it."
+         },
+         "relation": {
+          "type": "string",
+          "enum": [
+           "identical",
+           "differs"
+          ],
+          "description": "`identical`: the maker says it is the same product. `differs`: the same product except `differences`; not like for like."
+         },
+         "differences": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "What the maker says differs. Empty when identical."
+         },
+         "maker": {
+          "type": "object",
+          "description": "The maker's own page that says so: the proof. WEM is not the source of the claim.",
+          "properties": {
+           "url": {
+            "type": "string"
+           },
+           "host": {
+            "type": "string"
+           },
+           "says": {
+            "type": "string",
+            "description": "The page's words, as checked."
+           }
+          }
+         },
+         "checkedOn": {
+          "type": "string",
+          "description": "When a person at WEM read the maker’s page (YYYY-MM-DD)."
+         },
+         "cheapest": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "The other model's cheapest named shop. Null when no named shop has an in-stock price for it. `priceAgeDays` gives its age; without one it is not current.",
+          "properties": {
+           "shop": {
+            "type": "string"
+           },
+           "price": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "priceAgeDays": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Days since WEM read that price. Null means undated."
+           }
+          }
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "WEM's comparison for that model, not a shop."
+         },
+         "summary": {
+          "type": "string",
+          "description": "WEM’s words for it, written to be quoted as they are."
+         }
+        },
+        "required": [
+         "model",
+         "relation",
+         "differences",
+         "maker",
+         "checkedOn",
+         "summary"
+        ]
+       }
+      },
+      "degraded": {
+       "type": "object",
+       "description": "Present when this call hit its time budget and skipped enrichment. The offers returned are COMPLETE — only the extras were dropped. A missing catalogue block or missing observed retailers does not mean WEM holds nothing, and no retry is needed.",
+       "properties": {
+        "skipped": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "note": {
+         "type": "string"
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "found"
+     ]
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://wem/compare",
+      "visibility": [
+       "model",
+       "app"
+      ]
+     }
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "verify_offer",
+    "title": "Check whether a price claim is true",
+    "description": "Provide at least one of: gtin, slug, wem_id, provider and externalId, or title. Checks a price someone has claimed for a product against the prices WEM has itself observed at retailers (recent readings, within a small tolerance; not a live quote), and reports the cheapest observed offer. Identify the product by gtin (strongest), slug, wem_id, provider + externalId, or title (weakest, relevance-checked). `retailer` names the shop the claim is about; without it the nearest observed price at any shop is checked. Only offers in the claim's currency are compared. Verdicts: confirmed (WEM observed that price there), price_moved (WEM last observed a different price there), not_at_retailer (WEM has no observed price there, though it may hold a feed price), no_claim (no price given; the offers are returned), unknown_product (the product could not be resolved, or WEM holds no observed price for it in that currency). unknown_product means the claim could not be checked, not that it is false. `lastConfirmedAt` says when WEM last observed a price in the answer, or is null. Each call records an evidence receipt, whose id can be cited later.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "gtin": {
+       "type": "string",
+       "description": "Product barcode: EAN-13, UPC-A, EAN-8 or GTIN-14. Strongest identifier."
+      },
+      "slug": {
+       "type": "string",
+       "description": "WEM canonical slug, as in wem3.ai/pl/{slug}."
+      },
+      "wem_id": {
+       "type": "string",
+       "description": "WEM ID (W + 10 Crockford characters + check). Active catalogue products only."
+      },
+      "provider": {
+       "type": "string",
+       "description": "With externalId: the retailer source of a listing that identifies the product, e.g. 'amazon'. To name the shop the claim is about, use `retailer`."
+      },
+      "externalId": {
+       "type": "string",
+       "description": "That listing's own id (an ASIN, or the shop's own item number). Use with provider."
+      },
+      "title": {
+       "type": "string",
+       "description": "Product title. The weakest identifier: used only when no id is given, and only if it passes a relevance check."
+      },
+      "price": {
+       "type": "number",
+       "description": "The price being claimed. Omit to ask only for the observed offers."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code for the claimed price. Default GBP. Only offers in this currency are compared."
+      },
+      "retailer": {
+       "type": "string",
+       "description": "The shop the price was claimed at, as a slug or display name. Omit to compare against every shop."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "`unknown_product` means the claim could NOT be checked. It never means the claim is false and must not be reported as one.",
+     "properties": {
+      "verdict": {
+       "type": "string",
+       "enum": [
+        "confirmed",
+        "price_moved",
+        "not_at_retailer",
+        "no_claim",
+        "unknown_product"
+       ]
+      },
+      "identity": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "How the product was identified — a separate question from whether the price checks out. Never present a `strength` of \"inferred\" as a verified identity.",
+       "properties": {
+        "method": {
+         "type": "string",
+         "enum": [
+          "gtin",
+          "slug",
+          "listing",
+          "title"
+         ]
+        },
+        "strength": {
+         "type": "string",
+         "enum": [
+          "exact",
+          "catalogued",
+          "inferred"
+         ],
+         "description": "exact = barcode; catalogued = a WEM key or the retailer’s own listing id; inferred = matched on the product name and still a guess."
+        }
+       }
+      },
+      "product": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "slug": {
+         "type": "string"
+        },
+        "title": {
+         "type": "string"
+        }
+       }
+      },
+      "claimMatched": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "retailer": {
+         "type": "string",
+         "description": "Shopper-facing retailer name."
+        },
+        "provider": {
+         "type": "string"
+        },
+        "price": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        },
+        "inStock": {
+         "type": [
+          "boolean",
+          "null"
+         ],
+         "description": "null means the retailer did not report availability. Say \"stock not confirmed\" — never present null as in stock."
+        },
+        "url": {
+         "type": "string"
+        },
+        "affiliate": {
+         "type": "boolean",
+         "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+        },
+        "totalCost": {
+         "type": "object",
+         "description": "Item plus any stated extras. When unknown is non-empty, delivered is a floor — never relay it as what the shopper will pay.",
+         "properties": {
+          "item": {
+           "type": "number"
+          },
+          "shipping": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "tax": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "fees": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "delivered": {
+           "type": "number"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "confidence": {
+           "type": "string",
+           "enum": [
+            "stated",
+            "unknown"
+           ]
+          },
+          "unknown": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      },
+      "cheapest": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "retailer": {
+         "type": "string",
+         "description": "Shopper-facing retailer name."
+        },
+        "provider": {
+         "type": "string"
+        },
+        "price": {
+         "type": "number"
+        },
+        "currency": {
+         "type": "string"
+        },
+        "inStock": {
+         "type": [
+          "boolean",
+          "null"
+         ],
+         "description": "null means the retailer did not report availability. Say \"stock not confirmed\" — never present null as in stock."
+        },
+        "url": {
+         "type": "string"
+        },
+        "affiliate": {
+         "type": "boolean",
+         "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+        },
+        "totalCost": {
+         "type": "object",
+         "description": "Item plus any stated extras. When unknown is non-empty, delivered is a floor — never relay it as what the shopper will pay.",
+         "properties": {
+          "item": {
+           "type": "number"
+          },
+          "shipping": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "tax": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "fees": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "delivered": {
+           "type": "number"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "confidence": {
+           "type": "string",
+           "enum": [
+            "stated",
+            "unknown"
+           ]
+          },
+          "unknown": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      },
+      "betterBy": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "Saving from taking `cheapest` over the claimed price. Never negative."
+      },
+      "offers": {
+       "type": "array",
+       "description": "Prices WEM holds for this product, including indicative ones and shops it has no affiliate programme with yet. When `cheapest` is null, still show these rows and their links: they are a comparison, not a verification. Do not call them confirmed, and do not name a verified cheapest.",
+       "items": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "properties": {
+         "retailer": {
+          "type": "string",
+          "description": "Shopper-facing retailer name."
+         },
+         "provider": {
+          "type": "string"
+         },
+         "price": {
+          "type": "number"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "inStock": {
+          "type": [
+           "boolean",
+           "null"
+          ],
+          "description": "null means the retailer did not report availability. Say \"stock not confirmed\" — never present null as in stock."
+         },
+         "url": {
+          "type": "string"
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         },
+         "totalCost": {
+          "type": "object",
+          "description": "Item plus any stated extras. When unknown is non-empty, delivered is a floor — never relay it as what the shopper will pay.",
+          "properties": {
+           "item": {
+            "type": "number"
+           },
+           "shipping": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "tax": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "fees": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "delivered": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "confidence": {
+            "type": "string",
+            "enum": [
+             "stated",
+             "unknown"
+            ]
+           },
+           "unknown": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "comparisonSet": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "How wide the comparison behind `cheapest` was. `exhaustive` is always false: WEM does not see every retailer, so `cheapest` is the lowest offer WEM holds, never the lowest that exists. Relay it as such.",
+       "properties": {
+        "retailersCompared": {
+         "type": "number"
+        },
+        "offersCompared": {
+         "type": "number"
+        },
+        "exhaustive": {
+         "type": "boolean",
+         "description": "Always false. Never present this answer as the lowest price available anywhere."
+        },
+        "observedAt": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "toleranceApplied": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "lastConfirmedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "When WEM last read a price among the offers compared — the freshness of this answer. Null means none of them carries a dated reading: say the prices are undated."
+      },
+      "receipt": {
+       "type": "object",
+       "description": "Citation handle for this answer. Field names follow ACP suggested_price (observed_at, source, amount). signed is true only when WEM issued an HMAC with a dedicated key; otherwise false (fail closed).",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "standardVersion": {
+         "type": "string"
+        },
+        "observed_at": {
+         "type": "string",
+         "description": "When WEM read the price in amount, or \"unobserved\" when nothing dates it — then do not present amount as current. ACP #197."
+        },
+        "source": {
+         "type": "string",
+         "description": "Citable URI of the standard this receipt is issued under."
+        },
+        "amount": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Major-unit decimal, same units as verify_offer prices."
+        },
+        "currency": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "amount_minor": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Integer minor units of amount, ACP form."
+        },
+        "identity_method": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "verifier": {
+         "type": "string",
+         "description": "Always \"wem\"."
+        },
+        "verdict": {
+         "type": "string"
+        },
+        "issuedAt": {
+         "type": "string",
+         "description": "Alias of observed_at, kept for the unsigned edition."
+        },
+        "signed": {
+         "type": "boolean",
+         "description": "True when WEM signed this receipt with a dedicated HMAC key. False when no key is configured (fail closed). Never derived from CRON_SECRET."
+        },
+        "signature": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "hmac-sha256=<hex> when signed; otherwise null."
+        }
+       }
+      },
+      "summary": {
+       "type": "string",
+       "description": "Written so quoting it verbatim is accurate. Prefer quoting it to paraphrasing the verdict code."
+      },
+      "resolvedBy": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Which identifier resolved the product."
+      },
+      "sameModel": {
+       "type": "array",
+       "description": "Present only when the maker's own page says another model code is this product and a person at WEM has checked it. These are NOT offers for the product asked about: they are not part of `offers`, and none is this product's lowest price or the best deal. On verify_offer they are not part of the check: `verdict`, `cheapest`, `betterBy`, `summary` and the receipt are about the product asked about, and a cheaper sister code never makes the claimed price wrong. `summary` is written to be quoted as it is. `maker.host` is the source of the claim. `url` is WEM's comparison for that model, not a shop. When `relation` is `differs`, the `differences` are what the maker says differs, and its price is not a saving. Absent is not evidence that no equivalent exists.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "model": {
+          "type": "string",
+          "description": "The other model code, as the maker writes it."
+         },
+         "relation": {
+          "type": "string",
+          "enum": [
+           "identical",
+           "differs"
+          ],
+          "description": "`identical`: the maker says it is the same product. `differs`: the same product except `differences`; not like for like."
+         },
+         "differences": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "What the maker says differs. Empty when identical."
+         },
+         "maker": {
+          "type": "object",
+          "description": "The maker's own page that says so: the proof. WEM is not the source of the claim.",
+          "properties": {
+           "url": {
+            "type": "string"
+           },
+           "host": {
+            "type": "string"
+           },
+           "says": {
+            "type": "string",
+            "description": "The page's words, as checked."
+           }
+          }
+         },
+         "checkedOn": {
+          "type": "string",
+          "description": "When a person at WEM read the maker’s page (YYYY-MM-DD)."
+         },
+         "cheapest": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "description": "The other model's cheapest named shop. Null when no named shop has an in-stock price for it. `priceAgeDays` gives its age; without one it is not current.",
+          "properties": {
+           "shop": {
+            "type": "string"
+           },
+           "price": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "priceAgeDays": {
+            "type": [
+             "number",
+             "null"
+            ],
+            "description": "Days since WEM read that price. Null means undated."
+           }
+          }
+         },
+         "url": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "WEM's comparison for that model, not a shop."
+         },
+         "summary": {
+          "type": "string",
+          "description": "WEM’s words for it, written to be quoted as they are."
+         }
+        },
+        "required": [
+         "model",
+         "relation",
+         "differences",
+         "maker",
+         "checkedOn",
+         "summary"
+        ]
+       }
+      },
+      "source": {
+       "type": "string"
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "verdict",
+      "offers",
+      "summary",
+      "source",
+      "disclosure",
+      "receipt"
+     ]
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://wem/compare",
+      "visibility": [
+       "model",
+       "app"
+      ]
+     }
+    },
+    "annotations": {
+     "readOnlyHint": false,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "lookup_products",
+    "title": "Look up several products by barcode",
+    "description": "Looks up to 20 product identifiers in one call: barcodes (EAN/UPC/GTIN), Amazon ASINs, WEM IDs, catalogue slugs or wem3.ai/pl URLs. Each row has a status: found (WEM's catalogue holds it; the row gives its number of retailer offers, the lowest current price at a named retailer in the shopper's currency, a marketplace low where there is one, a WEM tracked link to the shop for each price it quotes, and a link to WEM's product page), not_found (WEM does not hold it yet, which says nothing about whether it exists or has a price), unrecognised (not an identifier, such as a product name) or not_checked (not reached in this call, so not a miss). Identifiers beyond 20 are counted in `overLimit`.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "identifiers": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "minItems": 1,
+       "maxItems": 20,
+       "description": "1-20 barcodes (EAN-13, UPC-A, EAN-8, GTIN-14), Amazon ASINs, WEM IDs, catalogue slugs or wem3.ai/pl URLs. Mixed kinds are fine; a comma-separated string is also accepted. Duplicates are looked up once. Each entry must be the identifier alone: not a product name, and not a name with a barcode in it."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code for the shopper's market. Default GBP. Lowest prices are quoted in this currency only, never converted; a product WEM holds only in another currency comes back found with lowPrice null and heldInCurrencies set."
+      }
+     },
+     "required": [
+      "identifiers"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "One row per distinct identifier, in the order sent. A row is a catalogue fact, not the full offer list: it says whether WEM holds the product and what the lowest price is, links to WEM’s product page, and gives the shop’s link for each price it quotes (`lowPriceLink`, `marketplaceLowLink`). compare_offers with product.slug lists every retailer offer and its link.",
+     "properties": {
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "input": {
+          "type": "string",
+          "description": "The identifier as sent, for joining rows back."
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "gtin",
+           "asin",
+           "wem_id",
+           "slug",
+           "unrecognised"
+          ]
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "found",
+           "not_found",
+           "unrecognised",
+           "not_checked"
+          ],
+          "description": "not_found: WEM does not hold it yet — that is not a finding that the product does not exist or has no price. compare_offers and search_products are the lookups for it. not_checked: not reached in this call, and not a miss. unrecognised: not an identifier this tool reads (product names go to compare_offers)."
+         },
+         "product": {
+          "type": "object",
+          "properties": {
+           "slug": {
+            "type": "string"
+           },
+           "title": {
+            "type": "string"
+           },
+           "gtin": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "wem_id": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string",
+            "description": "WEM product page listing every retailer WEM holds. The full URL; a shortened form is a different link."
+           }
+          },
+          "required": [
+           "slug",
+           "title",
+           "url"
+          ]
+         },
+         "retailers": {
+          "type": "number",
+          "description": "Distinct retailers holding it in `currency`. One retailer is a price, not a comparison — do not call it the cheapest."
+         },
+         "lowPrice": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Lowest current indicative price (read within 14 days) at a named retailer in `currency`, from a shop not out of stock when last checked. Null when WEM holds the product only in another currency (see heldInCurrencies) — never convert one yourself — only as marketplace listings, or with no such price (see note)."
+         },
+         "lowPriceRetailer": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "The named retailer quoting lowPrice. Its link is lowPriceLink."
+         },
+         "lowPriceLink": {
+          "type": "object",
+          "properties": {
+           "retailer": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string",
+            "description": "The shop’s key, as WEM’s other tools give it."
+           },
+           "price": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string",
+            "description": "WEM tracked link to the page this price was read on. The full URL; a shortened or rewritten form is a different link."
+           },
+           "markdown": {
+            "type": "string",
+            "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+           },
+           "affiliate": {
+            "type": "boolean",
+            "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+           }
+          },
+          "description": "The retailer page for lowPrice: that offer’s retailer, price and WEM tracked link. Present beside a lowPrice WEM holds a link for; absent when lowPrice is null. A retailer URL found elsewhere may be a different listing or price."
+         },
+         "marketplaceLowPrice": {
+          "type": "number",
+          "description": "Cheapest marketplace listing (AliExpress, Temu…), present only when it undercuts lowPrice or no named retailer holds the product. A seller’s price, not a retail floor: never quote it as the product’s price or the cheapest."
+         },
+         "marketplaceLowLink": {
+          "type": "object",
+          "properties": {
+           "retailer": {
+            "type": "string"
+           },
+           "provider": {
+            "type": "string",
+            "description": "The shop’s key, as WEM’s other tools give it."
+           },
+           "price": {
+            "type": "number"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "url": {
+            "type": "string",
+            "description": "WEM tracked link to the page this price was read on. The full URL; a shortened or rewritten form is a different link."
+           },
+           "markdown": {
+            "type": "string",
+            "description": "The same link as `[Retailer — £0.00](url)`, for hosts rendering markdown."
+           },
+           "affiliate": {
+            "type": "boolean",
+            "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+           }
+          },
+          "description": "The listing for marketplaceLowPrice: its seller’s marketplace, price and WEM tracked link. A seller’s price, not a retail floor, like marketplaceLowPrice."
+         },
+         "marketplaceListings": {
+          "type": "number"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "heldInCurrencies": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "Present when lowPrice is null: the currencies WEM does hold it in."
+         },
+         "lastConfirmedAt": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "When WEM last actually read a price for this row. Null means none can be dated — say so."
+         },
+         "identity": {
+          "type": [
+           "object",
+           "null"
+          ],
+          "properties": {
+           "method": {
+            "type": "string",
+            "enum": [
+             "gtin",
+             "slug",
+             "listing",
+             "title"
+            ]
+           },
+           "strength": {
+            "type": "string",
+            "enum": [
+             "exact",
+             "catalogued",
+             "inferred"
+            ]
+           }
+          }
+         },
+         "note": {
+          "type": "string",
+          "description": "Why a row is not found, unrecognised or not checked, or why a found row has no lowPrice. Quote it rather than paraphrase."
+         }
+        },
+        "required": [
+         "input",
+         "kind",
+         "status"
+        ]
+       }
+      },
+      "counts": {
+       "type": "object",
+       "properties": {
+        "requested": {
+         "type": "number"
+        },
+        "found": {
+         "type": "number"
+        },
+        "notFound": {
+         "type": "number"
+        },
+        "unrecognised": {
+         "type": "number"
+        },
+        "notChecked": {
+         "type": "number"
+        },
+        "duplicates": {
+         "type": "number"
+        },
+        "overLimit": {
+         "type": "number",
+         "description": "Identifiers beyond the per-call limit, not looked up."
+        }
+       }
+      },
+      "overLimitNote": {
+       "type": "string"
+      },
+      "unavailable": {
+       "type": "boolean",
+       "description": "Present and true when WEM could not reach its catalogue. Rows it could not check are not_checked, not not_found — do not report them as products WEM lacks."
+      },
+      "currency": {
+       "type": "string"
+      },
+      "links": {
+       "type": "array",
+       "description": "Lines to give the user, pre-formatted. First the prices the rows quote, each with the retailer page it was read on (the rows’ `lowPriceLink`, cheapest first, then any `marketplaceLowLink`, a seller’s price and not a retail floor). Then one line per found product to WEM’s product page, which lists every retailer WEM holds and carries no price. Give the price’s own line when you name a price; a retailer URL found elsewhere may be a different listing or price.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "input": {
+          "type": "string",
+          "description": "The identifier of the row this line belongs to."
+         },
+         "title": {
+          "type": "string"
+         },
+         "retailer": {
+          "type": "string",
+          "description": "Present on a price’s line: the retailer quoting it."
+         },
+         "provider": {
+          "type": "string",
+          "description": "Present on a price’s line: the shop’s key, as WEM’s other tools give it."
+         },
+         "price": {
+          "type": "number",
+          "description": "Present on a price’s line. A WEM product-page line has none."
+         },
+         "currency": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "description": "A price’s line: WEM tracked link to the page that price was read on. A product-page line: WEM’s page for the product. The full URL; a shortened or rewritten form is a different link."
+         },
+         "markdown": {
+          "type": "string",
+          "description": "The same link as `[Title at Retailer — £0.00](url)`, or `[Title on WEM](url)` for a product page."
+         },
+         "affiliate": {
+          "type": "boolean",
+          "description": "False when this link earns WEM nothing: the shop has no affiliate programme with WEM, or this link does not carry one. It is still a real offer, and its link is not affiliate-tracked. Absent (or true) means the link is affiliate-tracked. `disclosure` states whether all, some or none of the links are tracked."
+         }
+        }
+       }
+      },
+      "next": {
+       "type": "object",
+       "description": "The WEM tool that answers the follow-up question, and what to pass it.",
+       "properties": {
+        "tool": {
+         "type": "string"
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "results",
+      "counts",
+      "currency",
+      "links",
+      "disclosure"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_evidence_receipt",
+    "title": "Look up a verification receipt by id",
+    "description": "Fetches an evidence receipt by its id (wem-evr- followed by 32 hex characters), as issued with a verify_offer result. Returns the receipt's fields: verdict, observed_at, source, amount, currency and amount_minor, identity_method, verifier, standardVersion and issuedAt, with `signed` true and an HMAC `signature` when WEM signed it. It holds the citation, not the product's offers. A receipt issued moments ago may not be fetchable yet.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "Receipt id (wem-evr- followed by 32 hex characters), as returned in a verify_offer result's receipt.id."
+      }
+     },
+     "required": [
+      "id"
+     ]
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "A previously issued evidence receipt, looked up by id.",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "standardVersion": {
+       "type": "string"
+      },
+      "observed_at": {
+       "type": "string"
+      },
+      "source": {
+       "type": "string"
+      },
+      "amount": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "currency": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "amount_minor": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "identity_method": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "verifier": {
+       "type": "string"
+      },
+      "verdict": {
+       "type": "string"
+      },
+      "issuedAt": {
+       "type": "string"
+      },
+      "signed": {
+       "type": "boolean"
+      },
+      "signature": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "id",
+      "standardVersion",
+      "observed_at",
+      "source",
+      "verifier",
+      "signed"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "search_promotions",
+    "title": "Find current retailer promotions",
+    "description": "Lists current promotions (sales and offers) that retailers in WEM's Awin affiliate programmes have published, for the shopper's market. Filter by merchant or by words in the offer. Each row gives the offer, its dates and a tracked link. A promotion is not a price, and it is not a discount on a product unless its terms say it covers that product. Checkout codes are shown only where the retailer's programme lets WEM publish them; other matching promotions are counted by reason in `withheld`, and a withheld code may still exist. An empty result covers only these programmes, not every offer a retailer runs.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "merchant": {
+       "type": "string",
+       "description": "Retailer name, e.g. \"iHoverboard\". Omit for every retailer."
+      },
+      "query": {
+       "type": "string",
+       "description": "Words that must appear in the offer, e.g. \"hoverboard\" or \"free delivery\"."
+      },
+      "currency": {
+       "type": "string",
+       "description": "ISO 4217 code for the shopper's market: GBP (default) or USD. Promotions are regional, so this decides which market's offers are read."
+      },
+      "limit": {
+       "type": "number",
+       "description": "Max promotions to return (default 10, max 25)."
+      }
+     }
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "Promotions the retailer published to its affiliate network, filtered by WEM’s programme terms. A promotion is the retailer’s claim about some of its range, not a price — never compute a discounted price from it unless its terms name the product.",
+     "properties": {
+      "promotions": {
+       "type": "array",
+       "description": "Ending soonest first. Each row is one live promotion WEM is allowed to show.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "merchant": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "terms": {
+          "type": "string",
+          "description": "The retailer’s own conditions. Relay them with the offer."
+         },
+         "startsAt": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "endsAt": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "When the retailer said it ends. Null means no end was stated — do not invent one."
+         },
+         "kind": {
+          "type": "string",
+          "enum": [
+           "sale",
+           "code"
+          ],
+          "description": "code rows carry `code`, and appear only where the retailer’s programme lets WEM publish it."
+         },
+         "code": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string",
+          "description": "WEM tracked redirect to the retailer’s promotion page. The full URL; a shortened or rewritten form is a different link."
+         },
+         "network": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "merchant",
+         "title",
+         "kind",
+         "url"
+        ]
+       }
+      },
+      "count": {
+       "type": "number"
+      },
+      "more": {
+       "type": "number",
+       "description": "Further matching promotions beyond `limit`."
+      },
+      "currency": {
+       "type": "string"
+      },
+      "market": {
+       "type": "string",
+       "description": "ISO country code the promotions were read for."
+      },
+      "withheld": {
+       "type": "object",
+       "description": "Matching promotions WEM did not show, counted by reason: notPublishable (a checkout code or offer the retailer’s programme does not let WEM publish; the code may well exist), notJoined, notActive, outsideMarket, noTrackedLink, otherPublisherLink, incompleteRecord.",
+       "additionalProperties": {
+        "type": "number"
+       }
+      },
+      "withheldNote": {
+       "type": "string",
+       "description": "Quote this rather than paraphrase it when codes were withheld."
+      },
+      "reason": {
+       "type": "string",
+       "enum": [
+        "none_matched",
+        "not_configured",
+        "upstream_error",
+        "unsupported_market"
+       ],
+       "description": "Present only when no promotion is shown. None of these means the retailer has no offer on — not_configured and upstream_error mean WEM could not look."
+      },
+      "note": {
+       "type": "string"
+      },
+      "links": {
+       "type": "array",
+       "description": "The tracked links from `promotions`, pre-formatted. Give these to the user when you name a promotion.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "merchant": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "url": {
+          "type": "string"
+         },
+         "markdown": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "search": {
+       "type": "object",
+       "description": "Present when this result names no offer. `url` is WEM's results page for the query and `markdown` is the same link, pre-formatted. WEM searches retailers live on that page, including shops it holds no affiliate programme with, so an empty or withheld result here is not evidence the product is unavailable or unpriced.",
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "markdown": {
+         "type": "string",
+         "description": "The same link, pre-formatted."
+        },
+        "reason": {
+         "type": "string"
+        }
+       }
+      },
+      "disclosure": {
+       "type": "string",
+       "description": "WEM’s affiliate disclosure for this answer, written to be quoted as it is. Its wording changes with the rows: it states whether every outbound link is affiliate-tracked, only some are, or none are. A version from an earlier answer may not fit this one: a row marked `affiliate: false` earns WEM nothing."
+      }
+     },
+     "required": [
+      "promotions",
+      "count",
+      "currency",
+      "links",
+      "disclosure"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": true
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://wem/compare",
+    "name": "WEM price comparison",
+    "description": "Cross-retailer offers for one product, cheapest first, with the 90-day price low or a price-check verdict, and WEM's tracked outbound links.",
+    "mimeType": "text/html;profile=mcp-app",
+    "_meta": {
+     "ui": {
+      "csp": {
+       "connectDomains": [
+        "https://wem3.ai"
+       ],
+       "resourceDomains": [
+        "https://wem3.ai"
+       ]
+      },
+      "prefersBorder": true
+     }
+    }
+   }
+  ]
+ }
+}

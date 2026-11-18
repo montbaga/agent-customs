@@ -1,0 +1,354 @@
+{
+ "url": "https://mcp.uneed.best/mcp",
+ "doc": {
+  "name": "Uneed — product discovery",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "name": "search_products",
+    "title": "Search products",
+    "description": "Use this when the user is looking for a digital tool or product by need, keyword or name. Searches uneed.best's directory of thousands of tools (SaaS, AI, dev, design, marketing...) with full-text and typo-tolerant matching over names, descriptions and tags. Results are ordered by relevance and popularity only — paid placement never affects the order here. `premium: true` on a result means that product pays for featured placement on the Uneed website; surface it as a disclosure, not as a quality signal. Use a result's slug with get_product for the full profile, deals and community stats.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Search terms, e.g. \"email marketing\" or a product name"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "default": 10
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_product",
+    "title": "Get product details",
+    "description": "Use this when you have a product slug and need its full public profile on uneed.best: description, website URL, category, tags, pricing, open source status (`open_source` / `repo_url`), launch date, community stats (votes, rating, review count), Ahrefs Domain Rating (`domain_rating`, 0-100, null if not measured yet), active promo deals and social links. `premium: true` means the product currently pays for featured placement on the Uneed website — treat it as a disclosure, not a quality signal. `url` is the maker-supplied website link and may occasionally be an affiliate link; `uneed_url` is always the neutral Uneed listing. Find slugs with search_products, get_trending, get_recent_launches or get_alternatives.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "The product slug on uneed.best, e.g. \"resend\""
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_alternatives",
+    "title": "Find alternatives",
+    "description": "Use this when the user wants alternatives or competitors to a product listed on uneed.best. Alternatives are ranked by weighted tag overlap (rare, specific shared tags count more than broad ones) — the same signal that powers Uneed's alternatives pages — and each result carries the shared tags explaining WHY it is an alternative. Paid placement does not affect this ranking. Use get_product on a result's slug for details and deals.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Slug of the product to find alternatives to"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 25,
+       "default": 10
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_reviews",
+    "title": "Get product reviews",
+    "description": "Use this when the user wants to read what real users say about a product on uneed.best — the individual community reviews (testimonials) with their star rating. Each entry has `rate` (1-5, may be null), the `review` text, the public `author_username`, `like_count` and `created_at`. Only published, top-level reviews are returned — replies and any private user data are excluded. For just the aggregates (average rating and review count) use get_product's `stats`, which also carries a 3-review preview; call this for the full list. Sort by `recent` (default, newest first) or `top` (most liked first). Find the slug with search_products or get_product.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Slug of the product to read reviews for"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 10
+      },
+      "sort": {
+       "type": "string",
+       "enum": [
+        "recent",
+        "top"
+       ],
+       "default": "recent",
+       "description": "'recent' = newest first (default); 'top' = most liked first"
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_trending",
+    "title": "Community rankings",
+    "description": "Use this when the user asks what is trending, popular or winning on uneed.best. Returns the community-voted rankings for a period: 'daily' | 'weekly' | 'monthly' | 'yearly'. Rankings cover products LAUNCHED in the period, ordered purely by summed community vote value — paid placement is not a factor; weeks are ISO weeks (Monday-Sunday) anchored to America/Los_Angeles, the launch timezone. Pass date (YYYY-MM-DD) to get the period containing that date (e.g. a past week's winners); omit it for the current period. Each entry's `rank` is its position in the leaderboard.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "period": {
+       "type": "string",
+       "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "yearly"
+       ]
+      },
+      "date": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+       "description": "Any date inside the wanted period (YYYY-MM-DD). Omit for the current period."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20
+      }
+     },
+     "required": [
+      "period"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_recent_launches",
+    "title": "Recent launches",
+    "description": "Use this when the user asks what is new or what launched recently. Lists the most recent product launches on uneed.best, newest first, optionally filtered by category (slug or name, see list_categories) and/or tag slug. Ordered strictly by launch date — paid placement is not a factor. Combine with get_trending to know which of them the community voted up.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "category": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Category slug or exact name (see list_categories)"
+      },
+      "tag": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Tag slug"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_deals",
+    "title": "Active deals",
+    "description": "Use this when the user asks about discounts, promo codes or deals on digital products. Lists the active offers published by makers on uneed.best, each attached to the product it applies to (name, slug, URL, category). Optionally filter by category. Use get_product on a deal's slug for the full product profile.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "category": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Category slug or exact name (see list_categories)"
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_products_for_sale",
+    "title": "Products for sale",
+    "description": "Use this when the user wants to buy a SaaS, micro SaaS or side project, or asks which businesses are for sale. Lists products their makers put up for acquisition on uneed.best, newest listing first, with asking price and trailing twelve-month revenue and profit when the maker disclosed them. Optionally filter by category, maximum price or minimum revenue, and include recently sold ones for comparables. Use get_product on a slug for the full profile; buyers contact the seller from the product page on uneed.best.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "category": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Category slug or exact name (see list_categories)"
+      },
+      "max_price": {
+       "type": "number",
+       "exclusiveMinimum": 0,
+       "description": "Maximum asking price in US dollars"
+      },
+      "min_revenue": {
+       "type": "number",
+       "minimum": 0,
+       "description": "Minimum trailing-twelve-month revenue in US dollars (excludes listings with no disclosed revenue)"
+      },
+      "include_sold": {
+       "type": "boolean",
+       "default": false,
+       "description": "Also return recently sold products (price and listing date only, no financials) as comparables"
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 20
+      }
+     },
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "list_categories",
+    "title": "List categories",
+    "description": "Use this when you need the valid category values before filtering, or when the user asks what Uneed covers. Lists uneed.best's product categories with their slug, description and number of listed products. Feed the slug or name to the get_recent_launches and list_deals filters.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "get_launch_stats",
+    "title": "Get monthly launch statistics",
+    "description": "Use this when the user asks how many products are submitted, launched or declined on uneed.best per month, or wants launch-volume trends (for example to tell more people submitting products apart from stricter curation). Returns one row per month since 2024-02 with `launched`, plus `submitted` and `declined` from 2026-08, each with `complete` (false for the current month) and `estimated`. The answer carries the definitions of every field and the license (CC BY 4.0, attribution \"Source: Uneed, uneed.best\"): quote them when you reuse the figures. For the products themselves use get_recent_launches or get_trending.",
+    "inputSchema": {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "type": "object",
+     "properties": {}
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "search",
+    "title": "Search Uneed products",
+    "description": "Use this when a deep research run needs to look up digital tools and products on uneed.best. Same catalog and same relevance ordering as search_products, returned as `{id, title, url}` documents; pass a result's id to `fetch` for the full profile. Prefer search_products when you want structured product fields directly.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "query": {
+       "type": "string",
+       "minLength": 1
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   },
+   {
+    "name": "fetch",
+    "title": "Fetch a Uneed product",
+    "description": "Use this to retrieve the full uneed.best profile of a product returned by `search`, by its id (the product slug). Same data as get_product, wrapped in the `{id, title, text, url}` document shape deep research expects.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string",
+       "minLength": 1,
+       "description": "Product slug returned by search"
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false,
+     "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "openWorldHint": false
+    }
+   }
+  ]
+ }
+}

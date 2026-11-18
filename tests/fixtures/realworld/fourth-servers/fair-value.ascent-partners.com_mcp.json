@@ -1,0 +1,5314 @@
+{
+ "url": "https://fair-value.ascent-partners.com/mcp",
+ "doc": {
+  "name": "fair-value",
+  "version": "0.2.7",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Actuarial present value engine. Discount expected cash flows with mortality, survival, and risk adjustment for insurance and benefit obligations, generalising IFRS 17 (fulfilment cash flows), IAS 19 (employee benefits), IFRS 2 (share-based payments), and IAS 37 (provisions). Use this for regulated IFRS/HKFRS obligations only; it does NOT do generic project or scenario probability weighting (use calculate_expected_value). Methods: ifrs17_gmm: cash_flows, discount_rate, risk_adjustment; ifrs17_paa: premiums, claims_cash, acquisition_cash_flows, coverage_periods; ifrs17_vfa: cash_flows, discount_rate, underlying_items_return, risk_adjustment; ias19_puc: projected_benefits, discount_rate, attribution_years; ias37_provision: outcomes, probabilities, discount_rate, periods. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "ifrs17_gmm",
+        "ifrs17_paa",
+        "ifrs17_vfa",
+        "ias19_puc",
+        "ias37_provision"
+       ],
+       "type": "string"
+      },
+      "cash_flows": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Projected cash flows in reporting currency, indexed t=1..n."
+      },
+      "discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Discount rate as a decimal (0.10 = 10%); pre-tax when method=viu_pre_tax."
+      },
+      "risk_adjustment": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Explicit risk adjustment for non-financial risk."
+      },
+      "premiums": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Premiums in reporting currency."
+      },
+      "claims_cash": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Expected claims in reporting currency."
+      },
+      "acquisition_cash_flows": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Acquisition cash flows in reporting currency."
+      },
+      "coverage_periods": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Coverage periods for the PAA (>=1)."
+      },
+      "underlying_items_return": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Return on underlying items (decimal)."
+      },
+      "projected_benefits": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Projected benefits per service year."
+      },
+      "attribution_years": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Years of service for attribution (>=1)."
+      },
+      "outcomes": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Outcome values aligned with probabilities."
+      },
+      "probabilities": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cumulative success probability per period in [0,1], aligned with cash_flows."
+      },
+      "periods": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of periods n (>=1)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_actuarial_pv",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Actuarial present value"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Convertible-bond engine. Value callable and puttable convertible or exchangeable bonds with credit risk using a Tsiveriotis-Fernandes lattice (equity discounted at the risk-free rate, debt at a credit spread), with conversion, issuer call, holder put, coupon schedule, and a straight-bond floor. Use this for convertible and exchangeable bonds; for a plain bond or rate curve use calculate_fixed_income, and for a standalone option or warrant use calculate_option. The lattice_tsf, lattice_intensity, finite_difference, lsmc and quantlib methods are alternative numerical schemes for the same valuation and take identical inputs (Tsiveriotis-Fernandes is the reference, lsmc is Monte Carlo, quantlib needs the optional engine); choose one. Methods: lattice_tsf/lattice_intensity/finite_difference/lsmc/quantlib: spot, face, coupon_rate, maturity, conversion_ratio, volatility, risk_free, credit_spread, call_schedule, put_schedule, rights_priority. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "lattice_tsf",
+        "lattice_intensity",
+        "finite_difference",
+        "lsmc",
+        "quantlib"
+       ],
+       "type": "string"
+      },
+      "spot": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Spot price of the underlying (or FX rate for garman_kohlhagen)."
+      },
+      "face": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Bond face value."
+      },
+      "coupon_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annual coupon rate (decimal)."
+      },
+      "maturity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Time to expiry in years (0.5 = six months); > 0."
+      },
+      "conversion_ratio": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Shares received per bond on conversion."
+      },
+      "volatility": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annualized volatility (decimal, 0.30 = 30%); > 0."
+      },
+      "risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuously-compounded risk-free rate (decimal)."
+      },
+      "credit_spread": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Credit spread over the risk-free rate (decimal)."
+      },
+      "call_schedule": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Issuer call schedule [{date_years, price}]; pass [] when there is none."
+      },
+      "put_schedule": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Investor put schedule [{date_years, price}]; pass [] when there is none."
+      },
+      "rights_priority": {
+       "anyOf": [
+        {
+         "enum": [
+          "holder",
+          "issuer"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Which right prevails when call and put coincide."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_convertible_bond",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Convertible and exchangeable bond valuation"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Credit-risk engine (IFRS 9 / HKFRS 9). Compute 12-month, lifetime, and staged expected credit loss, PD/LGD/EAD, provision matrices, hazard rates, and CVA/DVA. Use this for impairment, fair-value credit adjustment, and loan-loss provisioning; for the credit component of a specific convertible bond use calculate_convertible_bond, and for liquidity, control or marketability discounts rather than credit loss use calculate_fair_value_adjustment. Methods: ecl_12m: ead, pd, lgd; ecl_lifetime: ead, pd_lifetime, lgd; ecl_staged: ead, pd_12m, pd_lifetime, lgd, stage; provision_matrix: receivables_ageing, loss_rates; pd_from_spread: credit_spread, recovery, tenor_years; cumulative_pd: annual_pd, years; hazard: hazard_rate, tenor_years; cva_dva: exposure_profile, pd, lgd, discount_rate. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "ecl_12m",
+        "ecl_lifetime",
+        "ecl_staged",
+        "provision_matrix",
+        "pd_from_spread",
+        "cumulative_pd",
+        "hazard",
+        "cva_dva"
+       ],
+       "type": "string"
+      },
+      "ead": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Exposure at default in currency units."
+      },
+      "pd": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Probability of default over the horizon, in [0,1]."
+      },
+      "lgd": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Loss given default in [0,1] (1 - recovery rate)."
+      },
+      "pd_lifetime": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lifetime PD in [0,1]."
+      },
+      "pd_12m": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "12-month PD in [0,1]."
+      },
+      "stage": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "IFRS 9 stage (1, 2 or 3)."
+      },
+      "receivables_ageing": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Ageing buckets [{bucket, amount}]."
+      },
+      "loss_rates": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Loss rate per ageing bucket."
+      },
+      "credit_spread": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Credit spread over the risk-free rate (decimal)."
+      },
+      "recovery": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Recovery rate in [0,1]."
+      },
+      "tenor_years": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Tenor in years (>0)."
+      },
+      "annual_pd": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annual PD in [0,1]."
+      },
+      "years": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of projection years n; equal len(cash_flows) when both are supplied."
+      },
+      "hazard_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Default hazard rate as a decimal."
+      },
+      "exposure_profile": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Expected exposure per period."
+      },
+      "discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Discount rate as a decimal (0.10 = 10%); pre-tax when method=viu_pre_tax."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_credit_loss",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Credit loss and impairment"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Discounted cash flow valuation engine. Choose a method and supply its exact inputs to value a business from projected free cash flows, dividends, residual income, or economic profit. Covers FCFF/FCFE DCF, NPV/IRR, terminal values, and multi-stage growth. Use this for going-concern cash-flow businesses; for asset-anchored or financial firms use calculate_residual, for peer-based pricing use calculate_market_multiple, and for pre-profit companies use calculate_loss_making_company. Methods: dcf/npv: cash_flows, discount_rate; annuity: payment, discount_rate, periods; growing_annuity: payment, discount_rate, growth_rate, periods; perpetuity: payment, discount_rate; terminal_gordon: final_cash_flow, discount_rate, perpetual_growth; terminal_multiple: final_cash_flow, exit_multiple; viu_pre_tax: cash_flows, pre_tax_discount_rate; rnpv: cash_flows, discount_rate, probabilities; lease_pv: lease_payments, incremental_borrowing_rate. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "dcf",
+        "npv",
+        "annuity",
+        "growing_annuity",
+        "perpetuity",
+        "terminal_gordon",
+        "terminal_multiple",
+        "viu_pre_tax",
+        "rnpv",
+        "lease_pv"
+       ],
+       "type": "string"
+      },
+      "cash_flows": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Projected cash flows in reporting currency, indexed t=1..n."
+      },
+      "discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Discount rate as a decimal (0.10 = 10%); pre-tax when method=viu_pre_tax."
+      },
+      "payment": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Level periodic payment in reporting currency."
+      },
+      "periods": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of periods n (>=1)."
+      },
+      "growth_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Periodic growth rate as a decimal (0.03 = 3%)."
+      },
+      "final_cash_flow": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Final-period cash flow for the terminal value."
+      },
+      "perpetual_growth": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Gordon growth rate (decimal); strictly below discount_rate."
+      },
+      "exit_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Exit multiple on the final flow, e.g. 8.0 for 8x."
+      },
+      "pre_tax_discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Pre-tax discount rate (decimal), required by viu_pre_tax (IAS 36)."
+      },
+      "probabilities": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cumulative success probability per period in [0,1], aligned with cash_flows."
+      },
+      "lease_payments": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Contractual lease payments in reporting currency, t=1..n."
+      },
+      "incremental_borrowing_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lessee incremental borrowing rate (decimal), IFRS 16."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_dcf",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Discounted cash flow valuation"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Cost-of-capital engine. Compute WACC, cost of equity (CAPM), cost of debt, unlevered/relevered beta, and country or size premiums from an explicit capital structure and market inputs. Use this to derive the discount rate an income-approach valuation needs; it returns a rate, not a valuation, so feed the result to calculate_dcf, or to calculate_residual for IFRS-basis measurement. Methods: wacc: equity_weight, debt_weight, cost_equity, cost_debt, tax_rate; capm: risk_free, beta, market_return; startup_capm: risk_free, beta, market_risk_premium, size_premium, illiquidity_premium; build_up: risk_free, equity_risk_premium, size_premium, industry_premium, specific_premium; currency_adjusted: base_rate, currency_risk_premium, country_risk_premium; country_risk: sovereign_yield, us_risk_free; esg: base_rate, esg_risk_premium, esg_opportunity_discount; portfolio_beta: weights, betas; ibr: risk_free, credit_spread, tenor_years. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "wacc",
+        "capm",
+        "startup_capm",
+        "build_up",
+        "currency_adjusted",
+        "country_risk",
+        "esg",
+        "portfolio_beta",
+        "ibr"
+       ],
+       "type": "string"
+      },
+      "equity_weight": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Market-value weight of equity (decimal); with debt_weight must sum to 1."
+      },
+      "debt_weight": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Market-value weight of debt (decimal); with equity_weight must sum to 1."
+      },
+      "cost_equity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cost of equity as a decimal (0.12 = 12%)."
+      },
+      "cost_debt": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Pre-tax cost of debt as a decimal."
+      },
+      "tax_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Marginal corporate tax rate as a decimal."
+      },
+      "risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuously-compounded risk-free rate (decimal)."
+      },
+      "beta": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Equity beta (market = 1.0)."
+      },
+      "market_return": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Expected market return (decimal)."
+      },
+      "market_risk_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Market risk premium (decimal)."
+      },
+      "size_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Small-size premium (decimal)."
+      },
+      "illiquidity_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Illiquidity premium (decimal)."
+      },
+      "equity_risk_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Equity risk premium (decimal)."
+      },
+      "industry_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Industry risk premium (decimal)."
+      },
+      "specific_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Company-specific risk premium (decimal)."
+      },
+      "base_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base rate before currency/country/ESG adjustment (decimal)."
+      },
+      "currency_risk_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Currency risk premium (decimal)."
+      },
+      "country_risk_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Country risk premium (decimal)."
+      },
+      "sovereign_yield": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Sovereign bond yield (decimal)."
+      },
+      "us_risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "US Treasury risk-free yield (decimal)."
+      },
+      "esg_risk_premium": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "ESG risk premium added to the base rate (decimal)."
+      },
+      "esg_opportunity_discount": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "ESG opportunity discount subtracted from the base rate (decimal)."
+      },
+      "weights": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Weights that must sum to 1."
+      },
+      "betas": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Asset/segment betas aligned with weights."
+      },
+      "credit_spread": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Credit spread over the risk-free rate (decimal)."
+      },
+      "tenor_years": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Tenor in years (>0)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_discount_rate",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Cost of capital and discount rates"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Expected-value engine. Compute expected values over discrete, continuous, simulated, or tree-structured uncertainty, plus football-field ranges. Use this for generic probability weighting of scenarios, Monte-Carlo and decision trees; it does NOT perform IFRS/HKFRS measurement of provisions, insurance or employee-benefit obligations (use calculate_actuarial_pv), and it does not price path-dependent payoffs (use calculate_structured_product). Methods: discrete: outcomes, probabilities; continuous: distribution, mean, std, lower, upper; scenario: scenarios; monte_carlo: iterations, distributions, base_params, seed; decision_tree: tree; football_field: estimates. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "discrete",
+        "continuous",
+        "scenario",
+        "monte_carlo",
+        "decision_tree",
+        "football_field"
+       ],
+       "type": "string"
+      },
+      "outcomes": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Outcome values aligned with probabilities."
+      },
+      "probabilities": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cumulative success probability per period in [0,1], aligned with cash_flows."
+      },
+      "distribution": {
+       "anyOf": [
+        {
+         "enum": [
+          "normal",
+          "lognormal",
+          "uniform"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuous distribution to integrate over."
+      },
+      "mean": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Distribution mean."
+      },
+      "std": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Distribution standard deviation (>0)."
+      },
+      "lower": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lower integration bound."
+      },
+      "upper": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Upper integration bound."
+      },
+      "scenarios": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Scenarios [{probability, value}] with probabilities summing to 1."
+      },
+      "iterations": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Monte-Carlo iterations (>=1000)."
+      },
+      "distributions": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Input distributions [{parameter, type, mean, std}]."
+      },
+      "base_params": {
+       "anyOf": [
+        {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base parameter values for simulation."
+      },
+      "seed": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Deterministic RNG seed (required by simulation methods for reproducibility)."
+      },
+      "tree": {
+       "anyOf": [
+        {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Decision tree with chance/decision nodes."
+      },
+      "estimates": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Estimates [{method, central, low, high}] for a football field."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_expected_value",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Expected value and probability weighting"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Fair-value-adjustment engine (IFRS 13). Compute exit-price adjustments including credit, liquidity, control and marketability discounts, blockage, and the fair-value hierarchy level. Use this to move from an indicated value to the fair value recognised in the accounts; for liquidity/marketability inputs of a listed instrument prefer calculate_market_multiple, and for expected credit loss use calculate_credit_loss. Methods: dlom: base_value, restricted_period, volatility, risk_free; dloc: base_value, transaction_cost_pct; control_premium: base_value, control_premium_pct; minority_discount: base_value, minority_discount_pct; highest_best_use: base_value, alternative_use_values; hierarchy_level: inputs. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "dlom",
+        "dloc",
+        "control_premium",
+        "minority_discount",
+        "highest_best_use",
+        "hierarchy_level"
+       ],
+       "type": "string"
+      },
+      "base_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base valuation before the adjustment."
+      },
+      "restricted_period": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Restricted/marketability period in years (>=0)."
+      },
+      "volatility": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annualized volatility (decimal, 0.30 = 30%); > 0."
+      },
+      "risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuously-compounded risk-free rate (decimal)."
+      },
+      "transaction_cost_pct": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Transaction cost as a fraction of value."
+      },
+      "control_premium_pct": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Control premium as a fraction of value."
+      },
+      "minority_discount_pct": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Minority discount as a fraction of value."
+      },
+      "alternative_use_values": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Financially feasible alternative-use values."
+      },
+      "inputs": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Inputs [{value, level}] used to determine the hierarchy level."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_fair_value_adjustment",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Fair value adjustments (IFRS 13)"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Fixed-income engine. Price plain coupon bonds, solve for yield to maturity, measure interest-rate sensitivity via Macaulay and modified duration and convexity, and build a HIBOR/HKD-style term structure: bootstrap a zero curve from par rates, infer forward rates, and discount cash flows on the curve. Use this for vanilla bonds, rate risk and discount curves; for convertibles use calculate_convertible_bond and for structured payoffs use calculate_structured_product. Methods: bond_price/duration/convexity: face, coupon_rate, years, ytm, frequency; bond_yield: face, coupon_rate, years, price, frequency; matrix_pricing: target_tenor, benchmark_tenors, benchmark_yields; discount_factor: rate, years, frequency; zero_curve: par_rates, tenors, frequency; forward_rate: zero_rates, tenors, t1, t2; pv_curve: cash_flows, times, zero_rates, tenors. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "bond_price",
+        "bond_yield",
+        "duration",
+        "convexity",
+        "matrix_pricing",
+        "discount_factor",
+        "zero_curve",
+        "forward_rate",
+        "pv_curve"
+       ],
+       "type": "string"
+      },
+      "face": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Bond face value."
+      },
+      "coupon_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annual coupon rate (decimal)."
+      },
+      "years": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of projection years n; equal len(cash_flows) when both are supplied."
+      },
+      "ytm": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Yield to maturity (decimal, annualised)."
+      },
+      "frequency": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Coupon payments per year (1=annual, 2=semi-annual)."
+      },
+      "price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Dirty price of the instrument in reporting currency."
+      },
+      "target_tenor": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Target tenor in years for matrix pricing (interpolated)."
+      },
+      "benchmark_tenors": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Benchmark tenors in years, sorted, aligned with benchmark_yields."
+      },
+      "benchmark_yields": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Benchmark yields (decimal) at each benchmark tenor."
+      },
+      "rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "A single interest/zero rate (decimal)."
+      },
+      "par_rates": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Par (coupon) rates per tenor, aligned with tenors (decimal)."
+      },
+      "tenors": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Tenors in years, aligned with par_rates or zero_rates."
+      },
+      "zero_rates": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Zero (spot) rates per tenor, decimal, annual compounding."
+      },
+      "t1": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Forward period start in years (>=0)."
+      },
+      "t2": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Forward period end in years (> t1)."
+      },
+      "cash_flows": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Projected cash flows in reporting currency, indexed t=1..n."
+      },
+      "times": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cash-flow times in years, aligned with cash_flows."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_fixed_income",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Fixed income and term structure analytics"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Loss-making-company engine. Value currently unprofitable companies with margin-ramp DCF, revenue multiples, Merton structural equity, the VC method, distressed waterfalls, bank residual income, and SPAC deals; every method returns a central value plus a dispersion (sigma, percentiles, long-tail). Use this when earnings-based multiples break down; for standalone probability weighting of arbitrary scenarios use calculate_expected_value, and for a single going-concern DCF use calculate_dcf. Methods: margin_ramp_dcf: revenue, growth_rate, start_margin, target_margin, ramp_years, discount_rate, years, shares_outstanding, net_debt, range_method; revenue_multiple: revenue, ev_revenue_multiple, net_debt, shares_outstanding, range_method; merton_equity: firm_value, firm_volatility, debt, risk_free, maturity, range_method; vc_method: terminal_value, target_return, investment, shares_outstanding, range_method; distressed_waterfall: enterprise_value, claims, range_method; bank_residual_income: book_value, net_income, cost_equity, growth_rate, range_method; spac_deal: trust_cash, shares_outstanding, redemption_price, range_method. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "margin_ramp_dcf",
+        "revenue_multiple",
+        "merton_equity",
+        "vc_method",
+        "distressed_waterfall",
+        "bank_residual_income",
+        "spac_deal"
+       ],
+       "type": "string"
+      },
+      "revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base-year revenue in reporting currency."
+      },
+      "growth_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Periodic growth rate as a decimal (0.03 = 3%)."
+      },
+      "start_margin": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Opening operating margin (decimal, may be negative); margin_ramp."
+      },
+      "target_margin": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Normalized margin reached after ramp_years; margin_ramp."
+      },
+      "ramp_years": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Years to move from start_margin to target_margin (>=1)."
+      },
+      "discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Discount rate as a decimal (0.10 = 10%); pre-tax when method=viu_pre_tax."
+      },
+      "years": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of projection years n; equal len(cash_flows) when both are supplied."
+      },
+      "shares_outstanding": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Shares outstanding."
+      },
+      "net_debt": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Total debt minus cash and equivalents."
+      },
+      "range_method": {
+       "anyOf": [
+        {
+         "enum": [
+          "central",
+          "mean",
+          "median",
+          "downside",
+          "upside"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Statistic returned as the headline value; the full dispersion is always included."
+      },
+      "ev_revenue_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EV/Revenue multiple."
+      },
+      "firm_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Firm/asset value for the Merton equity model."
+      },
+      "firm_volatility": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Asset volatility for the Merton equity model (decimal)."
+      },
+      "debt": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Debt face value (default point) for the Merton equity model."
+      },
+      "risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuously-compounded risk-free rate (decimal)."
+      },
+      "maturity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Time to expiry in years (0.5 = six months); > 0."
+      },
+      "terminal_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Exit/terminal value (VC method)."
+      },
+      "target_return": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "VC target return multiple."
+      },
+      "investment": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Amount invested (VC method)."
+      },
+      "enterprise_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Enterprise value distributed across claims."
+      },
+      "claims": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Ordered claims [{name, amount, priority}] for a waterfall."
+      },
+      "book_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Book value of equity in reporting currency."
+      },
+      "net_income": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Net income in reporting currency."
+      },
+      "cost_equity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cost of equity as a decimal (0.12 = 12%)."
+      },
+      "trust_cash": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "SPAC trust cash available for redemption."
+      },
+      "redemption_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "SPAC redemption price per share."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_loss_making_company",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Loss-making and pre-profit company valuation"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Market-multiple engine. Apply peer multiples (P/E, P/B, EV/EBITDA, EV/Sales, PEG and more) or derive implied multiples to price a company on a comparable basis. Use this for market-approach pricing where peers exist; it does peer multiples only — for intrinsic cash-flow value use calculate_dcf, and for residual-income or IFRS-basis measurement use calculate_residual. Methods: ev_revenue: revenue, ev_revenue_multiple; ev_ebitda: ebitda, ev_ebitda_multiple; ev_arr: arr, ev_arr_multiple; ev_gmv: gmv, ev_gmv_multiple; pe: eps, pe_multiple; pb: book_value_per_share, pb_multiple; ps: sales_per_share, ps_multiple; cap_rate: net_operating_income, cap_rate; regression: intercept, growth_rate, growth_coefficient, market_maturity, maturity_coefficient; royalty_cap: revenue, royalty_rate, discount_rate; ddm: dividend_per_share, cost_equity, growth_rate. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "ev_revenue",
+        "ev_ebitda",
+        "ev_arr",
+        "ev_gmv",
+        "pe",
+        "pb",
+        "ps",
+        "cap_rate",
+        "regression",
+        "royalty_cap",
+        "ddm"
+       ],
+       "type": "string"
+      },
+      "revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base-year revenue in reporting currency."
+      },
+      "ev_revenue_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EV/Revenue multiple."
+      },
+      "ebitda": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EBITDA in reporting currency."
+      },
+      "ev_ebitda_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EV/EBITDA multiple."
+      },
+      "arr": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annual recurring revenue in reporting currency."
+      },
+      "ev_arr_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EV/ARR multiple."
+      },
+      "gmv": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Gross merchandise value in reporting currency."
+      },
+      "ev_gmv_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EV/GMV multiple."
+      },
+      "eps": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Earnings per share."
+      },
+      "pe_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Price/Earnings multiple."
+      },
+      "book_value_per_share": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Book value per share."
+      },
+      "pb_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Price/Book multiple."
+      },
+      "sales_per_share": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Sales per share."
+      },
+      "ps_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Price/Sales multiple."
+      },
+      "net_operating_income": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Stabilised net operating income in reporting currency."
+      },
+      "cap_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Capitalisation rate as a decimal (0.06 = 6%)."
+      },
+      "intercept": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Regression intercept (base multiple)."
+      },
+      "growth_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Periodic growth rate as a decimal (0.03 = 3%)."
+      },
+      "growth_coefficient": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Regression slope on growth."
+      },
+      "market_maturity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Market maturity indicator."
+      },
+      "maturity_coefficient": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Regression slope on market maturity."
+      },
+      "royalty_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Royalty rate as a decimal (0.05 = 5% of revenue)."
+      },
+      "discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Discount rate as a decimal (0.10 = 10%); pre-tax when method=viu_pre_tax."
+      },
+      "dividend_per_share": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Dividend per share in reporting currency."
+      },
+      "cost_equity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cost of equity as a decimal (0.12 = 12%)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_market_multiple",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Market multiples and comparable pricing"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Option-pricing engine. Price European and American options and warrants (Black-Scholes, Black-76, CRR binomial, Garman-Kohlhagen FX, digital, range, share-based) and their greeks. Use this for a single contingent claim or warrant on one underlying; it does NOT price listed structured payoffs such as CBBCs, inline/derivative warrants or autocallables (use calculate_structured_product). Methods: black_scholes: spot, strike, maturity, risk_free, volatility, option_type; black76: forward, strike, maturity, risk_free, volatility, option_type; binomial_american: spot, strike, maturity, risk_free, volatility, option_type, steps; garman_kohlhagen: spot, strike, maturity, domestic_rate, foreign_rate, volatility, option_type; barrier_first_passage: spot, strike, maturity, risk_free, volatility, option_type, barrier, barrier_type; asian_average: spot, strike, maturity, risk_free, volatility, option_type, average_type; digital: spot, strike, maturity, risk_free, volatility, cash_payout; range: spot, lower_strike, upper_strike, maturity, risk_free, volatility, payout; share_based: share_price, exercise_price, expected_life, volatility, risk_free, dividend_yield. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "black_scholes",
+        "black76",
+        "binomial_american",
+        "garman_kohlhagen",
+        "barrier_first_passage",
+        "asian_average",
+        "digital",
+        "range",
+        "share_based"
+       ],
+       "type": "string"
+      },
+      "spot": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Spot price of the underlying (or FX rate for garman_kohlhagen)."
+      },
+      "strike": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Strike or exercise price in the same currency as spot."
+      },
+      "maturity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Time to expiry in years (0.5 = six months); > 0."
+      },
+      "risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuously-compounded risk-free rate (decimal)."
+      },
+      "volatility": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annualized volatility (decimal, 0.30 = 30%); > 0."
+      },
+      "option_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "call",
+          "put"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Option right."
+      },
+      "forward": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Forward/futures price of the underlying."
+      },
+      "steps": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lattice steps for binomial_american (>=50)."
+      },
+      "domestic_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Domestic continuously-compounded rate (decimal)."
+      },
+      "foreign_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Foreign continuously-compounded rate (decimal)."
+      },
+      "barrier": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Knock level for barrier_first_passage."
+      },
+      "barrier_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "knock_in",
+          "knock_out"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Barrier direction."
+      },
+      "average_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "arithmetic",
+          "geometric"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Averaging convention."
+      },
+      "cash_payout": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Fixed cash amount paid when the digital condition is met."
+      },
+      "lower_strike": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lower strike of the range."
+      },
+      "upper_strike": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Upper strike of the range."
+      },
+      "payout": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Fixed payout when the range condition is met."
+      },
+      "share_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Grant-date share price (IFRS 2)."
+      },
+      "exercise_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Exercise price of the award (IFRS 2)."
+      },
+      "expected_life": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Expected life of the award in years (IFRS 2)."
+      },
+      "dividend_yield": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuous dividend yield (decimal)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_option",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Option and warrant pricing"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "IFRS/HKFRS measurement engine. Compute goodwill and purchase-price allocation, impairment (IAS 36), inventory net realisable value, held-for-sale, debt waterfalls, cap tables, sum-of-the-parts and SPAC redemption; residual income and justified price-to-book; and non-financial asset fair value: investment property (IAS 40 / HKAS 40), PP&E revaluation via depreciated replacement cost (IAS 16) and biological assets at fair value less costs to sell (IAS 41). Use this for accounting-basis measurement of assets and equity; for going-concern cash flow use calculate_dcf and for peer multiples use calculate_market_multiple. Methods: goodwill: purchase_price, fair_value_net_identifiable_assets; ppa: purchase_price, tangible_assets_fv, identified_intangibles_fv; impairment_fvlcd: carrying_value, fair_value_less_costs_to_dispose; impairment_viu: carrying_value, value_in_use; inventory_nrv: carrying_value, net_realisable_value; held_for_sale: carrying_value, fair_value_less_costs_to_sell; debt_waterfall/cap_table: enterprise_value, claims; sotp: segments, net_debt, holding_discount; spac_redemption: trust_cash, shares_outstanding, redemption_price; investment_property: noi, cap_rate; ppe_revaluation: replacement_cost, accumulated_depreciation; biological_asset: expected_price, quantity, costs_to_sell; residual_income: book_value, net_income, cost_equity; justified_pb: roe, cost_equity, growth_rate; relief_from_royalty: revenue, royalty_rate, discount_rate, periods; mpeem: cash_flows, contributory_charges, discount_rate; with_without: with_cash_flows, without_cash_flows, discount_rate; recoverable_amount: fair_value_less_costs_to_dispose, value_in_use; liability_fulfilment: fulfilment_costs, mark_up, discount_rate; inventory_residual: selling_price, costs_to_complete, profit_allowance; development_residual: gross_development_value, development_costs, developer_profit. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "goodwill",
+        "ppa",
+        "impairment_fvlcd",
+        "impairment_viu",
+        "inventory_nrv",
+        "held_for_sale",
+        "debt_waterfall",
+        "cap_table",
+        "sotp",
+        "spac_redemption",
+        "investment_property",
+        "ppe_revaluation",
+        "biological_asset",
+        "residual_income",
+        "justified_pb",
+        "relief_from_royalty",
+        "mpeem",
+        "with_without",
+        "recoverable_amount",
+        "liability_fulfilment",
+        "inventory_residual",
+        "development_residual"
+       ],
+       "type": "string"
+      },
+      "purchase_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Consideration transferred in reporting currency."
+      },
+      "fair_value_net_identifiable_assets": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Fair value of net identifiable assets."
+      },
+      "tangible_assets_fv": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Fair value of tangible assets."
+      },
+      "identified_intangibles_fv": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Fair value of separately identified intangibles."
+      },
+      "carrying_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Carrying amount before the test."
+      },
+      "fair_value_less_costs_to_dispose": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "FVLCD in reporting currency."
+      },
+      "value_in_use": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Value in use in reporting currency."
+      },
+      "net_realisable_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Estimated NRV in reporting currency."
+      },
+      "fair_value_less_costs_to_sell": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "FV less costs to sell in reporting currency."
+      },
+      "enterprise_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Enterprise value distributed across claims."
+      },
+      "claims": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Ordered claims [{name, amount, priority}] for a waterfall."
+      },
+      "segments": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Segments [{name, value}] for a sum-of-the-parts."
+      },
+      "net_debt": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Total debt minus cash and equivalents."
+      },
+      "holding_discount": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Holding-company discount as a decimal."
+      },
+      "trust_cash": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "SPAC trust cash available for redemption."
+      },
+      "shares_outstanding": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Shares outstanding."
+      },
+      "redemption_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "SPAC redemption price per share."
+      },
+      "noi": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Net operating income of the property (IAS 40)."
+      },
+      "cap_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Capitalisation rate as a decimal (0.06 = 6%)."
+      },
+      "replacement_cost": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Depreciated-replacement-cost gross value of PP&E (IAS 16)."
+      },
+      "accumulated_depreciation": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Accumulated depreciation to deduct (IAS 16)."
+      },
+      "expected_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Expected market price per biological-asset unit (IAS 41)."
+      },
+      "quantity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of units (biological assets)."
+      },
+      "costs_to_sell": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Incremental costs to sell / dispose (IAS 41)."
+      },
+      "book_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Book value of equity in reporting currency."
+      },
+      "net_income": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Net income in reporting currency."
+      },
+      "cost_equity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Cost of equity as a decimal (0.12 = 12%)."
+      },
+      "roe": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Return on equity (decimal)."
+      },
+      "growth_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Periodic growth rate as a decimal (0.03 = 3%)."
+      },
+      "revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base-year revenue in reporting currency."
+      },
+      "royalty_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Royalty rate as a decimal (0.05 = 5% of revenue)."
+      },
+      "discount_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Discount rate as a decimal (0.10 = 10%); pre-tax when method=viu_pre_tax."
+      },
+      "periods": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of periods n (>=1)."
+      },
+      "cash_flows": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Projected cash flows in reporting currency, indexed t=1..n."
+      },
+      "contributory_charges": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Contributory-asset charges (economic rent) per period, aligned with cash_flows (IVS 210 MPEEM)."
+      },
+      "with_cash_flows": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "After-tax cash flows with the asset in use (IVS 210 with-and-without)."
+      },
+      "without_cash_flows": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "After-tax cash flows absent the asset (IVS 210 with-and-without), aligned with with_cash_flows."
+      },
+      "fulfilment_costs": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Costs required to fulfil the performance obligation per period (IVS 220 Bottom-Up)."
+      },
+      "mark_up": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Reasonable mark-up on fulfilment costs (decimal, IVS 220 Bottom-Up)."
+      },
+      "selling_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Estimated selling price of the finished inventory (IVS 230 top-down)."
+      },
+      "costs_to_complete": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Remaining costs to complete work-in-process inventory (IVS 230)."
+      },
+      "profit_allowance": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Estimated profit allowance on the completion/disposal effort."
+      },
+      "gross_development_value": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Anticipated value of the completed development (IVS 410 residual method)."
+      },
+      "development_costs": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "All known/anticipated costs to complete the development."
+      },
+      "developer_profit": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Required developer's profit/risk allowance (IVS 410)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_residual",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "IFRS measurement, residual income and non-financial fair value"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Sector-metric engine. Compute the metrics that anchor valuation in specific industries: SaaS (ARR, NRR, magic number, Rule of 40), marketplaces (take rate, GMV multiple), lending (LTV/CAC), and crypto (NVT, Metcalfe). It returns operating metrics, not a valuation; use them as inputs to calculate_market_multiple or calculate_dcf. Methods: ltv: arpu, gross_margin, churn_rate; cac: sales_marketing_expense, new_customers; arr: subscription_values; nrr: starting_revenue, ending_revenue, expansion_revenue; magic_number: net_new_arr, sales_marketing_expense_prior; rule_of_40: growth_rate, profit_margin; take_rate: revenue, gmv; gmv_multiple: gmv, ev_gmv_multiple; retention: retained_customers, starting_customers; trl: market_size, market_share, margin, exit_multiple, trl_discount; break_even: fixed_costs, asp, variable_cost; gross_margin: asp, variable_cost; token: transaction_volume, price_per_tx, velocity, supply; nvt: market_cap, transaction_volume; metcalfe: n, coefficient. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "ltv",
+        "cac",
+        "arr",
+        "nrr",
+        "magic_number",
+        "rule_of_40",
+        "take_rate",
+        "gmv_multiple",
+        "retention",
+        "trl",
+        "break_even",
+        "gross_margin",
+        "token",
+        "nvt",
+        "metcalfe"
+       ],
+       "type": "string"
+      },
+      "arpu": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Average revenue per user per period."
+      },
+      "gross_margin": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Gross margin as a decimal (0.80 = 80%)."
+      },
+      "churn_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Periodic churn rate as a decimal."
+      },
+      "sales_marketing_expense": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Sales and marketing spend for the period."
+      },
+      "new_customers": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Customers acquired in the period."
+      },
+      "subscription_values": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Subscription revenue per customer."
+      },
+      "starting_revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Revenue from the cohort at period start."
+      },
+      "ending_revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Revenue from the cohort at period end."
+      },
+      "expansion_revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Expansion revenue from the cohort."
+      },
+      "net_new_arr": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Net new ARR in the period."
+      },
+      "sales_marketing_expense_prior": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Prior-period sales and marketing spend."
+      },
+      "growth_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Periodic growth rate as a decimal (0.03 = 3%)."
+      },
+      "profit_margin": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Profit margin as a decimal."
+      },
+      "revenue": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Base-year revenue in reporting currency."
+      },
+      "gmv": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Gross merchandise value in reporting currency."
+      },
+      "ev_gmv_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "EV/GMV multiple."
+      },
+      "retained_customers": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Customers retained at period end."
+      },
+      "starting_customers": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Customers at period start."
+      },
+      "market_size": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Total addressable market in reporting currency."
+      },
+      "market_share": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Achievable market share as a decimal."
+      },
+      "margin": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Operating margin as a decimal."
+      },
+      "exit_multiple": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Exit multiple on the final flow, e.g. 8.0 for 8x."
+      },
+      "trl_discount": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Technology-readiness risk discount as a decimal."
+      },
+      "fixed_costs": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Period fixed costs."
+      },
+      "asp": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Average selling price per unit."
+      },
+      "variable_cost": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Variable cost per unit."
+      },
+      "transaction_volume": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Transaction volume for the period."
+      },
+      "price_per_tx": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Value per transaction."
+      },
+      "velocity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Token velocity."
+      },
+      "supply": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Token supply."
+      },
+      "market_cap": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Market capitalisation."
+      },
+      "n": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Node/participant count n (>=0)."
+      },
+      "coefficient": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Scaling coefficient (Metcalfe)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_sector_metrics",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Sector-specific operating metrics"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "annotations": {
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "readOnlyHint": true
+    },
+    "description": "Structured-product engine. Value HKEX-listed and OTC structures: CBBCs, derivative and inline warrants, equity-linked notes and investments, autocallables, accumulators and decumulators, credit-linked notes, TRS, and CFDs. Use this for equity-linked and credit-linked payoff structures; for a plain option or warrant use calculate_option, for a convertible or exchangeable bond use calculate_convertible_bond, and for a vanilla bond or term structure use calculate_fixed_income. Methods: cbbc: notional, spot, strike, barrier, barrier_type, maturity, risk_free, volatility, option_type; cbbc_residual: notional, spot, call_price, entitlement, barrier, barrier_type, maturity, risk_free, volatility, option_type; derivative_warrant: notional, spot, strike, maturity, risk_free, volatility, average_type, option_type; inline_warrant: notional, spot, lower_strike, upper_strike, maturity, risk_free, volatility, payout; inline_warrant_avg: notional, spot, lower_strike, upper_strike, maturity, risk_free, volatility, payout, fixing_days; eli/eln: notional, spot, strike, maturity, risk_free, volatility, coupon_rate; autocallable: notional, spot, knock_out_level, observation_dates, coupon_rate_structured, maturity, risk_free, volatility; credit_linked_note: notional, credit_spread, recovery, maturity, risk_free, coupon_rate_structured; accumulator/decumulator: notional, spot, strike, knock_out_level, observation_dates, risk_free, volatility; trs: notional, spot, maturity, risk_free, dividend_yield; cfd: notional, spot, strike, maturity, risk_free. Supply exactly one method with its declared inputs (no defaults). An unknown method, a missing input, or an extra field returns an error envelope (code INVALID_ARGUMENT) instead of raising.",
+    "inputSchema": {
+     "properties": {
+      "method": {
+       "description": "Formula to apply; the tool description lists the exact inputs each value requires.",
+       "enum": [
+        "cbbc",
+        "cbbc_residual",
+        "derivative_warrant",
+        "inline_warrant",
+        "inline_warrant_avg",
+        "eli",
+        "eln",
+        "autocallable",
+        "credit_linked_note",
+        "accumulator",
+        "decumulator",
+        "trs",
+        "cfd"
+       ],
+       "type": "string"
+      },
+      "notional": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Contract notional/face amount in reporting currency."
+      },
+      "spot": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Spot price of the underlying (or FX rate for garman_kohlhagen)."
+      },
+      "strike": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Strike or exercise price in the same currency as spot."
+      },
+      "barrier": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Knock level for barrier_first_passage."
+      },
+      "barrier_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "knock_in",
+          "knock_out"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Barrier direction."
+      },
+      "maturity": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Time to expiry in years (0.5 = six months); > 0."
+      },
+      "risk_free": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuously-compounded risk-free rate (decimal)."
+      },
+      "volatility": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annualized volatility (decimal, 0.30 = 30%); > 0."
+      },
+      "option_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "call",
+          "put"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Option right."
+      },
+      "call_price": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "CBBC call price (mandatory-call trigger level)."
+      },
+      "entitlement": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "CBBC entitlement: units of underlying per contract."
+      },
+      "average_type": {
+       "anyOf": [
+        {
+         "enum": [
+          "arithmetic",
+          "geometric"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Averaging convention."
+      },
+      "lower_strike": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Lower strike of the range."
+      },
+      "upper_strike": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Upper strike of the range."
+      },
+      "payout": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Fixed payout when the range condition is met."
+      },
+      "fixing_days": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Number of closing fixings averaged for settlement (>=1)."
+      },
+      "coupon_rate": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Annual coupon rate (decimal)."
+      },
+      "knock_out_level": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Knock-out level for autocallables and accumulators."
+      },
+      "observation_dates": {
+       "anyOf": [
+        {
+         "items": {},
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Observation dates in years for path-dependent products."
+      },
+      "coupon_rate_structured": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Conditional coupon rate (decimal)."
+      },
+      "credit_spread": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Credit spread over the risk-free rate (decimal)."
+      },
+      "recovery": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Recovery rate in [0,1]."
+      },
+      "dividend_yield": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Continuous dividend yield (decimal)."
+      }
+     },
+     "required": [
+      "method"
+     ],
+     "type": "object",
+     "additionalProperties": false
+    },
+    "name": "calculate_structured_product",
+    "outputSchema": {
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "error"
+       ],
+       "description": "'ok' on success, 'error' on failure."
+      },
+      "method": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Method or tool name that produced the result."
+      },
+      "ticker": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Ticker the result pertains to, when applicable."
+      },
+      "value": {
+       "description": "Primary result: a number for scalar methods, an object for valuation methods."
+      },
+      "assumptions": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Inputs and assumptions used, echoed for traceability."
+      },
+      "formula_ref": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Formula or standards reference for the method."
+      },
+      "data_timestamp": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "ISO-8601 UTC timestamp of the underlying data, when fetched."
+      },
+      "steps": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "description": "Ordered computation steps, when the method reports them."
+      },
+      "error": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Error detail, present only when status='error'.",
+       "properties": {
+        "code": {
+         "type": "string",
+         "description": "Stable machine-readable error code."
+        },
+        "message": {
+         "type": "string",
+         "description": "Human-readable error message."
+        }
+       }
+      }
+     },
+     "required": [
+      "status"
+     ],
+     "type": "object",
+     "description": "Shared result envelope returned by every tool."
+    },
+    "title": "Structured product and derivative pricing"
+   }
+  ],
+  "prompts": [
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "arguments": [
+     {
+      "description": "Provide a value matching the following JSON schema: {\"type\":\"string\"}. Encode non-string values as JSON.",
+      "name": "ticker",
+      "required": true
+     }
+    ],
+    "description": "Guide a discounted cash flow valuation for a listed company.",
+    "name": "value_company_dcf"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "arguments": [
+     {
+      "description": "Provide a value matching the following JSON schema: {\"type\":\"string\"}. Encode non-string values as JSON.",
+      "name": "ticker",
+      "required": true
+     }
+    ],
+    "description": "Guide a cost-of-capital explanation using profile data and WACC.",
+    "name": "explain_cost_of_capital"
+   }
+  ],
+  "resources": [
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "description": "Machine-readable catalog of valuation methods, formulas, and standards.",
+    "mimeType": "text/plain",
+    "name": "valuation_methods",
+    "uri": "valuation://methods"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "description": "Canonical cross-service methods resource (server/version/tools).",
+    "mimeType": "text/plain",
+    "name": "fair_value_methods",
+    "uri": "fair-value://methods"
+   },
+   {
+    "_meta": {
+     "fastmcp": {
+      "tags": []
+     }
+    },
+    "description": "Machine-readable taxonomy of IVS/IFRS standards referenced by the tools.",
+    "mimeType": "text/plain",
+    "name": "valuation_standards",
+    "uri": "valuation://standards"
+   }
+  ]
+ }
+}

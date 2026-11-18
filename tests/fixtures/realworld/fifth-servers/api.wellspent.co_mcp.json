@@ -1,0 +1,2345 @@
+{
+ "url": "https://api.wellspent.co/mcp",
+ "doc": {
+  "name": "Wellspent: fee-only financial advisors",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "instructions": "Wellspent is a public graph of fee-only financial advisors (paid only by clients, no commissions) in the US and Canada, at find.wellspent.co. It does not give financial advice or vouch for any advisor: suggest the person verify registration at adviserinfo.sec.gov before hiring. Search with search_fee_only_advisors, show results as cards with show_advisor_cards, get details with get_advisor_profile, and look up valid slugs with list_specialties_and_audiences. Link to each profile_url and cite \"Source: Wellspent, find.wellspent.co\".\n\nEach result says whether its profile is maintained by the advisor (a Wellspent member) or was built from public sources: fee-only directory listings, SEC records, and the firm's own website, where every fact is checked against a quote on the page. Ranking is by fit to the request; nobody pays for placement.\n\nAlso: find_advisor_or_firm_by_name looks up a named advisor or firm, get_firm_profile reads a firm's record with its advisors and assets over time, and get_fee_benchmarks gives what fee-only firms typically charge.",
+  "tools": [
+   {
+    "name": "search_fee_only_advisors",
+    "title": "Search fee-only financial advisors",
+    "description": "Use this when someone wants to find a fee-only financial advisor, financial planner, or fiduciary in the US or Canada, especially for a specific situation (e.g. equity compensation, retirement, cross-border US/Canada, physicians). Returns advisors paid only by their clients, never by commissions, ranked by fit to where the person wants an advisor and what they need. Pass country, and region (US state or Canadian province slug, e.g. \"california\", \"ontario\") when the person has said where they want an advisor, because candidates are drawn from that region. city is optional and only ranks advisors in that city higher. specialties and audiences must be slugs from list_specialties_and_audiences. Set virtual_ok=true if the person is open to meeting remotely, which adds advisors elsewhere in the country who work virtually. fee_models, credentials and max_asset_minimum are filters, unlike specialties and audiences, which only rank: an advisor whose fee model or minimum isn't stated is left out when you filter on it, so use them only when the person asks for it. max_asset_minimum leaves out an advisor only when the minimum covers the whole firm: check each result's asset_minimum_scope before telling someone they qualify, because a minimum for investment_management applies to portfolio management and not to the firm's planning or hourly work. Each result includes why it matched, whether the profile is advisor-maintained (a Wellspent member who supplied their own specialties) or built from public records (fee-only directory listings, SEC adviser filings, the firm's website), and a profile_url to share. Specialties and client types come from the advisor's own profile for members, and for other listings from the firm's own website (each fact quote-checked against the site) and fee-only directory listings. To show results as cards, call show_advisor_cards with their slugs. Cite \"Source: Wellspent, find.wellspent.co\".",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "country": {
+       "type": "string",
+       "enum": [
+        "us",
+        "ca"
+       ],
+       "description": "\"us\" for the United States, \"ca\" for Canada."
+      },
+      "region": {
+       "type": "string",
+       "enum": [
+        "alabama",
+        "alaska",
+        "arizona",
+        "arkansas",
+        "california",
+        "colorado",
+        "connecticut",
+        "delaware",
+        "district-of-columbia",
+        "florida",
+        "georgia",
+        "hawaii",
+        "idaho",
+        "illinois",
+        "indiana",
+        "iowa",
+        "kansas",
+        "kentucky",
+        "louisiana",
+        "maine",
+        "maryland",
+        "massachusetts",
+        "michigan",
+        "minnesota",
+        "mississippi",
+        "missouri",
+        "montana",
+        "nebraska",
+        "nevada",
+        "new-hampshire",
+        "new-jersey",
+        "new-mexico",
+        "new-york",
+        "north-carolina",
+        "north-dakota",
+        "ohio",
+        "oklahoma",
+        "oregon",
+        "pennsylvania",
+        "rhode-island",
+        "south-carolina",
+        "south-dakota",
+        "tennessee",
+        "texas",
+        "utah",
+        "vermont",
+        "virginia",
+        "washington",
+        "west-virginia",
+        "wisconsin",
+        "wyoming",
+        "puerto-rico",
+        "guam",
+        "abroad",
+        "alberta",
+        "british-columbia",
+        "manitoba",
+        "newfoundland-and-labrador",
+        "nova-scotia",
+        "ontario",
+        "quebec",
+        "saskatchewan",
+        "yukon"
+       ],
+       "description": "Where the person wants an advisor: US state or Canadian province slug, lowercase and hyphenated (e.g. \"new-york\", \"british-columbia\"). Must be in the given country. If omitted, the host's coarse location hint may be used, and the result notes say so."
+      },
+      "city": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80,
+       "description": "City where the person wants an advisor (e.g. \"Austin\"). Only ranks advisors in that city higher; never filters."
+      },
+      "specialties": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "equity-compensation",
+         "crypto",
+         "cross-border",
+         "international-expat",
+         "physicians",
+         "founders-pre-exit",
+         "flat-fee-planning",
+         "retirement-planning",
+         "retirement-with-concentrated-positions",
+         "estate-planning",
+         "tax-planning",
+         "student-loans",
+         "divorce-planning",
+         "real-estate-investors",
+         "family-wealth-transfer",
+         "sustainable-investing",
+         "pension-planning",
+         "small-business-owners"
+        ]
+       },
+       "uniqueItems": true,
+       "maxItems": 5,
+       "description": "Planning specialties the person needs, as taxonomy slugs."
+      },
+      "audiences": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "founders",
+         "executives",
+         "tech-employees",
+         "physicians",
+         "retirees",
+         "pre-retirees",
+         "high-earners",
+         "cross-border-families",
+         "newcomers",
+         "canadians-in-us",
+         "early-career-professionals",
+         "mid-life-transitions",
+         "ultra-high-net-worth",
+         "henry",
+         "multi-generational-families",
+         "real-estate-investors",
+         "divorced-individuals"
+        ]
+       },
+       "uniqueItems": true,
+       "maxItems": 5,
+       "description": "Client types that describe the person (e.g. \"tech-employees\", \"retirees\"), as taxonomy slugs."
+      },
+      "virtual_ok": {
+       "type": "boolean",
+       "default": false,
+       "description": "True if the person is open to working with an advisor remotely."
+      },
+      "fee_models": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "aum",
+         "flat",
+         "hourly",
+         "ongoing",
+         "project"
+        ]
+       },
+       "uniqueItems": true,
+       "maxItems": 5,
+       "description": "Filter: only advisors who charge in at least one of these ways. \"aum\" = a percentage of assets managed, \"flat\" = a flat fee or retainer, \"hourly\" = by the hour, \"ongoing\" = an ongoing planning fee, \"project\" = a one-time planning fee. Leaves out advisors whose fee model isn't stated."
+      },
+      "credentials": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "CFP",
+         "CFA",
+         "ChFC",
+         "CPA",
+         "PFS",
+         "EA",
+         "CDFA",
+         "RICP",
+         "CLU",
+         "CIMA",
+         "CPWA",
+         "AIF",
+         "CIM",
+         "QAFP",
+         "RFP",
+         "TEP"
+        ]
+       },
+       "uniqueItems": true,
+       "maxItems": 3,
+       "description": "Filter: only advisors who hold every one of these credentials (e.g. [\"CFP\"], or [\"CFP\", \"CPA\"] for both)."
+      },
+      "max_asset_minimum": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1000000000,
+       "description": "Filter: only advisors whose stated minimum of investable assets is at most this amount, in the country's dollars. Pass what the person has to invest; 0 finds advisors who state no minimum. A higher minimum still passes when it covers investment management only or its service isn't recorded (see asset_minimum_scope on each result). Leaves out advisors who don't state a minimum, which is most of them."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "default": 5,
+       "description": "Maximum number of advisors to return (1-10)."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "required": [
+      "country"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "query": {
+       "type": "object",
+       "properties": {
+        "country": {
+         "type": "string"
+        },
+        "region": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "region_source": {
+         "type": "string",
+         "enum": [
+          "request",
+          "user_location_hint"
+         ]
+        },
+        "city": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "specialties": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "audiences": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "virtual_ok": {
+         "type": "boolean"
+        },
+        "fee_models": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "credentials": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "max_asset_minimum": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "limit": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "country",
+        "region",
+        "city",
+        "specialties",
+        "audiences",
+        "virtual_ok",
+        "limit"
+       ]
+      },
+      "result_count": {
+       "type": "integer"
+      },
+      "total_matches": {
+       "type": "integer",
+       "description": "How many advisors the search considered that fit it, of which results holds the best. A search considers at most 500 advisors."
+      },
+      "total_matches_capped": {
+       "type": "boolean",
+       "description": "True when the search reached its limit of 500 advisors considered, so more may fit than total_matches says."
+      },
+      "has_more": {
+       "type": "boolean",
+       "description": "True when more advisors fit than were returned. Narrow the search to see others."
+      },
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "title": {
+          "type": "string"
+         },
+         "firm": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "location": {
+          "type": "string"
+         },
+         "country": {
+          "type": "string"
+         },
+         "credentials": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "why_matched": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "profile_source": {
+          "type": "string",
+          "enum": [
+           "advisor_maintained",
+           "public_directory_listings"
+          ]
+         },
+         "specialties": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "audiences": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "specialties_source": {
+          "type": "string",
+          "enum": [
+           "advisor",
+           "firm_website_and_directories"
+          ]
+         },
+         "works_virtually": {
+          "type": "boolean"
+         },
+         "fee_models": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "enum": [
+            "aum",
+            "flat",
+            "hourly",
+            "ongoing",
+            "project"
+           ]
+          },
+          "description": "How the advisor charges, where stated. Empty when not stated."
+         },
+         "asset_minimum": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Stated minimum investable assets; 0 means no minimum, null means not stated. Read it with asset_minimum_scope."
+         },
+         "asset_minimum_scope": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "enum": [
+           "firm",
+           "investment_management",
+           "unclear",
+           null
+          ],
+          "description": "What asset_minimum covers. firm: needed to work with the firm at all. investment_management: needed only to have the firm manage a portfolio. unclear: the firm charges in more than one way and its website doesn't make plain which service the minimum belongs to, so ask the firm. Null when there is no minimum."
+         },
+         "years_practicing": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "slug": {
+          "type": "string"
+         },
+         "profile_url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "name",
+         "location",
+         "country",
+         "credentials",
+         "why_matched",
+         "profile_source",
+         "slug",
+         "profile_url"
+        ]
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "attribution",
+      "query",
+      "result_count",
+      "results",
+      "notes"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Search fee-only financial advisors"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Searching fee-only advisors…",
+     "openai/toolInvocation/invoked": "Found fee-only advisors"
+    }
+   },
+   {
+    "name": "get_advisor_profile",
+    "title": "Get a fee-only advisor's public profile",
+    "description": "Use this when the person wants more detail about one advisor from a search. Returns the public profile of a fee-only advisor listed on Wellspent, by the slug returned from search_fee_only_advisors (the last path segment of their profile_url). Advisor-maintained (member) profiles include the advisor's own description of their specialties, ideal client, fees, and background; directory-built records include listing facts and any public enrichment (bio, services, fee models, AUM). Contact details are not included. Send the person to profile_url to get in touch. Cite \"Source: Wellspent, find.wellspent.co\".",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+       "minLength": 1,
+       "maxLength": 120,
+       "description": "Advisor slug, e.g. \"jane-doe-cfp\"."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "description": "found=false: {slug, message}. Every found profile carries the same fees, verification and data_dates blocks, with nulls for facts that aren't known. Advisor-maintained profiles also carry the member's own fields; public_directory_listings records also carry listing facts and optional public_enrichment.",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "found": {
+       "type": "boolean"
+      },
+      "profile_source": {
+       "type": "string",
+       "enum": [
+        "advisor_maintained",
+        "public_directory_listings"
+       ]
+      },
+      "profile_note": {
+       "type": "string"
+      },
+      "slug": {
+       "type": "string"
+      },
+      "message": {
+       "type": "string"
+      },
+      "name": {
+       "type": "string"
+      },
+      "title": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "firm": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "location": {
+       "type": "object"
+      },
+      "credentials": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "specialties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "audiences": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "fee_models": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "engagement": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "pricing": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "Fees the advisor stated; null fields were not stated. aumPercent is the annual % on the first $1M.",
+       "properties": {
+        "planningFeeFrom": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "aumPercent": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "hourlyRate": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "assetMinimum": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "currency": {
+         "type": "string"
+        }
+       }
+      },
+      "crd": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "regulatory_lookup": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "website": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "works_virtually": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
+      "languages": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "accepting_new_clients": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
+      "fees": {
+       "type": "object",
+       "description": "What the advisor charges, in one shape for every profile. A null means the fact isn't known, not that the answer is no. stated_by says whose words these are.",
+       "properties": {
+        "fee_models": {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "enum": [
+           "aum",
+           "flat",
+           "hourly",
+           "ongoing",
+           "project"
+          ]
+         }
+        },
+        "pricing": {
+         "type": "object",
+         "properties": {
+          "ongoing_per_year_from": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "one_time_from": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "hourly_rate": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "aum_percent_first_tier": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Annual percentage on the first tier of assets (1 = 1%)."
+          },
+          "asset_minimum": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Minimum investable assets; 0 means no minimum. Read it with asset_minimum_scope."
+          },
+          "asset_minimum_scope": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "enum": [
+            "firm",
+            "investment_management",
+            "unclear",
+            null
+           ],
+           "description": "What asset_minimum covers. firm: needed to work with the firm at all. investment_management: needed only to have the firm manage a portfolio. unclear: the firm charges in more than one way and its website doesn't make plain which service the minimum belongs to, so ask the firm. Null when there is no minimum."
+          },
+          "currency": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "ongoing_per_year_from",
+          "one_time_from",
+          "hourly_rate",
+          "aum_percent_first_tier",
+          "asset_minimum",
+          "asset_minimum_scope",
+          "currency"
+         ]
+        },
+        "stated_by": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "enum": [
+          "advisor",
+          "firm_website",
+          null
+         ]
+        },
+        "source_url": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "checked_on": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "fee_models",
+        "pricing",
+        "stated_by",
+        "source_url",
+        "checked_on"
+       ]
+      },
+      "verification": {
+       "type": "object",
+       "description": "Public SEC facts (IAPD and Form ADV) about the advisor and their firm, in one shape for every profile. A null means Wellspent holds no SEC record for that fact.",
+       "properties": {
+        "crd": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "regulatory_lookup": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "investment_adviser_rep_states": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "active_broker_registration": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "disclosures_reported": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "exams": {
+         "type": "array"
+        },
+        "firm": {
+         "type": [
+          "object",
+          "null"
+         ]
+        },
+        "as_of": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "source": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "crd",
+        "regulatory_lookup",
+        "investment_adviser_rep_states",
+        "active_broker_registration",
+        "disclosures_reported",
+        "exams",
+        "firm",
+        "as_of",
+        "source"
+       ]
+      },
+      "data_dates": {
+       "type": "object",
+       "description": "When each source behind the profile was last updated or checked (YYYY-MM-DD), null where there is none.",
+       "properties": {
+        "profile_updated": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "directory_listing": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sec_records": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "firm_website": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "sec_record": {
+       "type": "object",
+       "description": "The same facts as verification, kept under this name for older clients. Directory-built records only."
+      },
+      "dealer_affiliation": {
+       "type": "object",
+       "description": "Canada: the listing's investment or mutual fund dealer, from the firm's own disclosures (not fee-only)."
+      },
+      "firm_website": {
+       "type": "object",
+       "description": "Facts from the firm's own website (specialties, fees and pricing, virtual, languages, accepting new clients), each backed by a quote found on the page (evidence), with the date checked."
+      },
+      "profile_url": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "attribution",
+      "found",
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Get advisor profile"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Loading advisor profile…",
+     "openai/toolInvocation/invoked": "Loaded advisor profile"
+    }
+   },
+   {
+    "name": "find_advisor_or_firm_by_name",
+    "title": "Look up an advisor or firm by name",
+    "description": "Use this when the person names a specific advisor or firm and wants to know whether Wellspent lists them as fee-only, or wants their profile. Matches advisor names, firm names and places in the public graph, which holds only advisors Wellspent treats as fee-only. A match gives the slug for get_advisor_profile and a link. No match does not mean the advisor isn't fee-only: the graph doesn't cover everyone, and the name may be spelled differently. Cite \"Source: Wellspent, find.wellspent.co\".",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 80,
+       "description": "An advisor's name, a firm's name, or both (e.g. \"Jane Doe\", \"Doe Wealth\"). A city or state can be added to narrow it."
+      },
+      "limit": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10,
+       "default": 5,
+       "description": "Maximum number of matches to return (1-10)."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "required": [
+      "name"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "query": {
+       "type": "string"
+      },
+      "result_count": {
+       "type": "integer"
+      },
+      "results": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "advisor",
+           "firm"
+          ]
+         },
+         "name": {
+          "type": "string"
+         },
+         "firm": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "location": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "slug": {
+          "type": "string"
+         },
+         "profile_url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind",
+         "name",
+         "firm",
+         "location",
+         "slug",
+         "profile_url"
+        ]
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "attribution",
+      "query",
+      "result_count",
+      "results",
+      "notes"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Look up an advisor or firm by name"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Looking up the name…",
+     "openai/toolInvocation/invoked": "Looked up the name"
+    }
+   },
+   {
+    "name": "get_firm_profile",
+    "title": "Get a fee-only firm's public profile",
+    "description": "Use this when the person asks about a firm rather than one advisor, or after find_advisor_or_firm_by_name returns a firm. Returns the public record of a firm listed on Wellspent, by the firm slug from find_advisor_or_firm_by_name (the last path segment of the firm's profile_url): where it is, the fee-only advisors Wellspent lists there with their slugs, what the firm's website says it charges, its SEC Form ADV record (assets managed, accounts, employees, how it is paid), and its assets under management over time. Assets changing over time reflects markets as well as clients, and says nothing on its own about the quality of advice. Contact details are not included: share profile_url. Cite \"Source: Wellspent, find.wellspent.co\" and suggest verifying the firm at its regulatory_lookup link.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slug": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 120,
+       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+       "description": "The firm's slug, from find_advisor_or_firm_by_name results where kind is \"firm\"."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "required": [
+      "slug"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "found": {
+       "type": "boolean"
+      },
+      "slug": {
+       "type": "string"
+      },
+      "message": {
+       "type": "string"
+      },
+      "name": {
+       "type": "string"
+      },
+      "location": {
+       "type": "string"
+      },
+      "country": {
+       "type": "string"
+      },
+      "region": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "city": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "website": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "profile_url": {
+       "type": "string"
+      },
+      "advisor_count": {
+       "type": "integer",
+       "description": "Fee-only advisors Wellspent lists at the firm."
+      },
+      "advisors_truncated": {
+       "type": "boolean",
+       "description": "True when the firm has more advisors than advisors holds."
+      },
+      "advisors": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "credentials": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "location": {
+          "type": "string"
+         },
+         "profile_source": {
+          "type": "string",
+          "enum": [
+           "advisor_maintained",
+           "public_directory_listings"
+          ]
+         },
+         "slug": {
+          "type": "string"
+         },
+         "profile_url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "name",
+         "credentials",
+         "location",
+         "profile_source",
+         "slug",
+         "profile_url"
+        ]
+       }
+      },
+      "fees": {
+       "type": "object",
+       "description": "What the advisor charges, in one shape for every profile. A null means the fact isn't known, not that the answer is no. stated_by says whose words these are.",
+       "properties": {
+        "fee_models": {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "enum": [
+           "aum",
+           "flat",
+           "hourly",
+           "ongoing",
+           "project"
+          ]
+         }
+        },
+        "pricing": {
+         "type": "object",
+         "properties": {
+          "ongoing_per_year_from": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "one_time_from": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "hourly_rate": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "aum_percent_first_tier": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Annual percentage on the first tier of assets (1 = 1%)."
+          },
+          "asset_minimum": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Minimum investable assets; 0 means no minimum. Read it with asset_minimum_scope."
+          },
+          "asset_minimum_scope": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "enum": [
+            "firm",
+            "investment_management",
+            "unclear",
+            null
+           ],
+           "description": "What asset_minimum covers. firm: needed to work with the firm at all. investment_management: needed only to have the firm manage a portfolio. unclear: the firm charges in more than one way and its website doesn't make plain which service the minimum belongs to, so ask the firm. Null when there is no minimum."
+          },
+          "currency": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         },
+         "required": [
+          "ongoing_per_year_from",
+          "one_time_from",
+          "hourly_rate",
+          "aum_percent_first_tier",
+          "asset_minimum",
+          "asset_minimum_scope",
+          "currency"
+         ]
+        },
+        "stated_by": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "enum": [
+          "advisor",
+          "firm_website",
+          null
+         ]
+        },
+        "source_url": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "checked_on": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "fee_models",
+        "pricing",
+        "stated_by",
+        "source_url",
+        "checked_on"
+       ]
+      },
+      "sec_record": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "From the firm's latest Form ADV. Null when no SEC record is linked to the firm.",
+       "properties": {
+        "firm_crd": {
+         "type": "string"
+        },
+        "sec_number": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "regulatory_lookup": {
+         "type": "string"
+        },
+        "regulatory_aum_usd": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "accounts": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "employees": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "clients_individuals": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Individual clients who aren't high net worth."
+        },
+        "clients_high_net_worth": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "offers_financial_planning": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "fee_types": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "latest_filing_date": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "source": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "firm_crd",
+        "regulatory_lookup",
+        "regulatory_aum_usd",
+        "fee_types",
+        "latest_filing_date",
+        "source"
+       ]
+      },
+      "assets_history": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "The firm's regulatory assets under management as reported on each Form ADV filing, oldest first. Null when there is no SEC record or no filings with assets.",
+       "properties": {
+        "source": {
+         "type": "string"
+        },
+        "points": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "as_of": {
+            "type": "string",
+            "description": "Filing date."
+           },
+           "regulatory_aum_usd": {
+            "type": "number"
+           },
+           "accounts": {
+            "type": [
+             "number",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "as_of",
+           "regulatory_aum_usd",
+           "accounts"
+          ]
+         }
+        },
+        "earlier_points_omitted": {
+         "type": "integer"
+        },
+        "change_percent_1y": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Change from the last filing at least a year before the latest one. Null when there is none."
+        },
+        "change_percent_5y": {
+         "type": [
+          "number",
+          "null"
+         ]
+        }
+       },
+       "required": [
+        "source",
+        "points",
+        "earlier_points_omitted",
+        "change_percent_1y",
+        "change_percent_5y"
+       ]
+      },
+      "data_dates": {
+       "type": "object",
+       "properties": {
+        "listed_since": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "fees_checked_on": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "sec_filing_date": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "attribution",
+      "found",
+      "slug"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Get a fee-only firm's public profile"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Reading firm record…",
+     "openai/toolInvocation/invoked": "Read firm record"
+    }
+   },
+   {
+    "name": "show_advisor_cards",
+    "title": "Show advisor cards",
+    "description": "Use this after search_fee_only_advisors to show up to 8 of its results as cards, in the order given, each with a View profile link to find.wellspent.co. Pass the slugs from the search results. Shows only public Wellspent data. Do not use for advisors that did not come from a Wellspent search.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "slugs": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "minLength": 1,
+        "maxLength": 120
+       },
+       "minItems": 1,
+       "maxItems": 8,
+       "uniqueItems": true,
+       "description": "Advisor slugs from search_fee_only_advisors results."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "required": [
+      "slugs"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "advisors": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         },
+         "firm": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "location": {
+          "type": "string"
+         },
+         "credentials": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "highlights": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "profile_source": {
+          "type": "string",
+          "enum": [
+           "advisor_maintained",
+           "public_directory_listings"
+          ]
+         },
+         "profile_url": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug",
+         "name",
+         "location",
+         "credentials",
+         "highlights",
+         "profile_source",
+         "profile_url"
+        ]
+       }
+      }
+     },
+     "required": [
+      "attribution",
+      "advisors"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Show advisor cards"
+    },
+    "_meta": {
+     "ui": {
+      "resourceUri": "ui://wellspent/advisor-cards-v1.html"
+     },
+     "openai/outputTemplate": "ui://wellspent/advisor-cards-v1.html",
+     "openai/toolInvocation/invoking": "Loading advisor cards…",
+     "openai/toolInvocation/invoked": "Advisor cards ready"
+    }
+   },
+   {
+    "name": "get_fee_benchmarks",
+    "title": "Get what fee-only advisors typically charge",
+    "description": "Use this when the person asks what a fee-only financial advisor costs, or whether a price they were quoted is typical. Returns the median and the middle half (25th to 75th percentile) of what fee-only firms charge for ongoing planning per year, a one-time plan, an hourly rate, and a percentage of assets, with how many firms each figure is drawn from. Pass country, and region (a US state slug) for that state's figures next to the country's; states where too few firms publish prices return the country figures only, and there are no provincial figures for Canada. Figures are starting prices that firms publish on their own websites, one per firm, from the latest quarterly edition of the Wellspent fee report: describe them as published prices, not as what the person will pay. State the edition and cite \"Source: Wellspent fee report, find.wellspent.co\" with the report's url.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "country": {
+       "type": "string",
+       "enum": [
+        "us",
+        "ca"
+       ],
+       "description": "\"us\" for the United States (US dollars), \"ca\" for Canada (Canadian dollars)."
+      },
+      "region": {
+       "type": "string",
+       "enum": [
+        "alabama",
+        "alaska",
+        "arizona",
+        "arkansas",
+        "california",
+        "colorado",
+        "connecticut",
+        "delaware",
+        "district-of-columbia",
+        "florida",
+        "georgia",
+        "hawaii",
+        "idaho",
+        "illinois",
+        "indiana",
+        "iowa",
+        "kansas",
+        "kentucky",
+        "louisiana",
+        "maine",
+        "maryland",
+        "massachusetts",
+        "michigan",
+        "minnesota",
+        "mississippi",
+        "missouri",
+        "montana",
+        "nebraska",
+        "nevada",
+        "new-hampshire",
+        "new-jersey",
+        "new-mexico",
+        "new-york",
+        "north-carolina",
+        "north-dakota",
+        "ohio",
+        "oklahoma",
+        "oregon",
+        "pennsylvania",
+        "rhode-island",
+        "south-carolina",
+        "south-dakota",
+        "tennessee",
+        "texas",
+        "utah",
+        "vermont",
+        "virginia",
+        "washington",
+        "west-virginia",
+        "wisconsin",
+        "wyoming",
+        "puerto-rico",
+        "guam",
+        "abroad",
+        "alberta",
+        "british-columbia",
+        "manitoba",
+        "newfoundland-and-labrador",
+        "nova-scotia",
+        "ontario",
+        "quebec",
+        "saskatchewan",
+        "yukon"
+       ],
+       "description": "Optional US state or Canadian province slug (e.g. \"california\"). Must be in the given country."
+      },
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "required": [
+      "country"
+     ],
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "source": {
+       "type": "object",
+       "properties": {
+        "title": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "edition": {
+         "type": "string"
+        },
+        "as_of": {
+         "type": "string"
+        },
+        "prices_checked_from": {
+         "type": "string"
+        },
+        "prices_checked_to": {
+         "type": "string"
+        },
+        "license": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "title",
+        "url",
+        "edition",
+        "as_of",
+        "license"
+       ]
+      },
+      "country": {
+       "type": "string",
+       "enum": [
+        "us",
+        "ca"
+       ]
+      },
+      "currency": {
+       "type": "string",
+       "enum": [
+        "USD",
+        "CAD"
+       ]
+      },
+      "country_fees": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "ongoing_planning_per_year": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Ongoing planning fee per year, starting price. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "one_time_plan": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "One-time financial plan, starting price. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "hourly_rate": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Hourly rate. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "aum_percent_first_tier": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Percent of assets a year on the first tier of managed assets. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        }
+       },
+       "required": [
+        "ongoing_planning_per_year",
+        "one_time_plan",
+        "hourly_rate",
+        "aum_percent_first_tier"
+       ],
+       "description": "What fee-only firms across the country charge."
+      },
+      "advice_only_fees": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "ongoing_planning_per_year": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Ongoing planning fee per year, starting price. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "one_time_plan": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "One-time financial plan, starting price. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "hourly_rate": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Hourly rate. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "aum_percent_first_tier": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Percent of assets a year on the first tier of managed assets. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        }
+       },
+       "required": [
+        "ongoing_planning_per_year",
+        "one_time_plan",
+        "hourly_rate",
+        "aum_percent_first_tier"
+       ],
+       "description": "The same, for firms that plan without managing investments."
+      },
+      "no_asset_minimum": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "percent": {
+         "type": "number"
+        },
+        "firms": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "percent",
+        "firms"
+       ],
+       "description": "Of the firms that state an asset minimum, the share that have none. US only."
+      },
+      "region": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "region_name": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "region_fees": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "ongoing_planning_per_year": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Ongoing planning fee per year, starting price. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "one_time_plan": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "One-time financial plan, starting price. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "hourly_rate": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Hourly rate. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        },
+        "aum_percent_first_tier": {
+         "type": [
+          "object",
+          "null"
+         ],
+         "description": "Percent of assets a year on the first tier of managed assets. Null when fewer than 12 firms publish this price.",
+         "properties": {
+          "median": {
+           "type": "number"
+          },
+          "middle_half_low": {
+           "type": "number",
+           "description": "25th percentile."
+          },
+          "middle_half_high": {
+           "type": "number",
+           "description": "75th percentile."
+          },
+          "firms": {
+           "type": "integer",
+           "description": "How many firms the figure is drawn from."
+          }
+         },
+         "required": [
+          "median",
+          "middle_half_low",
+          "middle_half_high",
+          "firms"
+         ]
+        }
+       },
+       "required": [
+        "ongoing_planning_per_year",
+        "one_time_plan",
+        "hourly_rate",
+        "aum_percent_first_tier"
+       ],
+       "description": "What firms in the region charge. Null when no region was given or too few firms there publish prices."
+      },
+      "region_no_asset_minimum": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "percent": {
+         "type": "number"
+        },
+        "firms": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "percent",
+        "firms"
+       ]
+      },
+      "how_firms_charge": {
+       "type": "object",
+       "description": "US and Canada together: of firms whose website says how they charge, the share charging each way. A firm can charge more than one way.",
+       "properties": {
+        "firms": {
+         "type": "integer"
+        },
+        "shares": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "fee_model": {
+            "type": "string"
+           },
+           "description": {
+            "type": "string"
+           },
+           "percent": {
+            "type": "number"
+           }
+          },
+          "required": [
+           "fee_model",
+           "description",
+           "percent"
+          ]
+         }
+        }
+       },
+       "required": [
+        "firms",
+        "shares"
+       ]
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "attribution",
+      "source",
+      "country",
+      "currency",
+      "country_fees",
+      "region",
+      "region_fees",
+      "notes"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "Get what fee-only advisors typically charge"
+    },
+    "_meta": {
+     "openai/toolInvocation/invoking": "Looking up typical fees…",
+     "openai/toolInvocation/invoked": "Found typical fees"
+    }
+   },
+   {
+    "name": "list_specialties_and_audiences",
+    "title": "List Wellspent specialties, audiences, and regions",
+    "description": "Use this when you need valid slugs for search_fee_only_advisors, or the person asks what they can search by. Lists planning specialties, client audiences, and regions (US states and Canadian provinces that have advisors).",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "context": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Optional, for analytics only. Why are you calling this tool? Describe the goal in general terms in 15 to 25 words, and refer to people by role (\"the user\") rather than by name. Leave out personal and identifying information."
+      },
+      "conversation_id": {
+       "type": "string",
+       "maxLength": 64,
+       "description": "Optional, for analytics only. The conversation_id this server returned earlier in this conversation, passed back unchanged so its calls are counted together. Leave it out on the first call."
+      }
+     },
+     "additionalProperties": false
+    },
+    "outputSchema": {
+     "type": "object",
+     "properties": {
+      "attribution": {
+       "type": "string"
+      },
+      "specialties": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug"
+        ]
+       }
+      },
+      "audiences": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug"
+        ]
+       }
+      },
+      "regions": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug"
+        ]
+       }
+      }
+     },
+     "required": [
+      "attribution",
+      "specialties",
+      "audiences",
+      "regions"
+     ]
+    },
+    "annotations": {
+     "readOnlyHint": true,
+     "destructiveHint": false,
+     "idempotentHint": true,
+     "openWorldHint": false,
+     "title": "List specialties, audiences, and regions"
+    }
+   }
+  ],
+  "resources": [
+   {
+    "uri": "ui://wellspent/advisor-cards-v1.html",
+    "name": "advisor-cards",
+    "title": "Advisor cards",
+    "description": "Cards for fee-only advisors from a Wellspent search, each linking to its public profile.",
+    "mimeType": "text/html;profile=mcp-app"
+   }
+  ]
+ }
+}

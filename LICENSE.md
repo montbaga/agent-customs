@@ -1,3 +1,127 @@
+<div align="center">
+
+<p align="center">
+<a href="README.md"><img src="docs/images/tab-readme-off.svg" alt="README" height="46"></a><a href="ARCHITECTURE.md"><img src="docs/images/tab-architecture-off.svg" alt="Architecture" height="46"></a><a href="PAPER.md"><img src="docs/images/tab-paper-off.svg" alt="Paper" height="46"></a><a href="LICENSE.md"><img src="docs/images/tab-license-on.svg" alt="License (this page)" height="46"></a>
+</p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/page-banner-license-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/page-banner-license-light.svg">
+  <img src="docs/images/page-banner-license-dark.svg" alt="Agent Customs license: Apache License 2.0 in plain words" width="100%">
+</picture>
+
+<br><br>
+
+[**Full license text**](#the-full-license-text) &nbsp;·&nbsp;
+[**Contact**](README.md#lets-talk)
+
+<br>
+
+<img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18">
+<img alt="Copyright 2026 Monty Bagati" src="https://img.shields.io/badge/copyright-2026_Monty_Bagati-ece4d3?labelColor=0c1d18">
+<img alt="SPDX: Apache-2.0" src="https://img.shields.io/badge/SPDX-Apache--2.0-8fd1a6?labelColor=0c1d18">
+
+</div>
+
+<br>
+
+> **In one sentence:** you can use, change, share and sell Agent Customs, as long as you keep the license and the copyright notice, say which files you changed, and accept that it comes with no warranty.
+>
+> This page is a plain-words guide. The legal text further down is what counts.
+
+<br>
+
+## What you can do, and what you have to do
+
+<table width="100%">
+<tr>
+<td width="33.3%" valign="top">
+  <strong>You can</strong><br><br>
+  &#10003; Use it for anything, at home or at work<br>
+  &#10003; Run it on your own site or product<br>
+  &#10003; Change the code<br>
+  &#10003; Share your copy, changed or not<br>
+  &#10003; Sell a product that includes it<br>
+  &#10003; Use the patents the contributors hold on their own contributions
+</td>
+<td width="33.3%" valign="top">
+  <strong>You must</strong><br><br>
+  &bull; Include a copy of this license<br>
+  &bull; Keep the copyright and notice lines in files you pass on<br>
+  &bull; Mark the files you changed<br>
+  &bull; Pass on any <code>NOTICE</code> file that came with a part you use
+</td>
+<td width="33.3%" valign="top">
+  <strong>You cannot</strong><br><br>
+  &#10007; Use the Agent Customs name or logo as if your product were the original<br>
+  &#10007; Hold the authors responsible if it goes wrong: there is no warranty<br>
+  &#10007; Keep the patent grant if you sue someone claiming the code infringes your patent
+</td>
+</tr>
+</table>
+
+## What this license covers
+
+| Part of the repository | Owner | License |
+| :--- | :--- | :--- |
+| Agent Customs itself: [`site/customs/`](site/customs/), the desk in [`site/`](site/), [`bin/`](bin/), [`tools/`](tools/), [`tests/`](tests/), [`extension/`](extension/), [`practice/`](practice/), [`range/`](range/) and the docs | Monty Bagati | Apache License 2.0 (this page) |
+| Cognizant's Open Agentic Web runtime in [`site/runtime/`](site/runtime/) and its copies, and the kit in [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant AI Labs | Apache License 2.0, kept unmodified ([`site/runtime/LICENSE.txt`](site/runtime/LICENSE.txt)) |
+| Cognizant's official example sites in [`range/official/`](range/official/) | Cognizant AI Labs | Apache License 2.0 ([`range/official/NOTICE`](range/official/NOTICE)) |
+| The Geist, Geist Mono and Instrument Serif fonts in [`site/fonts/`](site/fonts/) | Their designers | SIL Open Font License 1.1 (the `OFL-*.txt` files next to the fonts) |
+| Snapshots of public MCP servers and A2A cards in [`tests/fixtures/realworld/`](tests/fixtures/realworld/) | Each service's owner | Not covered by this license. They are copies of public tool lists, kept only as frozen test data. |
+
+<details>
+<summary><b>Putting the notice on a file you copy</b></summary>
+
+<br>
+
+When you copy a file from Agent Customs into your own project, keep a short notice at the top, written in that file's comment style:
+
+```text
+Copyright 2026 Monty Bagati
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+If you change the file, add a line such as `Changed by <your name>, <year>: <what you changed>`.
+
+</details>
+
+<details>
+<summary><b>Common questions</b></summary>
+
+<br>
+
+**Can I put the guard on a commercial site?** Yes. Copy `customs/`, keep this license with it, and you are done.
+
+**Do I have to publish my changes?** No. Apache 2.0 does not make you share your own code. If you do pass the files on, mark what you changed.
+
+**Can I call my fork "Agent Customs"?** Please don't use the name or logo in a way that suggests it is the original or that I endorse it. Saying "based on Agent Customs" is fine.
+
+**Is it certified safe?** No. A *Cleared* stamp means none of its checks found a known problem. The license says the same thing in legal terms: the software comes "as is".
+
+</details>
+
+---
+
+## The full license text
+
+The text below is the Apache License, Version 2.0, word for word.
+
+<details open>
+<summary><b>Apache License, Version 2.0</b></summary>
+
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -199,3 +323,19 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+```
+
+</details>
+
+---
+
+<div align="center">
+
+<a href="https://montbaga.github.io/agent-customs/"><img src="site/favicon.svg" alt="Agent Customs" width="36"></a>
+
+<br>
+
+**Agent Customs** · Built by [**Monty Bagati**](https://www.linkedin.com/in/monty-bagati-90454626/) for the Open Agentic Web  
+<sub>Apache License 2.0 · Copyright 2026 Monty Bagati · Runtime &amp; templates from <a href="https://github.com/cognizant-ai-labs/agentic-web">cognizant-ai-labs/agentic-web</a> (Apache 2.0)</sub>
+
+</div>
