@@ -2,9 +2,11 @@
 //
 // Everything that comes from an inspected network is inserted with text nodes, never
 // as HTML, so a hostile network cannot put markup into this page.
+import { ARENA_SCENARIOS, runArenaScenario } from "./arena.js";
 import { EXAMPLES, NOT_APPROVABLE, PROTOCOL_SAMPLES, desk } from "./desk.js";
-import { certificateFilename, certificateMeta, certificateSvg } from "./certificate.js";
+import { certificateFilename, certificateHtml, certificateMeta, certificateSvg, verifyDroppedArtifact } from "./certificate.js";
 import { matchesPin } from "./customs/diff.js";
+import { inspectNetworkUrl } from "./customs/inspect.js";
 import { verifyReceipt } from "./customs/receipts.js";
 
 const SEVERITY_TONE = { critical: "bad", high: "warn", medium: "caution", low: "info", info: "info" };
@@ -14,7 +16,7 @@ const PAPER_TITLES = { "open-agentic-web": "Open Agentic Web spec", a2a: "A2A Ag
 const $ = (sel) => document.querySelector(sel);
 
 // ---- Workspace tabs: one panel at a time ---------------------------------------------
-const TAB_PANELS = { report: "report-section", approvals: "desk", compare: "compare", officer: "assistant" };
+const TAB_PANELS = { report: "report-section", officer: "assistant", compare: "compare", verify: "verify-panel", approvals: "desk" };
 
 function showTab(name, { focus = false } = {}) {
   for (const [tab, panelId] of Object.entries(TAB_PANELS)) {
@@ -28,6 +30,8 @@ function showTab(name, { focus = false } = {}) {
     }
     if (panel) panel.hidden = !active;
   }
+  const resetBtn = $("#report-reset");
+  if (resetBtn) resetBtn.hidden = name !== "report" || !$("#report") || $("#report").hidden;
   moveHighlight();
 }
 
@@ -136,6 +140,8 @@ function renderReport({ animate = false } = {}) {
   $("#report-empty").hidden = true;
   box.hidden = false;
   box.replaceChildren();
+  const resetBtn = $("#report-reset");
+  if (resetBtn) resetBtn.hidden = $("#report-section")?.hidden ?? false;
   const tone = report.verdict.tone;
   const title = report.identity.brand || report.target.network || report.target.host || "Inspection";
 
@@ -458,7 +464,7 @@ async function openCertificateDialog(report, reportToast) {
   const receiptCheck = verified?.check || null;
   const meta = certificateMeta(report, receiptCheck);
   const verifyUrl = reportVerifyUrl(report);
-  const svg = certificateSvg(report, { receiptCheck, verifyUrl, theme: activePaletteTheme() });
+  const svg = certificateSvg(report, { receiptCheck, signedReceipt: verified?.found?.signed || null, verifyUrl, theme: activePaletteTheme() });
   const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   revokeCertUrl();
   activeCertUrl = URL.createObjectURL(svgBlob);
@@ -511,6 +517,12 @@ async function openCertificateDialog(report, reportToast) {
             window.print();
             setTimeout(clearPrint, 1000);
           } }, "Print / PDF"),
+          h("button", { type: "button", class: "ghost small", onclick: () => {
+            const htmlBlob = new Blob([certificateHtml(svg, `${meta.documentTitle} — ${titleText}`)], { type: "text/html;charset=utf-8" });
+            downloadBlob(htmlBlob, certificateFilename(report, "html"));
+            dialogToast.textContent = "Saved HTML.";
+            setTimeout(() => { dialogToast.textContent = ""; }, 2500);
+          } }, "Download HTML"),
           h("button", { type: "button", class: "ghost small", onclick: () => {
             downloadBlob(svgBlob, certificateFilename(report, "svg"));
             dialogToast.textContent = "Saved SVG.";
@@ -752,18 +764,33 @@ function wire() {
   const examples = $("#examples");
   // The dot hints at the verdict each test-range network is built to get.
   const EXAMPLE_TONE = { sunny: "ok", shady: "bad", bank: "bad", maze: "warn", rug: "warn", oven: "ok", guesthouse: "ok", harbor: "ok" };
+  const exampleItem = (label, note, url, tone) => h("li", null,
+    h("button", { type: "button", onclick: () => runInspect(url), title: url },
+      h("span", { class: `dot tone-${tone || "info"}`, "aria-hidden": "true" }),
+      label, " ",
+      h("small", { class: "example-tag" }, note)));
   const officialExamples = $("#examples-official");
   for (const e of EXAMPLES) {
-    (e.group === "official" && officialExamples ? officialExamples : examples).append(h("li", null, h("button", { type: "button", onclick: () => runInspect(e.url), title: e.url },
-      h("span", { class: `dot tone-${EXAMPLE_TONE[e.id] || "info"}`, "aria-hidden": "true" }), e.label, " ", h("small", null, e.note))));
+    const dest = e.group === "official" && officialExamples ? officialExamples : examples;
+    dest.append(exampleItem(e.label, e.note, e.url, EXAMPLE_TONE[e.id]));
   }
   const protocolExamples = $("#examples-protocols");
   if (protocolExamples) {
     for (const s of PROTOCOL_SAMPLES) {
-      const sampleUrl = new URL(s.path, location.href).href;
-      protocolExamples.append(h("li", null, h("button", { type: "button", onclick: () => runInspect(sampleUrl), title: sampleUrl },
-        h("span", { class: `dot tone-${s.tone || "info"}`, "aria-hidden": "true" }), s.label, " ", h("small", null, s.note))));
+      protocolExamples.append(exampleItem(s.label, s.note, new URL(s.path, location.href).href, s.tone));
     }
+  }
+  const resetBtn = $("#report-reset");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      $("#report").hidden = true;
+      $("#report-empty").hidden = false;
+      const emptyTitle = $("#report-empty h3");
+      const emptyCopy = $("#report-empty p");
+      if (emptyTitle) emptyTitle.textContent = "Inspect any agent URL, or try a fixture";
+      if (emptyCopy) emptyCopy.textContent = "Deterministic rules run inside your browser without using an API key.";
+      resetBtn.hidden = true;
+    });
   }
   $("#inspect-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -793,6 +820,8 @@ function wire() {
     $("#compare-after").value = rug;
     runCompare(sunny, rug);
   });
+  wireVerifyPanel();
+  wireArenaPanel();
   $("#copy-guard").addEventListener("click", (event) => {
     const toast = { set textContent(v) { event.target.textContent = v || "Copy"; } };
     copy($("#guard-code").textContent, toast, "Copied");
@@ -819,6 +848,176 @@ function wire() {
     revealWorkspace("instant");
     runInspect(targetUrl, { scrollBehavior: "instant" });
   }
+}
+
+const VERIFY_TONE = { verified: "ok", unsigned: "info", changed: "warn", expired: "warn", tampered: "bad", invalid: "bad" };
+
+function renderVerifyResult(result, { label = "", liveState = null, onRecheck = null } = {}) {
+  const box = $("#verify-result");
+  if (!box) return;
+  box.replaceChildren();
+  if (!result.ok) {
+    box.append(h("div", { class: "verify-card" },
+      h("div", { class: "verify-head" },
+        h("span", { class: "pill tone-bad", style: "--tone: var(--bad)" }, "Unrecognized"),
+        h("h4", null, label || "Could not verify file")),
+      h("p", { class: "none" }, result.reason)));
+    return;
+  }
+
+  const art = result.artifact;
+  const tone = VERIFY_TONE[result.status] || "info";
+  const sourceLabel = result.signature?.valid
+    ? (result.signedSource === "published" ? "Verified vs. published receipt" : "ES256 signed artifact")
+    : result.status === "tampered"
+      ? "Tampered ES256 artifact"
+      : art.pdfExtracted
+        ? "PDF link extract"
+        : "Unsigned snapshot";
+  const facts = [
+    ["Target URL", art.url || "not present"],
+    ["Verdict recorded", art.stamp || art.verdict || "unknown"],
+    ["SHA-256 fingerprint", art.fingerprint || "not present"],
+    ["Issued", art.inspectedAt ? fmtDate(art.inspectedAt) : "unknown"],
+    ["ES256 key ID", result.signature?.receipt?.inspector?.keyId || "unsigned"],
+    ["Proof source", sourceLabel],
+  ];
+
+  const liveTone = liveState?.status === "match" ? "ok" : liveState?.status === "changed" ? "bad" : "info";
+  const liveText = liveState?.message || "Ready to compare against the live endpoint.";
+
+  const liveActions = [];
+  if (art.url) {
+    if (onRecheck) {
+      liveActions.push(h("button", { type: "button", class: "ghost small", onclick: onRecheck }, "Check live site"));
+    }
+    liveActions.push(h("button", { type: "button", class: "ghost small", onclick: () => runInspect(art.url) }, "Open full report"));
+  }
+
+  box.append(h("div", { class: "verify-card" },
+    h("div", { class: "verify-head" },
+      h("span", { class: `pill tone-${tone}`, style: `--tone: var(--${tone})` }, result.status),
+      h("h4", null, result.headline),
+      label ? h("span", { class: "where" }, label) : null),
+    h("p", { class: "none" }, result.detail),
+    h("dl", { class: "verify-grid" }, facts.map(([dt, dd]) => h("div", null, h("dt", null, dt), h("dd", null, dd)))),
+    art.url ? h("div", { class: "verify-live", style: `--tone: var(--${liveTone})` },
+      h("span", null, liveText),
+      h("div", { class: "tags" }, liveActions)) : null));
+}
+
+async function verifyArtifactInput(input, label) {
+  const keyDoc = await (receiptKey ||= loadJson(".well-known/agent-customs-key.json").catch(() => null));
+  const lookupSignedReceipt = async (url) => (await findReceipt(url).catch(() => null))?.signed || null;
+  let result = await verifyDroppedArtifact(input, {
+    fileName: label,
+    publicJwk: keyDoc?.publicKey || null,
+    lookupSignedReceipt,
+  });
+
+  const runLiveCheck = async () => {
+    if (!result.ok || !result.artifact?.url) return;
+    renderVerifyResult(result, { label, liveState: { status: "checking", message: `Checking ${result.artifact.url} live…` } });
+    let liveReport = null;
+    try {
+      liveReport = await inspectNetworkUrl(result.artifact.url, { fetchImpl: desk.fetchImpl || undefined, pageOrigin: desk.pageOrigin });
+    } catch { liveReport = null; }
+    result = await verifyDroppedArtifact(input, {
+      fileName: label,
+      publicJwk: keyDoc?.publicKey || null,
+      lookupSignedReceipt,
+      liveReport,
+    });
+    const liveMsg = result.liveStatus === "match"
+      ? `Matches live endpoint (${liveReport.identity.short}).`
+      : result.liveStatus === "changed"
+        ? `Live endpoint drifted since issue! Now ${liveReport.verdict.stamp} (${liveReport.identity.short}).`
+        : result.liveSummary || "Live check unavailable offline or blocked by CORS.";
+    renderVerifyResult(result, { label, liveState: { status: result.liveStatus, message: liveMsg }, onRecheck: runLiveCheck });
+  };
+
+  renderVerifyResult(result, {
+    label,
+    liveState: result.ok && result.status !== "tampered" && result.artifact?.url
+      ? { status: "checking", message: `Checking ${result.artifact.url} live…` }
+      : { status: "skipped", message: "Skipped live check because signature failed." },
+    onRecheck: result.status === "tampered" ? null : runLiveCheck,
+  });
+  if (result.ok && result.status !== "tampered" && result.artifact?.url) {
+    await runLiveCheck();
+  }
+}
+
+function wireVerifyPanel() {
+  const drop = $("#verify-drop");
+  const fileInput = $("#verify-file");
+  const pickBtn = $("#verify-pick");
+  if (!drop || !fileInput) return;
+
+  const readFile = async (file) => {
+    if (!file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await verifyArtifactInput({ bytes, name: file.name }, file.name);
+  };
+
+  pickBtn?.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
+  drop.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", () => {
+    const picked = fileInput.files?.[0];
+    fileInput.value = "";
+    readFile(picked);
+  });
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("drag");
+    readFile(e.dataTransfer?.files?.[0]);
+  });
+}
+
+function wireArenaPanel() {
+  const picks = $("#arena-picks");
+  const box = $("#arena-result");
+  if (!picks || !box) return;
+
+  let activeId = ARENA_SCENARIOS[0].id;
+  const run = async (id) => {
+    activeId = id;
+    for (const btn of picks.querySelectorAll("button")) {
+      btn.setAttribute("aria-pressed", String(btn.dataset.scenario === id));
+    }
+    const res = await runArenaScenario(id);
+    const col = (cls, title, data) => h("section", { class: `arena-card ${cls}` },
+      h("div", { class: "arena-card-head" },
+        h("h4", null, title),
+        h("span", { class: `pill ${cls === "bad" ? "sev-critical" : ""}`, style: cls === "ok" ? "--tone: var(--ok)" : null }, data.outcome)),
+      h("ol", { class: "arena-steps" }, data.steps.map((s) => h("li", null,
+        h("strong", null, s.stage),
+        h("span", null, s.detail)))));
+
+    box.replaceChildren(
+      h("p", { class: "arena-summary" }, res.scenario.summary),
+      h("div", { class: "arena-grid" },
+        col("bad", "Without Agent Customs", res.unprotected),
+        col("ok", "Protected by Agent Customs", res.protected)),
+      h("div", { class: "arena-foot" },
+        h("span", null, `Checked live in browser in ${res.elapsedMs} ms · zero external API keys`),
+        h("a", { class: "draw", href: "#workspace" }, "Inspect a live URL in the Desk ↑")));
+  };
+
+  for (const sc of ARENA_SCENARIOS) {
+    picks.append(h("li", null, h("button", {
+      type: "button",
+      "data-scenario": sc.id,
+      "aria-pressed": String(sc.id === activeId),
+      onclick: () => run(sc.id),
+    }, sc.label)));
+  }
+  run(activeId);
 }
 
 // Back from the officer's Save and start, which reloads the page: reopen the Officer tab and

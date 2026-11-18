@@ -727,8 +727,8 @@ export function mountModelPicker(root, { engine, providers, providerForApiKey, a
     body.hidden = true;
   } else {
     current.textContent = engine
-      ? "No model chosen yet. The inspection tools above work without one."
-      : "The assistant could not load. The inspection tools above still work.";
+      ? "No model chosen yet. Report, Compare and Verify work without one."
+      : "The assistant could not load. Report, Compare and Verify still work.";
     body.hidden = !engine;
   }
   show(active || choiceForProvider("Google AI Studio"));
