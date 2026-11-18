@@ -281,6 +281,12 @@ export async function analyzeNetwork(input) {
     if (hit.rule.id === "C-PERSONAL" && field.agent && peerGuarded(field.agent)) {
       severity = "low";
       detail += " It asks on its own site; its peer rule stops this when another site runs it.";
+    } else if (hit.rule.id === "C-EXEC" && !/instructions|command/i.test(field.field || "")) {
+      const directsVisitor = /\b(?:ask|tell|have|get|instruct|direct|urge)\s+(?:the\s+)?(?:visitor|user|guest|customer|client|them)\b|\b(?:visitor|user|guest|customer)\s+(?:should|must|needs?\s+to|has\s+to)\b/i.test(hit.excerpt || "");
+      if (!directsVisitor) {
+        severity = "medium";
+        detail += " Found in tool/schema documentation rather than assistant instructions; verify it is reference docs rather than user coercion.";
+      }
     }
     add({ rule: hit.rule.id, category: "contraband", severity, title: hit.rule.title,
       detail, evidence: hit.excerpt, where: { agent: field.agent, field: field.field }, why: hit.rule.why, fix: hit.rule.fix });

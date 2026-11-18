@@ -48,6 +48,12 @@ test("detectCanaryLeak catches raw, URL, Base64, hex, and reversed encodings", (
   assert.equal(detectCanaryLeak({ b: Buffer.from(JSON.stringify({ note: "ctx", t: token })).toString("base64") }, token)?.encoding, "base64");
   assert.match(detectCanaryLeak({ b: Buffer.from(`x${token}`).toString("base64url") }, token)?.encoding || "", /^base64(?:url)?$/);
   assert.equal(detectCanaryLeak(`tok=${[...token].join(" ")}`, token)?.encoding, "spaced");
+  assert.equal(detectCanaryLeak(enc.base64.replace(/(.{8})/g, "$1\n"), token)?.encoding, "base64");
+  const hexSpaced = [...Buffer.from(token)].map((b) => b.toString(16).padStart(2, "0")).join(" ");
+  assert.equal(detectCanaryLeak(hexSpaced, token)?.encoding, "hex");
+  const charCodes = [...token].map((c) => c.charCodeAt(0)).join(",");
+  assert.equal(detectCanaryLeak(charCodes, token)?.encoding, "charcodes");
+  assert.equal(detectCanaryLeak(`token_part=${token.slice(7)}`, token)?.encoding, "raw");
   assert.equal(detectCanaryLeak("totally unrelated data chunk", token), null);
 });
 
