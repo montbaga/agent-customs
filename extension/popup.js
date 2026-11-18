@@ -18,11 +18,44 @@ function h(tag, attrs, ...children) {
 
 const DESK_BASE = "https://montbaga.github.io/agent-customs/";
 
-async function runCheck(targetUrl) {
+async function ensureOriginPermission(targetUrl, { request = false } = {}) {
+  if (typeof chrome === "undefined" || !chrome.permissions?.contains) return { granted: true };
+  let parsed;
+  try { parsed = new URL(targetUrl); } catch { return { granted: false, reason: "Enter a valid https:// agent URL." }; }
+  if (parsed.protocol !== "https:") {
+    return { granted: false, reason: "Extension host permissions require https:// URLs." };
+  }
+  const origins = [`${parsed.origin}/*`];
+  try {
+    if (await chrome.permissions.contains({ origins })) return { granted: true };
+    if (!request) return { granted: false, origin: parsed.origin };
+    const granted = await chrome.permissions.request({ origins });
+    return { granted, origin: parsed.origin, reason: granted ? "" : `Host permission declined for ${parsed.origin}.` };
+  } catch (err) {
+    return { granted: false, origin: parsed.origin, reason: err?.message || `Permission check failed for ${parsed.origin}.` };
+  }
+}
+
+async function runCheck(targetUrl, { requestPermission = true } = {}) {
   const out = $("#ext-out");
   const proto = $("#ext-proto");
   const deskLink = $("#ext-open-desk");
   proto.hidden = true;
+
+  const perm = await ensureOriginPermission(targetUrl, { request: requestPermission });
+  if (!perm.granted) {
+    out.replaceChildren(
+      h("p", { class: "title" }, perm.reason || `Allow access to ${perm.origin || "this origin"}?`),
+      h("p", { class: "muted" }, "Grant one-time permission for this https:// site to inspect its manifests."),
+      perm.origin ? h("button", {
+        type: "button",
+        class: "perm-btn",
+        onclick: () => runCheck(targetUrl, { requestPermission: true }),
+      }, `Inspect ${perm.origin}`) : null,
+    );
+    return;
+  }
+
   out.replaceChildren(h("p", { class: "muted" }, `Inspecting ${targetUrl}…`));
 
   try {
@@ -63,15 +96,15 @@ async function bootPopup() {
   $("#ext-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const val = input.value.trim();
-    if (val) runCheck(val);
+    if (val) runCheck(val, { requestPermission: true });
   });
 
   if (typeof chrome !== "undefined" && chrome.tabs?.query) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.url && /^https?:/i.test(tab.url)) {
+    if (tab?.url && /^https:/i.test(tab.url)) {
       const origin = new URL(tab.url).origin;
       input.value = origin;
-      await runCheck(origin);
+      await runCheck(origin, { requestPermission: false });
       return;
     }
   }
