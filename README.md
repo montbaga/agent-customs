@@ -22,7 +22,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 166 passing" src="https://img.shields.io/badge/tests-166_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 180 passing" src="https://img.shields.io/badge/tests-180_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -102,6 +102,8 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 - Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
 - Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
 
+The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp.
+
 ---
 
 ## Add the guard to your site
@@ -138,7 +140,7 @@ New to the design? [**How it works**](ARCHITECTURE.md) explains every step with 
 | Option | Default | What it does |
 | :--- | :--- | :--- |
 | `strict` | `false` | Asks before every partner, never pins on its own, ignores `trustedActions` and blocks personal details going out |
-| `semanticJudge` | `false` | Opt-in AI check of *Cleared* and *Cleared with conditions* results, using the site's own AI provider. It can only make a verdict stricter. Off means no tokens are used |
+| `semanticJudge` | `false` | The AI double-check. The site's own AI also reads partners the rules cleared, their MCP tool lists and their replies, and it can only make a verdict stricter. `true` turns it on; a function `() => boolean` lets a switch on your page turn it on and off, as the desk does. Off means no tokens are used |
 | `locks` | `true` | `false` turns off the three runtime locks and MCP tool pinning |
 | `canary` | `true` | Plants a canary word in your assistant's instructions and withdraws a partner's approval if it leaks |
 | `trustedActions` | `[]` | Harmless page actions that do not need an extra click after a partner reply |
@@ -166,7 +168,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  166 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension and the practice site.
+  180 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension and the practice site.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -181,7 +183,8 @@ Three ways in, fastest first:
   <strong>3 · The Officer or the practice site</strong><br><br>
   Paste a key (Google AI Studio and Groq have free tiers) on <strong>Officer</strong> or the <a href="https://montbaga.github.io/agent-customs/practice/"><strong>practice site</strong></a>:<br>
   • <code>Ask Shady Pizza what it offers.</code> → blocked<br>
-  • <code>Ask Sunny Bakery what it offers.</code> → runs normally
+  • <code>Ask Sunny Bakery what it offers.</code> → runs normally<br>
+  • Turn on <strong>AI double-check</strong>, then inspect <strong>Sunny Bakery</strong> → a round seal says what your AI found
 </td>
 </tr>
 </table>
@@ -406,7 +409,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 166 tests
+npm test                                # 180 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -510,7 +513,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 166 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 180 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>

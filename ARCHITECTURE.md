@@ -141,7 +141,7 @@ The guard is in [`guard.js`](site/customs/guard.js), the locks in [`locks.js`](s
 
 - The same files always get the same stamp. You can test it, and nobody can talk the stamp into changing its mind.
 - It is free and fast. No API key and no tokens, so it can run on every partner call.
-- An AI model can still help. On the desk, the Officer (bring your own key) explains reports in plain words. There is also an opt-in `semanticJudge` that can make a verdict stricter, never softer. It is off by default.
+- An AI model can still help. On the desk, the Officer (bring your own key) explains reports in plain words. There is also the **AI double-check**, a switch under the desk's address box (`semanticJudge` in the guard). When you turn it on, your AI also reads what the rules clear and can make a verdict stricter, never softer. Networks the rules already stopped are not sent to it. It is off by default.
 
 The trade-off is that rules miss wording they were never written for. That is why the locks in section 5 exist: they stop the damage even when the wording gets past.
 
@@ -177,7 +177,7 @@ For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.
 | [`practice/`](practice/) | Main Street Guide, an ordinary site with the guard added in two lines |
 | [`range/`](range/) | Test networks, some honest and some deliberately unsafe |
 | [`bin/`](bin/), [`action.yml`](action.yml), [`extension/`](extension/) | The command line tool, the GitHub Action and the browser extension |
-| [`tests/`](tests/) | 166 automatic tests, the frozen attack sets and the real-world snapshots |
+| [`tests/`](tests/) | 180 automatic tests, the frozen attack sets and the real-world snapshots |
 | [`tools/`](tools/) | The benchmark, the stamp signer, the local server and the builders |
 
 ---

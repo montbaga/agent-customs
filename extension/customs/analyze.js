@@ -712,7 +712,8 @@ export async function reanalyze(report, pin) {
  */
 export function escalateReport(report, finding) {
   if (!report || !finding) return report;
-  const findings = [...(report.findings || []), {
+  // Copies, so numbering the new list leaves the original report's finding ids alone.
+  const findings = [...(report.findings || []).map((f) => ({ ...f })), {
     id: "",
     rule: finding.rule || "J-SEMANTIC",
     category: finding.category || "contraband",
@@ -733,12 +734,15 @@ export function escalateReport(report, finding) {
   else if (blockingTitles.length) verdict = VERDICTS.INVALID;
   else if (counts.high) verdict = VERDICTS.HOLD;
   else if (counts.medium) verdict = VERDICTS.CONDITIONS;
-  return {
+  const raised = {
     ...report,
     findings,
     counts,
     verdict: { ...verdict, summary: summarize(verdict, counts, findings, blockingTitles) },
   };
+  // A spread drops the hidden inputs, and reanalyze() needs them to redo the report.
+  if (report.inputs) Object.defineProperty(raised, "inputs", { value: report.inputs, enumerable: false });
+  return raised;
 }
 
 function summarize(verdict, counts, findings, blocking) {

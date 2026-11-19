@@ -9,10 +9,13 @@
 //     before it runs, using the same rules as the page.
 //  3. Each guard decision appears in the page's border log, and as a notice in the chat
 //     whose "See the full report" opens the report on this page.
+//  4. The desk's AI double-check switch uses the visitor's own key, for inspections on the
+//     page and for partners the guard lets in.
 // Before the runtime mounts, OpenRouter joins its AI providers (providers.js).
 import { desk } from "./desk.js";
 import { installCustomsGuard } from "./customs/guard.js";
 import { confirmChoice, confirmEntryDialog } from "./customs/guard-ui.js";
+import { createEngineJudge, engineJudgeModel } from "./customs/judge.js";
 import { addProviders } from "./providers.js";
 import { mountModelPicker } from "./model-picker.js";
 
@@ -33,6 +36,8 @@ export class AssistantMount {
   static async start() {
     const status = document.querySelector("#assistant-status");
     const siteBase = new URL("./", import.meta.url).href;
+    let connectAi = () => {};
+    desk.connectAi(new Promise((resolve) => { connectAi = resolve; }));
     try {
       const [{ boot }, { API_KEY_PROVIDERS, providerForApiKey }, byok] = await Promise.all([
         import("./runtime/index.js"), import("./runtime/ui.js"), import("./runtime/byok.js"),
@@ -64,9 +69,12 @@ export class AssistantMount {
         // The notice's "See the full report" shows the report here, on the Report tab.
         reportPage: siteBase,
         openReport: (url) => document.dispatchEvent(new CustomEvent("customs:inspect", { detail: { url } })),
+        // 4. The same switch turns the AI double-check on for partners.
+        semanticJudge: () => desk.aiCheckOn,
       });
 
       const needsKey = !engine.mockLLM && (!engine.byokKey || engine.byokKey === "demo");
+      connectAi({ judge: createEngineJudge(engine), ready: !engine.mockLLM && !needsKey, model: engineJudgeModel(engine) });
       // Without a key, the model picker below says what to do, so the status line rests.
       status.textContent = "Officer on duty. Every partner network is inspected before it runs.";
       status.hidden = needsKey;
@@ -78,6 +86,7 @@ export class AssistantMount {
       return engine;
     } catch (error) {
       // The page must keep working without the assistant.
+      connectAi(null);
       status.textContent = "The assistant could not load. You can still inspect networks with the form above.";
       const current = document.querySelector("#mp-current");
       if (current) current.textContent = "The assistant could not load, so no model can be set. The inspection tools above still work.";

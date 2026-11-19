@@ -3,13 +3,17 @@
 // One desk per page. The page's own forms and buttons (view.js) and the assistant's
 // website_* tools (site-actions.js) call the same methods, so both follow one set of
 // rules. Operations refuse by returning {ok: false, reason} and change nothing.
-// Nothing here talks to a model: inspections are deterministic.
+// The rules decide every verdict. Only the AI double-check talks to a model, when the
+// visitor turns it on, and it can only make a verdict stricter (customs/judge.js).
 
 import { compactReport, reanalyze } from "./customs/analyze.js";
 import { diffSnapshots } from "./customs/diff.js";
 import { inspectNetworkUrl } from "./customs/inspect.js";
+import { applyJudge, carryAiCheck, withAiCheck } from "./customs/judge.js";
 import { PinStore, pinFromReport } from "./customs/pins.js";
 import { revealHidden } from "./customs/unicode.js";
+
+const AI_CHECK_KEY = "agent-customs-ai-check";
 
 // The test range's address. tools/set-origins.mjs rewrites it for hosting.
 export const RANGE_ORIGIN = "https://agent-customs-range.github.io";
@@ -62,7 +66,62 @@ export class CustomsDesk {
     // Set by site.js: async ({action, report, url}) => true when the visitor agrees. The
     // officer reads text written by strangers, so it cannot change approvals on its own.
     this.confirmApproval = null;
+    // The AI double-check: off until the visitor turns it on. site.js connects the AI.
+    this.aiCheckOn = readSwitch();
+    this.ai = null;
+    this.aiConnecting = null;
+    this.aiPending = false;
+    this.phase = "";
     this.pins.onChange?.(() => this.emit("pins"));
+  }
+
+  /**
+   * Turn the AI double-check on or off. This browser remembers the choice.
+   *
+   * :param on: true to have the visitor's AI read what the rules clear.
+   * :return: The new setting.
+   */
+  setAiCheck(on) {
+    this.aiCheckOn = on === true;
+    writeSwitch(this.aiCheckOn);
+    this.emit("ai-check");
+    return this.aiCheckOn;
+  }
+
+  /**
+   * Connect the visitor's AI for the double-check. site.js calls this as the officer
+   * starts, with a promise of {judge, ready, model}; ready is false without a key of the
+   * visitor's own. Inspections started meanwhile wait for it.
+   *
+   * :param pending: The AI, or a promise of it (null when the officer could not start).
+   */
+  connectAi(pending) {
+    this.aiPending = true;
+    this.aiConnecting = Promise.resolve(pending).then((ai) => ai || null, () => null).then((ai) => {
+      this.ai = ai;
+      this.aiPending = false;
+      this.emit("ai-check");
+      return ai;
+    });
+    return this.aiConnecting;
+  }
+
+  /**
+   * The double-check's state for the page: "off", "connecting", "needs-key" or "ready".
+   */
+  aiCheckState() {
+    if (!this.aiCheckOn) return "off";
+    if (this.aiPending) return "connecting";
+    return this.ai?.ready ? "ready" : "needs-key";
+  }
+
+  // Run the double-check on a report the rules just made.
+  async doubleCheck(report) {
+    const ai = this.ai || (await this.aiConnecting) || null;
+    if (!ai?.ready || typeof ai.judge !== "function") return withAiCheck(report, { status: "needs-key" });
+    this.phase = "ai";
+    this.emit("busy");
+    return applyJudge(report, async (request) => ({ model: ai.model || "", ...(await ai.judge(request)) }));
   }
 
   onChange(fn) {
@@ -79,7 +138,8 @@ export class CustomsDesk {
   /**
    * Inspect a network. The page's own form calls this directly: the visitor typed the
    * address and pressed Inspect. The assistant's tool passes askFirst, so the visitor
-   * approves contact with that host on a consent card first.
+   * approves contact with that host on a consent card first. With the AI double-check
+   * on, the visitor's AI then reads a network the rules cleared.
    *
    * :param url: A network URL (or a site URL with one network).
    * :param options.askFirst: Ask before contacting another origin.
@@ -109,12 +169,15 @@ export class CustomsDesk {
       if (!allowed) return { ok: false, reason: `The visitor did not allow contacting ${host}. Nothing was fetched.` };
     }
     this.busy = true;
+    this.phase = "rules";
     this.emit("busy");
     let report;
     try {
       report = await inspectNetworkUrl(input, { fetchImpl: this.fetchImpl || undefined, pins: this.pins, pageOrigin: this.pageOrigin, transitive });
+      if (this.aiCheckOn && !report.failure) report = await this.doubleCheck(report);
     } finally {
       this.busy = false;
+      this.phase = "";
     }
     this.remember(input, report);
     this.latest = report;
@@ -139,7 +202,7 @@ export class CustomsDesk {
   async inspectForAgent(url) {
     const report = await this.inspect(url, { askFirst: true });
     if (report.ok === false) return report;
-    const summary = compactReport(report);
+    const summary = compact(report);
     if (report.choices?.length) summary.choices = report.choices;
     return { ok: true, shownOnPage: true, report: summary };
   }
@@ -247,7 +310,7 @@ export class CustomsDesk {
     }
     // Redo the report against this approval, so its verdict no longer counts the changes
     // the visitor has just accepted, and store that verdict with the approval.
-    const fresh = await reanalyze(report, pinFromReport(report, "manual"));
+    const fresh = carryAiCheck(report, await reanalyze(report, pinFromReport(report, "manual")));
     const pin = pinFromReport(fresh, "manual");
     this.pins.set(report.target.url, pin);
     this.replace(report, fresh);
@@ -269,7 +332,7 @@ export class CustomsDesk {
       return { ok: false, reason: "The visitor kept the approval.", field: "url" };
     }
     this.pins.delete(key);
-    if (report) this.replace(report, await reanalyze(report, null));
+    if (report) this.replace(report, carryAiCheck(report, await reanalyze(report, null)));
     this.emit("pins");
     return { ok: true, unpinned: normalize(key) };
   }
@@ -307,7 +370,8 @@ export class CustomsDesk {
    */
   state() {
     return {
-      latestReport: this.latest ? compactReport(this.latest, 6) : null,
+      latestReport: this.latest ? compact(this.latest, 6) : null,
+      aiDoubleCheck: this.aiCheckState(),
       approvedVersions: this.pins.list().map((p) => ({ url: p.url, brand: p.brand, fingerprint: p.short, verdictWhenApproved: p.verdict, approvedAt: p.pinnedAt, how: p.how })),
       testRange: EXAMPLES.map((e) => ({ name: e.label, kind: e.note, networkUrl: e.url, page: e.page })),
       borderLog: this.borderLog.slice(0, 8),
@@ -328,6 +392,33 @@ function normalize(url) {
 function clip(text, max) {
   const s = String(text ?? "");
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+// The officer's summary, with a plain line on what the AI double-check did.
+function compact(report, maxFindings) {
+  return { ...compactReport(report, maxFindings), aiDoubleCheck: aiCheckNote(report.aiCheck) };
+}
+
+function aiCheckNote(check) {
+  switch (check?.status) {
+    case "clear": return "on: the visitor's AI read it and found nothing";
+    case "flagged": return "on: the visitor's AI flagged it, so the verdict was raised to Held for review";
+    case "skipped": return "on: not asked, because the rules had already held or refused it";
+    case "failed": return "on: the visitor's AI gave no usable answer, so only the rules decided";
+    case "needs-key": return "on, but no AI key is set, so only the rules decided";
+    default: return "off: only the rules checked it";
+  }
+}
+
+function readSwitch() {
+  try { return globalThis.localStorage?.getItem(AI_CHECK_KEY) === "on"; } catch { return false; }
+}
+
+function writeSwitch(on) {
+  try {
+    if (on) globalThis.localStorage?.setItem(AI_CHECK_KEY, "on");
+    else globalThis.localStorage?.removeItem(AI_CHECK_KEY);
+  } catch { /* storage blocked: the switch still works for this visit */ }
 }
 
 // The one desk this page uses.
