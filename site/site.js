@@ -41,8 +41,8 @@ export class AssistantMount {
   static async start() {
     const status = document.querySelector("#assistant-status");
     const siteBase = new URL("./", import.meta.url).href;
-    let connectAi = () => {};
-    desk.connectAi(new Promise((resolve) => { connectAi = resolve; }));
+    const { promise: aiConnected, resolve: connectAi } = Promise.withResolvers();
+    desk.connectAi(aiConnected);
     const vault = AssistantMount.openVault();
     try {
       const [{ boot }, { API_KEY_PROVIDERS }, byok] = await Promise.all([
@@ -230,7 +230,8 @@ export class AssistantMount {
   }
 }
 
-// Boot only in a browser. Node tests import this file without booting.
+// Boot only in a browser. Node tests import this file without booting. No top-level await:
+// start() reports its own failures, and older browsers can run this file.
 if (typeof window !== "undefined") {
-  await AssistantMount.start();
+  AssistantMount.start();
 }

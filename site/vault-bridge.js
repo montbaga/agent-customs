@@ -52,9 +52,7 @@ export class KeyVault {
     this.next = 1;
     this.pending = new Map();
     this.listeners = new Set();
-    let connected;
-    this.connected = new Promise((resolve) => { connected = resolve; });
-    this.onConnected = connected;
+    ({ promise: this.connected, resolve: this.onConnected } = Promise.withResolvers());
     this.ready = Promise.race([this.connected, new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))]);
   }
 

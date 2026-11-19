@@ -76,7 +76,7 @@ export class CustomsDesk {
     this.ai = null;
     this.aiSettled = false;
     this.aiWaitMs = aiWaitMs;
-    this.aiConnecting = new Promise((resolve) => { this.settleAi = resolve; });
+    ({ promise: this.aiConnecting, resolve: this.settleAi } = Promise.withResolvers());
     this.phase = "";
     this.pins.onChange?.(() => this.emit("pins"));
   }

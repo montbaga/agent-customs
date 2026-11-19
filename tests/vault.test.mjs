@@ -227,16 +227,20 @@ test("only requests for the stand-in address are routed to the vault", async () 
   assert.equal(calls.at(-1)[0], "page");
 });
 
-test("both pages allow only their own scripts, and the site frames only the key vault", async () => {
+test("both pages allow only their own scripts, and all HTML the site writes goes through one cleaner", async () => {
   const site = await readFile(path.join(ROOT, "site", "index.html"), "utf8");
   const policy = site.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
   assert.match(policy, /script-src 'self';/);
   assert.match(policy, /object-src 'none'/);
-  assert.match(policy, /frame-src https:\/\/agent-customs-vault\.github\.io /);
+  assert.match(policy, /form-action 'self'/);
+  assert.match(policy, /frame-src https: /, "frames: the key vault, and partners' action bridges");
+  assert.match(policy, /require-trusted-types-for 'script'; trusted-types default agent-customs-html/);
+  assert.ok(site.indexOf('src="trusted-types.js"') < site.indexOf('type="module"'), "the cleaner loads before any module");
   assert.equal([...site.matchAll(/<script(?![^>]*\bsrc=)[^>]*>/g)].length, 0, "no inline scripts, which the policy would block");
   assert.doesNotMatch(site, /\son[a-z]+="/, "no inline event handlers");
   const vault = await readFile(path.join(ROOT, "vault", "index.html"), "utf8");
   const vaultPolicy = vault.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
   assert.match(vaultPolicy, /default-src 'none'; script-src 'self'; style-src 'self'/);
   assert.match(vaultPolicy, /base-uri 'none'/);
+  assert.match(vaultPolicy, /require-trusted-types-for 'script'; trusted-types 'none'/, "the vault writes no HTML at all");
 });
