@@ -1283,6 +1283,13 @@ function wireBuilderCodeTabs() {
   if (!codeEl || !tabs.length) return;
   const siteMarkup = codeEl.innerHTML;
   const snippets = {
+    twolines: [
+      "// At the top of site.js",
+      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/site/customs/guard.js\";",
+      "",
+      "// Right after boot(), with any of the guard's options",
+      "installCustomsGuard(booted.engine, { strict: true });",
+    ].join("\n"),
     npm: [
       "# For projects with a build step",
       "npm install agent-customs",

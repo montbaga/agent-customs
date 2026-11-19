@@ -145,12 +145,11 @@ try {
   await scrollTo("#lab", -20);
   await element("phase2-attack-lab", "#lab", 1250, 24);
 
-  // Phase 3: Builders card with CLI tab active
-  await b.evaluate("document.querySelector('[data-code-tab=\"cli\"]')?.click(); true");
+  // The install section, with the one-line install shown, as visitors first see it.
+  await b.evaluate("document.querySelector('[data-code-tab=\"site\"]')?.click(); true");
   await sleep(200);
   await scrollTo("#guard", 0);
   await element("phase3-builders", "#guard", 900, 0);
-  await b.evaluate("document.querySelector('[data-code-tab=\"site\"]')?.click(); true");
 
   // Reset to Officer tab and Shady Pizza before scrolling to Officer notice test.
   await b.evaluate("document.querySelector('#tab-report').click(); true");
