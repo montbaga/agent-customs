@@ -12,12 +12,17 @@
 //  4. The desk's AI double-check switch uses the visitor's own key, for inspections on the
 //     page and for partners the guard lets in.
 // Before the runtime mounts, OpenRouter joins its AI providers (providers.js).
+//
+// The visitor's key lives in the key vault (vault-bridge.js), a separate site in a frame. The
+// runtime starts with a stand-in key and address, and every AI request it makes goes through
+// the vault, which adds the real key. This page never reads or stores the key.
 import { desk } from "./desk.js";
 import { installCustomsGuard } from "./customs/guard.js";
 import { confirmChoice, confirmEntryDialog } from "./customs/guard-ui.js";
 import { createEngineJudge, engineJudgeModel } from "./customs/judge.js";
 import { addProviders } from "./providers.js";
-import { mountModelPicker } from "./model-picker.js";
+import { legacyKeys, mountModelPicker, readModelSetup } from "./model-picker.js";
+import { KeyVault, VAULT_KEY, VAULT_ROUTER, pageTheme, routeVaultFetch } from "./vault-bridge.js";
 
 /**
  * Boots the browser runtime in the page's assistant section.
@@ -38,14 +43,22 @@ export class AssistantMount {
     const siteBase = new URL("./", import.meta.url).href;
     let connectAi = () => {};
     desk.connectAi(new Promise((resolve) => { connectAi = resolve; }));
+    const vault = AssistantMount.openVault();
     try {
-      const [{ boot }, { API_KEY_PROVIDERS, providerForApiKey }, byok] = await Promise.all([
+      const [{ boot }, { API_KEY_PROVIDERS }, byok] = await Promise.all([
         import("./runtime/index.js"), import("./runtime/ui.js"), import("./runtime/byok.js"),
+        vault?.ready,
       ]);
       addProviders(API_KEY_PROVIDERS);
+      const setup = readModelSetup();
+      if (setup && vault?.status) await vault.ask("use", setup);
+      // Never a saved key: the practice site, on this same address, saves keys the old way.
       const booted = await boot("#agent-app", {
         originUrl: siteBase,
         sandboxWorkerUrl: new URL("runtime/sandbox-worker.js", siteBase).href,
+        byokKey: VAULT_KEY,
+        router: VAULT_ROUTER,
+        model: setup?.model || "",
       });
       const engine = booted.engine;
       AssistantMount.engine = engine;
@@ -73,14 +86,24 @@ export class AssistantMount {
         semanticJudge: () => desk.aiCheckOn,
       });
 
-      const needsKey = !engine.mockLLM && (!engine.byokKey || engine.byokKey === "demo");
-      connectAi({ judge: createEngineJudge(engine), ready: !engine.mockLLM && !needsKey, model: engineJudgeModel(engine) });
+      // The AI is ready once the vault holds the key the setup uses; a saved key may be locked.
+      const judge = createEngineJudge(engine);
+      const model = engineJudgeModel(engine);
+      const aiState = () => {
+        const active = vault?.status?.active;
+        const ready = !!setup && !!active && active.router === setup.router;
+        return { ready, locked: ready && vault.status.state === "locked" };
+      };
+      connectAi({ judge, model, ...aiState() });
+      vault?.on((event) => { if (event === "status") desk.connectAi({ judge, model, ...aiState() }); });
+      document.addEventListener("customs:focus-key", () => vault?.focus());
       // Without a key, the model picker below says what to do, so the status line rests.
+      const needsKey = !aiState().ready;
       status.textContent = "Officer on duty. Every partner network is inspected before it runs.";
       status.hidden = needsKey;
       const picker = document.querySelector("#model-picker");
       if (picker) {
-        mountModelPicker(picker, { engine, providers: API_KEY_PROVIDERS, providerForApiKey, app: document.querySelector("#agent-app"), byok });
+        mountModelPicker(picker, { engine, providers: API_KEY_PROVIDERS, app: document.querySelector("#agent-app"), vault, setup, legacy: legacyKeys(byok) });
       }
       if (!needsKey) AssistantMount.greet();
       return engine;
@@ -115,6 +138,18 @@ export class AssistantMount {
       est: { totalTokens: 0, costText: "no AI calls" },
     });
     return decision !== "decline";
+  }
+
+  /** Put the vault's frame into the model settings and route the runtime's AI requests through it. */
+  static openVault() {
+    const slot = document.querySelector("#mp-vault");
+    if (!slot) return null;
+    const vault = KeyVault.mount(slot, { theme: pageTheme() });
+    routeVaultFetch(vault, window);
+    // The palette switch changes the page's colours; the vault's box follows.
+    new MutationObserver(() => vault.ask("theme", { theme: pageTheme() }))
+      .observe(document.documentElement, { attributes: true, attributeFilter: ["data-palette"] });
+    return vault;
   }
 
   static greet() {

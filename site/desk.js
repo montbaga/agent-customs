@@ -96,8 +96,9 @@ export class CustomsDesk {
 
   /**
    * Connect the visitor's AI for the double-check. site.js calls this as the officer
-   * starts, with a promise of {judge, ready, model}; ready is false without a key of the
-   * visitor's own. Inspections started meanwhile wait for it.
+   * starts, with a promise of {judge, ready, locked, model}, and again whenever the key vault
+   * changes. ready is false without a key of the visitor's own; locked is true while a saved
+   * key waits to be unlocked. Inspections started meanwhile wait for it.
    *
    * :param pending: The AI, or a promise of it (null when the officer could not start).
    */
@@ -116,19 +117,26 @@ export class CustomsDesk {
     return Boolean(this.ai?.ready);
   }
 
+  /** True while the visitor's saved key waits to be unlocked in the key vault. */
+  aiKeyLocked() {
+    return Boolean(this.ai?.ready && this.ai.locked);
+  }
+
   /**
-   * The double-check's state for the page: "off", "connecting", "needs-key" or "ready".
+   * The double-check's state for the page: "off", "connecting", "needs-key", "locked" or "ready".
    */
   aiCheckState() {
     if (!this.aiCheckOn) return "off";
     if (!this.aiSettled) return "connecting";
-    return this.hasAiKey() ? "ready" : "needs-key";
+    if (!this.hasAiKey()) return "needs-key";
+    return this.aiKeyLocked() ? "locked" : "ready";
   }
 
   // Run the double-check on a report the rules just made.
   async doubleCheck(report) {
     const ai = this.aiSettled ? this.ai : await within(this.aiConnecting, this.aiWaitMs);
     if (!ai?.ready || typeof ai.judge !== "function") return withAiCheck(report, { status: "needs-key" });
+    if (ai.locked) return withAiCheck(report, { status: "locked" });
     this.phase = "ai";
     this.emit("busy");
     return applyJudge(report, async (request) => ({ model: ai.model || "", ...(await ai.judge(request)) }));
@@ -416,6 +424,7 @@ function aiCheckNote(check) {
     case "skipped": return "on: not asked, because the rules had already held or refused it";
     case "failed": return "on: the visitor's AI gave no usable answer, so only the rules decided";
     case "needs-key": return "on, but no AI key is set, so only the rules decided";
+    case "locked": return "on, but the visitor's saved key is locked, so only the rules decided";
     default: return "off: only the rules checked it";
   }
 }

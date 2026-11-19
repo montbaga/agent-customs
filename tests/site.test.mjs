@@ -219,51 +219,8 @@ test("the model picker knows every provider it offers, and reads addresses and m
   assert.equal(modelLabel("someone/custom-model"), "Custom Model");
 });
 
-test("one box for every key: a provider's setup is named after it, another service's after its address", async () => {
-  const { API_KEY_PROVIDERS } = await import("../site/runtime/ui.js");
-  const { addProviders } = await import("../site/providers.js");
-  const { MODEL_CHOICES, setupFor, isServiceAddress } = await import("../site/model-picker.js");
-  addProviders(API_KEY_PROVIDERS);
-  const card = (id) => MODEL_CHOICES.find((c) => c.id === id);
-  assert.deepEqual(setupFor(card("gemini"), { model: "gemini-3.8-flash" }, API_KEY_PROVIDERS),
-    { router: API_KEY_PROVIDERS.find((p) => p.name === "Google AI Studio").router, model: "gemini-3.8-flash", name: "Google AI Studio" });
-  assert.deepEqual(setupFor(card("other"), { address: " https://llm.example.invalid/v1/ ", model: "my-model" }, API_KEY_PROVIDERS),
-    { router: "https://llm.example.invalid/v1", model: "my-model", name: "llm.example.invalid" });
-  for (const ok of ["https://llm.example.invalid/v1", "http://localhost:11434/v1"]) assert.equal(isServiceAddress(ok), true, ok);
-  for (const bad of ["", "llm.example.invalid", "javascript:alert(1)", "ftp://files.example.invalid"]) assert.equal(isServiceAddress(bad), false, bad);
-});
-
-test("exact copies of a saved key are cleared, keeping the one in use or else the newest", async () => {
-  const { duplicateSetups } = await import("../site/model-picker.js");
-  const google = "https://generativelanguage.googleapis.com/v1beta/openai";
-  const profiles = [
-    { id: "a", router: google, key: "AIza-one", updatedAt: "2026-11-14T10:00:00Z" },
-    { id: "b", router: `${google}/`, key: "AIza-one", updatedAt: "2026-11-15T10:00:00Z" },
-    { id: "c", router: google, key: "AIza-two", updatedAt: "2026-11-13T10:00:00Z" },
-    { id: "d", router: "https://api.groq.com/openai/v1", key: "gsk-one", updatedAt: "2026-11-12T10:00:00Z" },
-  ];
-  assert.deepEqual(duplicateSetups(profiles), ["a"], "the newest copy stays; another key for the same provider is not a copy");
-  assert.deepEqual(duplicateSetups(profiles, "a"), ["b"], "the setup in use always stays");
-  assert.deepEqual(duplicateSetups([]), []);
-  assert.deepEqual(duplicateSetups(null), []);
-});
-
-test("the model picker fills the runtime's form, key first, then presses Save and start", async () => {
-  const { applyToRuntime } = await import("../site/model-picker.js");
-  const events = [];
-  const field = (id) => ({ value: "", dispatchEvent: (e) => events.push(`${id}:${e.type}`), click: () => events.push(`${id}:click`) });
-  const fields = { "#ns-key": field("key"), "#ns-router": field("router"), "#ns-model": field("model"), "#ns-profile-name": field("name"), "#ns-apply": field("apply") };
-  const app = { querySelector: (selector) => fields[selector] || null };
-  const sent = applyToRuntime(app, { key: "sk-ant-example", router: "https://api.anthropic.com/v1", model: "claude-sonnet-5-5", name: "Claude Sonnet 5.5 (Anthropic)" });
-  assert.equal(sent, true);
-  assert.deepEqual(events, ["key:input", "router:input", "model:input", "apply:click"]);
-  assert.equal(fields["#ns-model"].value, "claude-sonnet-5-5");
-  assert.equal(fields["#ns-profile-name"].value, "Claude Sonnet 5.5 (Anthropic)");
-  assert.equal(applyToRuntime({ querySelector: () => null }, { key: "k", router: "r", model: "m", name: "n" }), false);
-});
-
 test("the model picker lists a key's chat models, suggestions first under the provider's own ids", async () => {
-  const { chatModels, mergeModels, modelLabel, listModels, MODEL_CHOICES } = await import("../site/model-picker.js");
+  const { chatModels, mergeModels, modelLabel, MODEL_CHOICES } = await import("../site/model-picker.js");
   const gemini = MODEL_CHOICES.find((c) => c.id === "gemini");
   assert.ok(gemini.models.some((m) => m.name === "Gemini 4 Argon (paid tier)"));
   const live = chatModels(["models/gemini-4-argon", "models/text-embedding-005", "models/imagen-5", "models/gemini-3.8-flash", "models/gemma-4-27b", "models/gemini-4-argon"]);
@@ -273,29 +230,47 @@ test("the model picker lists a key's chat models, suggestions first under the pr
   assert.equal(merged.at(-1).name, "Gemma 4 27B");
   assert.deepEqual(mergeModels(gemini.models, null), gemini.models);
   assert.equal(modelLabel("models/gemini-4-argon"), "Gemini 4 Argon (paid tier)");
-  // The request is the runtime's own: GET <router>/models with the key as a bearer token.
-  let asked = null;
-  const ok = await listModels("https://llm.example/v1/", "k-1", async (url, init) => {
-    asked = { url, auth: init.headers.Authorization };
-    return { ok: true, json: async () => ({ data: [{ id: "a" }, { id: "b" }] }) };
-  });
-  assert.deepEqual(asked, { url: "https://llm.example/v1/models", auth: "Bearer k-1" });
-  assert.deepEqual(ok, { ok: true, ids: ["a", "b"] });
-  assert.deepEqual(await listModels("https://llm.example/v1", "bad", async () => ({ ok: false, status: 401 })), { ok: false, status: 401 });
-  assert.deepEqual(await listModels("https://llm.example/v1", "k", async () => { throw new TypeError("Failed to fetch"); }), { ok: false, status: 0 });
 });
 
-test("changing only the model keeps the key the runtime already holds", async () => {
-  const { applyToRuntime } = await import("../site/model-picker.js");
-  const events = [];
-  const field = (id, value = "") => ({ value, dispatchEvent: (e) => events.push(`${id}:${e.type}`), click: () => events.push(`${id}:click`) });
-  const fields = { "#ns-key": field("key", "AIza-saved"), "#ns-router": field("router"), "#ns-model": field("model"), "#ns-profile-name": field("name"), "#ns-apply": field("apply") };
-  const app = { querySelector: (selector) => fields[selector] || null };
-  assert.equal(applyToRuntime(app, { key: "", router: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-4-argon", name: "Gemini 4 Argon (Google AI Studio)" }), true);
-  assert.deepEqual(events, ["router:input", "model:input", "apply:click"]);
-  assert.equal(fields["#ns-key"].value, "AIza-saved");
-  fields["#ns-key"].value = "";
-  assert.equal(applyToRuntime(app, { key: "", router: "r", model: "m", name: "n" }), false);
+test("Save and start keeps the provider and the model in this browser, never a key", async () => {
+  const { readModelSetup, saveModelSetup } = await import("../site/model-picker.js");
+  const items = new Map();
+  const storage = { getItem: (k) => items.get(k) ?? null, setItem: (k, v) => items.set(k, String(v)) };
+  assert.equal(readModelSetup(storage), null);
+  saveModelSetup({ provider: "Groq", router: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", key: "gsk_should_not_be_kept" }, storage);
+  assert.deepEqual(readModelSetup(storage), { provider: "Groq", router: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b" });
+  assert.doesNotMatch([...items.values()].join(), /gsk_/, "a key passed by mistake is not stored");
+  items.set("agent-customs-model", "{broken");
+  assert.equal(readModelSetup(storage), null);
+  assert.equal(readModelSetup({ getItem: () => { throw new Error("blocked"); } }), null);
+});
+
+test("keys an older version saved outside the vault are counted, and deleted only when asked", async () => {
+  const { legacyKeys } = await import("../site/model-picker.js");
+  const deleted = [];
+  let tabCleared = false;
+  const byok = {
+    loadByokStore: () => ({ profiles: [{ id: "a", key: "AIza-old" }, { id: "b", key: "demo" }, { id: "c", key: "" }, { id: "d", key: "gsk_old" }] }),
+    loadTabByokSetup: () => ({ key: "AIza-old" }),
+    deleteByokProfile: (id) => deleted.push(id),
+    saveTabByokSetup: (setup) => { tabCleared = setup === null; },
+  };
+  const found = legacyKeys(byok);
+  assert.equal(found.count, 2);
+  assert.deepEqual(deleted, [], "nothing is deleted until the visitor asks");
+  found.clear();
+  assert.deepEqual(deleted, ["a", "d"]);
+  assert.equal(tabCleared, true);
+  assert.equal(legacyKeys({ loadByokStore: () => { throw new Error("blocked"); } }).count, 0);
+});
+
+test("every card says how to keep a lost key from costing much", async () => {
+  const { MODEL_CHOICES } = await import("../site/model-picker.js");
+  for (const choice of MODEL_CHOICES) {
+    assert.match(choice.safety, /^Safest: /, choice.id);
+    if (choice.limitUrl) assert.ok(choice.limitUrl.startsWith("https://"), choice.id);
+  }
+  assert.ok(MODEL_CHOICES.filter((c) => c.limitUrl).length >= 2, "the paid providers link to their spending limits");
 });
 
 test("a Google key's catalogue saves under Google's own names, newest Gemini first", async () => {
@@ -328,6 +303,9 @@ test("a provider's refusal reads as advice, with its own words kept as details",
   assert.match(explainProviderError('LLM HTTP 403: {"error":{"status":"PERMISSION_DENIED"}}', "Google AI Studio", "Gemini 4 Argon").advice, /billing/);
   assert.match(explainProviderError("LLM HTTP 503: overloaded").advice, /Try again in a minute/);
   assert.equal(explainProviderError("Something else went wrong"), null);
+  // The key vault's own refusals are plain words already, and stay as they are.
+  const locked = explainProviderError('LLM HTTP 423: {"error":{"message":"Your saved key is locked in the key vault. Unlock it under AI model settings, then try again."}}', "Groq");
+  assert.equal(locked.advice, "Your saved key is locked in the key vault. Unlock it under AI model settings, then try again.");
 });
 
 test("a model outside a free-tier key is explained as a billing matter", async () => {
@@ -340,40 +318,4 @@ test("a model outside a free-tier key is explained as a billing matter", async (
   assert.match(bare.advice, /not part of this key's free tier/);
   const ordinary = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded, limit: 10, model: x"}}');
   assert.match(ordinary.advice, /reached its limit/);
-});
-
-test("each provider's newest saved key is found, by address or by the key itself", async () => {
-  const { savedSetupFor } = await import("../site/model-picker.js");
-  const { providerForApiKey } = await import("../site/runtime/ui.js");
-  const groq = { name: "Groq", router: "https://api.groq.com/openai/v1" };
-  const google = { name: "Google AI Studio", router: "https://generativelanguage.googleapis.com/v1beta/openai" };
-  const profiles = [
-    { id: "g1", router: "https://generativelanguage.googleapis.com/v1beta/openai/", key: "AIza-old", updatedAt: "2026-11-13T10:00:00Z" },
-    { id: "q1", router: "https://api.groq.com/openai/v1", key: "gsk_saved", model: "openai/gpt-oss-120b", updatedAt: "2026-11-13T09:00:00Z" },
-    { id: "g2", router: "https://api.otari.ai/api/v1", key: "AIza-newer", updatedAt: "2026-11-14T08:00:00Z" },
-    { id: "x", router: "https://api.groq.com/openai/v1", key: "", updatedAt: "2026-11-14T09:00:00Z" },
-  ];
-  assert.equal(savedSetupFor(profiles, groq, providerForApiKey)?.id, "q1");
-  assert.equal(savedSetupFor(profiles, google, providerForApiKey)?.id, "g2");
-  assert.equal(savedSetupFor(profiles, { name: "OpenAI", router: "https://api.openai.com/v1" }, providerForApiKey), null);
-  assert.equal(savedSetupFor(null, groq, providerForApiKey), null);
-});
-
-test("a saved setup is updated in place: selected first, and kept selected after a new key", async () => {
-  const { applyToRuntime } = await import("../site/model-picker.js");
-  const events = [];
-  const field = (id, value = "") => ({ value, dispatchEvent: (e) => events.push(`${id}:${e.type}`), click: () => events.push(`${id}:click`) });
-  const profile = { ...field("profile"), options: [{ value: "" }, { value: "q1" }] };
-  const fields = { "#ns-key": field("key", "AIza-active"), "#ns-router": field("router"), "#ns-model": field("model"), "#ns-profile-name": field("name"), "#ns-apply": field("apply"), "#ns-profile": profile };
-  // The runtime clears the selection when another key goes in; the picker selects it again.
-  fields["#ns-key"].dispatchEvent = (e) => { events.push(`key:${e.type}`); profile.value = ""; };
-  const app = { querySelector: (selector) => fields[selector] || null };
-  assert.equal(applyToRuntime(app, { key: "gsk_saved", profileId: "q1", router: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", name: "GPT-OSS 120B (Groq)" }), true);
-  assert.deepEqual(events, ["profile:change", "key:input", "router:input", "model:input", "apply:click"]);
-  assert.equal(profile.value, "q1");
-  assert.equal(fields["#ns-key"].value, "gsk_saved");
-  // An unknown setup id is not selected.
-  events.length = 0;
-  applyToRuntime(app, { key: "gsk_new", profileId: "gone", router: "r", model: "m", name: "n" });
-  assert.equal(events.includes("profile:change"), false);
 });

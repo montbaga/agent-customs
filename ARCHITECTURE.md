@@ -145,6 +145,30 @@ The guard is in [`guard.js`](site/customs/guard.js), the locks in [`locks.js`](s
 
 The trade-off is that rules miss wording they were never written for. That is why the locks in section 5 exist: they stop the damage even when the wording gets past.
 
+### Where your AI key lives
+
+The desk reads files written by strangers, so it holds no key. The key lives in the **key vault**, a separate website ([`vault/`](vault/), published at `agent-customs-vault.github.io`) shown as a small box in the model settings. A different address means the browser keeps the two sites' storage apart.
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant Page as Agent Customs page
+    participant Vault as Key vault (its own site)
+    participant AI as Your AI company
+    You->>Vault: paste the key into the vault's box
+    Page->>Vault: hello, on a private channel
+    Page->>Vault: chat request (no key)
+    Vault->>AI: same request + your key
+    AI-->>Vault: answer
+    Vault-->>Page: answer only
+```
+
+- The runtime starts with a stand-in key and a stand-in address (`key-vault.invalid`, which can never reach a real server). Every request for that address goes to the vault. The runtime's code is unchanged.
+- The vault answers only Agent Customs, and only two requests: list the models, and chat, at most 60 a minute. It sends a key only to the AI company it belongs to, or to the address typed into the vault itself, so the page cannot redirect a key.
+- By default the key is kept for this visit and forgotten when the tab closes. *Remember on this computer* encrypts it with AES-256. The lock comes from a passkey (WebAuthn PRF) or a password (PBKDF2, 600,000 rounds), and neither is ever stored. It locks again after 15 minutes without use.
+- The page itself allows only its own scripts, and frames only from the vault.
+- What it cannot stop: a virus or a harmful browser extension while the key is unlocked, or a page that was taken over showing a fake key box. A free-tier key, or one with a spending limit, keeps that loss small.
+
 ---
 
 ## 7 · Signed stamps
@@ -174,10 +198,11 @@ For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.
 | [`site/customs/`](site/customs/) | The engine and the guard. This is the folder other sites copy. |
 | [`site/`](site/) | The inspection desk website |
 | [`site/runtime/`](site/runtime/) | Cognizant's Open Agentic Web runtime, unmodified |
+| [`vault/`](vault/) | The key vault, the separate site that keeps the visitor's AI key |
 | [`practice/`](practice/) | Main Street Guide, an ordinary site with the guard added in two lines |
 | [`range/`](range/) | Test networks, some honest and some deliberately unsafe |
 | [`bin/`](bin/), [`action.yml`](action.yml), [`extension/`](extension/) | The command line tool, the GitHub Action and the browser extension |
-| [`tests/`](tests/) | 182 automatic tests, the frozen attack sets and the real-world snapshots |
+| [`tests/`](tests/) | 194 automatic tests, the frozen attack sets and the real-world snapshots |
 | [`tools/`](tools/) | The benchmark, the stamp signer, the local server and the builders |
 
 ---
