@@ -1283,13 +1283,20 @@ function wireBuilderCodeTabs() {
   if (!codeEl || !tabs.length) return;
   const siteMarkup = codeEl.innerHTML;
   const snippets = {
+    npm: [
+      "# For projects with a build step",
+      "npm install agent-customs",
+      "",
+      "import { installCustomsGuard } from \"agent-customs\";",
+      "installCustomsGuard(booted.engine);",
+    ].join("\n"),
     cli: [
-      "# Inspect a local folder or MCP/A2A manifest",
-      "node bin/agent-customs.mjs check site/agent_customs --strict",
-      "node bin/agent-customs.mjs check site/samples/mcp-poisoned",
+      "# Inspect a site, a folder, or an MCP / A2A file",
+      "npx agent-customs check https://your-site.example/",
+      "npx agent-customs check ./my-network --strict",
       "",
       "# Run the reproducible benchmark",
-      "npm run bench",
+      "npx agent-customs bench",
     ].join("\n"),
     action: [
       "# .github/workflows/agent-customs.yml",
