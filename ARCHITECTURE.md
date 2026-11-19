@@ -202,7 +202,7 @@ For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.
 | [`practice/`](practice/) | Main Street Guide, an ordinary site with the guard added in two lines |
 | [`range/`](range/) | Test networks, some honest and some deliberately unsafe |
 | [`bin/`](bin/), [`action.yml`](action.yml), [`extension/`](extension/) | The command line tool, the GitHub Action and the browser extension |
-| [`tests/`](tests/) | 198 automatic tests, the frozen attack sets and the real-world snapshots |
+| [`tests/`](tests/) | 199 automatic tests, the frozen attack sets and the real-world snapshots |
 | [`tools/`](tools/) | The benchmark, the stamp signer, the local server and the builders |
 
 ---

@@ -22,7 +22,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 198 passing" src="https://img.shields.io/badge/tests-198_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 199 passing" src="https://img.shields.io/badge/tests-199_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -116,19 +116,19 @@ A first-time visitor has no key, so the switch says so. Turning it on opens a sh
 
 Any site built with Cognizant's `agentify-website` kit can add it. There is no server and no build step, and the runtime stays unchanged. Pick one of four ways.
 
-**1. One line (easiest).** Paste this into your page, next to your other `<script>` tags. The guard switches itself on when your assistant starts.
+**1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.0/site/customs/auto.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.1/site/customs/auto.js"></script>
 ```
 
-`@v1.0.0` is a fixed version, so it never changes under you; change the number to update. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`@v1.0.1` is a fixed version, so it never changes under you; change the number to update. Above the other tags, the browser runs it before your page starts the assistant. Until the guard's files have loaded, chats wait a moment, and if they cannot load, chats fail instead of running unchecked. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
 **2. Two lines, with your own settings.** Load the guard from the same address and pass any of the *Guard options* below:
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.0/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.1/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
@@ -185,7 +185,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  198 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault and the one-line install.
+  199 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault and the one-line install.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -430,7 +430,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 198 tests
+npm test                                # 199 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -537,7 +537,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 198 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 199 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>
