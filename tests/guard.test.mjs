@@ -308,6 +308,76 @@ test("semantic AI judge is opt-in by default (deterministic, zero extra model ca
   assert.equal(judgeInvoked, 0, "default guard must not invoke AI semantic judge unless semanticJudge: true");
 });
 
+test("the AI double-check switch is read before every check, so the page can turn it on and off", async () => {
+  let on = false;
+  const asked = [];
+  const t = makeEngine({
+    store: new PinStore(new MemoryStorage()),
+    officerSteps: [SUNNY_CALL[0], { text: "Bread." }, SUNNY_CALL[0], { text: "Blocked." }],
+    peerSteps: [{ text: "Open 8am." }, { text: "Open 8am." }],
+    guardOptions: {
+      semanticJudge: () => on,
+      aiJudge: async ({ kind }) => { asked.push(kind); return { checked: true, flagged: kind === "reply", reason: "Steers the visitor to a payment page" }; },
+    },
+  });
+  await t.engine.runTurn("Ask Sunny Bakery.");
+  assert.deepEqual(asked, [], "off: the AI reads neither the partner nor its reply");
+  assert.equal(t.reports[0].verdict.code, "CLEARED");
+  assert.equal(t.reports[0].aiCheck, undefined);
+  assert.match(toolMessage(t.officer, 1), /Open 8am/);
+
+  on = true;
+  await t.engine.runTurn("Ask Sunny Bakery again.");
+  assert.deepEqual(asked, ["reply"], "on: the partner, compiled earlier, has its reply read by the AI");
+  assert.match(toolMessage(t.officer, 3), /Agent Customs blocked an unsafe reply/);
+});
+
+test("with the AI double-check on, a partner the AI flags is held for the visitor, and one the rules refused is not sent to it", async () => {
+  const kinds = [];
+  const judge = async ({ kind }) => { kinds.push(kind); return { checked: true, flagged: kind === "network", reason: "Asks for card details in a roundabout way" }; };
+  const sunny = makeEngine({
+    store: new PinStore(new MemoryStorage()),
+    officerSteps: SUNNY_CALL,
+    peerSteps: [{ text: "should not run" }],
+    confirm: async () => false,
+    guardOptions: { semanticJudge: () => true, aiJudge: judge },
+  });
+  await sunny.engine.runTurn("Ask Sunny Bakery.");
+  const held = sunny.confirmations[0];
+  assert.equal(held.verdict.code, "HOLD", "the AI raised Cleared to Held");
+  assert.equal(held.aiCheck.status, "flagged");
+  assert.equal(held.aiCheck.reason, "Asks for card details in a roundabout way");
+  assert.ok(held.findings.some((f) => f.rule === "J-SEMANTIC" && f.severity === "high"));
+  assert.equal(sunny.peer.calls.length, 0, "declined, so the partner never ran");
+
+  kinds.length = 0;
+  const shady = makeEngine({
+    store: new PinStore(new MemoryStorage()),
+    officerSteps: SHADY_CALL,
+    guardOptions: { semanticJudge: () => true, aiJudge: judge },
+  });
+  await shady.engine.runTurn("Ask Shady Pizza.");
+  assert.equal(shady.reports[0].verdict.code, "DENIED");
+  assert.equal(shady.reports[0].aiCheck.status, "skipped");
+  assert.ok(!kinds.includes("network"), "a refused partner costs no AI call");
+});
+
+test("a broken semanticJudge switch counts as off", async () => {
+  let asked = 0;
+  const t = makeEngine({
+    store: new PinStore(new MemoryStorage()),
+    officerSteps: SUNNY_CALL,
+    peerSteps: [{ text: "Open 8am." }],
+    guardOptions: {
+      semanticJudge: () => { throw new Error("switch unavailable"); },
+      aiJudge: async () => { asked += 1; return { checked: true, flagged: true, reason: "x" }; },
+    },
+  });
+  await t.engine.runTurn("Ask Sunny Bakery.");
+  assert.equal(asked, 0);
+  assert.equal(t.reports[0].verdict.code, "CLEARED");
+});
+
 test("MCP tool list pinning detects description changes on later listTools calls and drops tools", async () => {
   const engine = new Engine({ originUrl: SITE, trace: new TraceBus() });
   const store = new PinStore(new MemoryStorage());

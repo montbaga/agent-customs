@@ -25,8 +25,8 @@
 // or IBAN never goes to a partner, and after a partner answers, website actions that change
 // something wait for the visitor's click.
 
-import { analyzeNetwork, escalateReport } from "./analyze.js";
-import { createEngineJudge } from "./judge.js";
+import { analyzeNetwork } from "./analyze.js";
+import { applyJudge, createEngineJudge } from "./judge.js";
 import { installLocks } from "./locks.js";
 import { PinStore, pinFromReport } from "./pins.js";
 
@@ -64,8 +64,14 @@ export const STRICT_POLICY = Object.freeze({
  * :param options.canary: false disables the synthetic Lock 3 canary tripwire (on by default).
  * :param options.canaryToken: Optional fixed canary token for tests or interactive demos.
  * :param options.onCanaryTrip: Called with {encoding, where, partners, revoked} when tripped.
- * :param options.semanticJudge: Opt-in Layer 2 AI semantic judge (default false so checks
- *   stay deterministic and zero-token; set true to escalate unseen risks via caller's model).
+ * :param options.semanticJudge: The AI double-check, off by default so checks stay
+ *   deterministic and use no tokens. true turns it on. A function () => boolean is asked
+ *   before each check, so a switch on the page can turn it on and off. When on, the site's
+ *   AI also reads partners the rules cleared, their MCP tool lists and their replies, and it
+ *   can only make a verdict stricter.
+ * :param options.aiJudge: Your own judge, async ({kind, text, host}) => {checked, flagged,
+ *   reason}, used in place of the site's AI. semanticJudge, when a function, still turns it
+ *   on and off.
  * :param options.trustedActions: Names of website actions that only change harmless things
  *   on the page, or ask the visitor themselves, so the action lock lets them run.
  * :param options.onLock: Called with {lock, kind, where, reason} whenever a lock blocks
@@ -83,9 +89,18 @@ export function installCustomsGuard(engine, options = {}) {
   const log = [];
   const partnerInfo = new Map();
   const original = engine._compile;
-  const aiJudge = typeof options.aiJudge === "function"
+  const switchable = typeof options.semanticJudge === "function";
+  const judgeOn = switchable
+    ? () => { try { return options.semanticJudge() === true; } catch { return false; } }
+    : () => true;
+  const baseJudge = typeof options.aiJudge === "function"
     ? options.aiJudge
-    : (options.semanticJudge === true ? createEngineJudge(engine) : null);
+    : (options.semanticJudge === true || switchable ? createEngineJudge(engine) : null);
+  // Replies and tool lists are checked through this one, so turning the switch off stops
+  // every AI call at once.
+  const aiJudge = baseJudge
+    ? async (request) => (judgeOn() ? baseJudge(request) : { checked: false, flagged: false })
+    : null;
 
   let locks = null;
 
@@ -108,25 +123,10 @@ export function installCustomsGuard(engine, options = {}) {
       validation: { errors: compiled.validation?.errors || [], warnings: compiled.validation?.warnings || [] },
       pin,
     });
-    // Layer 2 Semantic AI Judge: when an isolated non-mock AI is active and static rules
-    // returned CLEARED or CONDITIONS, let the zero-tool judge check for unseen tricks.
-    if (aiJudge && (report.verdict.code === "CLEARED" || report.verdict.code === "CONDITIONS")) {
-      const sampleText = (network.config?.tools || []).map((t) => [
-        t?.name, t?.instructions, t?.command, t?.function?.description,
-        t?.function?.parameters ? JSON.stringify(t.function.parameters) : "",
-      ].filter(Boolean).join("\n")).join("\n---\n");
-      const verdict = await aiJudge({ kind: "network", text: sampleText, host: report.target.host });
-      if (verdict?.flagged) {
-        report = escalateReport(report, {
-          rule: "J-SEMANTIC",
-          category: "contraband",
-          severity: "high",
-          title: "AI semantic check flagged suspicious intent",
-          detail: verdict.reason || "Isolated AI judge flagged hidden or manipulative intent.",
-          evidence: sampleText.slice(0, 220),
-          where: { agent: frontMan || "" },
-        });
-      }
+    // Layer 2, the AI double-check: when it is on and the rules cleared the partner, the
+    // isolated zero-tool judge reads it too. It can raise the verdict to Held, never lower it.
+    if (baseJudge && judgeOn()) {
+      report = await applyJudge(report, baseJudge, { config: network.config });
     }
     report.guard = { decision: "pending", pinned: false };
     log.push(report);

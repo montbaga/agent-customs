@@ -310,6 +310,9 @@ test("all shipped UI protocol sample targets match their expected verdicts", asy
     "mcp-poison": "DENIED",
     "mcp-trifecta": "HOLD",
     "transitive-hub": "DENIED",
+    // The rules clear it on purpose: it shows what the AI double-check adds. If a rule starts
+    // catching it, the demo needs a new example.
+    "ai-check-demo": "CLEARED",
   };
   for (const sample of PROTOCOL_SAMPLES) {
     const r = await inspectNetworkUrl(`${ORIGIN}/${sample.path}`, { fetchImpl, pageOrigin: ORIGIN });

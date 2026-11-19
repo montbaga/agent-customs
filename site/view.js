@@ -160,14 +160,21 @@ function renderReport({ animate = false } = {}) {
   const receiptLine = h("p", { class: "receipt-line", hidden: true, "aria-live": "polite" });
   if (!report.failure) showReceipt(report, receiptLine);
 
+  // What the AI double-check did, or that it was off.
+  const aiLine = h("p", { id: "ai-line", class: "ai-line", hidden: Boolean(report.failure) });
+  if (!report.failure) fillAiLine(report, aiLine);
+
   box.append(h("header", { class: "report-head" },
-    h("div", { class: `stamp tone-${tone}${animate ? " animate" : ""}`, role: "img", "aria-label": `Verdict: ${report.verdict.stamp}` },
-      h("strong", null, report.verdict.stamp),
-      h("small", null, h("span", null, "Agent Customs"), h("span", null, stampDate(report.inspectedAt)))),
+    h("div", { class: "stamp-stack" },
+      h("div", { class: `stamp tone-${tone}${animate ? " animate" : ""}`, role: "img", "aria-label": `Verdict: ${report.verdict.stamp}` },
+        h("strong", null, report.verdict.stamp),
+        h("small", null, h("span", null, "Agent Customs"), h("span", null, stampDate(report.inspectedAt)))),
+      report.failure ? null : countersign(report.aiCheck, animate)),
     h("div", null,
       h("h2", { id: "report-title", tabindex: "-1" }, title),
       h("p", { class: "report-url" }, report.target.url),
       h("p", { class: "report-summary" }, report.verdict.summary),
+      aiLine,
       receiptLine,
       facts)));
 
@@ -207,6 +214,201 @@ function renderReport({ animate = false } = {}) {
     box.querySelectorAll(".light").forEach((el) => { el.style.setProperty("--sd", "40ms"); el.classList.add("stagger"); });
   }
   box.append(renderReportActions(report));
+}
+
+// ---- AI double-check -------------------------------------------------------------------
+// When the visitor's AI has read a network, a round seal countersigns the verdict stamp.
+
+const SEAL_RING = { clear: "AI double-check · nothing found · ", flagged: "AI double-check · flagged for review · " };
+
+function svgEl(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  return node;
+}
+
+function countersign(check, animate) {
+  const ring = SEAL_RING[check?.status];
+  if (!ring) return null;
+  const seal = svgEl("svg", {
+    class: `countersign tone-${check.status === "flagged" ? "warn" : "ok"}${animate ? " animate" : ""}`,
+    viewBox: "0 0 100 100", "aria-hidden": "true",
+  });
+  const words = svgEl("textPath", { href: "#countersign-ring", textLength: 224, lengthAdjust: "spacing" });
+  words.textContent = ring.toUpperCase();
+  const text = svgEl("text");
+  text.append(words);
+  seal.append(
+    svgEl("circle", { class: "rim", cx: 50, cy: 50, r: 47 }),
+    svgEl("circle", { class: "rim inner", cx: 50, cy: 50, r: 30 }),
+    svgEl("path", { id: "countersign-ring", d: "M50 50 m-35.5 0 a35.5 35.5 0 1 1 71 0 a35.5 35.5 0 1 1 -71 0", fill: "none" }),
+    text,
+    svgEl("path", { class: "glyph", d: check.status === "flagged" ? "M50 38.5v13.5 M50 60.5v.5" : "M40.5 50.5l6.5 6.5 12.5-13.5" }));
+  return seal;
+}
+
+function fillAiLine(report, line) {
+  const check = report.aiCheck;
+  const yourAi = check?.model ? `your AI (${check.model})` : "your AI";
+  const again = (label) => [label, () => runInspect(report.target.url)];
+  let tone = "off";
+  let text;
+  let action = null;
+  switch (check?.status) {
+    case "clear":
+      tone = "ok";
+      text = `${yourAi} read it too and found nothing. The rules' verdict stands.`;
+      break;
+    case "flagged":
+      tone = "warn";
+      text = `${yourAi} flagged it: "${check.reason}". The verdict was raised to Held for review.`;
+      break;
+    case "skipped":
+      text = "not needed. The rules had already stopped this network, so your AI was not asked.";
+      break;
+    case "failed":
+      tone = "caution";
+      text = `${yourAi} gave no usable answer, so only the rules decided.`;
+      action = again("Try again");
+      break;
+    case "needs-key":
+      tone = "caution";
+      text = "waiting for your AI key, so only the rules checked this.";
+      action = ["Set up a free key", () => startKeySetup(report.target.url)];
+      break;
+    default:
+      // Your AI is only asked about what the rules clear, so a stopped network needs no offer.
+      if (!["CLEARED", "CONDITIONS"].includes(report.verdict.code)) {
+        text = "not needed here. The rules already stopped this network.";
+        break;
+      }
+      text = desk.aiCheckOn ? "off when this was inspected." : "off. Only the rules checked this.";
+      if (!desk.hasAiKey()) action = ["Set up AI double-check", () => startKeySetup(report.target.url)];
+      else if (desk.aiCheckOn) action = again("Check again with AI");
+      else action = ["Turn on and check again", () => { desk.setAiCheck(true); runInspect(report.target.url); }];
+  }
+  line.dataset.tone = tone;
+  line.replaceChildren(
+    icon("i-seal", "ai-line-icon"),
+    h("span", null, h("strong", null, "AI double-check:"), " ", text),
+    ...(action ? [h("button", { type: "button", class: "ai-line-action", onclick: action[1] }, action[0])] : []));
+}
+
+function openKeySettings() {
+  showTab("officer");
+  const picker = $("#model-picker");
+  // Leave room for the floating navigation bar, as the return after Save and start does.
+  if (picker) window.scrollTo({ top: picker.getBoundingClientRect().top + window.scrollY - 110, behavior: "smooth" });
+  const key = $("#mp-key");
+  if (key && key.offsetParent) key.focus({ preventScroll: true });
+}
+
+// A visitor who sets up a key for the AI double-check goes back to their inspection after
+// Save and start reloads the page, instead of staying on the Officer tab.
+const AI_SETUP_KEY = "agent-customs-ai-setup";
+const AFTER_SAVE_KEY = "agent-customs-after-save";
+let aiJustReady = false;
+
+function readAiSetup() {
+  try {
+    const setup = JSON.parse(sessionStorage.getItem(AI_SETUP_KEY) || "null");
+    return setup && Date.now() - Number(setup.at) < 30 * 60_000 ? setup : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearAiSetup() {
+  try { sessionStorage.removeItem(AI_SETUP_KEY); } catch { /* storage blocked */ }
+}
+
+function startKeySetup(url = "") {
+  desk.setAiCheck(true);
+  try { sessionStorage.setItem(AI_SETUP_KEY, JSON.stringify({ at: Date.now(), url: String(url || "") })); } catch { /* storage blocked */ }
+  syncAiCheck();
+  openKeySettings();
+}
+
+function switchLabel(state) {
+  if (state === "off") return desk.aiSettled && !desk.hasAiKey() ? "Off · needs an AI key" : "Off";
+  return { connecting: "On · connecting", "needs-key": "Waiting for your key", ready: "On · your key" }[state] || "Off";
+}
+
+function aiSetupCard() {
+  const url = () => $("#inspect-url")?.value.trim() || desk.latest?.target.url || "";
+  return [
+    h("strong", null, "Your own AI takes a second look."),
+    " It reads what the rules clear, and it can only make a verdict stricter.",
+    h("span", { class: "ai-note-more" },
+      "It needs an AI key: a code from an AI company that lets this page use its AI for you. Google AI Studio and Groq give free keys, and yours stays in this browser."),
+    h("span", { class: "ai-note-actions" },
+      h("button", { type: "button", class: "primary small", onclick: () => startKeySetup(url()) }, "Set up a free key"),
+      h("button", { type: "button", class: "ghost small", onclick: () => { clearAiSetup(); desk.setAiCheck(false); $("#ai-check")?.focus(); } }, "Not now")),
+  ];
+}
+
+const CATALOG_TITLE = "Inspect any agent URL, or try a fixture";
+
+function catalogCopy() {
+  return desk.aiCheckOn
+    ? "Rules run inside your browser. With the AI double-check on, your AI also reads what they clear."
+    : "Deterministic rules run inside your browser without using an API key.";
+}
+
+function syncAiCheck() {
+  const state = desk.aiCheckState();
+  const on = desk.aiCheckOn;
+  const button = $("#ai-check");
+  if (button) {
+    button.setAttribute("aria-checked", String(on));
+    button.dataset.state = state;
+  }
+  const label = $("#ai-check-state");
+  if (label) label.textContent = switchLabel(state);
+  const note = $("#ai-check-note");
+  if (note) {
+    note.hidden = !on;
+    note.dataset.state = state;
+    if (!on) note.replaceChildren();
+    else if (state === "needs-key") note.replaceChildren(...aiSetupCard());
+    else {
+      note.replaceChildren(aiJustReady ? "Your key is saved and the AI double-check is on. " : "",
+        "Your AI also reads anything the rules clear, and can only make a verdict stricter. The network's public text goes to your AI provider, on your key.");
+    }
+  }
+  const hint = $("#mp-ai-hint");
+  if (hint) {
+    hint.hidden = state !== "needs-key";
+    hint.textContent = readAiSetup()
+      ? "This key will also run the AI double-check. After Save and start, you go straight back to your inspection."
+      : "This key will also run the AI double-check.";
+  }
+  const fact = $("#privacy-fact");
+  if (fact) fact.textContent = on ? "AI double-check on: public agent text also goes to your AI provider" : "No server: nothing you inspect leaves your browser";
+  const emptyTitle = $("#report-empty h3");
+  const emptyCopy = $("#report-empty p");
+  if (emptyTitle?.textContent === CATALOG_TITLE && emptyCopy) emptyCopy.textContent = catalogCopy();
+  const line = $("#ai-line");
+  if (line && desk.latest && !desk.latest.failure) fillAiLine(desk.latest, line);
+}
+
+function wireAiCheck() {
+  $("#ai-check")?.addEventListener("click", () => {
+    if (!desk.setAiCheck(!desk.aiCheckOn)) clearAiSetup();
+  });
+  syncAiCheck();
+}
+
+function aiProofLine(check) {
+  if (!check) return null;
+  const said = {
+    clear: "the visitor's AI found nothing",
+    flagged: `the visitor's AI flagged it ("${check.reason}"), so the verdict was raised to Held`,
+    skipped: "not asked, the rules had already stopped it",
+    failed: "the visitor's AI gave no usable answer",
+    "needs-key": "on, but no AI key was set",
+  }[check.status];
+  return said ? `AI double-check: ${said}${check.model ? ` (${check.model})` : ""}` : null;
 }
 
 function renderLights(report) {
@@ -552,8 +754,9 @@ function proofText(report) {
     `Verdict: ${report.verdict.stamp} (${report.verdict.summary})`,
     `Fingerprint: ${report.identity.hash || "n/a"}`,
     `Spec checks: ${report.conformance.passed}/${report.conformance.total} passed (${report.profile || "Open Agentic Web MVP"})`,
+    aiProofLine(report.aiCheck),
     `Re-check it yourself: ${link}`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 async function copy(text, toast, done) {
@@ -792,8 +995,8 @@ function wire() {
       $("#report-empty").hidden = false;
       const emptyTitle = $("#report-empty h3");
       const emptyCopy = $("#report-empty p");
-      if (emptyTitle) emptyTitle.textContent = "Inspect any agent URL, or try a fixture";
-      if (emptyCopy) emptyCopy.textContent = "Deterministic rules run inside your browser without using an API key.";
+      if (emptyTitle) emptyTitle.textContent = CATALOG_TITLE;
+      if (emptyCopy) emptyCopy.textContent = catalogCopy();
       resetBtn.hidden = true;
     });
   }
@@ -841,7 +1044,13 @@ function wire() {
     if (kind === "pins") { renderPins(); renderReport(); }
     if (kind === "compare") renderCompare();
     if (kind === "border") renderBorderLog();
+    if (kind === "ai-check") syncAiCheck();
+    if (kind === "busy" && desk.phase === "ai") {
+      const button = $("#inspect-button");
+      if (button?.disabled) button.textContent = "AI double-check…";
+    }
   });
+  wireAiCheck();
   renderPins();
   renderBorderLog();
 
@@ -1094,8 +1303,20 @@ function wireBuilderCodeTabs() {
 // head of index.html keeps the page hidden until this has run.
 function returnToOfficer() {
   let at = 0;
-  try { at = Number(sessionStorage.getItem("agent-customs-after-save") || 0); } catch { /* storage blocked */ }
-  if (at && Date.now() - at < 60_000) {
+  try { at = Number(sessionStorage.getItem(AFTER_SAVE_KEY) || 0); } catch { /* storage blocked */ }
+  const saved = at && Date.now() - at < 60_000;
+  const setup = saved ? readAiSetup() : null;
+  if (setup) {
+    // The key was set up for the AI double-check: back to the inspection, which runs again
+    // with it. Removing the note also keeps model-picker.js from scrolling to the Officer tab.
+    try { sessionStorage.removeItem(AFTER_SAVE_KEY); } catch { /* storage blocked */ }
+    clearAiSetup();
+    aiJustReady = true;
+    syncAiCheck();
+    window.scrollTo({ top: 0, behavior: "instant" });
+    if (setup.url) runInspect(setup.url, { scrollBehavior: "instant" });
+    else $("#inspect-url")?.focus({ preventScroll: true });
+  } else if (saved) {
     showTab("officer");
     const picker = document.querySelector("#model-picker");
     if (picker) window.scrollTo({ top: picker.getBoundingClientRect().top + window.scrollY - 110, behavior: "instant" });
