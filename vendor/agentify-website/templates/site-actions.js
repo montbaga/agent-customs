@@ -38,7 +38,9 @@ class SiteActions {
   static readStateAction() {
     return {
       name: "get_site_state",
-      description: "TODO: Read the actual <catalog>, <current selection/cart>, its version and the latest <order/request> on this page.",
+      // The model reads each description to choose a tool. Say when to call it and what
+      // to call before it here, not in the agent's instructions.
+      description: "TODO: Read the actual <catalog>, <current selection/cart>, its version and the latest <order/request> on this page. Call it before answering about <catalog or cart>, and again in each turn that needs it: the visitor can also use the page.",
       effect: "read",
       inputSchema: {
         type: "object",
@@ -66,7 +68,7 @@ class SiteActions {
   static addItemAction() {
     return {
       name: "add_item",
-      description: "TODO: Add a quantity of one <item> to the visible <cart>, keeping existing items. Returns the updated state with the new version, or ok false with a reason. Does not place an order.",
+      description: "TODO: Call it only when the visitor asks, with an id from website_get_site_state. Add a quantity of one <item> to the visible <cart>, keeping existing items. Returns the updated state with the new version, or ok false with a reason. Does not place an order.",
       // "write" runs immediately. Use it only for changes the visitor can undo on the page.
       effect: "write",
       inputSchema: {
@@ -110,7 +112,7 @@ class SiteActions {
   static submitOrderAction() {
     return {
       name: "submit_order",
-      description: "TODO: Place the <order> for the current <cart>. The browser asks the visitor to confirm first. The site refuses a stale expectedVersion. Returns the receipt.",
+      description: "TODO: Place the <order> for the current <cart>. First ask for <the required details>. In the turn you call it, first call website_get_site_state and wait for its result: this needs its current version, and results from earlier turns are not kept. The browser asks the visitor to confirm. The site refuses a stale expectedVersion. Returns the receipt.",
       // "irreversible" makes the runtime open a confirmation dialog before execute runs.
       effect: "irreversible",
       inputSchema: {

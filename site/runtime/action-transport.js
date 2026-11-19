@@ -53,7 +53,13 @@ export function reviewActions(items, title = "Review actions") {
   });
 }
 
-function openActionWindow(url, signal) {
+// The chat may ask in its own messages before a partner's window opens, naming the
+// partner. The prompt must call window.open in the visitor's click and resolve with it.
+let actionWindowPrompt = null;
+export function setActionWindowPrompt(prompt) { actionWindowPrompt = prompt; }
+
+function openActionWindow(url, signal, brand) {
+  if (actionWindowPrompt) return actionWindowPrompt({ url, origin: new URL(url).origin, brand, signal });
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(new Error("Action was cancelled.")); return; }
     const dialog = document.createElement("dialog");
@@ -75,7 +81,7 @@ function openActionWindow(url, signal) {
 }
 
 export class ActionBridgeClient {
-  constructor(url) { this.url = url; this.pending = new Map(); this.seq = 0; }
+  constructor(url, brand) { this.url = url; this.brand = brand; this.pending = new Map(); this.seq = 0; }
   async connect(popup = false, signal) {
     if (this.port) return;
     const origin = new URL(this.url).origin;
@@ -104,7 +110,7 @@ export class ActionBridgeClient {
     // Attach rejection immediately even while waiting for the user's click.
     ready.catch(() => {});
     try {
-      if (popup) { peer = await openActionWindow(this.url, signal); this.popup = peer; }
+      if (popup) { peer = await openActionWindow(this.url, signal, this.brand); this.popup = peer; }
       else {
         this.frame = document.createElement("iframe");
         this.frame.hidden = true; this.frame.title = "Site action bridge";
@@ -140,14 +146,14 @@ export async function registerRemoteActions(registry, scope, manifest) {
   registry.remoteLoads ||= new Map();
   const key = `${scope.base}::${scope.network}`;
   if (registry.remoteLoads.has(key)) return registry.remoteLoads.get(key);
-  const loading = discoverRemoteActions(registry, scope, url);
+  const loading = discoverRemoteActions(registry, scope, url, manifest.brand);
   registry.remoteLoads.set(key, loading);
   try { await loading; } catch (error) { registry.remoteLoads.delete(key); throw error; }
   finally { registry.onChange?.(); }
 }
 
-async function discoverRemoteActions(registry, scope, url) {
-  const client = new ActionBridgeClient(url);
+async function discoverRemoteActions(registry, scope, url, brand) {
+  const client = new ActionBridgeClient(url, brand);
   const registered = [];
   try {
     try { await client.connect(); }
@@ -158,7 +164,7 @@ async function discoverRemoteActions(registry, scope, url) {
     for (const definition of catalog) registered.push(registry.register(scope, definition, async (args, { requestId, signal }) => {
       // Mutations are approved on the owning origin in a top-level window. The
       // receiving bridge enforces this independently of the caller's catalog.
-      const executor = new ActionBridgeClient(url);
+      const executor = new ActionBridgeClient(url, brand);
       const abort = () => executor.dispose();
       signal?.addEventListener("abort", abort, { once: true });
       try {
@@ -213,7 +219,8 @@ export async function serveActionBridge() {
         validateData(entry.inputSchema, request.args);
         busy = true;
         try {
-          if (entry.effect !== "read" && !await reviewActions([{ action: entry.name, description: entry.description, origin: location.origin, effect: entry.effect, arguments: request.args }], `Request from ${caller}`)) throw new Error("User declined; action not started.");
+          // An action that shows its own confirmation in this window skips the generic dialog.
+          if (entry.effect !== "read" && !entry.confirmsInWindow && !await reviewActions([{ action: entry.name, description: entry.description, origin: location.origin, effect: entry.effect, arguments: request.args }], `Request from ${caller}`)) throw new Error("User declined; action not started.");
           seen.add(request.requestId);
           const value = cloneData(await entry.execute(request.args, { requestId: request.requestId, callerOrigin: caller }));
           if (entry.outputSchema) validateData(entry.outputSchema, value, "result");

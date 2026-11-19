@@ -25,9 +25,10 @@ partners, each after its own card (`runtime/engine.js`, `_assertAllowedPeer`).
   not say that the partner asks, and the partner chose its label.
 - **After Allow**, the caller fetches the partner's manifest, network file and
   `links.json`. If that manifest has `actions`, the caller also loads the partner's
-  `actions.bridge` page in a hidden frame (`runtime/action-transport.js`,
-  `registerRemoteActions`). Then it runs the partner's front agent with only the request
-  text: no chat history and no `sly_data` (`runtime/runner.js`, `dispatchToolCall`).
+  `actions.bridge` page in a hidden frame and asks which actions it shares with the
+  visitor's page (`runtime/action-transport.js`, `registerRemoteActions`). Then it runs the
+  partner's front agent with only the request text: no chat history and no `sly_data`
+  (`runtime/runner.js`, `dispatchToolCall`).
 - **The partner's model calls** go to the caller's router with the visitor's key, never
   to the partner (`runtime/engine.js`, `_compile`). They use the visitor's model or, when
   the visitor picked none, the calling site's front-agent model. Each partner agent stops
@@ -48,14 +49,27 @@ partners, each after its own card (`runtime/engine.js`, `_assertAllowedPeer`).
   call. Under another host name, such as `www.` and the bare domain, allowing it runs
   this site's network once more, with no site tools, on the visitor's key. Redirect
   other host names to the one partners name.
-- **Site tools.** Neither side gets the other's site tools: the runtime offers
-  `website_*` tools only on the visitor's own site (`runtime/runner.js`,
-  `buildToolTable`). So a partner cannot list what it has, such as its rooms or menu, or
-  give live availability, prices or bookings: it says what kinds of things it offers and
-  that its page has the details. This site's own note about the partner may already say
-  more. If a partner's bridge shares actions, its answer can still hold a button for one.
-  `site.js` then shows the runtime's dialog, which names the partner's host, even when
-  the action has the name of one of this site's.
+- **Site tools.** A partner never gets the calling page's actions. It gets only the
+  actions its own bridge shares with the visitor's page: actions in its
+  `bridge/bridge-actions.js` with `availability: "bridge"`, the page's origin or `"*"` in
+  `callerOrigins`, and their names in the partner's own `actions.agentTools`
+  (`runtime/runner.js`, `websiteToolRefusal`). Each call runs the partner's own code on
+  the partner's origin (`runtime/action-transport.js`, `registerRemoteActions`).
+  - A read runs in a new hidden frame.
+  - A write, meaning any action that changes something (`effect: "write"` or
+    `"irreversible"`), such as a booking or an order, runs in the partner's own window.
+    First the chat asks in
+    a message that names the partner and has an Open button, and this page shows no
+    dialog of its own (`runtime/ui.js`, `setActionWindowPrompt`). In the window, the
+    partner's form shows what will happen and takes the visitor's details, so they never
+    pass through an agent. The action has 3 minutes from the call, the click included
+    (`runtime/actions.js`, `execute`).
+  - A partner that shares nothing answers only from its instructions: it says what kinds
+    of things it offers and that its page has the details.
+  - A bridge checks `callerOrigins` against the page the visitor is on, not against the
+    site whose agent asks, because every agent runs in that page. So when this site's
+    partner asks its own partner, the second partner checks this site's origin. It shares
+    its reads only if it lists this site or uses `"*"`.
 - **Cost.** The card's token estimate counts only the request, so a call costs more than
   the card says (`runtime/runner.js`, `dispatchToolCall`). In a test, one partner call
   used about 2,500 tokens.
@@ -68,21 +82,65 @@ Do this for every site.
    `bridge/agent-manifest.json` when the manifest has `actions`, and checks that
    `actions.bridge` is `"./bridge/action-bridge.html"`. Callers load that page in a
    hidden frame before they run the network. Without it they wait 10 seconds, then ask
-   their visitor to open a popup, and the network never runs. The bridge's manifest lists
-   no action module, so callers get none of this site's actions and none of its page code
-   runs in their visitors' browsers (`runtime/action-transport.js`,
-   `serveActionBridge`). Do not edit the `bridge/` folder.
-2. **Keep `{peer_rules}`** in the front agent's instructions. Run on another site, the
-   network has no `website_*` tools, and the rule makes it point to this site's page
-   instead of guessing. The runtime then adds a note after it that says "Report missing
-   integration explicitly" (`runtime/actions.js`, `actionContext`), so the rule says to
-   ignore that. A caller learns little more than the front agent's first sentence, so
-   name the kinds of things the site offers there (see "Writing instructions" in
-   `network_design.md`).
-3. **Host it.** Serve the files that "Static hosting" in `bundle_and_hosting.md` lists,
+   their visitor to open a popup, and the network never runs. The bridge's manifest names
+   `bridge/bridge-actions.js` when the site has it, and no action module otherwise, so
+   none of the site's page code runs in other visitors' browsers
+   (`runtime/action-transport.js`, `serveActionBridge`). Do not edit the two files the
+   build writes there.
+2. **Share reads.** So that partners can answer with live facts, such as what is free on
+   a date and what it costs, copy `templates/bridge/bridge-actions.js` to
+   `<out>/bridge/bridge-actions.js` and fill in its TODOs. Like `site-actions.js`, it
+   exports `registerActions` and registers actions, here the reads other sites may use.
+   The build then names it in the bridge's manifest. For each action:
+   - give it the name of the page's own action, so the network's instructions fit both,
+     and take the same input;
+   - set `effect: "read"`, `availability: "bridge"`, and `callerOrigins`. Each action has
+     its own list. By default, list the exact origins, with the port, of the sites that
+     call this one. `"*"` shares the action with every site on the web. Use it only for a
+     read of facts the public page already shows, such as times, prices or a menu. It is
+     also the only way such a read reaches a visitor who started on a site you do not
+     list, when one of your partners asks you;
+   - keep its name in the manifest's `actions.agentTools`: a partner's agents get only
+     the actions listed there;
+   - read nothing from the page: the bridge frame has none. Use the site's data and
+     business code with a fresh store or the site's server, and for facts that only the
+     page's HTML holds, fetch the page and parse it with `DOMParser`, as the template's
+     `readPage` does;
+   - leave out what belongs to one visitor, such as a basket, a form or a booking, and
+     anything personal.
+
+   Name the kinds of things the site offers in the front agent's first sentence: a
+   caller learns little more than that (see "Writing instructions" in
+   `network_design.md`). A read can return three kinds of facts: plain data, the site's
+   own rules run on a fresh store, and the page's facts.
+3. **Share writes.** Only if the user wants partners' visitors to make a change on this
+   site from their own chat, such as a booking, an order or a sign-up. Copy
+   `templates/bridge/write-window.js` to `<out>/bridge/`, one file per write, fill in its
+   TODOs, and register it in `bridge/bridge-actions.js`. For each write:
+   - set `effect: "irreversible"` for a change the visitor cannot undo, or `"write"` for
+     one they can: both open the window. Set `availability: "bridge"`, and set
+     `callerOrigins` to the exact sites that may make it. Never `"*"`;
+   - take only what the agent knows, such as what to book and for how many people. Never
+     names, emails, phone numbers or addresses, and say in the description not to ask for
+     them;
+   - in `execute`, check the request with the site's own rules first, and return the
+     site's reason before any form when it refuses;
+   - then show a form in the window, with the site's stylesheet: what will happen and
+     what it costs, the fields for the visitor's details, and a confirm button that says
+     what it does, and Cancel. Set `confirmsInWindow: true`, so the bridge skips its
+     generic dialog of the raw arguments;
+   - return a reference, such as a code or an order number, and what was done, never the
+     details the visitor typed. On Cancel, return `ok: false` with a reason;
+   - add its name to the manifest's `actions.agentTools`. The page has no action of that
+     name, so the site's tests must accept a name that only the bridge shares.
+
+   The window starts a fresh store, like a fresh page, so it cannot see what the visitor
+   did on the site's page. A site with no server keeps the change only in that window. A
+   real site sends it to its own server.
+4. **Host it.** Serve the files that "Static hosting" in `bundle_and_hosting.md` lists,
    with the headers it gives, the `bridge/` rules included; locally, `serve_site.mjs`
    does this. Use HTTPS in production (spec sections 3.2 and 3.3).
-4. **Pick the model.** Give the network a small, widely available model. Callers on stock
+5. **Pick the model.** Give the network a small, widely available model. Callers on stock
    nsdeploy runtimes run this network on that model when their visitor picked none.
 
 ## Call a partner site
@@ -144,16 +202,22 @@ Do this only when the user names a partner site that publishes an agent network.
    the partner's link, so the agent can send the visitor there. If the page has no link
    to the partner's own page, add one and read its `href` in the read action ("Expose
    page-only facts" in `site_actions.md`): the agent has no other link to give, and the
-   network URL is not a page.
-4. **What goes in a request.** One or two short sentences. Ask only what the partner can
-   answer from its instructions, such as what it offers and how to book. Keep it under
-   140 characters: the visitor sees only that much on the card. Never names, emails,
-   phone numbers or booking codes.
+   network URL is not a page. If the partner's bridge shares a write with this site, such
+   as a booking or an order, say in the line what the partner can do, to ask it only once
+   the visitor agrees, and not to ask for the visitor's details: they type them in the
+   partner's window.
+4. **What goes in a request.** One or two short sentences with exact dates and numbers of
+   people. A partner whose bridge shares reads can answer what is free and what it costs;
+   one that shares none answers only from its instructions. Keep it under 140
+   characters: the visitor sees only that much on the card. Never names, emails, phone
+   numbers or booking codes.
 5. **What to promise visitors.** In `GREETING`, the assistant section and the sample
-   queries, promise only what a partner can answer from here, such as "I can ask
-   <partner> what it offers" or "Is there a good place to eat nearby?". Do not promise
-   anything behind its site tools, such as which rooms or dishes it has, free places or
-   prices: write "what it offers", not "what rooms it has".
+   queries, promise only what a partner can answer from here. `check_partner.mjs` prints
+   whether its bridge shares actions. If it shares none, promise "I can ask <partner>
+   what it offers", not free places or prices. Promise a change, such as a booking or an
+   order, only when the partner's bridge shares that write with this site. Make the
+   page's own text say the same, and take that change off this site's "cannot" list: the
+   agent reads both.
 6. **What comes back.** `{partner_rules}` tells the agent how to read it:
 
    | The tool result, or its `text`, starts with | It means |
@@ -180,9 +244,12 @@ Do this only when the user names a partner site that publishes an agent network.
    - what a request contains, and that the assistant is told never to put names, emails,
      phone numbers or booking codes in it, though the runtime does not filter it, so the
      visitor checks it on the card;
-   - that the partner's network runs in this browser on the visitor's key, with none of
-     the partner's site tools, so it cannot give live availability or prices, and that a
-     call costs more than the card's token estimate.
+   - that the partner's network runs in this browser on the visitor's key, with only the
+     actions the partner's bridge shares with this site, if any, and that a call costs
+     more than the card's token estimate;
+   - for a partner that shares a write, that it opens in the partner's own window, where
+     the visitor types their details, and that the chat gets only a reference, such as a
+     code, and what was done.
 9. **Rebuild and check.** Run the build without `--check`, which writes the network file,
    then the checks in "Check it".
 
@@ -191,13 +258,14 @@ Do this only when the user names a partner site that publishes an agent network.
 - **The build.** Run it with `--check`, as in step 7 of `SKILL.md`. It fails on a
   missing or misplaced bridge, a partner URL the runtime would refuse, a partner or MCP
   origin missing from `allowed_peers`, a partner tool whose name another tool of the
-  same agent already has, and a partner with no `link_labels` entry. It warns when
-  instructions lack `{peer_rules}` or `{partner_rules}` or never name a partner tool,
-  when either rule differs from `templates/network.hocon`, and on link slots or an open
-  peer policy. For a partner on `localhost` or `127.0.0.1`, it prints what to replace
-  before hosting.
+  same agent already has, and a partner with no `link_labels` entry. It warns when the
+  site still has the old `peer_rules`, when instructions lack `{partner_rules}` or never
+  name a partner tool, when `partner_rules` differs from `templates/network.hocon`, and
+  on link slots or an open peer policy. It says whether the bridge shares
+  `bridge/bridge-actions.js`. For a partner on `localhost` or `127.0.0.1`, it prints what
+  to replace before hosting.
 - **The Node tests.** The template's tests check that:
-  - the front agent keeps the peer and partner rules;
+  - the front agent keeps the partner rules and has no old peer rules;
   - a partner's action never gets this page's dialog, and neither does a chat form
     that bundles one of this page's dialog actions with others;
   - the consent card gets focus while it waits, unless the visitor is typing in the
@@ -227,21 +295,32 @@ Do this only when the user names a partner site that publishes an agent network.
 
   Use the same host names in the partner URLs and in `allowed_peers`: site A calls
   `http://localhost:8081/<network B>`, and site B calls `http://127.0.0.1:8080/<network A>`.
+
+  A third site needs a third host name, `[::1]`, the IPv6 loopback address. Bind its
+  server there, since `--open-as` alone would leave it on `127.0.0.1`, and quote URLs
+  with brackets in a shell:
+
+  ```shell
+  node SKILL_DIR/scripts/serve_site.mjs <site C> --host ::1 --port 8083
+  ```
+
+  Sites A and B then call `http://[::1]:8083/<network C>` and list
+  `http://[::1]:8083` in `allowed_peers`.
 - **The consent card without a key.** See "Check without a key" in
   `bundle_and_hosting.md`.
 - **The live check.** With the user's own key, check that the card appears before anything
   is sent (the browser's Network panel, or the partner server's `--log` file), and that
   declining gives an honest answer. The build and the Node tests check the setup, not how
-  a real model follows the peer and partner rules. Only the live check shows that. Three
+  a real model follows the partner rules. Only the live check shows that. Three
   runtime messages around a partner call are expected:
   - While the card waits, the runtime's status line says "Contacting <label>…", though
     nothing has been sent (`runtime/turn-status.js`). `assistant.css` hides it until the
     visitor answers, and `site.js` names the card and moves focus to its title, so a
     screen reader reads it and a stray Enter answers nothing.
-  - After an allowed call, the "website actions connected" note at the top of the chat
-    says "Remote action bridge: No actions exposed to this caller" when opened, in place
-    of the note that other actions run right away. The partner's bridge shares no
-    actions (`runtime/index.js`).
+  - After an allowed call to a partner whose bridge shares nothing with this site, the
+    "website actions connected" note at the top of the chat says "Remote action bridge:
+    No actions exposed to this caller" when opened, in place of the note that other
+    actions run right away (`runtime/index.js`).
   - A failed partner call shows as done, with a green dot, in the agents panel
     (`runtime/ui.js`). The chat answer still says that it failed.
 
@@ -256,11 +335,13 @@ Do this only when the user names a partner site that publishes an agent network.
    ```
 
 2. Add `"bridge": "./bridge/action-bridge.html"` to `actions` in `agent-manifest.json`.
-3. Add `peer_rules` from `templates/network.hocon` to `commondefs.replacement_strings`,
-   and `{peer_rules}` to the end of the front agent's instructions, after
-   `{cruse_rules}`. In each write action's "How to work" line, say to call it "only when
-   the visitor asks", as `templates/network.hocon` does: `testActionsMatchManifest`
-   checks it. Then check the instruction count the build prints.
+3. If the `.hocon` has `peer_rules` from an older template, delete it and its
+   `{peer_rules}` line: the build warns about it. Add the template's "Offer only what your
+   tools can do" line to `grounding_rules`. In each write action's description, say to
+   call it "only when the visitor asks", as `templates/site-actions.js` does:
+   `testActionsMatchManifest` checks it. Then check the instruction count the build
+   prints. To let partners read live facts, add `bridge/bridge-actions.js` ("Share reads"
+   above).
 4. Check the front agent's first sentence. It should name the kinds of things the site
    offers ("Writing instructions" in `network_design.md`): a caller learns little more
    than that.

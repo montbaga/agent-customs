@@ -64,7 +64,7 @@ export class ContentActions {
   static searchAction() {
     return {
       name: "search_site_content",
-      description: "Search the saved snapshot of the website's public pages. Returns the best matching pages with title, URL and a text excerpt, plus the snapshot date.",
+      description: "Search the saved snapshot of the website's public pages. Call it before answering about the site, unless website_get_site_records has the answer. Returns the best matching pages with title, URL and a text excerpt, plus the snapshot date.",
       effect: "read",
       inputSchema: {
         type: "object",
@@ -98,7 +98,7 @@ export class ContentActions {
   static recordsAction(collections) {
     return {
       name: "get_site_records",
-      description: "Read structured records from the website snapshot, such as products or opening hours. Give a collection, and optionally one record id.",
+      description: "Read structured records from the website snapshot, such as products or opening hours. Call it for questions about those records. Give a collection, and optionally one record id.",
       effect: "read",
       inputSchema: {
         type: "object",

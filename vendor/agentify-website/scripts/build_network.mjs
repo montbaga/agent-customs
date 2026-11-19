@@ -13,7 +13,7 @@
 // sites load: bridge/action-bridge.html and bridge/agent-manifest.json.
 // It exits with code 1 when it finds errors.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -34,9 +34,10 @@ class NetworkBuilder {
   static BRIDGE = "./bridge/action-bridge.html";
 
   /**
-   * A phrase from the template's peer_rules, looked for in the expanded instructions.
+   * The file in the bridge folder that holds the actions a site shares with other agent
+   * sites. The bridge manifest names it when it exists.
    */
-  static PEER_RULES = "When you have no website_* tools, another site's assistant is asking";
+  static BRIDGE_MODULE = "bridge-actions.js";
 
   /**
    * A phrase from the template's partner_rules, looked for in the expanded instructions.
@@ -204,7 +205,8 @@ class NetworkBuilder {
       this.checkPlaceholders(manifest, "manifest");
     }
     this.added = this.runtimeContextSizes(runtime, network, frontMan);
-    this.websiteTools = this.offeredTools(manifest, network.config);
+    this.websiteTools = this.websiteToolNames(manifest);
+    this.cruse = Boolean(network.config.cruse);
     this.outputs.set(this.options.out, `${JSON.stringify(config, null, 2)}\n`);
     if (manifest !== null) {
       this.addDiscoveryFiles(manifest);
@@ -241,13 +243,12 @@ class NetworkBuilder {
   }
 
   /**
-   * List the tools the runtime adds to every agent, on top of its "tools" list.
+   * List the website_* tools named in the manifest's actions.agentTools.
    *
    * :param manifest: The parsed manifest, or null.
-   * :param resolved: The resolved network.
-   * :return: The added tool names.
+   * :return: The tool names.
    */
-  offeredTools(manifest, resolved) {
+  websiteToolNames(manifest) {
     const names = [];
     const actions = manifest === null ? null : manifest.actions || null;
     if (actions !== null && Array.isArray(actions.agentTools)) {
@@ -255,6 +256,19 @@ class NetworkBuilder {
         names.push(`website_${name}`);
       }
     }
+    return names;
+  }
+
+  /**
+   * List the tools the runtime may add to an agent besides its "tools" list: the
+   * website_* tools, and render_cruse when CRUSE is on.
+   *
+   * :param manifest: The parsed manifest, or null.
+   * :param resolved: The resolved network.
+   * :return: The added tool names.
+   */
+  offeredTools(manifest, resolved) {
+    const names = this.websiteToolNames(manifest);
     if (resolved.cruse) {
       names.push("render_cruse");
     }
@@ -455,9 +469,6 @@ class NetworkBuilder {
       this.checkAgent(agent);
     }
     this.checkModels(resolved);
-    if (frontMan !== null) {
-      this.checkPeerRules(frontMan);
-    }
   }
 
   /**
@@ -477,21 +488,23 @@ class NetworkBuilder {
   }
 
   /**
-   * Warn when the peer or partner rules differ from the template's. They guard what the
-   * agent sends to other sites and says for them, and a site that drops a sentence still
-   * builds and passes its own tests.
+   * Warn when the partner rules differ from the template's, or when the site still has the
+   * old peer rules. The partner rules guard what the agent sends to other sites and says
+   * for them, and a site that drops a sentence still builds and passes its own tests.
    *
    * :param raw: The parsed .hocon, before placeholders are expanded.
    */
   checkTemplateRules(raw) {
     const strings = (raw.commondefs || {}).replacement_strings || {};
+    // Older templates told a partner network it had no tools. A partner now gets the
+    // reads its bridge shares, so that text would contradict them.
+    if (typeof strings.peer_rules === "string") {
+      this.warnings.push("peer_rules is no longer used. Delete it and {peer_rules}: a partner network now gets the reads its site's bridge shares (references/linking.md).");
+    }
     const rules = this.templateRules;
     // loadTemplateRules already warned when the template could not be read.
     if (!rules) {
       return;
-    }
-    if (typeof strings.peer_rules === "string" && strings.peer_rules !== rules.peer_rules) {
-      this.warnings.push("peer_rules differs from templates/network.hocon. Copy it unchanged.");
     }
     if (typeof strings.partner_rules === "string") {
       // Each site names its own read action in place of website_<read_action>.
@@ -504,22 +517,6 @@ class NetworkBuilder {
     }
   }
 
-  /**
-   * Warn when the front agent lacks the peer rules.
-   *
-   * Other agent sites can run this network. Then it has no website_* tools, and the peer
-   * rules tell it to point to this site's page instead of guessing.
-   *
-   * :param frontMan: The front agent name.
-   */
-  checkPeerRules(frontMan) {
-    const spec = this.network.getAgentSpec(frontMan);
-    const instructions = spec && typeof spec.instructions === "string" ? spec.instructions : "";
-    // checkAgent already reports an agent with no instructions.
-    if (instructions.trim() && !instructions.includes(NetworkBuilder.PEER_RULES)) {
-      this.warnings.push(`${frontMan}: instructions lack {peer_rules}. Other agent sites can run this network; keep the template's peer rules.`);
-    }
-  }
 
   /**
    * Check that every agent has a model to use when the visitor picks none.
@@ -738,8 +735,10 @@ class NetworkBuilder {
 
   /**
    * Add the action bridge to the outputs: the skill's bridge page, and a manifest next to
-   * it that names only this network. That manifest lists no action module, so the bridge
-   * shares no actions and loads none of the site's code.
+   * it that names only this network. When the site has bridge/bridge-actions.js, the
+   * manifest names it, and the bridge shares the actions it registers. Otherwise the
+   * manifest lists no action module, so the bridge shares no actions and loads none of
+   * the site's code.
    */
   async addBridgeFiles() {
     if (!this.writesBridge) {
@@ -749,22 +748,44 @@ class NetworkBuilder {
     const template = new URL("../templates/bridge/action-bridge.html", import.meta.url);
     // A Windows checkout may use CRLF line endings. Use LF so every system builds the same file.
     const page = (await readFile(template, "utf8")).replace(/\r\n/g, "\n");
+    const actions = {
+      version: 1,
+    };
+    this.bridgeModule = await NetworkBuilder.fileExists(path.join(folder, NetworkBuilder.BRIDGE_MODULE));
+    if (this.bridgeModule) {
+      actions.module = `./${NetworkBuilder.BRIDGE_MODULE}`;
+    }
     const bridgeManifest = {
       networks: [
         {
           name: this.options.networkName,
         },
       ],
-      actions: {
-        version: 1,
-      },
+      actions: actions,
     };
     this.outputs.set(path.join(folder, "action-bridge.html"), page);
     this.outputs.set(path.join(folder, "agent-manifest.json"), `${JSON.stringify(bridgeManifest, null, 2)}\n`);
   }
 
   /**
-   * Compare website_* names in instructions with the manifest's agentTools list.
+   * Say whether a file exists.
+   *
+   * :param file: The file's path.
+   * :return: A promise of true when it exists.
+   */
+  static async fileExists(file) {
+    try {
+      await access(file);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check that every website_* name in the instructions is in the manifest's agentTools.
+   *
+   * Instructions need not name every tool: each action's description says when to call it.
    *
    * :param manifest: The parsed agent-manifest.json.
    * :param resolved: The network after the runtime applied commondefs and defaults.
@@ -793,11 +814,6 @@ class NetworkBuilder {
         this.errors.push(`Instructions mention website_${name}, but "${name}" is not in manifest actions.agentTools.`);
       }
     }
-    for (const name of agentTools) {
-      if (!mentioned.has(name)) {
-        this.warnings.push(`actions.agentTools lists "${name}", but no instructions say when to call website_${name}.`);
-      }
-    }
   }
 
   /**
@@ -821,7 +837,7 @@ class NetworkBuilder {
       return;
     }
     if (bridge !== NetworkBuilder.BRIDGE) {
-      this.errors.push(`Manifest: actions.bridge is "${bridge}". Use "./bridge/action-bridge.html": the build writes that page with its own manifest, which shares no actions.`);
+      this.errors.push(`Manifest: actions.bridge is "${bridge}". Use "./bridge/action-bridge.html": the build writes that page with its own manifest, which shares only the actions in bridge/${NetworkBuilder.BRIDGE_MODULE}, if the site has that file.`);
       return;
     }
     this.writesBridge = true;
@@ -925,7 +941,7 @@ class NetworkBuilder {
       return null;
     }
     if (url.protocol === "http:" && !NetworkBuilder.LOOPBACK_HOSTS.includes(url.hostname)) {
-      this.errors.push(`${agentName}: partner ${ref} uses http. Use https for every host but localhost and 127.0.0.1.`);
+      this.errors.push(`${agentName}: partner ${ref} uses http. Use https for every host but localhost, 127.0.0.1 and [::1].`);
     }
     // The model and the consent card see the tool under this name (runtime/runner.js, buildToolTable).
     const toolName = this.runtime.safeName(this.runtime.parseExternalAgent(ref, url.origin).agentName);
@@ -1077,9 +1093,20 @@ class NetworkBuilder {
         console.log(`  - ${agent.name}: ${size} instruction chars (+${added} CRUSE context added by the runtime); tools: [${names.join(", ")}]`);
       }
       if (this.websiteTools && this.websiteTools.length) {
-        console.log(`Added to every agent by the runtime: ${this.websiteTools.join(", ")}`);
+        console.log(`Website tools from actions.agentTools: ${this.websiteTools.join(", ")}`);
+        // The runtime gives each agent only the ones registered where its network runs.
+        let shared = " Called from another site, it gets none, because no bridge shares actions.";
+        if (this.writesBridge && this.bridgeModule) {
+          shared = ` Called from another site, it gets the ones bridge/${NetworkBuilder.BRIDGE_MODULE} shares with that site.`;
+        }
+        console.log(`  On this site's page, an agent gets the ones the page registers as local-only.${shared}`);
       }
-      if (this.writesBridge) {
+      if (this.cruse) {
+        console.log("Added to every agent by the runtime: render_cruse");
+      }
+      if (this.writesBridge && this.bridgeModule) {
+        console.log(`Bridge: bridge/action-bridge.html (shares the actions in bridge/${NetworkBuilder.BRIDGE_MODULE} with the callers they list)`);
+      } else if (this.writesBridge) {
         console.log("Bridge: bridge/action-bridge.html (shares no actions)");
       }
       for (const partner of this.partners) {
