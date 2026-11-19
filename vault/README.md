@@ -32,4 +32,4 @@ So use a free-tier key, or one with a spending limit. Then even a lost key costs
 
 `index.html`, `vault.js` (the box and the private channel), `vault-core.js` (the rules and the encryption), `vault.css`, and the Geist fonts (SIL Open Font License). There are no outside scripts, and the page allows none.
 
-The source lives in the Agent Customs repository, in [`vault/`](https://github.com/montbaga/agent-customs/tree/main/vault), with its tests. This repository only publishes it. Apache-2.0.
+The source lives in the Agent Customs repository, in [`vault/`](https://github.com/montbaga/agent-customs/tree/main/vault), with its tests. This repository only publishes it. Licensed under the [Apache License 2.0](LICENSE).
