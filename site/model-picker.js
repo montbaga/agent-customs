@@ -459,10 +459,11 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (event === "status") {
       refreshCards();
       layout(refreshCurrent());
-    } else if (event === "detected" && !selected().custom) {
+    } else if (event === "detected" && (!selected().custom || otherProvider)) {
       // A pasted key that belongs to another provider selects that provider's card. A key for
       // a service the runtime knows but no card shows, such as Otari, which sites made with
       // Cognizant's kit use by default, goes under "Other" with that service's default model.
+      // "Other" with a named service (an Otari key saved before) moves too; a typed address stays.
       const a = (name) => (/^[aeiou]/i.test(name) ? "an" : "a");
       const match = choiceForProvider(data.provider);
       if (match && match.id !== selected().id) {
