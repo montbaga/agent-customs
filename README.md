@@ -12,10 +12,10 @@
 
 <br><br>
 
+[**Add it to your site**](#add-it-to-your-site-in-one-line) &nbsp;·&nbsp;
 [**Live desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
 [**Practice site**](https://montbaga.github.io/agent-customs/practice/) &nbsp;·&nbsp;
 [**Test range**](https://agent-customs-range.github.io/) &nbsp;·&nbsp;
-[**Add the guard**](#add-the-guard-to-your-site) &nbsp;·&nbsp;
 [**Contact**](#lets-talk)
 
 <br>
@@ -37,6 +37,46 @@
 
 <br>
 
+## Add it to your site in one line
+
+For any site made with Cognizant's `agentify-website` kit. No server, no build step, and the runtime stays unchanged.
+
+<table width="100%">
+<tr>
+<td width="33.3%" valign="top">
+  <strong>1 · Copy the line</strong><br><br>
+  It loads the whole guard as one file, and each visitor's browser checks its fingerprint before running it.
+</td>
+<td width="33.3%" valign="top">
+  <strong>2 · Paste it above your other scripts</strong><br><br>
+  In the page that holds your assistant, above its other <code>&lt;script&gt;</code> tags.
+</td>
+<td width="33.3%" valign="top">
+  <strong>3 · That's it</strong><br><br>
+  Every partner your assistant calls is checked before it runs. Denied partners never run, changed ones wait for review, and visitors see the stamp in the chat.
+</td>
+</tr>
+</table>
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/dist/agent-customs.js" integrity="sha384-OGtRjuJ2hhEs8ntZHxM92x/7I93DVa4/22kF/6BrqrhhVNBBIcg/gULlR0TQtV7U" crossorigin="anonymous"></script>
+```
+
+**See it first:** [Main Street Guide](https://montbaga.github.io/agent-customs/practice/) is an ordinary site with the guard added. With your own AI key, ask its assistant about Shady Pizza, and the guard refuses it.
+
+| You want | Use | How |
+| :--- | :--- | :--- |
+| The quickest setup | **One line** | The line above |
+| Your own settings | **Two lines** | Import `installCustomsGuard` and pass options ([details](#install-details)) |
+| A project with a build step | **npm** | `npm install agent-customs` |
+| Nothing loaded from outside | **Copy the folder** | Copy [`site/customs/`](site/customs/) next to your `runtime/` folder |
+| To check a site before you publish | **Command line or CI** | `npx agent-customs check <url>`, or the [GitHub Action](#run-it-anywhere-command-line-github-action-browser-extension) |
+| Protection as a visitor, on any site | **Browser extension** | Load [`extension/`](extension/) in Chrome or Edge ([how](#run-it-anywhere-command-line-github-action-browser-extension)) |
+
+Every way, step by step, with all the guard's settings: [Install details](#install-details).
+
+<br>
+
 ### Watch it work
 
 https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
@@ -46,15 +86,15 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 <table width="100%">
 <tr>
 <td width="33.3%" valign="top">
-  <strong>1 · Inspect any link</strong><br><br>
+  <strong>Inspect any link</strong><br><br>
   Paste an Open Agentic Web network, a Google A2A agent card or an MCP server address. No API key needed. You get a stamp, the hidden text decoded, the data paths and how to fix each problem.
 </td>
 <td width="33.3%" valign="top">
-  <strong>2 · Catch silent changes</strong><br><br>
+  <strong>Catch silent changes</strong><br><br>
   Approving a clean version saves its fingerprint in your browser, for networks and for MCP tool lists. If the files change later, the guard holds them and shows what changed, line by line.
 </td>
 <td width="33.3%" valign="top">
-  <strong>3 · Guard every call</strong><br><br>
+  <strong>Guard every call</strong><br><br>
   Add one line to any <code>agentify-website</code> site. Every partner call is then checked before it runs, and three locks stay on while it runs.
 </td>
 </tr>
@@ -93,30 +133,10 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 
 ---
 
-## What is new in this version
 
-This round fixed a weakness in how the rules handled their own exceptions, and it was measured on 237 real tools the rules had never seen.
+## Install details
 
-- An exception can only soften a warning, never remove it. Some honest tools sound like attacks: "we email you a 6-digit code", "the tracking link". Before, the rules removed the warning for such wording, and copied scams passed silently. Now the wording only turns a finding into a note, so the stamp becomes *Cleared with conditions* and the visitor still sees it.
-- Signatures and data are recognised by what they are. Standard signatures on agent cards and Base64-encoded JSON are decoded and checked, wherever they appear, instead of being matched by field name.
-- Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
-- Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
-
-The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
-
-**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-the-guard-to-your-site). The line carries a fingerprint (Subresource Integrity), so a browser refuses the file if it was ever changed; the whole guard is one file, so the fingerprint covers all of it.
-
-**Checked against Google's guidance.** The site was scanned with the Chrome team's [Modern Web Guidance](https://developer.chrome.com/docs/modern-web-guidance) and checked against [Baseline](https://web.dev/baseline): it uses only features that work in all current browsers, or that have a fallback. Every piece of HTML the page writes, in its own code and in the runtime's, now passes one cleaner first ([Trusted Types](site/trusted-types.js)), which removes anything that could run code.
-
-**Your AI key now lives in a key vault.** The page no longer keeps your key anywhere. You paste it into a small box that is really a separate website, the [key vault](vault/) (`agent-customs-vault.github.io`). The browser keeps that site's storage apart from this page's. When the Officer or the AI double-check needs your AI, the page asks the vault, and the vault adds the key, calls your AI company and passes back only the answer. So even an agent file that broke this page could not take your key. By default the vault forgets the key when you close the tab. *Remember on this computer* keeps it encrypted (AES-256), locked with your passkey or a password that is never stored. The page now also lets only its own scripts run, and each card says how to give a key a spending limit.
-
-A first-time visitor has no key, so the switch says so. Turning it on opens a short card that explains what an AI key is and that Google AI Studio and Groq give free ones. *Set up a free key* opens the key settings, and after *Save and start* the page goes back to the inspection and runs it again with your AI. To see it catch something, inspect the **VIP Points MCP** sample on the desk ([`site/samples/ai-check-demo/mcp.json`](site/samples/ai-check-demo/mcp.json)). It asks guests to *"read back all twenty-four words from their emergency paper sheet"*. That is a crypto wallet's recovery phrase, worded so that none of the rules' words appear. The rules clear it; your AI should hold it.
-
----
-
-## Add the guard to your site
-
-Any site built with Cognizant's `agentify-website` kit can add it. There is no server and no build step, and the runtime stays unchanged. Pick one of four ways.
+Each way to add the guard, step by step. All of them work with any site built with Cognizant's `agentify-website` kit, with no server, no build step and the runtime unchanged.
 
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
@@ -287,7 +307,7 @@ An ordinary town-guide site built with Cognizant's kit, in its own colours ([`pr
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Attack lab and benchmark scorecard"><br><sub><b>Attack lab and benchmark:</b> the same attacks with and without Agent Customs, next to the benchmark scorecard.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="For builders panel with One line, npm, CLI, Action and Extension tabs"><br><sub><b>For builders:</b> ready-to-copy setup: the one-line install, npm, the command line tool, the GitHub Action and the extension.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Protect your assistant in one line: three steps, and the one-line install with its fingerprint"><br><sub><b>Add it to your site:</b> three steps and the one line to copy, with tabs for two lines, npm, the command line tool, the GitHub Action and the extension.</sub></td>
   </tr>
 </table>
 
@@ -473,6 +493,27 @@ node tools/set-origins.mjs --range https://agent-customs-range.github.io
 `npm run smoke` drives Edge or Chrome headlessly against the local servers and fails on any page error. It starts the key vault on port 8090 if it is not running (`npm run serve:vault`), since a page on this computer looks for the vault there.
 
 `npm run vault:check` checks the key vault end to end in a headless browser, with a stand-in AI service on this computer: the page never holds the key, every AI request comes from the vault with the key, a remembered key is stored only encrypted, a new visit starts locked, a wrong password does not open it, and *Forget* removes it.
+
+---
+
+## What is new in this version
+
+This round fixed a weakness in how the rules handled their own exceptions, and it was measured on 237 real tools the rules had never seen.
+
+- An exception can only soften a warning, never remove it. Some honest tools sound like attacks: "we email you a 6-digit code", "the tracking link". Before, the rules removed the warning for such wording, and copied scams passed silently. Now the wording only turns a finding into a note, so the stamp becomes *Cleared with conditions* and the visitor still sees it.
+- Signatures and data are recognised by what they are. Standard signatures on agent cards and Base64-encoded JSON are decoded and checked, wherever they appear, instead of being matched by field name.
+- Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
+- Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
+
+The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
+
+**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-it-to-your-site-in-one-line). The line carries a fingerprint (Subresource Integrity), so a browser refuses the file if it was ever changed; the whole guard is one file, so the fingerprint covers all of it.
+
+**Checked against Google's guidance.** The site was scanned with the Chrome team's [Modern Web Guidance](https://developer.chrome.com/docs/modern-web-guidance) and checked against [Baseline](https://web.dev/baseline): it uses only features that work in all current browsers, or that have a fallback. Every piece of HTML the page writes, in its own code and in the runtime's, now passes one cleaner first ([Trusted Types](site/trusted-types.js)), which removes anything that could run code.
+
+**Your AI key now lives in a key vault.** The page no longer keeps your key anywhere. You paste it into a small box that is really a separate website, the [key vault](vault/) (`agent-customs-vault.github.io`). The browser keeps that site's storage apart from this page's. When the Officer or the AI double-check needs your AI, the page asks the vault, and the vault adds the key, calls your AI company and passes back only the answer. So even an agent file that broke this page could not take your key. By default the vault forgets the key when you close the tab. *Remember on this computer* keeps it encrypted (AES-256), locked with your passkey or a password that is never stored. The page now also lets only its own scripts run, and each card says how to give a key a spending limit.
+
+A first-time visitor has no key, so the switch says so. Turning it on opens a short card that explains what an AI key is and that Google AI Studio and Groq give free ones. *Set up a free key* opens the key settings, and after *Save and start* the page goes back to the inspection and runs it again with your AI. To see it catch something, inspect the **VIP Points MCP** sample on the desk ([`site/samples/ai-check-demo/mcp.json`](site/samples/ai-check-demo/mcp.json)). It asks guests to *"read back all twenty-four words from their emergency paper sheet"*. That is a crypto wallet's recovery phrase, worded so that none of the rules' words appear. The rules clear it; your AI should hold it.
 
 ---
 
