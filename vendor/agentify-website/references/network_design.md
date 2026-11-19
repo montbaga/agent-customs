@@ -86,22 +86,21 @@ string must not contain another `{placeholder}`.
 
 Keep each agent's expanded instructions under about 5,000 characters (`build_network.mjs`
 warns above that). In the front agent, the template's `{grounding_rules}` without its
-TODO line, `{cruse_rules}`, `{peer_rules}` and `{partner_rules}` already use about 3,500
-of them, or about 2,850 without `{partner_rules}`. Everything else shares the rest,
-about 1,450 or 2,150: the first sentence, the list of what the site cannot do, and every
-"How to work" line. The template's own words in those lines count: about 250 in the
-irreversible action's line. The runtime appends about 2,000 more: CRUSE guidance
-(`runtime/cruse.js`, `agentPresentationContext`) and a note on `website_*` tools
+TODO line, `{cruse_rules}` and `{partner_rules}` already use about 3,550 of them, or
+about 2,650 without `{partner_rules}`. Everything else shares the rest, about 1,450 or
+2,350: the first sentence, the list of what the site cannot do, and the
+"How to work" lines for specialists and partners. The runtime appends about 2,000 more:
+CRUSE guidance (`runtime/cruse.js`, `agentPresentationContext`) and a note on `website_*` tools
 (`runtime/runner.js`, `runAgent`). Do not repeat that guidance; the template's
 `{cruse_rules}` adds the component shapes and two short rules.
 
-Each model call also sends every `website_*` tool's description and input schema, and
-`build_network.mjs` does not count them. They can be longer than the instructions: in the
-agentic-web repository's `examples/guesthouse_agentified`, its tool definitions are about
-1.7 times the size of its instructions. Keep each description to what the model
-needs to choose and call the tool, and do not add an action whose job another action
-already does. The template's read-tool test prints what one model call sends: the system
-prompt with the runtime's notes, and all tool definitions.
+Each model call also sends every `website_*` tool's description and input schema.
+`build_network.mjs` does not count them, but the site's test does: it fails when one model
+call sends more than 16,000 characters of system prompt and tool definitions
+(`CALL_BUDGET` in the template's test). In the agentic-web repository's
+`examples/guesthouse_agentified`, one call sends about 6,000 characters of system prompt
+and 9,200 of tool definitions. Keep each description to what the model needs to choose
+and call the tool, and do not add an action whose job another action already does.
 
 A good front agent's instructions have these parts, in this order:
 
@@ -110,32 +109,52 @@ A good front agent's instructions have these parts, in this order:
    prices, times or other details that change. When another agent site runs this
    network, it learns little more than this ("Site tools" in `linking.md`).
 2. `{grounding_rules}`.
-3. "How to work": one line per tool or specialist, saying when to call it and with what.
+3. "How to work": one line per specialist (the job it owns) and per partner (what to ask
+   it). The front agent's lines name no `website_*` tools.
 4. `{partner_rules}`, only when the agent calls partner sites.
 5. `{cruse_rules}`. Only the front agent needs these: only its presentation is shown.
-6. `{peer_rules}`.
 
 Some rules on the site decide what to pass to an operation, such as who counts as a guest
-or what goes in a notes field. Tell the agent to read them before the operation, not only
-when the visitor asks. If a separate read returns them, tell the agent to make that read
-in the same reply as its state read, which costs no extra round trip. The model writes
-every call in a reply before the first one runs, so the operation goes in a later reply.
+or what goes in a notes field. Say in the operation's description to read them first, not
+only when the visitor asks. If a separate read returns them, say in that read's
+description to make it in the same reply as the state read, which costs no extra round
+trip. The model writes every call in a reply before the first one runs, so the operation
+goes in a later reply.
 
 Some rules depend on what only the visitor tells the agent, such as a child's age against
 a trip's minimum age, so the site's own check cannot apply them. Return the rule with each
 result it affects, such as the trip's age limit with each departure. Say in the read's
-description what the site does not check, and add a "How to work" line that tells the
-agent to apply the rule before it offers or adds a result.
+description what the site does not check, and that the agent applies the rule before it
+offers or adds a result.
 
 Tool results last one turn: the next turn gets the visitor's messages and the agent's
 answers, not the results (`runtime/engine.js`, `runTurn`). So a version or fee read in an
-earlier turn is gone when the visitor says yes. Tell the agent to call that read again in
-the turn of the irreversible call, and pass the value from the new result. The template's
-line for the irreversible action already says this.
+earlier turn is gone when the visitor says yes. Say in the irreversible action's
+description to call that read again in the same turn, and pass the value from the new
+result. The template's irreversible action already says this.
 
 Name tools exactly as the model sees them: `website_<action name>`.
 `build_network.mjs --manifest` checks that every `website_*` name in the instructions is
 listed in `actions.agentTools`.
+
+## When to call each tool
+
+Put each tool's rules in its `description` in `site-actions.js`, not in the instructions:
+when to call it, what to ask the visitor first, and which read to call first in the same
+turn. The model reads each description with its tool. A network that another agent site
+runs has no `website_*` tools, so it then gets none of these rules either. The template's
+descriptions show the three kinds: a read says when to call it and to call it again in
+each turn that needs it, a write says to call it only when the visitor asks, and an
+irreversible action says what to ask for and what to read first.
+
+Do not list the tools in the front agent's instructions. The model already gets each tool
+with its description. When another agent site runs this network, the agents get no
+`website_*` tools, and tool names in the instructions can lead the model to call tools
+it does not have.
+
+Partner lines stay in the instructions. The runtime writes each partner tool's
+description itself (`runtime/runner.js`, `buildToolTable`), so the "How to work" line is
+the only place to say what to ask a partner.
 
 ## External capabilities
 

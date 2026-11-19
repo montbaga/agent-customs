@@ -18,7 +18,9 @@ The agentified site is a copy of the original site with these additions:
   agent-mcp.json              generated from the manifest; do not edit by hand
   .well-known/                generated discovery files (see "How others find the site")
   bridge/action-bridge.html   written by the build; other agent sites load the page in a hidden frame
-  bridge/agent-manifest.json  written by the build; the bridge's own manifest, with no action module
+  bridge/agent-manifest.json  written by the build; the bridge's own manifest, naming bridge-actions.js if the site has it
+  bridge/bridge-actions.js    optional: the reads, and any write, shared with other agent sites (templates/bridge/bridge-actions.js)
+  bridge/write-window.js      optional: a shared write, made in a window on this site (templates/bridge/write-window.js)
   runtime/                    copied unchanged from the skill's runtime/
   tests/                      templates/tests/, filled in for this site
 ```
@@ -205,7 +207,8 @@ It sends the headers that "Static hosting" below lists. `python3 -m http.server`
 for one site but sends no CORS header, so other sites cannot call it.
 
 Open http://127.0.0.1:8080/, expand **⚙ AI model settings**, and paste an API key for
-the site's default provider. For another provider, select it in the panel, which fills
+the site's default provider. Or select **Connect with OpenRouter** to sign in to
+OpenRouter instead of pasting a key. For another provider, select it in the panel, which fills
 in its provider URL and model, or enter both under **Advanced settings (optional)**. Then
 select **Save and start**. There, fill in the provider URL before the model, or type a
 setup name: the runtime names the setup from both fields when the model is typed

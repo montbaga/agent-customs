@@ -85,7 +85,7 @@ The module named in `actions.module` exports `registerActions(actions)` and call
 | Field | Rules (from `runtime/actions.js`) |
 | --- | --- |
 | `name` | Starts with a letter; letters, digits, `_` or `-`; up to 80 characters; unique. |
-| `description` | What it does, what it returns, and what it does not do. The model reads this. The confirmation dialog shows the visitor the words from `DIALOGS` in `site.js` instead. |
+| `description` | What it does, what it returns, what it does not do, and when to call it ("When to call each tool" in `network_design.md`). The model reads this. The confirmation dialog shows the visitor the words from `DIALOGS` in `site.js` instead. |
 | `inputSchema` | An object schema. Allowed keywords: `type`, `properties`, `required`, `additionalProperties` (only `false`), `items`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `format` (`date` or `email`), `title`, `description`, `default`, `x-*`. Anything else fails registration. Depth up to 8. |
 | `effect` | `read`, `write` or `irreversible`. See below. |
 | `availability` | Leave it out (`local-only`). Only local-only actions become `website_*` tools. Other agent sites get none of them. |

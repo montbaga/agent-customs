@@ -1,4 +1,5 @@
 // Site-owned executable capabilities. Agent output is data, never executable code.
+// Changed by agentic-web. See README.md in this folder for what changed.
 export const plain = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 const badKeys = new Set(["__proto__", "prototype", "constructor"]);
 export function cloneData(value) {
@@ -67,7 +68,7 @@ export function actionContext(catalog) {
 export class ActionRegistry {
   constructor() { this.entries = new Map(); this.sequence = 0; this.discoveryIssues = []; }
   register(scope, definition, execute = definition.execute) {
-    const { name, description, inputSchema, outputSchema, effect = "write", availability = "local-only", callerOrigins = [], timeoutMs = 180000 } = cloneData(definition);
+    const { name, description, inputSchema, outputSchema, effect = "write", availability = "local-only", callerOrigins = [], timeoutMs = 180000, confirmsInWindow = false } = cloneData(definition);
     if (!/^[A-Za-z][\w-]{0,79}$/.test(name || "") || !description || typeof execute !== "function") throw new Error("Action requires name, description and execute function.");
     if (!["read", "write", "irreversible"].includes(effect) || !["local-only", "bridge", "top-level"].includes(availability)) throw new Error("Invalid action policy.");
     if (!Array.isArray(callerOrigins) || callerOrigins.some(o => o !== "*" && new URL(o).origin !== o)) throw new Error("callerOrigins must contain exact origins.");
@@ -77,7 +78,9 @@ export class ActionRegistry {
     if (outputSchema) checkSchema(outputSchema);
     const ref = `${scope.base.replace(/\/$/, "")}/${encodeURIComponent(scope.network)}#${name}`;
     if (this.entries.has(ref)) throw new Error(`Duplicate action: ${name}`);
-    const entry = { ref, name, description, inputSchema, outputSchema, effect, availability, callerOrigins, timeoutMs, ...scope, execute };
+    // confirmsInWindow: the action shows its own confirmation. Only a bridge in the site's
+    // own top-level window honors it (action-transport.js).
+    const entry = { ref, name, description, inputSchema, outputSchema, effect, availability, callerOrigins, timeoutMs, confirmsInWindow: confirmsInWindow === true, ...scope, execute };
     this.entries.set(ref, entry);
     return ref;
   }

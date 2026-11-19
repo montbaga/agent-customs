@@ -132,6 +132,29 @@ export function schemaFor(name, fn) {
   };
 }
 
+// Why a registered site action cannot be a website_* tool for this network, or "" when it
+// can. The site decides first: its manifest's actions.agentTools lists the actions its
+// agents may call.
+// - The visitor's own site gets its local-only actions. An irreversible one also needs
+//   the page's confirmation dialog.
+// - A partner network runs on this page, so it never gets this page's actions. It gets
+//   only the actions its own bridge shares with this page's origin, run with the
+//   partner's own code on the partner's origin. A read runs in a hidden frame. A write
+//   runs in the partner's own window, where the visitor confirms it.
+export function websiteToolRefusal(ctx, action) {
+  if (!action) return "no such action is registered for this network";
+  if (!(ctx.manifest?.actions?.agentTools || []).includes(action.name)) return "not listed in the manifest's actions.agentTools";
+  if (!ctx.isTop) {
+    if (action.availability !== "bridge") return "a partner network gets only actions its bridge shares";
+    return "";
+  }
+  if (action.availability !== "local-only") return "not a local-only action";
+  if (action.effect === "irreversible" && typeof ctx.confirmWebsiteActions !== "function") {
+    return "irreversible, and the page has no confirmation dialog";
+  }
+  return "";
+}
+
 // Build the tool table + OpenAI-style schemas for one agent's `tools`.
 export async function buildToolTable(ctx, spec, chain, parentSpan) {
   const { network } = ctx;
@@ -194,14 +217,10 @@ export async function buildToolTable(ctx, spec, chain, parentSpan) {
       toolSchemas.push(schemaFor(name, c.spec.function));
     }
   }
-  // Publisher opt-in: expose selected local website actions as model tools.
-  // Irreversible operations also require the host's confirmation callback.
-  // Only the visitor's own site gets them. A partner network runs on this page, and a
-  // partner's actions would reach this page's confirmation dialog.
-  const callable = new Set(ctx.isTop ? ctx.manifest?.actions?.agentTools || [] : []);
+  // Publisher opt-in: expose selected website actions as model tools. websiteToolRefusal
+  // says which ones this network may call.
   for (const action of ctx.actions?.catalog({ base: ctx.baseOrigin, network: network.name }) || []) {
-    if (!callable.has(action.name) || action.availability !== "local-only"
-      || (action.effect === "irreversible" && typeof ctx.confirmWebsiteActions !== "function")) continue;
+    if (websiteToolRefusal(ctx, action)) continue;
     const name = `website_${action.name}`;
     if (toolByName.has(name)) throw new Error(`Duplicate website tool: ${name}`);
     toolByName.set(name, { kind: "website", ref: action.ref, parallelSafe: false });
@@ -346,14 +365,14 @@ export async function dispatchToolCall(ctx, entry, args, parentSpan, chain) {
 
   if (entry.kind === "website") {
     const registered = ctx.actions.entries.get(entry.ref);
-    if (!ctx.isTop || !registered || !ctx.manifest?.actions?.agentTools?.includes(registered.name)
-      || registered.base !== ctx.baseOrigin || registered.network !== ctx.network.name
-      || registered.availability !== "local-only"
-      || (registered.effect === "irreversible" && typeof ctx.confirmWebsiteActions !== "function")) {
+    // The same check that offered the tool, run again when the model calls it.
+    if (!registered || registered.base !== ctx.baseOrigin || registered.network !== ctx.network.name
+      || websiteToolRefusal(ctx, registered)) {
       throw new Error("Website action is not callable by this agent.");
     }
     const plan = ctx.actions.prepare({ kind: "action", action: entry.ref, arguments: args });
-    const confirm = registered.effect === "irreversible"
+    // A partner's write is confirmed in the partner's own window, not on this page.
+    const confirm = registered.effect === "irreversible" && ctx.isTop
       ? ctx.confirmWebsiteActions : async () => true;
     const receipts = await ctx.actions.execute(plan, confirm, crypto.randomUUID());
     return receipts?.[0] || { action: entry.ref, status: "cancelled", message: "Customer declined; nothing was submitted." };
@@ -491,12 +510,13 @@ export async function runAgent(ctx, agentName, userText, parentSpan, chain) {
   // ctx: siblings and remote networks can be running concurrently.
   const catalog = ctx.actions?.catalog({ base: ctx.baseOrigin, network: ctx.network.name }) || [];
   const presentationContext = agentPresentationContext(ctx, agentName);
-  const nativeTools = new Set(ctx.manifest?.actions?.agentTools || []);
-  const proposalCatalog = catalog.filter(action => !nativeTools.has(action.name)
-    || action.availability !== "local-only"
-    || (action.effect === "irreversible" && typeof ctx.confirmWebsiteActions !== "function"));
-  const websiteContext = proposalCatalog.length || !catalog.length
+  // An action that is not a tool here is offered as a proposal instead.
+  const proposalCatalog = catalog.filter(action => websiteToolRefusal(ctx, action));
+  // A partner network that shares no actions gets no note: "report a missing
+  // integration" would be wrong, since another site called it on purpose.
+  const websiteContext = proposalCatalog.length || (!catalog.length && ctx.isTop)
     ? actionContext(proposalCatalog)
+    : !catalog.length ? ""
     : "\nWebsite operations are connected as website_* tools. CRUSE forms remain available to collect missing details in one step. Return an ordinary form without submit.actions; its submitted values arrive as CRUSE interaction data on the next turn. Then call the appropriate website tool using those values. A form submission only supplies answers; checkout still requires the tool's browser confirmation. Do not report a missing integration.\n";
   const context = presentationContext + (presentationContext && ctx.actions ? websiteContext : "");
   const network = Object.create(ctx.network);

@@ -40,12 +40,6 @@ export class PartnerCheck {
   static MAX_REDIRECTS = 5;
 
   /**
-   * The start of the template's peer rule. Without it, a network run with no website_*
-   * tools follows the runtime's note to report a missing integration.
-   */
-  static PEER_RULE = "When you have no website_* tools, another site's assistant is asking";
-
-  /**
    * The longest start of the partner's instructions to print, in characters.
    */
   static OPENING_LENGTH = 300;
@@ -68,6 +62,8 @@ export class PartnerCheck {
     this.print = print;
     this.errors = [];
     this.warnings = [];
+    // The bridge's action module, when its manifest names one (checkBridgeManifest).
+    this.bridgeModule = "";
     // The Origin header for every request: this site's origin, or a stand-in for any site.
     this.origin = options.origin || PartnerCheck.ANY_SITE;
   }
@@ -202,7 +198,7 @@ export class PartnerCheck {
       return null;
     }
     if (url.protocol === "http:" && !PartnerCheck.LOOPBACK_HOSTS.includes(url.hostname)) {
-      this.errors.push(`${ref} uses http. Use https for every host but localhost and 127.0.0.1.`);
+      this.errors.push(`${ref} uses http. Use https for every host but localhost, 127.0.0.1 and [::1].`);
     }
     const segments = url.pathname.split("/");
     // The runtime reads the manifest from the folder before the last path segment, and
@@ -559,6 +555,34 @@ export class PartnerCheck {
     if (manifest.actions !== undefined && manifest.actions !== null && manifest.actions.version !== 1) {
       this.errors.push(`The bridge's manifest at ${file.url} has actions.version ${JSON.stringify(manifest.actions.version)}, so the bridge stops before it answers a caller. It must be 1.`);
     }
+    // A module here holds the actions the partner shares with its callers
+    // (bridge/bridge-actions.js). The bridge imports it before it answers anyone.
+    const module = manifest.actions && typeof manifest.actions.module === "string" ? manifest.actions.module : "";
+    if (module) {
+      this.bridgeModule = new URL(module, file.url).href;
+      await this.checkScript(this.bridgeModule, "The bridge's action module");
+    }
+  }
+
+  /**
+   * Check that a script loads, served as JavaScript.
+   *
+   * :param url: The script's address.
+   * :param what: What the script is, for the messages.
+   */
+  async checkScript(url, what) {
+    const script = await this.get(url, what);
+    if (script === null) {
+      return;
+    }
+    if (script.response.status !== 200) {
+      this.errors.push(`${what} at ${script.url} answered ${script.response.status}, not 200, so the bridge stops before it answers a caller.`);
+      return;
+    }
+    const type = String(script.response.headers.get("content-type") || "");
+    if (!/javascript|ecmascript/i.test(type)) {
+      this.errors.push(`${what} at ${script.url} is served as "${type}". Browsers run module scripts only with a JavaScript type, such as text/javascript.`);
+    }
   }
 
   /**
@@ -675,12 +699,14 @@ export class PartnerCheck {
     const instructions = String((network.getAgentSpec(front) || {}).instructions || "");
     this.print("");
     this.print("What the partner's network can reach. It runs in this site's visitor's browser, on the visitor's key, and its instructions read every request.");
-    this.print("It gets none of the partner's website_* tools, so it answers only from its instructions.");
+    if (this.bridgeModule) {
+      // Only a browser can run the module, so this check cannot list what it shares.
+      this.print(`Its bridge loads ${this.bridgeModule}. The partner's agents get the reads in it that list this site's origin or "*" in callerOrigins and are in the partner's actions.agentTools. Each runs in a hidden frame on the partner's origin.`);
+    } else {
+      this.print("Its bridge shares no actions, so it gets none of the partner's website_* tools and answers only from its instructions.");
+    }
     // A caller learns little more than this, so the owner can see what the partner can answer.
     this.print(`Its front agent's instructions start: "${PartnerCheck.opening(instructions)}"`);
-    if (!instructions.includes(PartnerCheck.PEER_RULE)) {
-      this.warnings.push("The partner's front agent has no peer rule. With no website_* tools, the runtime's note tells it to report a missing integration, so it may answer only that.");
-    }
     // The runtime's partner context sets the model and step limit (runtime/engine.js, _makeCtx).
     this.print("It runs on the visitor's model, or else this site's front-agent model, within this site's step limit. Below are the models it names:");
     const agents = Array.isArray(network.config.tools) ? network.config.tools : [];

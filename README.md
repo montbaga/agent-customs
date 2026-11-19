@@ -198,7 +198,7 @@ installCustomsGuard(booted.engine, { strict: true });
 </picture>
 
 - Notices in the chat. Under every partner consent card, visitors see the stamp, the problems found and a *See the full report* link. The notice uses Agent Customs' own wording only, so a partner's hidden text never reaches the model through it.
-- It checks what will actually run. The guard inspects the network objects the runtime has just compiled, after the visitor agrees and before anything runs. A server cannot show one file to the scanner and run another. A test confirms that all 58 of Cognizant's kit files stay untouched.
+- It checks what will actually run. The guard inspects the network objects the runtime has just compiled, after the visitor agrees and before anything runs. A server cannot show one file to the scanner and run another. A weekly check runs every test against Cognizant's latest kit, and all 62 of its files are used unchanged.
 
 New to the design? [**How it works**](ARCHITECTURE.md) explains every step with diagrams.
 
