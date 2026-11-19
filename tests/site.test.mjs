@@ -179,6 +179,56 @@ test("comparing the bakery with its rug-pulled version lists the new lines", asy
   assert.match(lines, /email address and phone number/);
 });
 
+test("asking the officer about a deep check keeps it deep; it can never swap in a lighter report", async () => {
+  desk.askContact = async () => true;
+  const url = `${BASE}/agent_customs`;
+  const light = await desk.inspect(url);
+  const deep = await desk.inspect(url, { transitive: true });
+  assert.notEqual(light.verdict.code, deep.verdict.code, "the deep check finds what the light one cannot");
+  assert.equal(desk.wasDeep(url), true);
+  const asked = await callTool("inspect_agent_network", { url });
+  assert.equal(asked.report.deepCheck, true);
+  assert.equal(asked.report.verdict, deep.verdict.code);
+  assert.equal(desk.latest.verdict.code, deep.verdict.code, "the page still shows the deep report");
+  const lighter = await callTool("inspect_agent_network", { url, deep: false });
+  assert.equal(lighter.report.verdict, deep.verdict.code, "the officer cannot make it lighter");
+  // A light check by the visitor makes the officer's next check light too, unless it asks for deep.
+  await desk.inspect(url);
+  assert.equal((await callTool("inspect_agent_network", { url })).report.deepCheck, false);
+  assert.equal((await callTool("inspect_agent_network", { url, deep: true })).report.verdict, deep.verdict.code);
+});
+
+test("asking the officer again keeps your AI's answer for the same version; a flag never disappears", async () => {
+  desk.askContact = async () => true;
+  const url = `${BASE}/samples/ai-check-demo/mcp.json`;
+  let calls = 0;
+  let flags = true;
+  desk.setAiCheck(true);
+  await desk.connectAi({ ready: true, model: "stand-in", judge: async () => {
+    calls += 1;
+    return flags ? { checked: true, flagged: true, reason: "Asks guests for wallet recovery words", quote: "" } : { checked: true, flagged: false };
+  } });
+  try {
+    const first = await desk.inspect(url);
+    assert.equal(first.verdict.code, "HOLD", "the AI held what the rules cleared");
+    assert.equal(calls, 1);
+    flags = false; // asked again, this AI would now find nothing
+    const asked = await callTool("inspect_agent_network", { url });
+    assert.equal(asked.report.verdict, "HOLD");
+    assert.equal(calls, 1, "the officer's re-check does not ask the AI again for the same version");
+    assert.equal(desk.latest.aiCheck.status, "flagged");
+    desk.setAiCheck(false);
+    assert.equal((await callTool("inspect_agent_network", { url })).report.verdict, "HOLD", "turning the switch off does not drop the flag");
+    // The visitor's own inspection asks afresh, as "Check again with AI" does.
+    desk.setAiCheck(true);
+    assert.equal((await desk.inspect(url)).verdict.code, "CLEARED");
+    assert.equal(calls, 2);
+  } finally {
+    desk.setAiCheck(false);
+    await desk.connectAi(null);
+  }
+});
+
 test("bad URLs are refused before anything is fetched", async () => {
   desk.askContact = async () => true;
   const before = requests.length;
