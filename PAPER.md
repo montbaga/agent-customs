@@ -18,7 +18,7 @@
 
 <br>
 
-<img alt="Tests: 203 passing" src="https://img.shields.io/badge/tests-203_passing-ece4d3?labelColor=0c1d18">
+<img alt="Tests: 205 passing" src="https://img.shields.io/badge/tests-205_passing-ece4d3?labelColor=0c1d18">
 <img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18">
 <img alt="Unseen real tools: 5.5% false alarms" src="https://img.shields.io/badge/unseen_real_tools-5.5%25_false_alarms-f0a35e?labelColor=0c1d18">
 <img alt="Model tokens: 0" src="https://img.shields.io/badge/model_tokens-0-ece4d3?labelColor=0c1d18">
@@ -173,7 +173,7 @@ On batch 4 this cut false alarms from 26 to 3, and probe8 went from 7 to 27 of 2
 ## 7 · Reproduce the numbers
 
 ```sh
-npm test                      # 203 tests, including every frozen set and batch above
+npm test                      # 205 tests, including every frozen set and batch above
 npm run bench -- --verbose    # the benchmark table in section 5.1
 npm run check                 # the desk network passes Cognizant's build check
 npm run check:practice        # so does the practice site

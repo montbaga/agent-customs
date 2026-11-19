@@ -52,9 +52,12 @@ class SiteActions {
         type: "object",
         additionalProperties: false,
         required: ["url"],
-        properties: { url: URL_FIELD },
+        properties: {
+          url: URL_FIELD,
+          deep: { type: "boolean", description: "Also inspect the cross-origin partners and MCP servers it links to, like the page's deep-check box. If the visitor deep-checked this address, it is deep anyway." },
+        },
       },
-      execute: (args) => desk.inspectForAgent(args.url),
+      execute: (args) => desk.inspectForAgent(args.url, { deep: args.deep }),
     };
   }
 

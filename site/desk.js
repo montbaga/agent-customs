@@ -58,6 +58,8 @@ export class CustomsDesk {
     this.pageOrigin = pageOrigin || (typeof location !== "undefined" ? location.origin : null);
     this.reports = new Map();
     this.aliases = new Map();
+    // Whether each address was last inspected with the deep check (linked partners too).
+    this.deep = new Map();
     this.latest = null;
     this.comparison = null;
     this.borderLog = [];
@@ -162,9 +164,11 @@ export class CustomsDesk {
    * :param url: A network URL (or a site URL with one network).
    * :param options.askFirst: Ask before contacting another origin.
    * :param options.transitive: Also inspect cross-origin linked partners and MCP endpoints.
+   * :param options.keepAi: Keep the visitor's AI answer for a version it already read, instead
+   *   of asking again (the officer's re-checks).
    * :return: The full report, or {ok: false, reason} when the visitor declined or the URL is unusable.
    */
-  async inspect(url, { askFirst = false, transitive = false } = {}) {
+  async inspect(url, { askFirst = false, transitive = false, keepAi = false } = {}) {
     const input = String(url || "").trim();
     let host;
     let origin;
@@ -189,18 +193,27 @@ export class CustomsDesk {
     this.busy = true;
     this.phase = "rules";
     this.emit("busy");
+    const previous = keepAi ? this.reportFor(input) : null;
     let report;
     try {
       report = await inspectNetworkUrl(input, { fetchImpl: this.fetchImpl || undefined, pins: this.pins, pageOrigin: this.pageOrigin, transitive });
-      if (this.aiCheckOn && !report.failure) report = await this.doubleCheck(report);
+      const earlier = keptAiCheck(previous, report);
+      if (earlier) report = carryAiCheck(earlier, report);
+      else if (this.aiCheckOn && !report.failure) report = await this.doubleCheck(report);
     } finally {
       this.busy = false;
       this.phase = "";
     }
     this.remember(input, report);
+    for (const key of new Set([normalize(input), normalize(report.target?.url || input)])) this.deep.set(key, transitive);
     this.latest = report;
     this.emit("report");
     return report;
+  }
+
+  /** True when the visitor's last inspection of this address was a deep check. */
+  wasDeep(url) {
+    return this.deep.get(normalize(url)) === true;
   }
 
   remember(input, report) {
@@ -217,10 +230,13 @@ export class CustomsDesk {
   /**
    * Inspect for the assistant and return a compact summary.
    */
-  async inspectForAgent(url) {
-    const report = await this.inspect(url, { askFirst: true });
+  // As deep as the visitor's last check of this address, or deeper: the officer can never
+  // replace a deep report on the page with a lighter one.
+  async inspectForAgent(url, { deep = false } = {}) {
+    const transitive = deep === true || this.wasDeep(url);
+    const report = await this.inspect(url, { askFirst: true, transitive, keepAi: true });
     if (report.ok === false) return report;
-    const summary = compact(report);
+    const summary = { ...compact(report), deepCheck: transitive };
     if (report.choices?.length) summary.choices = report.choices;
     return { ok: true, shownOnPage: true, report: summary };
   }
@@ -396,6 +412,17 @@ export class CustomsDesk {
       comparison: this.comparison ? { before: this.comparison.before.target.url, after: this.comparison.after.target.url, changes: this.comparison.changes.length } : null,
     };
   }
+}
+
+// The earlier report whose AI answer a re-check of the same version keeps. An AI can answer
+// differently twice, so a flag must never quietly disappear; and a clear answer is kept only
+// where the AI would be asked at all (a network the rules clear).
+function keptAiCheck(previous, fresh) {
+  const check = previous?.aiCheck;
+  if (!check || !["clear", "flagged"].includes(check.status) || fresh?.failure) return null;
+  const same = previous.identity?.hash && previous.identity.hash === fresh.identity?.hash && previous.identity.linksHash === fresh.identity?.linksHash;
+  if (!same) return null;
+  return check.status === "flagged" || ["CLEARED", "CONDITIONS"].includes(fresh.verdict?.code) ? previous : null;
 }
 
 function normalize(url) {

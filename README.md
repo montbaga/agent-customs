@@ -12,7 +12,7 @@
 
 <br><br>
 
-[**Add it to your site**](#add-it-to-your-site-in-one-line) &nbsp;·&nbsp;
+[**Add it to your site**](#add-it-to-your-site) &nbsp;·&nbsp;
 [**Live desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
 [**Practice site**](https://montbaga.github.io/agent-customs/practice/) &nbsp;·&nbsp;
 [**Test range**](https://agent-customs-range.github.io/) &nbsp;·&nbsp;
@@ -22,7 +22,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 203 passing" src="https://img.shields.io/badge/tests-203_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 205 passing" src="https://img.shields.io/badge/tests-205_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -37,49 +37,80 @@
 
 <br>
 
-## Add it to your site in one line
-
-For any site made with Cognizant's `agentify-website` kit. No server, no build step, and the runtime stays unchanged.
-
-<table width="100%">
-<tr>
-<td width="33.3%" valign="top">
-  <strong>1 · Copy the line</strong><br><br>
-  It loads the whole guard as one file, and each visitor's browser checks its fingerprint before running it.
-</td>
-<td width="33.3%" valign="top">
-  <strong>2 · Paste it above your other scripts</strong><br><br>
-  In the page that holds your assistant, above its other <code>&lt;script&gt;</code> tags.
-</td>
-<td width="33.3%" valign="top">
-  <strong>3 · That's it</strong><br><br>
-  Every partner your assistant calls is checked before it runs. Denied partners never run, changed ones wait for review, and visitors see the stamp in the chat.
-</td>
-</tr>
-</table>
-
-```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/dist/agent-customs.js" integrity="sha384-OGtRjuJ2hhEs8ntZHxM92x/7I93DVa4/22kF/6BrqrhhVNBBIcg/gULlR0TQtV7U" crossorigin="anonymous"></script>
-```
-
-**See it first:** [Main Street Guide](https://montbaga.github.io/agent-customs/practice/) is an ordinary site with the guard added. With your own AI key, ask its assistant about Shady Pizza, and the guard refuses it.
-
-| You want | Use | How |
-| :--- | :--- | :--- |
-| The quickest setup | **One line** | The line above |
-| Your own settings | **Two lines** | Import `installCustomsGuard` and pass options ([details](#install-details)) |
-| A project with a build step | **npm** | `npm install agent-customs` |
-| Nothing loaded from outside | **Copy the folder** | Copy [`site/customs/`](site/customs/) next to your `runtime/` folder |
-| To check a site before you publish | **Command line or CI** | `npx agent-customs check <url>`, or the [GitHub Action](#run-it-anywhere-command-line-github-action-browser-extension) |
-| Protection as a visitor, on any site | **Browser extension** | Load [`extension/`](extension/) in Chrome or Edge ([how](#run-it-anywhere-command-line-github-action-browser-extension)) |
-
-Every way, step by step, with all the guard's settings: [Install details](#install-details).
-
-<br>
-
 ### Watch it work
 
 https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
+
+<br>
+
+## Add it to your site
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/install-steps-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/install-steps-light.svg">
+  <img src="docs/images/install-steps-dark.svg" alt="Add it to your site: copy the line, paste it above your scripts, and every partner is checked" width="100%">
+</picture>
+
+Pick one of four ways. Each works with any site made with Cognizant's `agentify-website` kit, and each code block below has a copy button.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/install-way-1-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/install-way-1-light.svg">
+  <img src="docs/images/install-way-1-dark.svg" alt="Way 1, one line, easiest: paste it above your page's other scripts and the guard turns itself on" width="100%">
+</picture>
+
+```html
+<script type="module"
+  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/dist/agent-customs.js"
+  integrity="sha384-OGtRjuJ2hhEs8ntZHxM92x/7I93DVa4/22kF/6BrqrhhVNBBIcg/gULlR0TQtV7U"
+  crossorigin="anonymous"></script>
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/install-way-2-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/install-way-2-light.svg">
+  <img src="docs/images/install-way-2-dark.svg" alt="Way 2, two lines, your settings: import the guard and pass your own settings" width="100%">
+</picture>
+
+```js
+// At the top of site.js
+import { installCustomsGuard }
+  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/site/customs/guard.js";
+
+// Right after boot()
+installCustomsGuard(booted.engine, { strict: true });
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/install-way-3-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/install-way-3-light.svg">
+  <img src="docs/images/install-way-3-dark.svg" alt="Way 3, npm, build tools: for projects with a build step" width="100%">
+</picture>
+
+```sh
+npm install agent-customs
+```
+
+```js
+import { installCustomsGuard } from "agent-customs";
+
+installCustomsGuard(booted.engine);
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/install-way-4-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/install-way-4-light.svg">
+  <img src="docs/images/install-way-4-dark.svg" alt="Way 4, copy the folder, self-hosted: nothing loads from outside" width="100%">
+</picture>
+
+```js
+// After copying site/customs/ next to your runtime/ folder, in site.js:
+import { installCustomsGuard } from "./customs/guard.js";
+
+installCustomsGuard(booted.engine);
+```
+
+**See it live:** [Main Street Guide](https://montbaga.github.io/agent-customs/practice/) is an ordinary site with the guard added the fourth way. **Before you publish:** `npx agent-customs check <url>` or the [GitHub Action](#run-it-anywhere-command-line-github-action-browser-extension) checks your own network. **As a visitor:** the [browser extension](#run-it-anywhere-command-line-github-action-browser-extension) checks agents on any site. Every setting and detail: [Install details](#install-details).
 
 <br>
 
@@ -207,7 +238,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  203 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault, the one-line install and its one-file build.
+  205 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault, the one-line install and its one-file build.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -452,7 +483,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 203 tests
+npm test                                # 205 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -507,7 +538,7 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 
 The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
 
-**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-it-to-your-site-in-one-line). The line carries a fingerprint (Subresource Integrity), so a browser refuses the file if it was ever changed; the whole guard is one file, so the fingerprint covers all of it.
+**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-it-to-your-site). The line carries a fingerprint (Subresource Integrity), so a browser refuses the file if it was ever changed; the whole guard is one file, so the fingerprint covers all of it.
 
 **Checked against Google's guidance.** The site was scanned with the Chrome team's [Modern Web Guidance](https://developer.chrome.com/docs/modern-web-guidance) and checked against [Baseline](https://web.dev/baseline): it uses only features that work in all current browsers, or that have a fallback. Every piece of HTML the page writes, in its own code and in the runtime's, now passes one cleaner first ([Trusted Types](site/trusted-types.js)), which removes anything that could run code.
 
@@ -580,7 +611,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 203 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 205 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>

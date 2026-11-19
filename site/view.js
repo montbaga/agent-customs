@@ -795,7 +795,8 @@ function askOfficer(report) {
   showTab("officer");
   revealWorkspace();
   if (!input) return;
-  input.value = `Explain the inspection of ${report.target.url} in plain words, and what the publisher should fix.`;
+  const deep = desk.wasDeep(report.target.url) ? "deep-checked " : "";
+  input.value = `Explain the ${deep}report on the page for ${report.target.url} in plain words, and what the publisher should fix.`;
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.focus({ preventScroll: true });
 }
