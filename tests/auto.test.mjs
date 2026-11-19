@@ -1,52 +1,102 @@
-// The one-line install: site/customs/auto.js attaches the guard when the runtime starts.
+// The one-line install: site/customs/auto.js holds the runtime until the guard is on.
 // Run from the project folder: node --test "tests/*.test.mjs"
 import assert from "node:assert/strict";
 import test from "node:test";
 import { guardWhenReady } from "../site/customs/auto.js";
 
-test("the guard attaches when the runtime publishes its engine, once", () => {
+const deferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+};
+const fakeEngine = (order) => ({
+  runTurn: async function (text) { order.push(`turn:${text}`); return { text: "answer" }; },
+  _compile: async function (base) { order.push(`compile:${base}`); return {}; },
+});
+// Like the real guard: it wraps the runtime's partner step and checks every partner first.
+const fakeGuard = (order) => ({
+  installCustomsGuard: (engine) => {
+    order.push("guard");
+    const step = engine._compile;
+    engine._compile = async function (...args) { order.push("checked"); return step.apply(this, args); };
+    engine.__agentCustoms = { on: true };
+  },
+});
+
+test("a chat sent before the guard has loaded waits for it, then runs guarded", async () => {
+  const order = [];
+  const guardFiles = deferred();
   const page = {};
-  const installed = [];
-  guardWhenReady(page, (engine) => installed.push(engine));
-  assert.deepEqual(installed, [], "nothing to guard before the runtime starts");
-  const engine = { name: "engine" };
+  guardWhenReady(page, () => guardFiles.promise);
+  const engine = fakeEngine(order);
   page.__nsweb = { engine, trace: {} };
-  assert.deepEqual(installed, [engine]);
   assert.equal(page.__nsweb.engine, engine, "the runtime still reads back what it set");
-  page.__nsweb = { trace: {} };
-  assert.equal(installed.length, 1, "a value without an engine is ignored");
+  const turn = engine.runTurn("hello");
+  const partner = engine._compile("https://partner.example");
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(order, [], "nothing runs while the guard is still loading");
+  guardFiles.resolve(fakeGuard(order));
+  assert.deepEqual(await turn, { text: "answer" });
+  await partner;
+  assert.deepEqual(order, ["guard", "turn:hello", "checked", "compile:https://partner.example"],
+    "a partner held while the guard loaded goes through the guard, not around it");
+  assert.ok(engine.__agentCustoms, "the guard is on");
 });
 
-test("a runtime that started before the script loaded is guarded straight away", () => {
-  const engine = { name: "engine" };
-  const page = { __nsweb: { engine } };
-  const installed = [];
-  guardWhenReady(page, (e) => installed.push(e));
-  assert.deepEqual(installed, [engine]);
-});
-
-test("a guard that cannot start never breaks the page's own start-up", () => {
+test("if the guard cannot load, chats and partners fail instead of running unchecked", async () => {
+  const order = [];
   const page = {};
   const errors = [];
   const original = console.error;
   console.error = (...args) => errors.push(args.join(" "));
   try {
-    guardWhenReady(page, () => { throw new Error("no _compile step"); });
-    assert.doesNotThrow(() => { page.__nsweb = { engine: {} }; });
+    guardWhenReady(page, () => Promise.reject(new Error("offline")));
+    const engine = fakeEngine(order);
+    page.__nsweb = { engine };
+    await assert.rejects(engine.runTurn("hello"), /Agent Customs could not load/);
+    await assert.rejects(engine._compile("https://partner.example"), /Agent Customs could not load/);
   } finally {
     console.error = original;
   }
+  assert.deepEqual(order, [], "nothing ran");
   assert.match(errors.join(), /Agent Customs could not start/);
 });
 
-test("with the real installer, the engine ends up guarded, and installing twice is harmless", async () => {
-  const { installCustomsGuard } = await import("../site/customs/guard.js");
-  const engine = { _compile: async () => ({}), top: null };
+test("a runtime that started before the script loaded is held and guarded too", async () => {
+  const order = [];
+  const engine = fakeEngine(order);
+  const page = { __nsweb: { engine } };
+  guardWhenReady(page, async () => fakeGuard(order));
+  await engine.runTurn("hi");
+  assert.deepEqual(order, ["guard", "turn:hi"]);
+});
+
+test("a value without an engine is ignored, and an engine is held only once", async () => {
   const page = {};
-  guardWhenReady(page, (e) => installCustomsGuard(e, { notice: false, locks: false, canary: false }));
+  let loads = 0;
+  guardWhenReady(page, async () => { loads += 1; return fakeGuard([]); });
+  page.__nsweb = { trace: {} };
+  const engine = fakeEngine([]);
   page.__nsweb = { engine };
-  const guard = engine.__agentCustoms;
-  assert.ok(guard, "the guard is installed");
-  assert.equal(installCustomsGuard(engine), guard, "a site that also installs it by hand gets the same guard");
-  guard.uninstall();
+  const held = engine.runTurn;
+  page.__nsweb = { engine };
+  assert.equal(engine.runTurn, held, "the second publish does not wrap it again");
+  await engine.runTurn("x");
+  assert.equal(loads, 1, "the guard's files load once");
+});
+
+test("with the real guard, and a site that also installs it by hand, nothing runs unguarded or loops", async () => {
+  const { installCustomsGuard } = await import("../site/customs/guard.js");
+  const calls = [];
+  const engine = { runTurn: async () => "turn done", _compile: async (base) => { calls.push(base); return {}; }, top: null };
+  const page = {};
+  guardWhenReady(page, async () => ({ installCustomsGuard: (e) => installCustomsGuard(e, { notice: false, locks: false, canary: false }) }));
+  page.__nsweb = { engine };
+  const byHand = installCustomsGuard(engine, { notice: false, locks: false, canary: false });
+  assert.equal(await engine.runTurn("hi"), "turn done");
+  assert.equal(engine.__agentCustoms, byHand, "one guard, the one installed by hand");
+  await engine._compile("https://partner.example", {}, {}, { isTop: true });
+  assert.deepEqual(calls, ["https://partner.example"], "the runtime's own step ran exactly once");
+  byHand.uninstall();
 });
