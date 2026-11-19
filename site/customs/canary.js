@@ -97,7 +97,7 @@ export function canaryEncodings(token) {
   const b64 = toBase64(raw);
   return {
     raw,
-    reversed: [...raw].reverse().join(""),
+    reversed: [...raw].toReversed().join(""),
     base64: b64,
     base64url: b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
     hex: toHex(raw),

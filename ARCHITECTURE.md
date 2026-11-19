@@ -166,7 +166,7 @@ sequenceDiagram
 - The runtime starts with a stand-in key and a stand-in address (`key-vault.invalid`, which can never reach a real server). Every request for that address goes to the vault. The runtime's code is unchanged.
 - The vault answers only Agent Customs, and only two requests: list the models, and chat, at most 60 a minute. It sends a key only to the AI company it belongs to, or to the address typed into the vault itself, so the page cannot redirect a key.
 - By default the key is kept for this visit and forgotten when the tab closes. *Remember on this computer* encrypts it with AES-256. The lock comes from a passkey (WebAuthn PRF) or a password (PBKDF2, 600,000 rounds), and neither is ever stored. It locks again after 15 minutes without use.
-- The page itself allows only its own scripts, and frames only from the vault.
+- The page itself allows only its own scripts, and every piece of HTML it writes passes one cleaner first (Trusted Types, `site/trusted-types.js`).
 - What it cannot stop: a virus or a harmful browser extension while the key is unlocked, or a page that was taken over showing a fake key box. A free-tier key, or one with a spending limit, keeps that loss small.
 
 ---
@@ -202,7 +202,7 @@ For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.
 | [`practice/`](practice/) | Main Street Guide, an ordinary site with the guard added in two lines |
 | [`range/`](range/) | Test networks, some honest and some deliberately unsafe |
 | [`bin/`](bin/), [`action.yml`](action.yml), [`extension/`](extension/) | The command line tool, the GitHub Action and the browser extension |
-| [`tests/`](tests/) | 199 automatic tests, the frozen attack sets and the real-world snapshots |
+| [`tests/`](tests/) | 203 automatic tests, the frozen attack sets and the real-world snapshots |
 | [`tools/`](tools/) | The benchmark, the stamp signer, the local server and the builders |
 
 ---

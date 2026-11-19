@@ -22,7 +22,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 199 passing" src="https://img.shields.io/badge/tests-199_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 203 passing" src="https://img.shields.io/badge/tests-203_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -104,7 +104,9 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 
 The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
 
-**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-the-guard-to-your-site).
+**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-the-guard-to-your-site). The line carries a fingerprint (Subresource Integrity), so a browser refuses the file if it was ever changed; the whole guard is one file, so the fingerprint covers all of it.
+
+**Checked against Google's guidance.** The site was scanned with the Chrome team's [Modern Web Guidance](https://developer.chrome.com/docs/modern-web-guidance) and checked against [Baseline](https://web.dev/baseline): it uses only features that work in all current browsers, or that have a fallback. Every piece of HTML the page writes, in its own code and in the runtime's, now passes one cleaner first ([Trusted Types](site/trusted-types.js)), which removes anything that could run code.
 
 **Your AI key now lives in a key vault.** The page no longer keeps your key anywhere. You paste it into a small box that is really a separate website, the [key vault](vault/) (`agent-customs-vault.github.io`). The browser keeps that site's storage apart from this page's. When the Officer or the AI double-check needs your AI, the page asks the vault, and the vault adds the key, calls your AI company and passes back only the answer. So even an agent file that broke this page could not take your key. By default the vault forgets the key when you close the tab. *Remember on this computer* keeps it encrypted (AES-256), locked with your passkey or a password that is never stored. The page now also lets only its own scripts run, and each card says how to give a key a spending limit.
 
@@ -119,16 +121,16 @@ Any site built with Cognizant's `agentify-website` kit can add it. There is no s
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.1/site/customs/auto.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/dist/agent-customs.js" integrity="sha384-OGtRjuJ2hhEs8ntZHxM92x/7I93DVa4/22kF/6BrqrhhVNBBIcg/gULlR0TQtV7U" crossorigin="anonymous"></script>
 ```
 
-`@v1.0.1` is a fixed version, so it never changes under you; change the number to update. Above the other tags, the browser runs it before your page starts the assistant. Until the guard's files have loaded, chats wait a moment, and if they cannot load, chats fail instead of running unchecked. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.1.0` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
-**2. Two lines, with your own settings.** Load the guard from the same address and pass any of the *Guard options* below:
+**2. Two lines, with your own settings.** Load the guard from the same release and pass any of the *Guard options* below. A browser cannot check a fingerprint on an `import`, so for that use option 3 or 4.
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.1/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.0/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
@@ -185,7 +187,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  199 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault and the one-line install.
+  203 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault, the one-line install and its one-file build.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -430,7 +432,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 199 tests
+npm test                                # 203 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -537,7 +539,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 199 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 203 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>

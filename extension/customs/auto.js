@@ -1,8 +1,7 @@
-// auto.js: Agent Customs in one line. Add this to a page made with Cognizant's
-// agentify-website kit, above the page's own script tags, and the guard starts with its
-// default settings:
-//
-//   <script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.1/site/customs/auto.js"></script>
+// auto.js: Agent Customs in one line. Added to a page made with Cognizant's
+// agentify-website kit, above the page's own script tags, it starts the guard with its default
+// settings. The published one-line file is dist/agent-customs.js: this file and the guard,
+// joined by tools/make-bundle.mjs so one integrity hash covers them (see the README).
 //
 // Above the other tags, the browser runs it before the page's own code starts the assistant.
 // The kit's runtime publishes its engine as window.__nsweb once boot() is done. This file

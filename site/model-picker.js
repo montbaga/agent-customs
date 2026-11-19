@@ -332,7 +332,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
 
   // The model list: options, then "Other" for any name. Keeps the wanted model when listed.
   const renderModels = (models, want) => {
-    modelSelect.innerHTML = "";
+    modelSelect.replaceChildren();
     for (const m of models) modelSelect.append(new Option(m.name, m.id));
     modelSelect.append(new Option("Other: type a model name", ""));
     const match = models.find((m) => m.id === want || bare(m.id) === bare(want));

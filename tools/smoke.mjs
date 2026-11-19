@@ -169,6 +169,23 @@ try {
   console.log(`  remote images: ${JSON.stringify(images)}`);
   for (let i = problems.length - 1; i >= 0; i -= 1) if (problems[i].includes("collect.invalid")) problems.splice(i, 1);
   if (images.markdownImages || images.htmlImages || !images.refusedByPolicy) problems.push(`remote images: ${JSON.stringify(images)}`);
+  // The HTML cleaner (trusted-types.js): every HTML write is cleaned, and scripts load only from
+  // this site. Browsers without Trusted Types skip this.
+  const before = problems.length;
+  const cleaner = await evaluate(`(() => {
+    if (!window.trustedTypes) return { supported: false };
+    const div = document.createElement("div");
+    div.innerHTML = '<b>kept</b><img src="favicon.svg" onerror="alert(1)"><iframe srcdoc="x"></iframe><a href="javascript:alert(1)">link</a><svg><use href="#i-arrow"></use></svg>';
+    let foreign = "allowed";
+    try { trustedTypes.defaultPolicy.createScriptURL("https://collect.invalid/x.js"); } catch { foreign = "refused"; }
+    return { supported: true, policy: trustedTypes.defaultPolicy?.name, html: div.innerHTML, foreign };
+  })()`);
+  console.log(`  HTML cleaner: ${JSON.stringify(cleaner)}`);
+  // The test's own handler is reported as blocked while the cleaner reads it; nothing runs.
+  await sleep(300);
+  for (let i = problems.length - 1; i >= before; i -= 1) if (/inline event handler/.test(problems[i])) problems.splice(i, 1);
+  if (cleaner.supported && (cleaner.policy !== "default" || /onerror|iframe|javascript:/.test(cleaner.html) || !/<b>kept<\/b>/.test(cleaner.html)
+    || !/<use href="#i-arrow">/.test(cleaner.html) || cleaner.foreign !== "refused")) problems.push(`HTML cleaner: ${JSON.stringify(cleaner)}`);
   // Lock 1: the page never follows a link that carries a real card number, and says so.
   const linkLock = await evaluate(`(async () => {
     const link = document.createElement("a");

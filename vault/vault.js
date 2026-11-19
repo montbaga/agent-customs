@@ -622,10 +622,12 @@ keyInput.addEventListener("input", () => {
     else tell({ event: "draft" });
   }, 400);
 });
-keyInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); tell({ event: "submit" }); } });
+// Enter while an input method (Chinese, Japanese, Korean...) is composing picks a character, not submit.
+const enter = (e) => e.key === "Enter" && !e.isComposing && e.keyCode !== 229;
+keyInput.addEventListener("keydown", (e) => { if (enter(e)) { e.preventDefault(); tell({ event: "submit" }); } });
 addressInput.addEventListener("change", () => { changed(); if (keyForSelection()) tell({ event: "draft" }); });
-unlockInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); run("unlock", unlock); } });
-passwordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); run("remember", () => remember("password")); } });
+unlockInput.addEventListener("keydown", (e) => { if (enter(e)) { e.preventDefault(); run("unlock", unlock); } });
+passwordInput.addEventListener("keydown", (e) => { if (enter(e)) { e.preventDefault(); run("remember", () => remember("password")); } });
 
 new ResizeObserver(tellHeight).observe($("#vault"));
 setInterval(() => { if (lockIfIdle()) { say("Locked after 15 minutes without use."); changed(); } }, 30_000);

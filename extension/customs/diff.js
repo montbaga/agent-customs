@@ -66,7 +66,7 @@ export function snapshotOf(config, manifest, fingerprint) {
     links: config?.links || {},
     manifest: {
       brand: manifest?.brand || "",
-      allowedPeers: [...(manifest?.allowed_peers || [])].sort(),
+      allowedPeers: (manifest?.allowed_peers || []).toSorted(),
       peerPolicy: peerPolicyOf(manifest),
       codedTools: manifest?.coded_tools ? JSON.stringify(manifest.coded_tools) : "",
     },
