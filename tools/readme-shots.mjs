@@ -156,9 +156,14 @@ try {
   await b.evaluate("document.querySelector('#tab-report').click(); true");
   await inspect("Shady Pizza");
   await b.evaluate("document.querySelector('#tab-officer').click(); true");
-  await sleep(500);
+  // The key vault's box is a frame from another site, and frames outside the window are not
+  // drawn in a capture, so the window is made tall enough to hold it.
+  await b.viewport(1280, 1200, { scale: 1.5 });
+  await b.waitFor("document.querySelector('#mp-vault iframe')?.offsetHeight > 60", 15000);
+  await sleep(600);
   await scrollTo("#workspace");
-  await element("officer", ".desk-window", 795);
+  await element("officer", ".desk-window", 1060);
+  await desktop();
 
   // The officer calls Shady Pizza: the guard refuses it, the chat shows a notice, and the
   // notice's "See the full report" opens the report right here, on the Report tab.

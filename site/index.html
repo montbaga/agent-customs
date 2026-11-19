@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<!-- Images load only from this site, so no answer can leak the chat through a remote image. -->
-<meta http-equiv="Content-Security-Policy" content="img-src 'self' data: blob:">
+<!-- Scripts run only from this site, so text from an inspected network can never run as code.
+     Frames come only from the key vault. Images load only from this site, so no answer can leak
+     the chat through a remote image. -->
+<meta http-equiv="Content-Security-Policy" content="script-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-src https://agent-customs-vault.github.io http://127.0.0.1:8090 http://localhost:8090; img-src 'self' data: blob:">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0c1d18">
@@ -18,18 +20,7 @@
 <link rel="preload" href="fonts/InstrumentSerif-Italic.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="assistant.css">
-<script>
-  // Back from the officer's "Save and start", which reloads the page: keep the page hidden
-  // until view.js has reopened the Officer tab and scrolled to it, so it never shows another
-  // section first. A timer reveals it anyway if that does not happen.
-  try {
-    var savedAt = Number(sessionStorage.getItem("agent-customs-after-save") || 0);
-    if (savedAt && Date.now() - savedAt < 60000) {
-      document.documentElement.classList.add("returning");
-      setTimeout(function () { document.documentElement.classList.remove("returning"); }, 2000);
-    }
-  } catch (e) { /* storage blocked: show the page as usual */ }
-</script>
+<script src="returning.js"></script>
 <script type="module" src="effects.js"></script>
 <script type="module" src="view.js"></script>
 <script type="module" src="site.js"></script>
@@ -290,11 +281,6 @@
             <div id="mp-body" class="mp-body" hidden>
               <p class="mp-step"><span class="mp-num" aria-hidden="true">1</span>Choose a model</p>
               <div id="mp-cards" class="mp-cards" role="radiogroup" aria-label="AI model"></div>
-              <div class="mp-model-row" id="mp-router-row" hidden>
-                <label for="mp-router">Service address</label>
-                <input id="mp-router" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="https://your-ai-service.example/v1">
-                <p class="mp-hint">Any AI service with an OpenAI-style chat address, including one on your own computer.</p>
-              </div>
               <div class="mp-model-row">
                 <label for="mp-model">Model</label>
                 <select id="mp-model"></select>
@@ -302,14 +288,16 @@
               </div>
               <p class="mp-step"><span class="mp-num" aria-hidden="true">2</span>Create a key</p>
               <a id="mp-key-link" class="text-link" href="#" target="_blank" rel="noopener noreferrer"><span>Open the <span data-mp-provider>Google AI Studio</span> key page</span> <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
-              <p id="mp-key-other" class="mp-hint" hidden>Create a key on that service's own website.</p>
-              <p class="mp-step"><span class="mp-num" aria-hidden="true">3</span>Paste the key and start</p>
+              <p id="mp-key-other" class="mp-hint" hidden>Create a key on that service's own website. Any AI service with an OpenAI-style chat address works, including one on your own computer.</p>
+              <p class="mp-step"><span class="mp-num" aria-hidden="true">3</span>Paste the key into your key vault</p>
+              <p class="mp-hint mp-vault-why">The box below is the key vault, a separate website. This page never sees your key, so an agent file that attacked this page could not take it.</p>
+              <div id="mp-vault" class="mp-vault"></div>
+              <p id="mp-safety" class="mp-hint mp-safety"></p>
               <div class="mp-key-row">
-                <input id="mp-key" type="password" autocomplete="off" spellcheck="false" aria-label="API key" placeholder="Paste your key">
                 <button type="button" id="mp-start" class="primary">Save and start</button>
               </div>
               <p id="mp-status" class="mp-status" role="status"></p>
-              <button type="button" id="mp-forget" class="mp-advanced" hidden>Forget the saved key</button>
+              <p id="mp-legacy" class="mp-hint mp-legacy" hidden><span data-mp-legacy></span> <button type="button" class="mp-advanced">Delete the old copy</button></p>
             </div>
           </section>
           <div id="agent-app">

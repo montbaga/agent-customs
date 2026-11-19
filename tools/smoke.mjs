@@ -4,10 +4,13 @@
 //
 //   node tools/smoke.mjs [--url http://127.0.0.1:8080/] [--out ./screenshots] [--browser <path>]
 //
-// Serve the site and the range first (see README). Exits 1 on any page error.
+// Serve the site and the range first (see README). The key vault is started here on its port
+// (8090) unless it is already running. Exits 1 on any page error.
 
+import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { findBrowser, openBrowser, sleep } from "./cdp.mjs";
 
 const args = process.argv.slice(2);
@@ -18,6 +21,9 @@ const browserPath = findBrowser(opt("--browser", ""));
 if (!browserPath) { console.error("No Edge or Chrome found. Pass --browser <path>."); process.exit(2); }
 
 await mkdir(OUT, { recursive: true });
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const vaultUp = await fetch("http://127.0.0.1:8090/").then((r) => r.ok, () => false);
+const vaultServer = vaultUp ? null : spawn(process.execPath, [path.join(ROOT, "tools", "serve.mjs"), path.join(ROOT, "vault"), "--port", "8090"], { stdio: "ignore" });
 const { send, evaluate, waitFor, close, problems } = await openBrowser({ browserPath, port: 9333 });
 const shot = async (name, { full = true } = {}) => {
   let params = { format: "png" };
@@ -118,70 +124,30 @@ try {
     return confirmEntryDialog(desk.comparison.after); }`, "Turn it away");
   console.log(`  guard asks: "${held.title}" · ${held.result ? "let in" : "turned away"}`);
   if (!/^Let /.test(held.title) || held.result !== false) problems.push(`the guard's review dialog did not work: ${JSON.stringify(held)}`);
-  // The model picker: choosing another provider shows its models and empties the key field.
+  // The model picker: another provider shows its models, its key page and how to keep the key
+  // cheap. The key itself goes into the key vault's frame, never into this page;
+  // tools/vault-check.mjs checks that end to end.
   const picked = await evaluate(`(() => {
-    const key = document.querySelector("#mp-key");
-    key.value = "a key typed for another provider";
     document.querySelector('#mp-cards input[value="claude"]').click();
-    return { cards: document.querySelectorAll("#mp-cards .mp-card").length, keyCleared: key.value === "",
-      model: document.querySelector("#mp-model").selectedOptions[0]?.textContent || "", link: document.querySelector("#mp-key-link").href };
+    return { cards: document.querySelectorAll("#mp-cards .mp-card").length,
+      model: document.querySelector("#mp-model").selectedOptions[0]?.textContent || "", link: document.querySelector("#mp-key-link").href,
+      safety: document.querySelector("#mp-safety").textContent, vault: !!document.querySelector("#mp-vault iframe"),
+      keyFieldOnPage: !!document.querySelector("#model-picker input[type=password]") };
   })()`);
-  console.log(`  model picker: ${picked.cards} cards · Claude shows "${picked.model}" · key field ${picked.keyCleared ? "emptied" : "kept"}`);
-  if (picked.cards !== 6 || !picked.keyCleared || !/Claude/.test(picked.model) || !/anthropic/.test(picked.link)) problems.push(`model picker: ${JSON.stringify(picked)}`);
-  // One box for every key: no advanced link, and the runtime's own form never shows. "Other
-  // service" takes an address and a model name and passes them to the runtime's form. The
-  // runtime's Save is stubbed here, so nothing is saved or sent.
-  const other = await evaluate(`(async () => {
+  console.log(`  model picker: ${picked.cards} cards · Claude shows "${picked.model}" · vault frame ${picked.vault ? "present" : "missing"}`);
+  if (picked.cards !== 6 || !/Claude/.test(picked.model) || !/anthropic/.test(picked.link) || !/spending limit/.test(picked.safety)
+    || !picked.vault || picked.keyFieldOnPage) problems.push(`model picker: ${JSON.stringify(picked)}`);
+  // "Other": no key page of its own (the address is typed into the vault), and the runtime's
+  // own settings form never shows.
+  const other = await evaluate(`(() => {
     const shown = (sel) => { const el = document.querySelector(sel); return !!el && !el.hidden && getComputedStyle(el).display !== "none"; };
     document.querySelector('#mp-cards input[value="other"]').click();
-    const card = { address: shown("#mp-router-row"), keyPage: shown("#mp-key-link"), keyHint: shown("#mp-key-other") };
-    const router = document.querySelector("#mp-router");
-    router.value = "https://ai.invalid/v1";
-    router.dispatchEvent(new Event("change"));
-    document.querySelector("#mp-model-other").value = "test-model";
-    document.querySelector("#mp-key").value = "test-key-not-real";
-    let applied = false;
-    document.querySelector("#ns-apply").click = () => { applied = true; };
-    document.querySelector("#mp-start").click();
-    // The picker first asks the made-up address for its models; that lookup can take a while to fail.
-    for (let waited = 0; !applied && waited < 12000; waited += 250) await new Promise((r) => setTimeout(r, 250));
-    const form = { router: document.querySelector("#ns-router")?.value, model: document.querySelector("#ns-model")?.value, name: document.querySelector("#ns-profile-name")?.value, applied };
-    try { sessionStorage.removeItem("agent-customs-after-save"); history.scrollRestoration = "auto"; } catch {}
+    const card = { keyPage: shown("#mp-key-link"), keyHint: shown("#mp-key-other") };
     document.querySelector('#mp-cards input[value="gemini"]').click();
-    return { card, form, advancedLink: !!document.querySelector("#mp-advanced"),
-      runtimeFormShown: shown('#agent-app [data-ns-slot="settings"]'), backToGemini: { address: shown("#mp-router-row"), keyPage: shown("#mp-key-link") } };
+    return { card, runtimeFormShown: shown('#agent-app [data-ns-slot="settings"]'), backToGemini: shown("#mp-key-link") };
   })()`);
   console.log(`  other service: ${JSON.stringify(other)}`);
-  // The picker asked the made-up address for its models; that address never resolves, by design.
-  for (let i = problems.length - 1; i >= 0; i -= 1) if (problems[i].includes("https://ai.invalid/")) problems.splice(i, 1);
-  if (!other.card.address || other.card.keyPage || !other.card.keyHint || other.advancedLink || other.runtimeFormShown
-    || other.form.router !== "https://ai.invalid/v1" || other.form.model !== "test-model" || other.form.name !== "ai.invalid" || !other.form.applied
-    || other.backToGemini.address || !other.backToGemini.keyPage) problems.push(`one key box / other service: ${JSON.stringify(other)}`);
-  // A key for a service the runtime knows but no card shows (Otari, the kit's default)
-  // selects "Other" with that service's address and default model. The model list request
-  // is answered here, so nothing reaches Otari.
-  const otari = await evaluate(`(async () => {
-    const realFetch = window.fetch;
-    const router = document.querySelector("#mp-router");
-    const before = router.value;
-    window.fetch = async () => new Response(JSON.stringify({ data: [{ id: "alibaba/qwen3.8-flash" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
-    try {
-      document.querySelector('#mp-cards input[value="gemini"]').click();
-      const key = document.querySelector("#mp-key");
-      key.value = "otk_" + "x".repeat(24);
-      key.dispatchEvent(new Event("input"));
-      await new Promise((r) => setTimeout(r, 900));
-      return { card: document.querySelector("#mp-cards input:checked")?.value, router: router.value,
-        model: document.querySelector("#mp-model").value || document.querySelector("#mp-model-other").value,
-        status: document.querySelector("#mp-status").textContent };
-    } finally {
-      window.fetch = realFetch;
-      document.querySelector("#mp-key").value = "";
-      router.value = before;
-      document.querySelector('#mp-cards input[value="gemini"]').click();
-    }
-  })()`);
-  console.log(`  otari key: ${JSON.stringify(otari)}`);
+  if (other.card.keyPage || !other.card.keyHint || other.runtimeFormShown || !other.backToGemini) problems.push(`other service: ${JSON.stringify(other)}`);
   // Lock 3: no answer can load a remote image. The runtime's renderers turn image markup into
   // text or links, and the page's policy refuses remote images anyway. The image addresses use
   // the reserved .invalid domain, so nothing is ever fetched.
@@ -219,9 +185,6 @@ try {
   })()`);
   console.log(`  card-number link: ${JSON.stringify(linkLock)}`);
   if (linkLock.followed || !/Kept a card number out of a link to collect\.invalid/.test(linkLock.notice || "")) problems.push(`card-number link: ${JSON.stringify(linkLock)}`);
-  if (otari.card !== "other" || otari.router !== "https://api.otari.ai/api/v1" || otari.model !== "alibaba/qwen3.8-flash" || /did not accept/.test(otari.status)) {
-    problems.push(`otari key: ${JSON.stringify(otari)}`);
-  }
   await evaluate("document.querySelector('#workspace').scrollIntoView()");
   await sleep(300);
   const desk = await evaluate("(() => { const r = document.querySelector('#workspace').getBoundingClientRect(); return {x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}; })()");
@@ -284,7 +247,8 @@ try {
 } catch (error) {
   problems.push(`smoke step failed: ${error.message}`);
 } finally {
-  close();
+  await close();
+  vaultServer?.kill();
 }
 
 // The made-up addresses (.invalid) never resolve, by design; a late failed lookup is not a problem.

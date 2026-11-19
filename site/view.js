@@ -276,6 +276,11 @@ function fillAiLine(report, line) {
       text = "waiting for your AI key, so only the rules checked this.";
       action = ["Set up a free key", () => startKeySetup(report.target.url)];
       break;
+    case "locked":
+      tone = "caution";
+      text = "your saved key is locked, so only the rules checked this.";
+      action = ["Unlock your key", () => startKeySetup(report.target.url)];
+      break;
     default:
       // Your AI is only asked about what the rules clear, so a stopped network needs no offer.
       if (!["CLEARED", "CONDITIONS"].includes(report.verdict.code)) {
@@ -299,12 +304,13 @@ function openKeySettings() {
   const picker = $("#model-picker");
   // Leave room for the floating navigation bar, as the return after Save and start does.
   if (picker) window.scrollTo({ top: picker.getBoundingClientRect().top + window.scrollY - 110, behavior: "smooth" });
-  const key = $("#mp-key");
-  if (key && key.offsetParent) key.focus({ preventScroll: true });
+  // The key field is inside the key vault's frame; site.js moves focus there.
+  if ($("#mp-vault")?.offsetParent) document.dispatchEvent(new CustomEvent("customs:focus-key"));
 }
 
 // A visitor who sets up a key for the AI double-check goes back to their inspection after
-// Save and start reloads the page, instead of staying on the Officer tab.
+// Save and start reloads the page, or as soon as a locked key is unlocked, instead of staying
+// on the Officer tab.
 const AI_SETUP_KEY = "agent-customs-ai-setup";
 const AFTER_SAVE_KEY = "agent-customs-after-save";
 let aiJustReady = false;
@@ -331,7 +337,18 @@ function startKeySetup(url = "") {
 
 function switchLabel(state) {
   if (state === "off") return desk.aiSettled && !desk.hasAiKey() ? "Off · needs an AI key" : "Off";
-  return { connecting: "On · connecting", "needs-key": "Waiting for your key", ready: "On · your key" }[state] || "Off";
+  return { connecting: "On · connecting", "needs-key": "Waiting for your key", locked: "On · key locked", ready: "On · your key" }[state] || "Off";
+}
+
+function aiUnlockCard() {
+  const url = () => $("#inspect-url")?.value.trim() || desk.latest?.target.url || "";
+  return [
+    h("strong", null, "Your saved key is locked."),
+    " Unlock it in the key vault, and your AI takes a second look at what the rules clear.",
+    h("span", { class: "ai-note-actions" },
+      h("button", { type: "button", class: "primary small", onclick: () => startKeySetup(url()) }, "Unlock your key"),
+      h("button", { type: "button", class: "ghost small", onclick: () => { clearAiSetup(); desk.setAiCheck(false); $("#ai-check")?.focus(); } }, "Not now")),
+  ];
 }
 
 function aiSetupCard() {
@@ -340,7 +357,7 @@ function aiSetupCard() {
     h("strong", null, "Your own AI takes a second look."),
     " It reads what the rules clear, and it can only make a verdict stricter.",
     h("span", { class: "ai-note-more" },
-      "It needs an AI key: a code from an AI company that lets this page use its AI for you. Google AI Studio and Groq give free keys, and yours stays in this browser."),
+      "It needs an AI key: a code from an AI company that lets this page use its AI for you. Google AI Studio and Groq give free keys. Yours goes into a separate key vault, which this page cannot read."),
     h("span", { class: "ai-note-actions" },
       h("button", { type: "button", class: "primary small", onclick: () => startKeySetup(url()) }, "Set up a free key"),
       h("button", { type: "button", class: "ghost small", onclick: () => { clearAiSetup(); desk.setAiCheck(false); $("#ai-check")?.focus(); } }, "Not now")),
@@ -371,6 +388,7 @@ function syncAiCheck() {
     note.dataset.state = state;
     if (!on) note.replaceChildren();
     else if (state === "needs-key") note.replaceChildren(...aiSetupCard());
+    else if (state === "locked") note.replaceChildren(...aiUnlockCard());
     else {
       note.replaceChildren(aiJustReady ? "Your key is saved and the AI double-check is on. " : "",
         "Your AI also reads anything the rules clear, and can only make a verdict stricter. The network's public text goes to your AI provider, on your key.");
@@ -378,10 +396,12 @@ function syncAiCheck() {
   }
   const hint = $("#mp-ai-hint");
   if (hint) {
-    hint.hidden = state !== "needs-key";
-    hint.textContent = readAiSetup()
-      ? "This key will also run the AI double-check. After Save and start, you go straight back to your inspection."
-      : "This key will also run the AI double-check.";
+    hint.hidden = state !== "needs-key" && state !== "locked";
+    hint.textContent = state === "locked"
+      ? (readAiSetup() ? "Unlock your key in the vault box. You then go straight back to your inspection." : "Unlock your key in the vault box to run the AI double-check.")
+      : readAiSetup()
+        ? "This key will also run the AI double-check. After Save and start, you go straight back to your inspection."
+        : "This key will also run the AI double-check.";
   }
   const fact = $("#privacy-fact");
   if (fact) fact.textContent = on ? "AI double-check on: public agent text also goes to your AI provider" : "No server: nothing you inspect leaves your browser";
@@ -407,6 +427,7 @@ function aiProofLine(check) {
     skipped: "not asked, the rules had already stopped it",
     failed: "the visitor's AI gave no usable answer",
     "needs-key": "on, but no AI key was set",
+    locked: "on, but the saved key was locked",
   }[check.status];
   return said ? `AI double-check: ${said}${check.model ? ` (${check.model})` : ""}` : null;
 }
@@ -1044,7 +1065,7 @@ function wire() {
     if (kind === "pins") { renderPins(); renderReport(); }
     if (kind === "compare") renderCompare();
     if (kind === "border") renderBorderLog();
-    if (kind === "ai-check") syncAiCheck();
+    if (kind === "ai-check") { resumeAfterUnlock(); syncAiCheck(); }
     if (kind === "busy" && desk.phase === "ai") {
       const button = $("#inspect-button");
       if (button?.disabled) button.textContent = "AI double-check…";
@@ -1295,6 +1316,22 @@ function wireBuilderCodeTabs() {
       else codeEl.textContent = snippets[mode] || "";
     });
   }
+}
+
+// A locked key was unlocked while the visitor was setting up the AI double-check: back to the
+// inspection, which runs again with the key. No reload happens, unlike after Save and start.
+let lastAiState = "";
+function resumeAfterUnlock() {
+  const state = desk.aiCheckState();
+  const was = lastAiState;
+  lastAiState = state;
+  if (was !== "locked" || state !== "ready") return;
+  const setup = readAiSetup();
+  if (!setup) return;
+  clearAiSetup();
+  aiJustReady = true;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (setup.url) runInspect(setup.url);
 }
 
 // Back from the officer's Save and start, which reloads the page: reopen the Officer tab and

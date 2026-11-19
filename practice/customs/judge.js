@@ -12,6 +12,7 @@
 //   skipped   the rules had already held or refused it, so the AI was not asked
 //   failed    the AI gave no usable answer, so only the rules decided
 //   needs-key the switch is on but no AI key is set (set by the desk)
+//   locked    the switch is on but the saved key waits to be unlocked (set by the desk)
 
 import { escalateReport } from "./analyze.js";
 
