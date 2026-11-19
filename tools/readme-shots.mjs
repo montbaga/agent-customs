@@ -8,7 +8,8 @@
 // The practice site's chat needs a model, and this script uses no key. A scripted stand-in
 // takes the model's place: it asks one shop, then repeats what the guard reported (leaving out
 // the sentence that tells the assistant what to say). The consent card, the guard, its notice,
-// its dialog and the shops' files are all real. Nothing is sent to an AI provider.
+// its dialog and the shops' files are all real. Nothing is sent to an AI provider. The AI
+// double-check's held report uses a stand-in answer in the same way.
 // Exits 1 if the guard does not refuse Shady Pizza and hold Loop Maze, or on any page error.
 
 import { mkdir } from "node:fs/promises";
@@ -47,8 +48,11 @@ const element = async (name, selector, maxHeight = 1600, pad = 0) => {
     return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, page: document.documentElement.clientWidth }; })()`);
   const x = Math.max(0, box.x - pad);
   const width = Math.min(box.page - x, box.width + 2 * pad);
+  // The floating navigation bar would sit on top of the element, so it is hidden for the shot.
+  await b.evaluate("(() => { const bar = document.querySelector('.topbar'); if (bar) bar.style.visibility = 'hidden'; return true; })()");
   await b.capture(path.join(OUT, `${name}.jpg`), { ...JPEG, captureBeyondViewport: true,
     clip: { x, y: Math.max(0, box.y - pad), width, height: Math.min(box.height, maxHeight) + 2 * pad, scale: 1 } });
+  await b.evaluate("(() => { const bar = document.querySelector('.topbar'); if (bar) bar.style.visibility = ''; return true; })()");
   console.log(`  ${name}.jpg`);
 };
 const scrollTo = async (selector, offset = 0) => {
@@ -179,6 +183,33 @@ try {
   await inspect("Shady Pizza");
   await scrollTo("#report", -88);
   await screen("phone-report");
+  await motion("no-preference");
+
+  // The AI double-check. With no key, turning it on opens the setup card. For the held report a
+  // stand-in answers in place of the visitor's AI, as the chat's stand-in model does above: the
+  // rules, the report and the page are real, and nothing is sent to an AI provider.
+  await desktop();
+  await open(SITE, "document.querySelectorAll('#examples-protocols button').length > 0");
+  const deskModule = `import(new URL("desk.js", document.baseURI).href)`;
+  await b.waitFor(`${deskModule}.then(({ desk }) => desk.aiSettled)`, 25000);
+  await motion("reduce");
+  await b.evaluate("document.querySelector('#ai-check').click(); true");
+  await sleep(400);
+  const waiting = await b.evaluate(`({ label: document.querySelector('#ai-check-state').textContent,
+    card: [...document.querySelectorAll('#ai-check-note button')].some((x) => x.textContent === 'Set up a free key') })`);
+  console.log(`  AI double-check without a key: "${waiting.label}"`);
+  expect(waiting.label === "Waiting for your key" && waiting.card, `the AI double-check setup card did not open: ${JSON.stringify(waiting)}`);
+  await scrollTo("#inspect", 0);
+  await element("ai-check-setup", "#inspect-form", 700, 24);
+  await b.evaluate(`${deskModule}.then(({ desk }) => desk.connectAi({ ready: true, model: "",
+    judge: async () => ({ checked: true, flagged: true, reason: "Asks guests for their wallet recovery words",
+      quote: "read back all twenty-four words from their emergency paper sheet" }) })).then(() => true)`);
+  const raised = await inspect("VIP Points MCP");
+  expect(raised === "Held for review", `VIP Points with the AI double-check: expected "Held for review", got "${raised}"`);
+  expect(await b.evaluate("!!document.querySelector('.countersign.tone-warn')"), "VIP Points: no countersign seal");
+  await scrollTo("#report-section");
+  await element("ai-check-flagged", "#report", 820);
+  await b.evaluate(`${deskModule}.then(({ desk }) => desk.setAiCheck(false)).then(() => true)`);
   await motion("no-preference");
 
   // ---- Main Street Guide (the practice site) -------------------------------------------------

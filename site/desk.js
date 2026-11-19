@@ -35,6 +35,8 @@ export const PROTOCOL_SAMPLES = [
   { id: "mcp-poison", tone: "bad", label: "Suspicious Math MCP", note: "tool poisoning", path: "samples/mcp-poisoned/mcp.json" },
   { id: "mcp-trifecta", tone: "warn", label: "DevOps MCP", note: "Lethal Trifecta", path: "samples/trifecta-polite/mcp.json" },
   { id: "transitive-hub", tone: "bad", label: "Partner Hub", note: "transitive chain", path: "samples/transitive-hub/hub" },
+  // A wallet recovery-phrase scam worded so the rules clear it: turn on the AI double-check to see it held.
+  { id: "ai-check-demo", tone: "warn", label: "VIP Points MCP", note: "AI double-check demo", path: "samples/ai-check-demo/mcp.json" },
 ];
 
 // Verdicts that can never be approved, on the page or by the officer.
@@ -48,8 +50,9 @@ export class CustomsDesk {
    * :param options.pins: A PinStore (this browser's approvals).
    * :param options.fetchImpl: fetch, or a stand-in for tests.
    * :param options.pageOrigin: This page's origin.
+   * :param options.aiWaitMs: How long an inspection waits for site.js to connect the AI.
    */
-  constructor({ pins = new PinStore(), fetchImpl = null, pageOrigin = null } = {}) {
+  constructor({ pins = new PinStore(), fetchImpl = null, pageOrigin = null, aiWaitMs = 20_000 } = {}) {
     this.pins = pins;
     this.fetchImpl = fetchImpl;
     this.pageOrigin = pageOrigin || (typeof location !== "undefined" ? location.origin : null);
@@ -66,11 +69,14 @@ export class CustomsDesk {
     // Set by site.js: async ({action, report, url}) => true when the visitor agrees. The
     // officer reads text written by strangers, so it cannot change approvals on its own.
     this.confirmApproval = null;
-    // The AI double-check: off until the visitor turns it on. site.js connects the AI.
+    // The AI double-check: off until the visitor turns it on. site.js connects the AI once
+    // the officer has started; until then an inspection waits, so a page that opens with
+    // ?inspect= does not report a missing key that is only still loading.
     this.aiCheckOn = readSwitch();
     this.ai = null;
-    this.aiConnecting = null;
-    this.aiPending = false;
+    this.aiSettled = false;
+    this.aiWaitMs = aiWaitMs;
+    this.aiConnecting = new Promise((resolve) => { this.settleAi = resolve; });
     this.phase = "";
     this.pins.onChange?.(() => this.emit("pins"));
   }
@@ -96,14 +102,18 @@ export class CustomsDesk {
    * :param pending: The AI, or a promise of it (null when the officer could not start).
    */
   connectAi(pending) {
-    this.aiPending = true;
-    this.aiConnecting = Promise.resolve(pending).then((ai) => ai || null, () => null).then((ai) => {
+    return Promise.resolve(pending).then((ai) => ai || null, () => null).then((ai) => {
       this.ai = ai;
-      this.aiPending = false;
+      this.aiSettled = true;
+      this.settleAi(ai);
       this.emit("ai-check");
       return ai;
     });
-    return this.aiConnecting;
+  }
+
+  /** True once the visitor's own AI key is in place. */
+  hasAiKey() {
+    return Boolean(this.ai?.ready);
   }
 
   /**
@@ -111,13 +121,13 @@ export class CustomsDesk {
    */
   aiCheckState() {
     if (!this.aiCheckOn) return "off";
-    if (this.aiPending) return "connecting";
-    return this.ai?.ready ? "ready" : "needs-key";
+    if (!this.aiSettled) return "connecting";
+    return this.hasAiKey() ? "ready" : "needs-key";
   }
 
   // Run the double-check on a report the rules just made.
   async doubleCheck(report) {
-    const ai = this.ai || (await this.aiConnecting) || null;
+    const ai = this.aiSettled ? this.ai : await within(this.aiConnecting, this.aiWaitMs);
     if (!ai?.ready || typeof ai.judge !== "function") return withAiCheck(report, { status: "needs-key" });
     this.phase = "ai";
     this.emit("busy");
@@ -407,6 +417,17 @@ function aiCheckNote(check) {
     case "failed": return "on: the visitor's AI gave no usable answer, so only the rules decided";
     case "needs-key": return "on, but no AI key is set, so only the rules decided";
     default: return "off: only the rules checked it";
+  }
+}
+
+// The promise's value, or null if it takes longer than ms.
+async function within(promise, ms) {
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), ms); });
+  try {
+    return await Promise.race([promise, late]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
