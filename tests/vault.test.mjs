@@ -28,6 +28,9 @@ test("the vault sends each company's keys only to that company's own address, th
   assert.equal(providerForKey(" gsk_123 ")?.name, "Groq");
   assert.equal(providerForKey("sk-or-v1-abc")?.name, "OpenRouter");
   assert.equal(providerForKey("sk-ant-api03")?.name, "Anthropic");
+  // Each Otari region refuses the other's keys (HTTP 421), so an EU key goes to the EU gateway.
+  assert.equal(providerForKey("otk_v1_eu_abc")?.router, "https://eu.api.otari.ai/api/v1");
+  assert.equal(providerForKey("otk_v1_abc")?.router, "https://api.otari.ai/api/v1");
   assert.equal(providerForKey("mystery-key"), null);
 });
 

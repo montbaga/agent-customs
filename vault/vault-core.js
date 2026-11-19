@@ -7,8 +7,10 @@
 
 export const AGENT_CUSTOMS = "https://montbaga.github.io";
 
-// The one address each company's keys go to. The prefixes are the runtime's.
+// The one address each company's keys go to. The prefixes are the runtime's. An Otari key
+// belongs to one region, and the other region refuses it, so EU keys come first.
 export const PROVIDERS = [
+  { name: "Otari EU", router: "https://eu.api.otari.ai/api/v1", prefixes: ["otk_v1_eu_"] },
   { name: "Otari", router: "https://api.otari.ai/api/v1", prefixes: ["otk_"] },
   { name: "Google AI Studio", router: "https://generativelanguage.googleapis.com/v1beta/openai", prefixes: ["AIza"] },
   { name: "Groq", router: "https://api.groq.com/openai/v1", prefixes: ["gsk_"] },
