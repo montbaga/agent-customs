@@ -22,7 +22,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 194 passing" src="https://img.shields.io/badge/tests-194_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 198 passing" src="https://img.shields.io/badge/tests-198_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -55,7 +55,7 @@ https://github.com/user-attachments/assets/856eb212-3735-4a19-86da-0168c0ab7a2b
 </td>
 <td width="33.3%" valign="top">
   <strong>3 · Guard every call</strong><br><br>
-  Add one folder and two lines to any <code>agentify-website</code> site. Every partner call is then checked before it runs, and three locks stay on while it runs.
+  Add one line to any <code>agentify-website</code> site. Every partner call is then checked before it runs, and three locks stay on while it runs.
 </td>
 </tr>
 </table>
@@ -104,6 +104,8 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 
 The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
 
+**Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-the-guard-to-your-site).
+
 **Your AI key now lives in a key vault.** The page no longer keeps your key anywhere. You paste it into a small box that is really a separate website, the [key vault](vault/) (`agent-customs-vault.github.io`). The browser keeps that site's storage apart from this page's. When the Officer or the AI double-check needs your AI, the page asks the vault, and the vault adds the key, calls your AI company and passes back only the answer. So even an agent file that broke this page could not take your key. By default the vault forgets the key when you close the tab. *Remember on this computer* keeps it encrypted (AES-256), locked with your passkey or a password that is never stored. The page now also lets only its own scripts run, and each card says how to give a key a spending limit.
 
 A first-time visitor has no key, so the switch says so. Turning it on opens a short card that explains what an AI key is and that Google AI Studio and Groq give free ones. *Set up a free key* opens the key settings, and after *Save and start* the page goes back to the inspection and runs it again with your AI. To see it catch something, inspect the **VIP Points MCP** sample on the desk ([`site/samples/ai-check-demo/mcp.json`](site/samples/ai-check-demo/mcp.json)). It asks guests to *"read back all twenty-four words from their emergency paper sheet"*. That is a crypto wallet's recovery phrase, worded so that none of the rules' words appear. The rules clear it; your AI should hold it.
@@ -112,18 +114,29 @@ A first-time visitor has no key, so the switch says so. Turning it on opens a sh
 
 ## Add the guard to your site
 
-Any site built with Cognizant's `agentify-website` kit can add it in two steps. There is no server and no build step, and the runtime stays unchanged.
+Any site built with Cognizant's `agentify-website` kit can add it. There is no server and no build step, and the runtime stays unchanged. Pick one of four ways.
 
-**1. Copy** [`site/customs/`](site/customs/) next to your `runtime/` folder.  
-**2. Add two lines** to your `site.js`:
+**1. One line (easiest).** Paste this into your page, next to your other `<script>` tags. The guard switches itself on when your assistant starts.
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.0/site/customs/auto.js"></script>
+```
+
+`@v1.0.0` is a fixed version, so it never changes under you; change the number to update. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+
+**2. Two lines, with your own settings.** Load the guard from the same address and pass any of the *Guard options* below:
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "./customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.0.0/site/customs/guard.js";
 
 // Right after the boot(...) call
-installCustomsGuard(booted.engine);
+installCustomsGuard(booted.engine, { strict: true });
 ```
+
+**3. npm.** For projects with a build step: `npm install agent-customs`, then `import { installCustomsGuard } from "agent-customs";`. The same package has the command line tool: `npx agent-customs check <url>`.
+
+**4. Copy the folder.** To load nothing from outside, copy [`site/customs/`](site/customs/) next to your `runtime/` folder and use `import { installCustomsGuard } from "./customs/guard.js";`. The [practice site](practice/site.js) does this.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/checkpoint-flow-dark.svg">
@@ -172,7 +185,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  194 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site and the key vault.
+  198 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault and the one-line install.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -272,7 +285,7 @@ An ordinary town-guide site built with Cognizant's kit, in its own colours ([`pr
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Attack lab and benchmark scorecard"><br><sub><b>Attack lab and benchmark:</b> the same attacks with and without Agent Customs, next to the benchmark scorecard.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="For builders panel with CLI, Action and Extension tabs"><br><sub><b>For builders:</b> ready-to-copy setup for <code>site.js</code>, the command line tool, the GitHub Action and the extension.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="For builders panel with One line, npm, CLI, Action and Extension tabs"><br><sub><b>For builders:</b> ready-to-copy setup: the one-line install, npm, the command line tool, the GitHub Action and the extension.</sub></td>
   </tr>
 </table>
 
@@ -417,7 +430,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 194 tests
+npm test                                # 198 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -524,7 +537,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 194 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 198 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>

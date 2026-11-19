@@ -37,7 +37,7 @@
 | **The visitor** | A person chatting on your site | Help, without their card number or chat ending up somewhere else |
 | **Your site's AI** | Your assistant, built with Cognizant's `agentify-website` kit | To answer well, sometimes by asking a partner |
 | **The partner's AI** | Another website's assistant (an Open Agentic Web network, a Google A2A agent or an MCP server) | Usually to help. Sometimes, to trick your AI |
-| **Agent Customs** | One folder of JavaScript, `customs/`, plus two lines in `site.js` | To check the partner before it runs and to watch it while it runs |
+| **Agent Customs** | One folder of JavaScript, `customs/`, added with one `<script>` line (or two lines in `site.js`, or npm) | To check the partner before it runs and to watch it while it runs |
 
 The airport is a good picture of it. The partner is a traveller, your browser is the country, and Agent Customs is the customs desk: it looks at the papers, X-rays the bags, stamps the passport, and keeps an officer at the gate.
 
@@ -202,7 +202,7 @@ For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.
 | [`practice/`](practice/) | Main Street Guide, an ordinary site with the guard added in two lines |
 | [`range/`](range/) | Test networks, some honest and some deliberately unsafe |
 | [`bin/`](bin/), [`action.yml`](action.yml), [`extension/`](extension/) | The command line tool, the GitHub Action and the browser extension |
-| [`tests/`](tests/) | 194 automatic tests, the frozen attack sets and the real-world snapshots |
+| [`tests/`](tests/) | 198 automatic tests, the frozen attack sets and the real-world snapshots |
 | [`tools/`](tools/) | The benchmark, the stamp signer, the local server and the builders |
 
 ---
