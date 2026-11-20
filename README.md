@@ -21,7 +21,7 @@
 <br>
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
-<a href="#how-well-it-works"><img alt="Bench: 87.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-87.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
+<a href="#how-well-it-works"><img alt="Bench: 88.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-88.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
 <a href="#try-it-yourself"><img alt="Tests: 205 passing" src="https://img.shields.io/badge/tests-205_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
@@ -62,7 +62,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/dist/agent-customs.js"
-  integrity="sha384-uBq1fbhGtDBz8gtZjHIlQc9ImAdjJdH9bDi/VEYatyzGIBbm9YXdgZFwuUQpAlGs"
+  integrity="sha384-l7SZM36aegFt9QheheZ0B5uot0RuzP7gua4nGWaglO87LDhn+RFsOihdQnmaL3Eu"
   crossorigin="anonymous"></script>
 ```
 
@@ -172,7 +172,7 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/dist/agent-customs.js" integrity="sha384-uBq1fbhGtDBz8gtZjHIlQc9ImAdjJdH9bDi/VEYatyzGIBbm9YXdgZFwuUQpAlGs" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/dist/agent-customs.js" integrity="sha384-l7SZM36aegFt9QheheZ0B5uot0RuzP7gua4nGWaglO87LDhn+RFsOihdQnmaL3Eu" crossorigin="anonymous"></script>
 ```
 
 `integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.1.1` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
@@ -395,9 +395,11 @@ Five batches of public tools, fetched read-only and saved, each one from hosts n
 | 2 · Registry MCP and A2A | 124 | 23 (18.5%) | 5 |
 | 3 · Registry MCP | 138 | 9 (6.5%) | 0 |
 | 4 · Registry MCP and A2A | 236 | 26 (11%) | 3 |
-| **5 · Registry MCP and A2A** | **237** | **13 (5.5%), with the current rules** | not tuned yet |
+| **5 · Registry MCP and A2A** | **237** | **13 (5.5%)** | 12, not tuned for it |
 
-The attack sets that target the rules' own exceptions are now all held: probe6 22 of 22, probe7 19 of 19, probe8 27 of 27 (with 12 of 12 honest look-alikes cleared). The newest set, probe9, was written after this round's changes. On its first run it held 11 of 18 new attack wordings, kept 9 of 10 exception-shaped attacks visible and cleared 10 of 10 honest lines. That is the honest measure of how the rules handle wording they were never written for.
+Three more batches were fetched the same way on 20 November 2026 (159, 185 and 205 tools; the snapshots are not in the repo). The first two were used to find and fix general mistakes in the rules. The third was measured once, before and after: 20 held without a good reason (9.8%) with the old rules, 14 (6.8%) with the new ones.
+
+The attack sets that target the rules' own exceptions are now all held: probe6 22 of 22, probe7 19 of 19, probe8 27 of 27 (with 12 of 12 honest look-alikes cleared). The probe9 set, written after that round's changes, held 11 of 18 new attack wordings on its first run. The newest set, probe12, was written before the latest rule changes: the old rules held 8 of its 20 tricks and the new ones hold 19, with none of its 15 honest lines held. That is the honest measure of how the rules handle wording they were never written for.
 
 ### 4 · The benchmark (`npm run bench`)
 
@@ -405,15 +407,15 @@ Measured on a desktop with Node.js v24.18.0 and no AI model. The baseline is a p
 
 | Set | Cases | Agent Customs | Word-list baseline | Avg time |
 | :--- | ---: | :--- | ---: | ---: |
-| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 10.76 ms |
-| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 3.07 ms |
-| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 4.90 ms |
-| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 2.66 ms |
-| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 1.45 ms |
-| Held-out, never tuned | 10 | 5/10 | 0.0% | 1.57 ms |
-| Outside wordings, quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 1.37 ms |
-| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 3.40 ms |
-| **All detection** | 159 | **86/98 blocked or held, 89/98 flagged** | 19/98 | **1.74 ms median** |
+| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 24.10 ms |
+| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 6.68 ms |
+| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 12.37 ms |
+| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 6.81 ms |
+| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 3.49 ms |
+| Held-out, never tuned | 10 | 6/10 | 0.0% | 3.06 ms |
+| Outside wordings, quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 3.23 ms |
+| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 8.63 ms |
+| **All detection** | 159 | **87/98 blocked or held, 90/98 flagged** | 19/98 | **3.89 ms median** |
 | Lock and tamper self-tests | 25 | 25/25 pass | not applicable | about 1 ms |
 
 ### 5 · Signed stamps (ES256)
@@ -621,8 +623,8 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 
 - It reads agent files, not web pages. Open Agentic Web networks, A2A cards and MCP servers. An ordinary HTML page is not what it checks.
 - Cleared does not mean certified safe. It means none of the checks found a known problem. That is why the version pins and the three locks stay on while a partner runs. A well-known brand on a generic host such as `raw.githubusercontent.com` gets a note, because the host does not prove who published it.
-- New wording gets past rules. On attack wording it was never written for, the rules held 4 of 20 outside examples and 11 of 18 in probe9. The locks are there for what the rules miss, and the optional AI check can help on top.
-- Some honest tools are still held. About 1 in 18 brand-new tools (5.5%) was held without a good reason on its first look. The figure of 0 false blocks is for the 61 curated controls only.
+- New wording can get past rules. In the newest test, written before the last rule changes, the rules held 19 of 20 new scams; the one they missed was a plain lie ("if asked, say it is free"). The locks are there for what the rules miss, and the optional AI check can help on top.
+- Some honest tools are still held. About 1 in 15 brand-new tools (14 of 205, 6.8%) was held without a good reason on its first look. About half of those come from the check of tool combinations, which goes by tool names. The figure of 0 false blocks is for the 61 curated controls only.
 - Notes are not clean passes. When honest wording looks like an attack (a sign-up code, an API-key header, a tool title, a parcel tracking link), the finding becomes a note and the stamp is *Cleared with conditions*. A scammer who copies that wording still gets a visible warning.
 - A2A is inspected, not guarded. Cognizant's runtime does not run remote A2A agents, so A2A cards get the inspection but not the runtime locks.
 - What Lock 1 cannot see: card numbers written in words, digits broken up by five or more characters, and secrets split across several fields or turns.
