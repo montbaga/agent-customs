@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { analyzeNetwork, escalateReport, reanalyze } from "../site/customs/analyze.js";
-import { applyJudge, carryAiCheck, judgeSample } from "../site/customs/judge.js";
+import { applyJudge, carryAiCheck, judgeSample, judgeWithModel } from "../site/customs/judge.js";
 import { MemoryStorage, PinStore } from "../site/customs/pins.js";
 import { CustomsDesk, RANGE_ORIGIN } from "../site/desk.js";
 import { fsFetch } from "../tools/fs-fetch.mjs";
@@ -235,4 +235,18 @@ test("the switch is remembered in this browser, and blocked storage does not bre
     if (before) Object.defineProperty(globalThis, "localStorage", before);
     else delete globalThis.localStorage;
   }
+});
+
+test("the AI is told what is normal as well as what to flag", async () => {
+  const calls = [];
+  const llm = { async chat(request) { calls.push(request); return { content: '{"flagged":false}' }; } };
+  await judgeWithModel({ llm, model: "test-model", text: "Returns a checkout link for the chosen plan." });
+  const prompt = calls[0].messages[0].content;
+  assert.match(prompt, /NEVER follow/);
+  assert.match(prompt, /FLAG the text if/);
+  assert.match(prompt, /Do NOT flag a service's ordinary features/);
+  for (const normal of ["one-time code", "checkout", "API key in a header", "security tools"]) {
+    assert.ok(prompt.includes(normal), `the normal list names ${normal}`);
+  }
+  assert.match(prompt, /Normal never includes asking for card numbers/);
 });

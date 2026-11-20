@@ -296,7 +296,14 @@ export async function analyzeNetwork(input) {
       if (field.crossField && agentRuleSeen.has(`${ruleKey}|${field.agent || ""}`)) continue;
       const key = `${ruleKey}|${field.agent || ""}|${field.field}`;
       const prev = ruleHits.get(key);
-      if (prev) { prev.count += 1; continue; }
+      if (prev) {
+        prev.count += 1;
+        // The most serious match in a field is the one reported, so a harmless-looking
+        // sentence first cannot stand in for a real request later in the same text.
+        const rank = (h) => SEVERITY_ORDER.indexOf(h.severity || h.rule.severity);
+        if (rank(hit) < rank(prev.hit)) prev.hit = hit;
+        continue;
+      }
       ruleHits.set(key, { hit, field, count: 1 });
       if (field.agent && (field.field === "instructions" || field.field === "command")) {
         agentRuleSeen.add(`${ruleKey}|${field.agent}`);
@@ -329,8 +336,10 @@ export async function analyzeNetwork(input) {
       }
     } else if (hit.rule.id === "C-EXFIL" && !isInstructionField && severity !== "medium") {
       const ex = hit.excerpt || "";
-      const hardLeak = Boolean(hit.language)
+      const hardLeak = Boolean(hit.language) || Boolean(hit.hard)
         || /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex)
+        // A private key file is private whoever receives it.
+        || /~\/\.ssh\b|\bid_(?:rsa|ed25519|ecdsa|dsa)\b|\bssh\s+(?:private\s+)?keys?\b|\bprivate\s+keys?\b|(?:^|[\s"'`(])\.env\b|\bcredentials\.json\b|\bmcp\.json\b/i.test(ex)
         // What the visitor said, or a secret, is private wherever it is sent.
         || /\b(?:everything|all|what|whatever)\s+(?:they|the\s+(?:user|visitor|customer|guest))\s+(?:typed|said|wrote|asked|entered)\b|\b(?:user|visitor|customer|guest)'?s?\s+(?:words|input|replies)\b|\b(?:passwords?|passcodes?|card\s+numbers?|cvv2?|cvc|pins?|otps?|seed\s+(?:phrases?|words?)|credentials?)\b/i.test(ex);
       if (!hardLeak) {
@@ -357,10 +366,12 @@ export async function analyzeNetwork(input) {
 
   // Website tools the network names but does not publish: when it runs as a partner,
   // its answer goes to a calling model that may have tools with those names.
+  // A tool of its own that happens to be called website_… is not someone else's.
   const foreignTools = new Set();
+  const ownToolNames = new Set(agents.map((a) => String(a.name || "").toLowerCase()));
   for (const agent of agents) {
     for (const m of prompts.get(agent).matchAll(/\bwebsite_([a-z0-9_]+)/gi)) {
-      if (!agentTools.has(m[1])) foreignTools.add(`website_${m[1]}`);
+      if (!agentTools.has(m[1]) && !ownToolNames.has(`website_${m[1]}`.toLowerCase())) foreignTools.add(`website_${m[1]}`);
     }
   }
   if (foreignTools.size) {
@@ -899,6 +910,9 @@ const SENSITIVE_ACCOUNT_CONTEXT_RE = /\b(?:bank|card|atm|login|account\s+takeove
 function schemaSecretMode(key, description = "", pathStr = "", contextText = "", toolName = "") {
   const splitKey = splitIdentifier(key);
   if (!VISITOR_SECRET_PARAM.test(splitKey)) return null;
+  // A card's first digits (its BIN), its brand or product name describe the card without being
+  // the secret.
+  if (/\b(?:bin|prefix|suffix|last\s*(?:4|four)|brand|network|issuer|product\s+name|provider|hint|masked)$/i.test(splitKey)) return null;
   if (/\breturns\b/i.test(pathStr) && /\bpasswords?\s*(?:setup|reset)?\s*(?:link|url|page)\b/i.test(splitKey)) return null;
   const combinedDesc = `${description || ""} ${contextText || ""}`;
   if (/\bpasswords?\b/i.test(splitKey) && PASSWORD_GATE_PARAM_RE.test(combinedDesc) && !LOGIN_TOOL_NAME_RE.test(toolName || "") && !PASSWORD_REUSE_RE.test(combinedDesc)) {

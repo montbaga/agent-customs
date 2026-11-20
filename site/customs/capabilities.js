@@ -92,6 +92,8 @@ function schemaParamSensitivity({ key, type, description }, ctx) {
   if ((type === "integer" || type === "number") && /\btokens?\b/i.test(kw)) return "no";
   if (NON_SECRET_TOKEN_METRIC.test(kw)) return "no";
   if (/\bid$/i.test(kw) || /\b(?:auth )?state$/i.test(kw)) return "no";
+  // A token's prefix, hash or last digits identifies it without being it.
+  if (/\b(?:prefix|suffix|last ?4|hint|hash|hashed|fingerprint|length|preview|masked|redacted)$/i.test(kw)) return "no";
   if (/\bpasswords? (?:setup|reset|change|recovery|policy)(?: (?:link|url|page|token))?\b/i.test(kw)) return "no";
   const desc = String(description || "");
   if (PASSWORD_GATE_DESC.test(desc) && !/^(?:login|sign in|auth)/i.test(toolWords) && !PASSWORD_REUSE_RISK.test(desc)) {
@@ -128,7 +130,9 @@ function schemaParamSensitivity({ key, type, description }, ctx) {
 }
 const SENSITIVE_DESC = /\b(?:private\s+(?:documents?|notes|photos|messages)|(?:user|visitor|customer)'?s?\s+(?:private\s+)?(?:files|documents|notes|photos)|environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|access\s+tokens?|config(?:uration)?\s+files?|private\s+data))\b/i;
 const EGRESS_TOOL = /\b(?:http post|post to url|post url|send to url|http request|post data|send email|send message|post message|send reply|send to|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|transfer domain|domain transfer|send telemetry)\b/i;
-const EGRESS_PARAM_URL = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient|target|post)\s*(?:url|uri|webhook|hook|email))\b/i;
+const OWN_STORE_TOOL = /\b(?:upload|write file|export data|push data)\b/i;
+const EGRESS_TO_OTHERS_TOOL = /\b(?:http post|post to url|post url|send to url|http request|post data|send email|send message|post message|send reply|send to|send webhook|webhook|notify|dispatch|exfil|publish|transfer funds|transfer domain|domain transfer|send telemetry)\b/i;
+const EGRESS_PARAM_URL =/\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient|target|post)\s*(?:url|uri|webhook|hook|email))\b/i;
 const EGRESS_PARAM_WEAK = /\b(?:destination|recipient|endpoint|callback|forward\s*to)\b/i;
 const EGRESS_PARAM_DESC_URL = /\b(?:url|uri|webhook|endpoint|https?|e-?mail)\b/i;
 const EGRESS_DESC = /\b(?:send|sends|post|posts|upload|uploads|transmit|transmits|forward|forwards|push|pushes|stream|streams|relay|relays|export|exports|ship|ships|submit|submits|deliver|delivers|exfiltrate|exfiltrates)\b[^.!?\n]{0,45}\b(?:webhook|callback|external\s+(?:url|endpoint|server|host|api)|remote\s+(?:url|endpoint|server|host)|https?:\/\/|url\s+you\s+(?:give|provide|pass|specify)|destination\s+url|configured\s+address|team|channel)\b|\b(?:send|sends)\s+(?:a\s+)?(?:real\s+)?(?:e-?mail|reply|message|link)\s+to\b|\b(?:post|posts|send|sends|upload|uploads)\b[^.!?\n]{0,30}\bto\s+any\s+(?:url|address|endpoint|server|host|webhook)\b|\b(?:telemetry\s+payload|notify\s+team|send\s+telemetry|webhook\s+url)\b/i;
@@ -242,7 +246,11 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
       }
       return false;
     }).map((p) => p.key);
-    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length) {
+    // An MCP server's upload or write tool stores data on that server, which already receives
+    // every call. Only a way to send data on to someone else adds a path.
+    const storesOnServerOnly = protocol === "mcp" && OWN_STORE_TOOL.test(toolWords) && !EGRESS_TO_OTHERS_TOOL.test(toolWords)
+      && !EGRESS_DESC.test(descWords) && !hintRaisesEgress && !toolExternalUrl && !egressParams.length;
+    if (!storesOnServerOnly && (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length)) {
       externalEgress.push({
         sink: toolExternalUrl || (egressParams.length ? `${name}(${egressParams[0]})` : name),
         kind: toolExternalUrl ? "external_endpoint" : egressParams.length ? "egress_param" : "outbound_tool",

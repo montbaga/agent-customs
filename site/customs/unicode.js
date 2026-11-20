@@ -339,7 +339,9 @@ export function stripHiddenChars(text) {
 export function findMixedScriptWords(text) {
   if (typeof text !== "string" || !text) return [];
   const found = [];
-  const tokens = text.split(/[\s_\-./:]+/u).filter(Boolean)
+  // Words end at any mark that is not a letter: in `classify("центрифуга")` the Cyrillic word
+  // stands apart from the Latin one. A look-alike hides inside one run of letters.
+  const tokens = text.split(/[^\p{L}\p{N}\p{M}'’]+/u).filter(Boolean)
     .map((raw) => raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
     .filter(Boolean);
   const latinWords = tokens.filter((w) => /\p{Script=Latin}/u.test(w) && !HAS_CONFUSABLE_SCRIPT.test(w)).length;
