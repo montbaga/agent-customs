@@ -66,7 +66,7 @@ let notice = { text: "", tone: "" };
 let passkeyReady = false;
 
 const keyInput = el("input", { id: "key", type: "password", autocomplete: "off", spellcheck: "false", "aria-describedby": "key-note" });
-const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://your-ai-service.example/v1" });
+const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://api.otari.ai/api/v1 or http://127.0.0.1:11434/v1" });
 const passwordInput = el("input", { id: "password", type: "password", autocomplete: "new-password", spellcheck: "false" });
 const unlockInput = el("input", { id: "unlock-password", type: "password", autocomplete: "current-password", spellcheck: "false", "aria-label": "Vault password" });
 
@@ -161,7 +161,9 @@ function changed() {
 
 // Measured on the box: the document's scrollHeight never drops below the frame's height.
 function tellHeight() {
-  tell({ event: "height", px: Math.ceil($("#vault").getBoundingClientRect().bottom) });
+  if (window.scrollY) window.scrollTo(0, 0);
+  const rect = $("#vault").getBoundingClientRect();
+  tell({ event: "height", px: Math.ceil(rect.height + Math.max(0, rect.top)) });
 }
 
 window.addEventListener("message", (event) => {
@@ -229,10 +231,19 @@ function keyForSelection() {
   return readSession().keys[selectedRouter()]?.key || "";
 }
 
+function ownProviderForDraft() {
+  const own = providerForKey(draftKey);
+  if (!own) return null;
+  if (selection.provider !== CUSTOM) return own;
+  const router = selectedRouter();
+  if (!router || router === own.router || own.name.startsWith("Otari")) return own;
+  return null;
+}
+
 // A key with another provider's prefix is not sent until that provider is selected.
 function mismatched() {
-  const own = providerForKey(draftKey);
-  return !!own && selection.provider !== CUSTOM && own.name !== selection.provider;
+  const own = ownProviderForDraft();
+  return !!own && own.name !== selection.provider;
 }
 
 async function listModels() {
@@ -255,12 +266,12 @@ async function listModels() {
 
 // A key with a known prefix is kept for its own provider, whatever the page selected.
 async function commit() {
+  const own = draftKey ? ownProviderForDraft() : null;
+  if (own) selection = { provider: own.name };
   let router = selectedRouter();
   if (!router) return { ok: false, reason: "address" };
   const s = readSession();
   if (draftKey) {
-    const own = providerForKey(draftKey);
-    if (own && selection.provider !== CUSTOM) { router = own.router; selection = { provider: own.name }; }
     s.keys[router] = { name: nameFor(router), key: draftKey, remembered: false };
     clearDraft();
     s.active = router;
@@ -396,6 +407,7 @@ async function unlock() {
 
 async function forget() {
   const router = selectedRouter();
+  const removedName = nameFor(router);
   const s = readSession();
   const box = readBox();
   const remembered = !!s.keys[router]?.remembered || !!box?.saved?.some((e) => e.router === router);
@@ -413,7 +425,8 @@ async function forget() {
     }
   }
   clearDraft();
-  say(`The ${nameFor(router)} key is gone from the vault.`);
+  if (selection.provider.startsWith("Otari")) selection = { provider: CUSTOM };
+  say(`The ${removedName} key is gone from the vault.`);
 }
 
 function forgetBox() {
@@ -484,7 +497,8 @@ function showOnly(text) {
 
 function focusField() {
   const target = $("#vault [data-focus]") || (selection.provider === CUSTOM && !selectedRouter() ? addressInput : keyInput);
-  target.focus();
+  target.focus({ preventScroll: true });
+  if (window.scrollY) window.scrollTo(0, 0);
 }
 
 async function run(label, work) {
@@ -519,7 +533,7 @@ function render() {
 
   const rows = [];
   if (custom) {
-    rows.push(el("div", { class: "field" }, el("label", { for: "address" }, "Service address"), addressInput));
+    rows.push(el("div", { class: "field" }, el("label", { for: "address" }, "Service address (or leave blank and paste an Otari key below)"), addressInput));
   }
   rows.push(keyInput);
   rows.push(el("p", { id: "key-note", class: "note" },
@@ -611,21 +625,29 @@ function forgetBoxButton() {
 }
 
 let typing = 0;
+let typingAddress = 0;
 keyInput.addEventListener("input", () => {
   draftKey = keyInput.value.trim();
   clearTimeout(typing);
   typing = setTimeout(() => {
-    const own = providerForKey(draftKey);
+    if (!draftKey && selection.provider.startsWith("Otari") && !status().selection.saved) {
+      selection = { provider: CUSTOM };
+    }
+    const own = ownProviderForDraft();
     changed();
     if (!draftKey) return;
-    if (own && selection.provider !== CUSTOM && own.name !== selection.provider) tell({ event: "detected", provider: own.name });
+    if (own && own.name !== selection.provider) tell({ event: "detected", provider: own.name });
     else tell({ event: "draft" });
   }, 400);
 });
 // Enter while an input method (Chinese, Japanese, Korean...) is composing picks a character, not submit.
 const enter = (e) => e.key === "Enter" && !e.isComposing && e.keyCode !== 229;
 keyInput.addEventListener("keydown", (e) => { if (enter(e)) { e.preventDefault(); tell({ event: "submit" }); } });
-addressInput.addEventListener("change", () => { changed(); if (keyForSelection()) tell({ event: "draft" }); });
+addressInput.addEventListener("input", () => {
+  clearTimeout(typingAddress);
+  typingAddress = setTimeout(() => { changed(); if (keyForSelection()) tell({ event: "draft" }); }, 400);
+});
+addressInput.addEventListener("change", () => { clearTimeout(typingAddress); changed(); if (keyForSelection()) tell({ event: "draft" }); });
 unlockInput.addEventListener("keydown", (e) => { if (enter(e)) { e.preventDefault(); run("unlock", unlock); } });
 passwordInput.addEventListener("keydown", (e) => { if (enter(e)) { e.preventDefault(); run("remember", () => remember("password")); } });
 

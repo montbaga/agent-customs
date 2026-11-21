@@ -105,7 +105,7 @@ export class KeyVault {
   }
 
   focus() {
-    this.frame?.focus();
+    this.frame?.focus({ preventScroll: true });
     return this.ask("focus");
   }
 

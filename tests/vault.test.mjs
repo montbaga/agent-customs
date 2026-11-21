@@ -36,6 +36,11 @@ test("the vault sends each company's keys only to that company's own address, th
 
 test("an address typed into the vault must be https, or http on this computer", () => {
   assert.equal(serviceAddress(" https://llm.example.invalid/v1/ "), "https://llm.example.invalid/v1");
+  assert.equal(serviceAddress("https://llm.example.invalid/v1/chat/completions"), "https://llm.example.invalid/v1");
+  assert.equal(serviceAddress("https://llm.example.invalid/v1/models"), "https://llm.example.invalid/v1");
+  assert.equal(serviceAddress("https://api.otari.ai/v1"), "https://api.otari.ai/api/v1");
+  assert.equal(serviceAddress("https://eu.api.otari.ai"), "https://eu.api.otari.ai/api/v1");
+  assert.equal(serviceAddress("https://otari.ai"), "https://api.otari.ai/api/v1");
   assert.equal(serviceAddress("http://localhost:11434/v1"), "http://localhost:11434/v1");
   assert.equal(serviceAddress("http://127.0.0.1:8099/v1"), "http://127.0.0.1:8099/v1");
   for (const bad of ["", "llm.example.invalid", "http://llm.example.invalid/v1", "javascript:alert(1)", "ftp://x.invalid",
