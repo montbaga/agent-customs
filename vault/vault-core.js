@@ -46,6 +46,11 @@ export function serviceAddress(text) {
   if (url.username || url.password || url.search || url.hash) return "";
   const local = url.protocol === "http:" && LOOPBACK.has(url.hostname);
   if (url.protocol !== "https:" && !local) return "";
+  if (url.hostname === "otari.ai") url.hostname = "api.otari.ai";
+  url.pathname = url.pathname.replace(/\/(?:chat\/completions|models)\/?$/i, "").replace(/\/+$/, "");
+  if ((url.hostname === "api.otari.ai" || url.hostname === "eu.api.otari.ai") && (!url.pathname || url.pathname === "/" || url.pathname === "/v1")) {
+    url.pathname = "/api/v1";
+  }
   return url.href.replace(/\/+$/, "");
 }
 

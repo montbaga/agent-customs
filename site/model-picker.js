@@ -334,22 +334,26 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const renderModels = (models, want) => {
     modelSelect.replaceChildren();
     for (const m of models) modelSelect.append(new Option(m.name, m.id));
-    modelSelect.append(new Option("Other: type a model name", ""));
+    modelSelect.append(new Option(models.length ? "Other: type a model name" : "Paste your key below to load models, or type a model name", ""));
     const match = models.find((m) => m.id === want || bare(m.id) === bare(want));
     modelSelect.value = match ? match.id : (models[0]?.id || "");
     modelOther.hidden = !!modelSelect.value;
     return !!match;
   };
 
-  // {models}, {rejected} or {reason}.
+  // {models}, {rejected}, {unreachable} or {reason}.
   const modelsFor = async (choice) => {
     if (choice.live === false || !vault) return { models: null };
     const result = await vault.ask("models");
     if (result?.ok) return { models: chatModels(result.ids) };
     if (result?.status === 401 || result?.status === 403) return { rejected: true };
-    return { models: null, reason: result?.reason || "" };
+    if (result?.status === 0) return { models: null, unreachable: true };
+    return { models: null, reason: result?.reason || "", status: result?.status || 0 };
   };
   const rejectedNote = (choice) => `${nameOf(choice)} did not accept this key. Check that you copied all of it.`;
+  const unreachableNote = (choice) => choice.custom && !otherProvider
+    ? `Could not reach ${nameOf(choice)} at that address. Check the service address (for example https://api.otari.ai/api/v1) and that it allows browser requests.`
+    : `Could not reach ${nameOf(choice)}. Check the service address or your connection, then try again.`;
 
   // Show the key's models in the list, keeping the chosen one when the key can use it.
   let request = 0;
@@ -362,6 +366,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     const result = await modelsFor(choice);
     if (mine !== request || selected().id !== choice.id) return;
     if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
+    if (result.unreachable) { say(unreachableNote(choice), "warn"); return; }
     if (!result.models?.length) { say(""); return; }
     const kept = renderModels(mergeModels(choice.models, result.models), wanted);
     const count = `${result.models.length} model${result.models.length === 1 ? "" : "s"}`;
@@ -388,11 +393,12 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     otherProvider = provider || (fromKey ? otherProvider : "");
     const radio = root.querySelector(`input[name="mp-model"][value="${choice.id}"]`);
     if (radio) radio.checked = true;
-    const known = providers.find((p) => p.name === choice.provider);
-    keyLink.hidden = !!choice.custom;
-    if (keyOther) keyOther.hidden = !choice.custom;
+    const providerName = choice.provider || otherProvider;
+    const known = providers.find((p) => p.name === providerName);
+    keyLink.hidden = !known?.keyUrl;
+    if (keyOther) keyOther.hidden = !!known?.keyUrl;
     keyLink.href = known?.keyUrl || "#";
-    keyLink.querySelector("[data-mp-provider]").textContent = choice.provider;
+    keyLink.querySelector("[data-mp-provider]").textContent = providerName;
     showSafety(choice);
     modelOther.value = "";
     // The model saved with this provider leads the list, even when it is not a suggestion.
@@ -459,7 +465,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (event === "status") {
       refreshCards();
       layout(refreshCurrent());
-    } else if (event === "detected" && (!selected().custom || otherProvider)) {
+    } else if (event === "detected") {
       // A pasted key that belongs to another provider selects that provider's card. A key for
       // a service the runtime knows but no card shows, such as Otari, which sites made with
       // Cognizant's kit use by default, goes under "Other" with that service's default model.
@@ -551,16 +557,20 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!sel.draft && !sel.saved) { say(commitProblem("empty", choice), "warn"); vault.focus(); return; }
     if (!sel.draft && sel.locked) { say(commitProblem("locked", choice), "warn"); vault.focus(); return; }
     let model = chosenModel();
-    if (!model) { say("Choose a model, or type its name.", "warn"); modelOther.hidden = false; modelOther.focus(); return; }
     start.disabled = true;
     try {
       // Save under the name the provider lists, which is the only name it accepts.
-      say(`Checking ${modelLabel(model)} with ${nameOf(choice)}…`);
+      say(model ? `Checking ${modelLabel(model)} with ${nameOf(choice)}…` : `Asking ${nameOf(choice)} which models your key can use…`);
       const result = await modelsFor(choice);
       if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
       // A key pasted for another provider: its own card is selected in a moment, with its models.
       if (result.reason === "mismatch") { say("That key belongs to another provider, so its card is selected. Check the model, then press Save and start.", "warn"); return; }
+      if (result.unreachable && choice.custom) { say(unreachableNote(choice), "warn"); vault.focus(); return; }
       if (result.models?.length) {
+        if (!model) {
+          renderModels(mergeModels(choice.models, result.models), "");
+          model = chosenModel();
+        }
         const listed = listedId(model, result.models);
         if (!listed) {
           renderModels(mergeModels(choice.models, result.models), "");
@@ -570,6 +580,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
         }
         model = listed;
       }
+      if (!model) { say("Choose a model, or type its name.", "warn"); modelOther.hidden = false; modelOther.focus(); return; }
       const done = await vault.ask("commit");
       if (!done?.ok || !done.status?.active) { say(commitProblem(done?.reason, choice), "warn"); vault.focus(); return; }
       const active = done.status.active;
