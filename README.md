@@ -420,7 +420,7 @@ Measured on a desktop with Node.js v24.18.0 and no AI model. The baseline is a p
 
 ### 5 · Signed stamps (ES256)
 
-Agent Customs publishes signed inspection stamps ([`receipts/index.json`](https://montbaga.github.io/agent-customs/receipts/index.json)) for the public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json). Each stamp is signed with an ECDSA P-256 key, lasts 35 days, and records the network's fingerprint, so anyone can check it is genuine and still matches the live network. A GitHub workflow signs fresh ones every month.
+Agent Customs publishes signed inspection stamps ([`receipts/index.json`](https://montbaga.github.io/agent-customs/receipts/index.json)) for the public networks listed in [`tools/receipt-sites.json`](tools/receipt-sites.json). Each stamp is signed with an ECDSA P-256 key, lasts 35 days, and records the network's fingerprint, so anyone can check it is genuine and still matches the live network. A GitHub workflow signs fresh ones every month, and again after each publish for any network that changed, so the stamps on these networks never go out of date.
 
 ```sh
 npm run receipts -- verify https://montbaga.github.io/agent-customs/receipts/agent-customs-range.github.io/shady_pizza/shady_pizza.json --live

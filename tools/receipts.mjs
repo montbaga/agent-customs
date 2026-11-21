@@ -2,6 +2,9 @@
 //
 //   npm run receipts -- key       make the signing key (once)
 //   npm run receipts -- sign      inspect every network in tools/receipt-sites.json and sign a stamp
+//   npm run receipts -- sign --if-changed
+//                                 sign only networks whose fingerprint or verdict changed, or
+//                                 whose stamp has less than 10 days left; write nothing otherwise
 //   npm run receipts -- verify <receipt file or address> [--live]
 //
 // The private key is read from the AGENT_CUSTOMS_SIGNING_KEY environment variable (as on
@@ -15,6 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeSigningKey, receiptFromReport, receiptPath, signReceipt, verifyReceipt } from "../site/customs/receipts.js";
 import { inspectWeb } from "./inspect-local.mjs";
+import { stampStillApplies } from "./stamp-renewal.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE_URL = "https://montbaga.github.io/agent-customs/";
@@ -70,17 +74,25 @@ async function sign() {
   const now = new Date();
   const index = [];
   const previous = existsSync(path.join(RECEIPTS_DIR, "index.json")) ? (await readJson(path.join(RECEIPTS_DIR, "index.json"))).receipts : [];
+  const onlyChanged = flag("--if-changed");
+  let newStamps = 0;
   for (const network of networks) {
+    const kept = previous.find((e) => e.network === network);
     let report;
     try {
       report = await inspectWeb(network);
     } catch (error) {
       // Keep the last stamp: a network that is down for a moment loses nothing.
-      const kept = previous.find((e) => e.network === network);
       if (kept) index.push(kept);
       console.log(`  skipped ${network}${kept ? " (kept its last stamp)" : ""}: ${error.message}`);
       continue;
     }
+    if (onlyChanged && stampStillApplies(kept, report, { now })) {
+      index.push(kept);
+      console.log(`  unchanged                ${network}`);
+      continue;
+    }
+    newStamps += 1;
     const signed = await signReceipt(receiptFromReport(report, { keyId: published.keyId, site: SITE_URL, now }), secret);
     const check = await verifyReceipt(signed, published.publicKey);
     if (!check.valid) throw new Error(`The signing key does not match the published public key (${check.reason}).`);
@@ -91,11 +103,17 @@ async function sign() {
       fingerprint: signed.receipt.fingerprint, inspectedAt: signed.receipt.inspectedAt, expiresAt: signed.receipt.expiresAt });
     console.log(`  ${signed.receipt.stamp.padEnd(24)} ${network}`);
   }
+  // With nothing re-signed, the files stay as they are, so the run after a stamps-only publish
+  // finds nothing to save and the chain stops there.
+  if (onlyChanged && !newStamps) {
+    console.log("Every stamp still applies; nothing was signed.");
+    return;
+  }
   await writeFile(path.join(RECEIPTS_DIR, "index.json"), JSON.stringify({
     about: "Signed Agent Customs stamps. Check them with the public key at .well-known/agent-customs-key.json.",
     issuer: "Agent Customs", site: SITE_URL, keyId: published.keyId, signedAt: now.toISOString(), receipts: index,
   }, null, 2) + "\n");
-  console.log(`Signed ${index.length} stamp(s) into ${path.relative(ROOT, RECEIPTS_DIR)}/`);
+  console.log(`Signed ${newStamps} new stamp(s); ${index.length} in ${path.relative(ROOT, RECEIPTS_DIR)}/`);
 }
 
 async function load(where) {
