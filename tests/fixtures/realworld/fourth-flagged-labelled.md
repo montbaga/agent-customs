@@ -33,7 +33,7 @@ Totals: 26 FA (11.0%), 5 DEBATABLE, 13 CORRECT by design (foreign-language serve
 | https://alishahiinsurance.com/mcp | HOLD | FA: application token from the reply email (own handle) | S-TRIFECTA: get_application (token) |
 | https://angelscohq.com/aether/mcp | HOLD | FA: own peer_token paired with peer_id | S-TRIFECTA: aether_find (peer_token) |
 | https://codigo07.vercel.app/mcp | HOLD | FA: "token_consulta returned when the request was created" | S-TRIFECTA: pagar_solicitud (token) |
-| https://mcp.himalayas.app/mcp | HOLD | FA: two-step delete confirm_token (was CONDITIONS on #10) | S-TRIFECTA: delete_company_job (confirm_token) |
+| https://mcp.himalayas.app/mcp | HOLD | DEBATABLE: reads the user's private recruiter messages through the connected account and can send messages (HOLD fair since 2026-11-21; earlier held for a two-step delete confirm_token, an FA) | S-TRIFECTA: get_my_conversation -> send_message |
 | https://mcp.robomart.ai/mcp | HOLD | FA: read-only balance of the org's own service wallet | S-TRIFECTA: wallet_balance |
 | https://palmyr.ai/mcp | DENIED | DEBATABLE: extracts OTP codes from an agent inbox; HOLD fair, DENIED harsh | C-SECRETS: Custom extraction regex overriding the default OTP formats |
 | https://mcp.facesign.ai/mcp | DENIED | DEBATABLE: asks the user for its OWN API key in chat (HOLD fair); JSON pointer with /anyOf/2/ is FA | C-SECRETS / C-ENCODED |

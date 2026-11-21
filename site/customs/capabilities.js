@@ -130,9 +130,44 @@ function schemaParamSensitivity({ key, type, description }, ctx) {
 }
 const SENSITIVE_DESC = /\b(?:private\s+(?:documents?|notes|photos|messages)|(?:user|visitor|customer)'?s?\s+(?:private\s+)?(?:files|documents|notes|photos)|environment settings?|environment variables?|api credentials?|database credentials?|private files?|secret keys?|ssh keys?|(?:read|reads|load|loads|fetch|fetches|dump|dumps|extract|extracts|get|gets|access|accesses|collect|collects|steal|steals)\s+(?:the\s+|host\s+|local\s+|user\s+)?(?:env(?:ironment)?(?:\s+vars?)?|\.env|credentials?|cookies?|access\s+tokens?|config(?:uration)?\s+files?|private\s+data))\b/i;
 const EGRESS_TOOL = /\b(?:http post|post to url|post url|send to url|http request|post data|send email|send message|post message|send reply|send to|send webhook|webhook|notify(?: team)?|dispatch|exfil|upload|export data|publish|write file|push data|transfer funds|transfer domain|domain transfer|send telemetry)\b/i;
-const OWN_STORE_TOOL = /\b(?:upload|write file|export data|push data)\b/i;
-const EGRESS_TO_OTHERS_TOOL = /\b(?:http post|post to url|post url|send to url|http request|post data|send email|send message|post message|send reply|send to|send webhook|webhook|notify|dispatch|exfil|publish|transfer funds|transfer domain|domain transfer|send telemetry)\b/i;
-const EGRESS_PARAM_URL =/\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient|target|post)\s*(?:url|uri|webhook|hook|email))\b/i;
+// Tool names that send to an address the caller chooses, or to people.
+const SENDS_ANYWHERE_TOOL = /\b(?:http post|post to url|post url|send to url|http request|post data|send e ?mails?|send (?:a )?(?:message|sms|text)s?|send to|send webhook|webhook|exfil|transfer funds|send telemetry|notify team|share|forward)\b/i;
+// A tool named for passing something on. An invite carries an email address, not data, so
+// inviting is not sending.
+const SHARES_OUT_NAME = /\b(?:share|send|forward)\b/i;
+const RECIPIENT_PARAM = /^(?:to|recipients?|share with|cc|bcc|forward to|send to|destination)$/i;
+// Names that read files or card details, which may be the service's own (files uploaded to it,
+// a card product's coverage) or a person's (files on their computer, their saved card). Only the
+// second is sensitive. Inboxes and messages stay sensitive by name.
+const OWNED_DATA_NAME = /^(?:read files?|list files?|bank accounts?|payment methods?|credit cards?)$/i;
+const OWNED_DATA = /\b(?:files?|documents?|docs|notes|photos|pictures|e-?mails?|mails?|mailbox|inbox|messages?|dms?|chats?|contacts?|address\s+book|calendar|drive|order\s+history|bookmarks|browsing\s+history|payment\s+methods?|cards?|bank\s+accounts?)\b/i;
+const READ_VERB = /\b(?:read|reads|reading|list|lists|get|gets|fetch|fetches|search|searches|return|returns|access|accesses|scan|scans|sync|syncs|load|loads|view|views|query|queries|pull|pulls)\b/i;
+// The reading verb takes the data as its object, a few words on: "read the latest emails in …",
+// not "a prefix is a search … your address book". "Download to your computer" goes the other way.
+const READS_DATA = /\b(?:read|reads|reading|list|lists|get|gets|fetch|fetches|search|searches|return|returns|access|accesses|scan|scans|sync|syncs|load|loads|view|views|query|queries|pull|pulls)\b(?:\s+[\w'’-]+){0,6}?\s+(?:files?|documents?|docs|notes|photos|pictures|e-?mails?|mails?|mailbox|inbox|messages?|dms?|chats?|contacts?|address\s+book|calendar|drive|order\s+history|bookmarks|browsing\s+history|payment\s+methods?|cards?|bank\s+accounts?)\b/i;
+// "The server cannot read the user's disk" says the opposite.
+const DENIES_ACCESS = /\b(?:cannot|can['’]t|never|doesn['’]t|does\s+not|won['’]t|will\s+not|isn['’]t|is\s+not|no\s+access)\b/i;
+// Whose data. A person's own mail and messages ("the user's latest emails"), or data kept
+// somewhere else (their computer, their Gmail or Drive, an address book). "Their docs", "opens
+// WhatsApp" or "the user's notes" in the service itself are not enough.
+const PERSON_IN_NAME = /\b(?:user|users|my|personal|private|local|computer|gmail|outlook|drive|dropbox|onedrive|icloud)\b/i;
+// An agent's own inbox on an agents' network ("your agent's inbox") is not a person's mail.
+const PERSON_COMMS = /\b(?:user['’]s|users['’]|your|personal|private)(?!\s+agent)(?:\s+[\w-]+){0,2}?\s+(?:e-?mails?|mails?|inbox|mailbox|messages|dms|texts|sms|chats)\b/i;
+const PERSON_PLACE = /\b(?:e-?mail\s+account|address\s+book|computer|laptop|hard\s+drive|file\s?system|local\s+(?:files?|folders?|disk|machine)|saved\s+cards?|stored\s+cards?|cards?\s+on\s+file)\b|\b(?:user['’]s|users['’]|your|their|connected|linked)(?:\s+[\w-]+){0,2}?\s+(?:gmail|outlook|google\s+drive|dropbox|onedrive|icloud|whatsapp|imessage|telegram|device|phone|machine|mailbox)\b/i;
+
+/** True when a tool's name or description says it reads a person's own mail, messages, files or contacts. */
+function readsSomeonesData(nameWords, description) {
+  if (READ_VERB.test(nameWords) && OWNED_DATA.test(nameWords) && PERSON_IN_NAME.test(nameWords)) return true;
+  if (/\baddress book\b/i.test(nameWords) && READ_VERB.test(nameWords)) return true;
+  // On a network of agents, "read your inbox" is the agent's own; it is a person's only when the
+  // sentence says so ("the user's", "personal", "private").
+  const personsComms = (s) => PERSON_COMMS.test(s)
+    && (!/\bagents?\b/i.test(s) || /\b(?:user['’]s|users['’]|personal|private)\b/i.test(s));
+  return String(description || "").split(/(?<=[.!?])\s+|\n+/)
+    .some((s) => READS_DATA.test(s) && !DENIES_ACCESS.test(s) && (personsComms(s) || PERSON_PLACE.test(s)));
+}
+
+const EGRESS_PARAM_URL = /\b(?:webhook(?:\s*url)?|callback(?:\s*url)?|exfil(?:\s*url)?|(?:destination|endpoint|upload|forward|recipient|target|post)\s*(?:url|uri|webhook|hook|email))\b/i;
 const EGRESS_PARAM_WEAK = /\b(?:destination|recipient|endpoint|callback|forward\s*to)\b/i;
 const EGRESS_PARAM_DESC_URL = /\b(?:url|uri|webhook|endpoint|https?|e-?mail)\b/i;
 const EGRESS_DESC = /\b(?:send|sends|post|posts|upload|uploads|transmit|transmits|forward|forwards|push|pushes|stream|streams|relay|relays|export|exports|ship|ships|submit|submits|deliver|delivers|exfiltrate|exfiltrates)\b[^.!?\n]{0,45}\b(?:webhook|callback|external\s+(?:url|endpoint|server|host|api)|remote\s+(?:url|endpoint|server|host)|https?:\/\/|url\s+you\s+(?:give|provide|pass|specify)|destination\s+url|configured\s+address|team|channel)\b|\b(?:send|sends)\s+(?:a\s+)?(?:real\s+)?(?:e-?mail|reply|message|link)\s+to\b|\b(?:post|posts|send|sends|upload|uploads)\b[^.!?\n]{0,30}\bto\s+any\s+(?:url|address|endpoint|server|host|webhook)\b|\b(?:telemetry\s+payload|notify\s+team|send\s+telemetry|webhook\s+url)\b/i;
@@ -202,10 +237,20 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
     // The description decides: a "wallet_balance" tool that "transfers it" moves money.
     const walletReadOnly = sensitiveMatch && /wallet/i.test(sensitiveMatch[0]) && !WALLET_CONTROL.test(toolText);
     const sensitiveToolName = Boolean(sensitiveMatch) && !NON_VISITOR_TOOL_SECRET.test(toolWords) && !onlyOwnCredentialLifecycle && !walletReadOnly;
-    if (sensitiveToolName || SENSITIVE_DESC.test(descWords) || SENSITIVE_DESC.test(schemaInfo.descWords) || agentToolHit) {
+    // Mail, files, messages or contacts count when they are a person's own ("the user's
+    // connected Gmail", "a file from their computer"). The same words for what the service keeps
+    // for itself (its support inbox, the images uploaded to it) do not.
+    // A server's general instructions describe every tool at once, so only a tool's own
+    // description (or a non-entry agent's instructions) says what that tool reads.
+    const rawDesc = [agent.function?.description, name === frontMan ? "" : agent.instructions].filter(Boolean).join(" ");
+    const readsPersonalData = readsSomeonesData(toolWords, rawDesc);
+    const ownDataOnly = sensitiveToolName && OWNED_DATA_NAME.test(sensitiveMatch[0]) && !readsPersonalData;
+    if ((sensitiveToolName && !ownDataOnly) || readsPersonalData || SENSITIVE_DESC.test(descWords) || SENSITIVE_DESC.test(schemaInfo.descWords) || agentToolHit) {
       sensitiveAccess.push({ source: name, kind: "sensitive_tool", detail: `"${name}" accesses potentially sensitive data, config, or files` });
     } else if (sensitiveMatch) {
-      exemptAccess.push({ source: name, kind: "sensitive_tool", detail: `"${name}" handles its own credentials or balances` });
+      exemptAccess.push({ source: name, kind: "sensitive_tool", detail: ownDataOnly
+        ? `"${name}" reads data the service keeps for itself`
+        : `"${name}" handles its own credentials or balances` });
     }
     if (sensitiveToolName && /^(?:secrets?|credentials?)$/i.test(sensitiveMatch[0]) && NO_SECRET_VALUES_RETURNED.test(descWords)) {
       // "Values are write-only and never returned": it lists names only. Only the tool's own
@@ -239,26 +284,33 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
     const toolExternalUrl = toolOffOriginUrl(agent, targetOrigin);
     const egressParams = schemaInfo.paramSpecs.filter(({ key, format, description }) => {
       const kw = splitWords(key);
+      const fmt = String(format || "").toLowerCase();
       if (EGRESS_PARAM_URL.test(kw)) return true;
       if (EGRESS_PARAM_WEAK.test(kw)) {
-        const fmt = String(format || "").toLowerCase();
         return fmt === "uri" || fmt === "url" || fmt === "email" || EGRESS_PARAM_DESC_URL.test(splitWords(description));
       }
+      // Who receives it: "to", "share_with", or the email field of a tool named share, send or forward.
+      // A "to" that is a wallet or contract address names where a transaction goes, not a person.
+      if (RECIPIENT_PARAM.test(kw)) return fmt === "email" || fmt === "uri" || fmt === "url" || /\b(?:e-?mail|url|phone|webhook|inbox)\b/i.test(description || "");
+      if (/^e-?mails?$/i.test(kw) && SHARES_OUT_NAME.test(toolWords)) return true;
       return false;
     }).map((p) => p.key);
-    // An MCP server's upload or write tool stores data on that server, which already receives
-    // every call. Only a way to send data on to someone else adds a path.
-    const storesOnServerOnly = protocol === "mcp" && OWN_STORE_TOOL.test(toolWords) && !EGRESS_TO_OTHERS_TOOL.test(toolWords)
-      && !EGRESS_DESC.test(descWords) && !hintRaisesEgress && !toolExternalUrl && !egressParams.length;
-    if (!storesOnServerOnly && (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length)) {
+    if (EGRESS_TOOL.test(toolWords) || EGRESS_DESC.test(descWords) || hintRaisesEgress || toolExternalUrl || egressParams.length) {
+      // A tool named "post", "publish", "upload" or "write" with no outside destination writes to
+      // the service itself, which already receives every call. Only a way to send data on to an
+      // address the caller chooses, or to people, adds a path.
+      const writesToServiceOnly = !toolExternalUrl && !egressParams.length && !hintRaisesEgress
+        && !EGRESS_DESC.test(descWords) && !SENDS_ANYWHERE_TOOL.test(toolWords);
       externalEgress.push({
         sink: toolExternalUrl || (egressParams.length ? `${name}(${egressParams[0]})` : name),
-        kind: toolExternalUrl ? "external_endpoint" : egressParams.length ? "egress_param" : "outbound_tool",
+        kind: toolExternalUrl ? "external_endpoint" : egressParams.length ? "egress_param" : writesToServiceOnly ? "own_write" : "outbound_tool",
         detail: toolExternalUrl
           ? `"${name}" sends tool requests off-origin (${toolExternalUrl})`
           : egressParams.length
             ? `"${name}" accepts external destination parameter(s) (${egressParams.slice(0, 3).join(", ")})`
-            : `"${name}" performs external or state-changing egress`,
+            : writesToServiceOnly
+              ? `"${name}" writes to the service itself`
+              : `"${name}" performs external or state-changing egress`,
       });
     }
 
@@ -310,7 +362,7 @@ export function analyzeCapabilities({ agents = [], itinerary = [], privacy = [],
 
   // Only treat external egress as a Trifecta when there is concrete sensitive access.
   const concreteSensitive = secrets.filter((s) => s.kind === "private_context" || s.kind === "sensitive_tool" || s.kind === "sensitive_param");
-  const concreteEgress = egress.filter((e) => e.kind !== "code_bundle");
+  const concreteEgress = egress.filter((e) => e.kind !== "code_bundle" && e.kind !== "own_write");
 
   const crossOriginEgress = concreteEgress.some((e) => externalStops.some((s) => e.sink === s.host) || e.kind === "rest_toolbox" || e.kind === "outbound_tool" || e.kind === "external_endpoint" || e.kind === "egress_param");
   const trifecta = inputs.length > 0 && concreteSensitive.length > 0 && concreteEgress.length > 0 && (crossOriginEgress || protocol === "mcp");
