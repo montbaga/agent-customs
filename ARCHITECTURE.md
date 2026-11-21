@@ -173,7 +173,7 @@ sequenceDiagram
 
 ## 7 · Signed stamps
 
-For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.json)), Agent Customs publishes stamps signed with an ECDSA P-256 key. The public half of the key sits at [`.well-known/agent-customs-key.json`](site/.well-known/agent-customs-key.json). Anyone can check that a stamp is genuine, is less than 35 days old, and still matches the network's live fingerprint (the **Verify** tab on the desk, or `npm run receipts -- verify`). A GitHub workflow signs fresh stamps every month.
+For public networks on a list ([`tools/receipt-sites.json`](tools/receipt-sites.json)), Agent Customs publishes stamps signed with an ECDSA P-256 key. The public half of the key sits at [`.well-known/agent-customs-key.json`](site/.well-known/agent-customs-key.json). Anyone can check that a stamp is genuine, is less than 35 days old, and still matches the network's live fingerprint (the **Verify** tab on the desk, or `npm run receipts -- verify`). A GitHub workflow signs fresh stamps every month, and after each publish it signs new ones for any listed network whose fingerprint or verdict changed.
 
 ---
 

@@ -1,39 +1,59 @@
-# On the 1st of each month, inspects the networks in tools/receipt-sites.json again, signs
-# fresh stamps (each is valid for 35 days), saves them and publishes the site.
-# Needs the repository secret AGENT_CUSTOMS_SIGNING_KEY: the contents of the private key
-# file made by `npm run receipts -- key`. Without that secret, nothing is signed.
+# Signs Agent Customs' stamps for the networks in tools/receipt-sites.json.
+# - After every publish of the site: re-signs only the networks whose fingerprint or verdict
+#   changed (or whose stamp has less than 10 days left), so a stamp never goes out of date.
+#   The publish that the new stamps start finds nothing changed, so the chain stops there.
+# - On the 1st of each month, and when started by hand: signs every stamp again (each is valid
+#   for 35 days).
+# Needs the repository secret AGENT_CUSTOMS_SIGNING_KEY: the contents of the private key file
+# made by `npm run receipts -- key`. Without that secret, nothing is signed.
 name: Sign fresh stamps
 
 on:
   schedule:
     - cron: "41 5 1 * *" # the 1st of each month at 05:41 UTC
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Publish the site"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: write
   actions: write
 
+concurrency:
+  group: stamps
+  cancel-in-progress: false
+
 jobs:
   sign:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # GitHub Pages serves files with a 10-minute cache, so right after a publish the old
+      # version may still be what a visitor gets. Signing waits until the new one is out.
+      - name: Wait for the published site to refresh
+        if: github.event_name == 'workflow_run'
+        run: sleep 660
       - name: Inspect and sign
         env:
           AGENT_CUSTOMS_SIGNING_KEY: ${{ secrets.AGENT_CUSTOMS_SIGNING_KEY }}
-        run: npm run receipts -- sign
-      - run: npm test
+        run: npm run receipts -- sign ${{ github.event_name == 'workflow_run' && '--if-changed' || '' }}
       # A push made with this workflow's token does not start other workflows, so the
       # publishing workflow is started by name.
-      - name: Save the stamps and publish the site
+      - name: Test, save the stamps and publish the site
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git add site/receipts
           if git diff --cached --quiet; then echo "No new stamps."; exit 0; fi
+          npm test
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git commit -m "Sign fresh stamps"
