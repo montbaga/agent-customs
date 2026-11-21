@@ -8,6 +8,7 @@ import { certificateFilename, certificateHtml, certificateMeta, certificateSvg, 
 import { matchesPin } from "./customs/diff.js";
 import { inspectNetworkUrl } from "./customs/inspect.js";
 import { verifyReceipt } from "./customs/receipts.js";
+import { wrongResultUrl } from "./wrong-result.js";
 
 const SEVERITY_TONE = { critical: "bad", high: "warn", medium: "caution", low: "info", info: "info" };
 const SEVERITY_RANK = ["critical", "high", "medium", "low", "info"];
@@ -608,6 +609,12 @@ function renderReportActions(report) {
     certificateSealIcon(cleared), h("span", null, certLabel)));
   bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(proofText(report), toast, "Proof copied.") }, "Copy proof"));
   bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(JSON.stringify({ ...report, snapshot: undefined }, null, 2), toast, "Report JSON copied.") }, "Copy JSON"));
+  const issue = wrongResultUrl(report);
+  if (issue) {
+    bar.append(h("a", { class: "button ghost small wrong-result", href: issue, target: "_blank", rel: "noopener noreferrer",
+      title: "Opens a public GitHub issue with this address and what was found. Nothing from your chat or keys is included." },
+    "Wrong result? Tell us"));
+  }
   bar.append(toast);
   return bar;
 }
@@ -1286,7 +1293,7 @@ function wireBuilderCodeTabs() {
   const snippets = {
     twolines: [
       "// At the top of site.js",
-      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/site/customs/guard.js\";",
+      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/site/customs/guard.js\";",
       "",
       "// Right after boot(), with any of the guard's options",
       "installCustomsGuard(booted.engine, { strict: true });",

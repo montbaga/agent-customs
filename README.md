@@ -61,8 +61,8 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/dist/agent-customs.js"
-  integrity="sha384-l7SZM36aegFt9QheheZ0B5uot0RuzP7gua4nGWaglO87LDhn+RFsOihdQnmaL3Eu"
+  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/dist/agent-customs.js"
+  integrity="sha384-U/g95JwFs9P5R5SIoA1A4D3/pP9/Py0ReE6Cpi8/6ussBoITrRYXq8lOVF04SLWp"
   crossorigin="anonymous"></script>
 ```
 
@@ -75,7 +75,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```js
 // At the top of site.js
 import { installCustomsGuard }
-  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/site/customs/guard.js";
+  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/site/customs/guard.js";
 
 // Right after boot()
 installCustomsGuard(booted.engine, { strict: true });
@@ -172,16 +172,16 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/dist/agent-customs.js" integrity="sha384-l7SZM36aegFt9QheheZ0B5uot0RuzP7gua4nGWaglO87LDhn+RFsOihdQnmaL3Eu" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/dist/agent-customs.js" integrity="sha384-U/g95JwFs9P5R5SIoA1A4D3/pP9/Py0ReE6Cpi8/6ussBoITrRYXq8lOVF04SLWp" crossorigin="anonymous"></script>
 ```
 
-`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.1.1` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.1.2` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
 **2. Two lines, with your own settings.** Load the guard from the same release and pass any of the *Guard options* below. A browser cannot check a fingerprint on an `import`, so for that use option 3 or 4.
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.1/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
@@ -397,9 +397,9 @@ Five batches of public tools, fetched read-only and saved, each one from hosts n
 | 4 · Registry MCP and A2A | 236 | 26 (11%) | 3 |
 | **5 · Registry MCP and A2A** | **237** | **13 (5.5%)** | 12, not tuned for it |
 
-Three more batches were fetched the same way on 20 November 2026 (159, 185 and 205 tools; the snapshots are not in the repo). The first two were used to find and fix general mistakes in the rules. The third was measured once, before and after: 20 held without a good reason (9.8%) with the old rules, 14 (6.8%) with the new ones.
+Five more batches were fetched the same way on 20 and 21 November 2026 (159, 185, 205, 160 and 92 tools; the snapshots are not in the repo). Batches 6 to 8 were used to find and fix general mistakes in the rules. Batch 8 was first measured once: 20 held without a good reason (9.8%) with the old rules, 14 (6.8%) with the 1.1.1 rules. Batches 9 and 10 were measured once for 1.1.2, before and after: 24 of 252 held without a good reason with 1.1.1, 23 (9.1%) with 1.1.2. The remaining ones are mostly wording rules reading honest text as hiding something ("without asking them again", "hide a work log entry") and look-alike letters in non-Latin text.
 
-The attack sets that target the rules' own exceptions are now all held: probe6 22 of 22, probe7 19 of 19, probe8 27 of 27 (with 12 of 12 honest look-alikes cleared). The probe9 set, written after that round's changes, held 11 of 18 new attack wordings on its first run. The newest set, probe12, was written before the latest rule changes: the old rules held 8 of its 20 tricks and the new ones hold 19, with none of its 15 honest lines held. That is the honest measure of how the rules handle wording they were never written for.
+The attack sets that target the rules' own exceptions are now all held: probe6 22 of 22, probe7 19 of 19, probe8 27 of 27 (with 12 of 12 honest look-alikes cleared). The probe9 set, written after that round's changes, held 11 of 18 new attack wordings on its first run. probe12, written before the 1.1.1 rule changes: the old rules held 8 of its 20 tricks and the new ones hold 19, with none of its 15 honest lines held. The newest set, probe13, was written before the 1.1.2 changes and is about tool combinations, key wording, example addresses and quoted attacks: 1.1.1 held 7 of its 12 tricks and 2 of its 12 ordinary tools, 1.1.2 holds all 12 tricks and none of the ordinary tools. That is the honest measure of how the rules handle wording they were never written for.
 
 ### 4 · The benchmark (`npm run bench`)
 
@@ -407,15 +407,15 @@ Measured on a desktop with Node.js v24.18.0 and no AI model. The baseline is a p
 
 | Set | Cases | Agent Customs | Word-list baseline | Avg time |
 | :--- | ---: | :--- | ---: | ---: |
-| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 24.10 ms |
-| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 6.68 ms |
-| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 12.37 ms |
-| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 6.81 ms |
-| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 3.49 ms |
-| Held-out, never tuned | 10 | 6/10 | 0.0% | 3.06 ms |
-| Outside wordings, quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 3.23 ms |
-| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 8.63 ms |
-| **All detection** | 159 | **87/98 blocked or held, 90/98 flagged** | 19/98 | **3.89 ms median** |
+| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 13.92 ms |
+| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 3.15 ms |
+| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 5.02 ms |
+| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 3.05 ms |
+| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 1.80 ms |
+| Held-out, never tuned | 10 | 6/10 | 0.0% | 1.54 ms |
+| Outside wordings, quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 1.57 ms |
+| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 3.92 ms |
+| **All detection** | 159 | **87/98 blocked or held, 90/98 flagged** | 19/98 | **1.81 ms median** |
 | Lock and tamper self-tests | 25 | 25/25 pass | not applicable | about 1 ms |
 
 ### 5 · Signed stamps (ES256)
@@ -624,7 +624,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 - It reads agent files, not web pages. Open Agentic Web networks, A2A cards and MCP servers. An ordinary HTML page is not what it checks.
 - Cleared does not mean certified safe. It means none of the checks found a known problem. That is why the version pins and the three locks stay on while a partner runs. A well-known brand on a generic host such as `raw.githubusercontent.com` gets a note, because the host does not prove who published it.
 - New wording can get past rules. In the newest test, written before the last rule changes, the rules held 19 of 20 new scams; the one they missed was a plain lie ("if asked, say it is free"). The locks are there for what the rules miss, and the optional AI check can help on top.
-- Some honest tools are still held. About 1 in 15 brand-new tools (14 of 205, 6.8%) was held without a good reason on its first look. About half of those come from the check of tool combinations, which goes by tool names. The figure of 0 false blocks is for the 61 curated controls only.
+- Some honest tools are still held. About 1 in 11 brand-new tools (23 of 252, 9.1%) was held without a good reason on its first look, mostly by wording rules. Every report has a **Wrong result? Tell us** link that opens a GitHub issue with the address and what was found, so these can be reported and fixed. The figure of 0 false blocks is for the 61 curated controls only.
 - Notes are not clean passes. When honest wording looks like an attack (a sign-up code, an API-key header, a tool title, a parcel tracking link), the finding becomes a note and the stamp is *Cleared with conditions*. A scammer who copies that wording still gets a visible warning.
 - A2A is inspected, not guarded. Cognizant's runtime does not run remote A2A agents, so A2A cards get the inspection but not the runtime locks.
 - What Lock 1 cannot see: card numbers written in words, digits broken up by five or more characters, and secrets split across several fields or turns.

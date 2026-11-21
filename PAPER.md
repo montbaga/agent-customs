@@ -20,7 +20,7 @@
 
 <img alt="Tests: 205 passing" src="https://img.shields.io/badge/tests-205_passing-ece4d3?labelColor=0c1d18">
 <img alt="Bench: 88.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-88.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18">
-<img alt="Unseen real tools: 6.8% false alarms" src="https://img.shields.io/badge/unseen_real_tools-6.8%25_false_alarms-f0a35e?labelColor=0c1d18">
+<img alt="Unseen real tools: 9.1% false alarms" src="https://img.shields.io/badge/unseen_real_tools-9.1%25_false_alarms-f0a35e?labelColor=0c1d18">
 <img alt="Model tokens: 0" src="https://img.shields.io/badge/model_tokens-0-ece4d3?labelColor=0c1d18">
 
 </div>
@@ -33,7 +33,7 @@
 >
 > Agent Customs reads those files first, in the browser, with fixed rules. It stamps the partner, remembers the approved version, and keeps three locks on while it runs.
 >
-> In the benchmark it blocks or holds **87 of 98** attacks (88.8%) and blocks **none of 61** honest controls, at no model cost and a median of 3.89 ms. On **205 public MCP servers and A2A cards it had never seen**, 14 (6.8%) were held without a good reason. Attack wording the rules were never written for can still get through: in the latest test, written before the rules were changed, they held 19 of 20 new scams, and the one they missed is a plain lie that only the AI double-check can judge. That is why the runtime locks exist.
+> In the benchmark it blocks or holds **87 of 98** attacks (88.8%) and blocks **none of 61** honest controls, at no model cost and a median of 1.81 ms. On **252 public MCP servers and A2A cards it had never seen** (batches 9 and 10), 23 (9.1%) were held without a good reason. Attack wording the rules were never written for can still get through: in the latest test, written before the rules were changed, they held 19 of 20 new scams, and the one they missed is a plain lie that only the AI double-check can judge. That is why the runtime locks exist.
 
 <br>
 
@@ -104,15 +104,15 @@ Every number below follows the same routine. New test data is saved in its own c
 
 | Set | Cases | Agent Customs | Word-list baseline | Avg time |
 | :--- | ---: | :--- | ---: | ---: |
-| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 24.10 ms |
-| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 6.68 ms |
-| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 12.37 ms |
-| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 6.81 ms |
-| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 3.49 ms |
-| Internal held-out (never tuned) | 10 | 6/10 | 0.0% | 3.06 ms |
-| External quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 3.23 ms |
-| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 8.63 ms |
-| **All detection** | 159 | **87/98 blocked or held, 90/98 flagged** | 19/98 | **3.89 ms median** |
+| Round 1 · Unicode tricks | 12 | 12/12 blocked or held | 58.3% | 13.92 ms |
+| Round 1 · injection and phishing | 24 | 24/24 | 16.7% | 3.15 ms |
+| Round 1 · A2A and MCP | 6 | 4/6 (6/6 flagged with notes) | 33.3% | 5.02 ms |
+| Round 2 · red team (3/24 before fixes) | 24 | 23/24 (24/24 flagged) | 20.8% | 3.05 ms |
+| Round 3 · fresh wordings (0/15 before fixes) | 15 | 15/15 | 0.0% | 1.80 ms |
+| Internal held-out (never tuned) | 10 | 6/10 | 0.0% | 1.54 ms |
+| External quoted (0/7 before format rules) | 7 | 3/7 | 14.3% | 1.57 ms |
+| **Honest controls** | 61 | **0 blocked** (57 cleared, 4 with notes) | 8.2% blocked | 3.92 ms |
+| **All detection** | 159 | **87/98 blocked or held, 90/98 flagged** | 19/98 | **1.81 ms median** |
 | Lock and tamper self-tests | 25 | 25/25 pass | not applicable | about 1 ms |
 
 ### 5.2 Real MCP servers and A2A cards
@@ -128,7 +128,9 @@ Each batch is a fresh random sample of public servers from the official MCP Regi
 | **5 · 190 Registry MCP + 47 A2A** | **237** | **13 (5.5%) on `a247319`**; about 25 (10.5%) on `cae4a77` | Not tuned for it; 12 after the batch 6 and 7 fixes |
 | 6 · 140 Registry MCP + 19 A2A | 159 | 12 (7.5%) on `f09ab17` | 5; used to find general mistakes |
 | 7 · 152 Registry MCP + 33 A2A | 185 | 18 (9.7%) on `f09ab17` | 10; used to find general mistakes |
-| **8 · 164 Registry MCP + 41 A2A** | **205** | **20 (9.8%) on `f09ab17`** | **14 (6.8%), measured once, not tuned** |
+| 8 · 164 Registry MCP + 41 A2A | 205 | 20 (9.8%) on `f09ab17` | 14 (6.8%) on `63406cc`, measured once; 10 after the 1.1.2 fixes |
+| **9 · 133 Registry MCP + 27 A2A** | **160** | **13 (8.1%) on `63406cc`** | **12, measured once, not tuned** |
+| **10 · 92 Registry MCP** | **92** | **11 (12.0%) on `63406cc`** | **11, measured once, not tuned** |
 
 The rate on a first look fell from about one tool in three to about one in eighteen. Batch 4 came out higher than batch 3 (11% against 6.5%), and the rules before it scored about the same on it (24 of 236), so batch 3 was partly an easy sample. Batch 5 is the honest number for the current rules. A small extra sample of 57 Registry servers, taken after the batch-1 fixes, gave 9 false alarms (15.8%).
 

@@ -574,12 +574,11 @@ test("a wording exception softens a finding to a note, never deletes it", () => 
   }
 });
 
-test("probe10, probe11 and probe12: attacks held and look-alikes not held, apart from the listed misses", async () => {
-  // Plain lies ("if asked, say it is free") are left to the AI double-check, and an attack
-  // detector that quotes "ignore previous instructions" outside brackets is still held.
-  const known = new Set(["lie about data sharing", "say it is free", "attack detector quoting an example"]);
+test("probe10 to probe13: attacks held and look-alikes not held, apart from the listed misses", async () => {
+  // Plain lies ("if asked, say it is free") are left to the AI double-check.
+  const known = new Set(["lie about data sharing", "say it is free"]);
   const wrong = [];
-  for (const name of ["probe10", "probe11", "probe12"]) {
+  for (const name of ["probe10", "probe11", "probe12", "probe13"]) {
     const mod = await import(`./fixtures/realworld/${name}-cases.mjs`);
     const host = mod[`${name.toUpperCase()}_HOST`];
     for (const [part, label, tools] of mod[`${name.toUpperCase()}_CASES`]) {
