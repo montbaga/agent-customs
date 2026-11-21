@@ -303,7 +303,11 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   };
   const choiceOf = (entry) => (entry && !entry.custom && choiceForProvider(entry.name)) || OTHER;
   const setupChoice = setup ? choiceOf({ name: setup.provider, custom: setup.provider === CUSTOM_SERVICE }) : null;
-  const savedModelFor = (choice) => (setupChoice?.id === choice.id ? setup.model : "");
+  const savedModelFor = (choice) => {
+    if (setupChoice?.id !== choice.id) return "";
+    if (choice.custom && (otherProvider || CUSTOM_SERVICE) !== setup.provider) return "";
+    return setup.model;
+  };
   const hasSaved = (choice) => (held()?.saved || []).some((s) => choiceOf(s).id === choice.id);
 
   // Cards: native radio buttons, so arrow keys and screen readers work as usual. A card whose
@@ -413,6 +417,9 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   };
 
   cards.addEventListener("change", () => show(selected()));
+  root.querySelector('input[name="mp-model"][value="other"]')?.closest(".mp-card")?.addEventListener("click", () => {
+    if (selected().custom && otherProvider) show(OTHER);
+  });
   modelSelect.addEventListener("change", () => {
     modelOther.hidden = !!modelSelect.value;
     if (!modelSelect.value) modelOther.focus();
@@ -463,6 +470,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
 
   vault?.on((event, data) => {
     if (event === "status") {
+      if (selected().custom && otherProvider && data?.selection?.provider === CUSTOM_SERVICE) {
+        otherProvider = "";
+        keyLink.hidden = true;
+        if (keyOther) keyOther.hidden = false;
+        renderModels([], "");
+        say("");
+      }
       refreshCards();
       layout(refreshCurrent());
     } else if (event === "detected") {
@@ -608,9 +622,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   body.hidden = mode !== "open";
   layout(mode);
   refreshCards();
-  // A key under "Other" that belongs to a service the vault knows by name (Otari) keeps that name.
-  show(setupChoice || choiceForProvider("Google AI Studio"),
-    { provider: setupChoice === OTHER && setup.provider !== CUSTOM_SERVICE ? setup.provider : "" });
+  // A key under "Other" that belongs to a service the vault knows by name (Otari) keeps that name
+  // while that key is still saved in the vault.
+  const savedOtherProvider = setupChoice === OTHER && setup.provider !== CUSTOM_SERVICE
+    && (held()?.saved || []).some((s) => s.name === setup.provider)
+    ? setup.provider
+    : "";
+  show(setupChoice || choiceForProvider("Google AI Studio"), { provider: savedOtherProvider });
 
   // Back from Save and start's reload. view.js reopened the Officer tab before anything drew;
   // the status line above the picker may have changed height since, so settle once more.

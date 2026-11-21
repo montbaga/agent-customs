@@ -407,6 +407,7 @@ async function unlock() {
 
 async function forget() {
   const router = selectedRouter();
+  const removedName = nameFor(router);
   const s = readSession();
   const box = readBox();
   const remembered = !!s.keys[router]?.remembered || !!box?.saved?.some((e) => e.router === router);
@@ -424,7 +425,8 @@ async function forget() {
     }
   }
   clearDraft();
-  say(`The ${nameFor(router)} key is gone from the vault.`);
+  if (selection.provider.startsWith("Otari")) selection = { provider: CUSTOM };
+  say(`The ${removedName} key is gone from the vault.`);
 }
 
 function forgetBox() {
@@ -628,6 +630,9 @@ keyInput.addEventListener("input", () => {
   draftKey = keyInput.value.trim();
   clearTimeout(typing);
   typing = setTimeout(() => {
+    if (!draftKey && selection.provider.startsWith("Otari") && !status().selection.saved) {
+      selection = { provider: CUSTOM };
+    }
     const own = ownProviderForDraft();
     changed();
     if (!draftKey) return;
