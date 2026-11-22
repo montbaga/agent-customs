@@ -55,6 +55,7 @@ test("only Agent Customs may use the published vault; pages on this computer may
     assert.equal(allowedPage(other, "agent-customs-vault.github.io"), false, other);
   }
   assert.equal(allowedPage("http://127.0.0.1:8080", "127.0.0.1"), true);
+  assert.equal(allowedPage("http://127.0.0.1:8080", "localhost"), true);
   assert.equal(allowedPage("http://localhost:8080", "localhost"), true);
   assert.equal(allowedPage("https://evil.example", "127.0.0.1"), false);
 });
@@ -123,7 +124,7 @@ test("a passkey's secret bytes open the box; other bytes do not", async () => {
 
 test("a published page uses the published vault; a page on this computer uses a local one", () => {
   assert.equal(vaultAddress({ hostname: "montbaga.github.io" }), "https://agent-customs-vault.github.io/");
-  assert.equal(vaultAddress({ hostname: "127.0.0.1" }), "http://127.0.0.1:8090/");
+  assert.equal(vaultAddress({ hostname: "127.0.0.1" }), "http://localhost:8090/");
   assert.equal(vaultAddress({ hostname: "localhost" }), "http://localhost:8090/");
   assert.equal(CUSTOM_SERVICE, "custom");
   assert.notEqual(VAULT_KEY, "demo", "the runtime treats 'demo' as no key at all");
@@ -251,4 +252,28 @@ test("both pages allow only their own scripts, and all HTML the site writes goes
   assert.match(vaultPolicy, /default-src 'none'; script-src 'self'; style-src 'self'/);
   assert.match(vaultPolicy, /base-uri 'none'/);
   assert.match(vaultPolicy, /require-trusted-types-for 'script'; trusted-types 'none'/, "the vault writes no HTML at all");
+});
+
+test("model-list errors keep their HTTP code separately from the vault status", async () => {
+  const { vault } = connectedVault((data, _port, main) => {
+    if (data.type === "models" && data.kind === "bad400") {
+      main.postMessage({ id: data.id, reply: { ok: false, code: 400, rejected: true, status: { state: "empty", active: null, saved: [] } } });
+    } else if (data.type === "models") {
+      main.postMessage({ id: data.id, reply: { ok: false, code: 401, status: { state: "empty", active: null, saved: [] } } });
+    } else if (data.type === "flush") {
+      main.postMessage({ id: data.id, reply: { ok: true, status: { state: "empty", active: null, saved: [], selection: { provider: "Otari", draft: true } } } });
+    }
+  });
+  await vault.ready;
+  const flushed = await vault.ask("flush");
+  assert.equal(flushed.ok, true);
+  assert.equal(flushed.status.selection.provider, "Otari");
+  const models = await vault.ask("models");
+  assert.equal(models.ok, false);
+  assert.equal(models.code, 401);
+  assert.equal(models.status.state, "empty");
+  const bad400 = await vault.ask("models", { kind: "bad400" });
+  assert.equal(bad400.code, 400);
+  assert.equal(bad400.rejected, true);
+  vault.port.close();
 });

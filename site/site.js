@@ -50,7 +50,7 @@ export class AssistantMount {
         vault?.ready,
       ]);
       addProviders(API_KEY_PROVIDERS);
-      const setup = readModelSetup();
+      let setup = readModelSetup();
       if (setup && vault?.status) await vault.ask("use", setup);
       // Never a saved key: the practice site, on this same address, saves keys the old way.
       const booted = await boot("#agent-app", {
@@ -103,7 +103,10 @@ export class AssistantMount {
       status.hidden = needsKey;
       const picker = document.querySelector("#model-picker");
       if (picker) {
-        mountModelPicker(picker, { engine, providers: API_KEY_PROVIDERS, app: document.querySelector("#agent-app"), vault, setup, legacy: legacyKeys(byok) });
+        mountModelPicker(picker, {
+          engine, providers: API_KEY_PROVIDERS, app: document.querySelector("#agent-app"), vault, setup, legacy: legacyKeys(byok),
+          onSetup: (next) => { setup = next; desk.connectAi({ judge, model, ...aiState() }); },
+        });
       }
       if (!needsKey) AssistantMount.greet();
       return engine;
