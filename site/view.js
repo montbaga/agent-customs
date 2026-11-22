@@ -589,7 +589,7 @@ function renderReportActions(report) {
   const pinnedNow = matchesPin(pin, report.snapshot);
   if (report.snapshot) {
     if (pinnedNow) {
-      bar.append(h("button", { type: "button", class: "ghost",
+      bar.append(h("button", { type: "button", class: "danger",
         onclick: () => changeApproval(() => desk.unpin(report.target.url), "Approval forgotten. Its next use is inspected as new."),
       }, "Forget approval"));
     } else {

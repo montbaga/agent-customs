@@ -440,7 +440,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     ? `Could not reach ${nameOf(choice)} at that address. Check the service address (for example https://api.example.com/v1) and that it allows browser requests.`
     : `Could not reach ${nameOf(choice)}. Check the service address or your connection, then try again.`;
 
-  const saveActionWords = () => (change.hidden ? "Save and start" : "Keep this model or Save and start");
+  const startLabel = (sel = selection()) => {
+    const readySaved = !!(sel?.saved && !sel.locked && !sel.draft);
+    if (!currentSetup || !readySaved) return "Save and start";
+    const same = sel.router === currentSetup.router && chosenModel() === currentSetup.model && held()?.active?.router === currentSetup.router;
+    return same ? "Keep this model" : "Use this model";
+  };
+  const saveActionWords = () => startLabel();
   // Show the key's models in the list, keeping the chosen one when the key can use it.
   let request = 0;
   const listForKey = async (choice) => {
@@ -535,6 +541,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!modelSelect.value) modelOther.focus();
     syncActions();
   });
+  modelOther.addEventListener("input", () => syncActions());
 
   const officerTab = document.querySelector("#tab-officer");
   const syncOfficerTab = (locked) => {
@@ -580,8 +587,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
         current.dataset.tone = "warn";
         current.textContent = `Your saved ${selLabel} key is locked; unlock it below. (${nowNote})`;
       } else if (sel?.saved && !sel.draft) {
-        const action = mode === "in-use" ? "Keep this model or Save and start" : "Save and start";
-        current.textContent = `Your saved ${selLabel} key is unlocked; press ${action} below to use it. (${nowNote})`;
+        current.textContent = `Your saved ${selLabel} key is unlocked; press ${startLabel(sel)} below to use it. (${nowNote})`;
       } else {
         current.textContent = `${needPhrase} (${nowNote})`;
       }
@@ -621,9 +627,9 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   };
   const syncActions = () => {
     const sel = selection();
-    const readySaved = !!(sel?.saved && !sel.locked && !sel.draft);
     change.setAttribute("aria-expanded", String(!body.hidden));
-    change.textContent = body.hidden ? "Change model" : (readySaved ? "Keep this model" : "Cancel");
+    change.textContent = body.hidden ? "Change model" : "Cancel";
+    start.textContent = startLabel(sel);
     syncForget();
   };
   const layout = (mode) => {
@@ -776,7 +782,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
         const listed = listedId(model, result.models);
         if (!listed) {
           renderModels(mergeModels(choice.models, result.models), "");
-          say(`Your key cannot use ${modelLabel(model)}. Pick one of the ${result.models.length} models in the list, then press Keep this model or Save and start.`, "warn");
+          say(`Your key cannot use ${modelLabel(model)}. Pick one of the ${result.models.length} models in the list, then press ${startLabel(sel)}.`, "warn");
           modelSelect.focus();
           return false;
         }
@@ -826,6 +832,18 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       }
       if (choice.custom && !otherProvider && !sel.router) { say(commitProblem("address", choice), "warn"); vault.focus(); return; }
       if (!sel.draft && sel.locked) { say(commitProblem("locked", choice), "warn"); vault.focus(); return; }
+      if (currentSetup && sel.saved && !sel.locked && !sel.draft) {
+        const sameRouter = sel.router === currentSetup.router && held()?.active?.router === currentSetup.router;
+        const sameModel = chosenModel() === currentSetup.model;
+        if (sameRouter && sameModel) {
+          body.hidden = true;
+          say("");
+          syncActions();
+          return;
+        }
+        await activateSavedChoice(choice);
+        return;
+      }
       let model = chosenModel();
       // Save under the name the provider lists, which is the only name it accepts.
       say(model ? `Checking ${modelLabel(model)} with ${nameOf(choice)}…` : `Asking ${nameOf(choice)} which models your key can use…`);
@@ -894,34 +912,16 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     }
   });
 
-  change.addEventListener("click", async () => {
+  change.addEventListener("click", () => {
     if (body.hidden) {
       body.hidden = false;
       syncActions();
       listForKey(selected());
       return;
     }
-    const sel = selection();
-    const readySaved = !!(sel?.saved && !sel.locked && !sel.draft);
-    if (!readySaved) {
-      body.hidden = true;
-      if (setupChoice) show(setupChoice, setupChoice.custom ? { provider: savedOtherProvider(currentSetup?.provider) } : {});
-      syncActions();
-      return;
-    }
-    const sameRouter = sel.router === currentSetup?.router;
-    const sameModel = chosenModel() === currentSetup?.model;
-    if (sameRouter && sameModel && held()?.active?.router === currentSetup?.router) {
-      body.hidden = true;
-      syncActions();
-      return;
-    }
-    change.disabled = true;
-    try {
-      await activateSavedChoice(selected());
-    } finally {
-      change.disabled = false;
-    }
+    body.hidden = true;
+    if (setupChoice) show(setupChoice, setupChoice.custom ? { provider: savedOtherProvider(currentSetup?.provider) } : {});
+    syncActions();
   });
 
   const switchedOnLoad = reconcileSetup();
