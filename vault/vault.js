@@ -748,10 +748,20 @@ function replaceButton() {
 }
 
 function stateCard(name, title, detail, ...primary) {
+  const buttons = primary.filter(Boolean);
+  const hasInput = buttons.includes(unlockInput);
+  const another = anotherAddressButton();
+  const secondary = [replaceButton(), another, forgetButton(name)].filter(Boolean);
+  if (hasInput) {
+    return el("div", { class: "state" },
+      el("p", null, el("strong", null, title), detail),
+      el("div", { class: "actions" }, ...buttons),
+      el("div", { class: "actions actions-fill" }, ...secondary));
+  }
+  const all = [...buttons, ...secondary];
   return el("div", { class: "state" },
     el("p", null, el("strong", null, title), detail),
-    el("div", { class: "actions" }, ...primary),
-    el("div", { class: "actions" }, replaceButton(), anotherAddressButton(), forgetButton(name)));
+    el("div", { class: all.length === 4 ? "actions actions-grid" : "actions actions-fill" }, ...all));
 }
 
 function visitRow(name) {
