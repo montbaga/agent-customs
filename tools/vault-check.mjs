@@ -38,6 +38,10 @@ const ai = http.createServer(async (req, res) => {
   let body = "";
   for await (const chunk of req) body += chunk;
   seen.push({ path: req.url, auth: req.headers.authorization || "", origin: req.headers.origin || "" });
+  if (req.headers.authorization === "Bearer wrong-key-400") {
+    reply(res, 400, JSON.stringify({ error: { code: 400, message: "Please pass a valid API key", status: "INVALID_ARGUMENT" } }));
+    return;
+  }
   if (req.headers.authorization !== `Bearer ${KEY}`) { reply(res, 401, JSON.stringify({ error: { message: "invalid api key" } })); return; }
   if (req.url === "/v1/models") { reply(res, 200, JSON.stringify({ data: [{ id: "stand-in-model" }] })); return; }
   if (req.url !== "/v1/chat/completions") { reply(res, 404, "{}"); return; }
@@ -111,9 +115,14 @@ try {
   await b.waitFor("/Paste your key first/.test(document.querySelector('#mp-status').textContent)", 5000);
   check((await inVault("document.activeElement?.id")) === "key", "an empty Other form asks for the key first and focuses it");
 
-  // A rejected key surfaces its 401 refusal instead of failing silently, and does not save.
+  // A rejected key (401 or 400 INVALID_ARGUMENT) surfaces its refusal instead of saving.
   await inVault(`(() => {
     const a = document.querySelector('#address'); a.value = ${JSON.stringify(AI)}; a.dispatchEvent(new Event('change'));
+    const k = document.querySelector('#key'); k.value = "wrong-key-400"; k.dispatchEvent(new Event('input')); return true; })()`);
+  await b.evaluate("document.querySelector('#mp-start').click(); true");
+  await b.waitFor("/did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
+  check(true, "a 400 invalid-key refusal is shown and never saves");
+  await inVault(`(() => {
     const k = document.querySelector('#key'); k.value = "wrong-stand-in-key"; k.dispatchEvent(new Event('input')); return true; })()`);
   await b.evaluate("document.querySelector('#mp-start').click(); true");
   await b.waitFor("/did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
@@ -206,7 +215,7 @@ try {
   const alone = await b.evaluate("document.body.textContent.trim() + ' | inputs: ' + document.querySelectorAll('input').length");
   check(/Open it from Agent Customs/.test(alone) && /inputs: 0/.test(alone), "the vault opened on its own takes no key", alone.slice(0, 90));
 
-  const problems = b.problems.filter((p) => !/the server responded with a status of 401|ERR_NAME_NOT_RESOLVED/.test(p));
+  const problems = b.problems.filter((p) => !/the server responded with a status of (?:400|401)|ERR_NAME_NOT_RESOLVED/.test(p));
   check(problems.length === 0, "no page errors or blocked scripts", problems.slice(0, 3).join(" / "));
 } catch (error) {
   failures.push(String(error.message || error));

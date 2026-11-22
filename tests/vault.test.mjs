@@ -255,7 +255,9 @@ test("both pages allow only their own scripts, and all HTML the site writes goes
 
 test("model-list errors keep their HTTP code separately from the vault status", async () => {
   const { vault } = connectedVault((data, _port, main) => {
-    if (data.type === "models") {
+    if (data.type === "models" && data.kind === "bad400") {
+      main.postMessage({ id: data.id, reply: { ok: false, code: 400, rejected: true, status: { state: "empty", active: null, saved: [] } } });
+    } else if (data.type === "models") {
       main.postMessage({ id: data.id, reply: { ok: false, code: 401, status: { state: "empty", active: null, saved: [] } } });
     } else if (data.type === "flush") {
       main.postMessage({ id: data.id, reply: { ok: true, status: { state: "empty", active: null, saved: [], selection: { provider: "Otari", draft: true } } } });
@@ -269,5 +271,8 @@ test("model-list errors keep their HTTP code separately from the vault status", 
   assert.equal(models.ok, false);
   assert.equal(models.code, 401);
   assert.equal(models.status.state, "empty");
+  const bad400 = await vault.ask("models", { kind: "bad400" });
+  assert.equal(bad400.code, 400);
+  assert.equal(bad400.rejected, true);
   vault.port.close();
 });

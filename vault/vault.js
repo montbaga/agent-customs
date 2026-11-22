@@ -207,9 +207,11 @@ async function handle(type, message) {
 
 function select({ provider, keepDraft = false }) {
   const next = provider === CUSTOM || providerNamed(provider) ? provider : selection.provider;
-  if (next !== selection.provider && !(keepDraft && providerForKey(draftKey)?.name === next)) clearDraft();
+  if (next !== selection.provider) {
+    if (!(keepDraft && providerForKey(draftKey)?.name === next)) clearDraft();
+    notice = { text: "", tone: "" };
+  }
   selection = { provider: next };
-  notice = { text: "", tone: "" };
   clearTimeout(armed);
   armed = 0;
   if (next === CUSTOM && !addressInput.value.trim()) {
@@ -263,7 +265,13 @@ async function listModels() {
   touch();
   try {
     const response = await fetch(`${router}/models`, { cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", headers: providerHeaders(router, key, false) });
-    if (!response.ok) return { ok: false, code: response.status };
+    if (!response.ok) {
+      const detail = response.status === 400 ? await response.text().catch(() => "") : "";
+      const rejected = response.status === 401
+        || response.status === 403
+        || (response.status === 400 && /key|auth|token|credential|invalid_argument|permission|unauthorized/i.test(detail));
+      return { ok: false, code: response.status, rejected };
+    }
     const body = await response.json();
     return { ok: true, ids: (Array.isArray(body?.data) ? body.data : []).map((m) => String(m?.id || "").trim()).filter(Boolean) };
   } catch {
@@ -420,6 +428,8 @@ async function forget(router = selectedRouter()) {
   const s = readSession();
   const box = readBox();
   const remembered = !!s.keys[router]?.remembered || !!box?.saved?.some((e) => e.router === router);
+  const wasActive = s.active === router || !s.active;
+  const hadDraftForRemoved = router === selectedRouter();
   delete s.keys[router];
   if (s.active === router) s.active = "";
   writeSession(s);
@@ -433,11 +443,23 @@ async function forget(router = selectedRouter()) {
       forgetBox();
     }
   }
-  if (router === selectedRouter()) {
-    clearDraft();
-    if (selection.provider.startsWith("Otari")) selection = { provider: CUSTOM };
+  const latest = readSession();
+  const nextBox = readBox();
+  if (wasActive) {
+    latest.active = Object.keys(latest.keys)[0] || nextBox?.saved?.[0]?.router || "";
+    writeSession(latest);
   }
-  if (!Object.keys(readSession().keys).length) panel = "";
+  if (hadDraftForRemoved) {
+    clearDraft();
+    if (latest.active) {
+      const nextProvider = providerAt(latest.active);
+      selection = { provider: nextProvider ? nextProvider.name : CUSTOM };
+      addressInput.value = nextProvider ? "" : latest.active;
+    } else if (selection.provider.startsWith("Otari")) {
+      selection = { provider: CUSTOM };
+    }
+  }
+  if (!Object.keys(latest.keys).length) panel = "";
   say(`The ${removedName} key is gone from the vault.`);
 }
 

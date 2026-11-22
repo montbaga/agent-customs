@@ -226,6 +226,7 @@ export function explainProviderError(text, provider = "The AI provider", model =
 }
 
 const SETUP_KEY = "agent-customs-model";
+const ROUTER_MODELS_KEY = "agent-customs-router-models";
 
 /** {provider, router, model} saved with Save and start, or null. provider may be "custom". */
 export function readModelSetup(storage = globalThis.localStorage) {
@@ -240,6 +241,28 @@ export function readModelSetup(storage = globalThis.localStorage) {
 
 export function saveModelSetup({ provider, router, model }, storage = globalThis.localStorage) {
   try { storage?.setItem(SETUP_KEY, JSON.stringify({ provider, router, model })); } catch { /* storage blocked */ }
+}
+
+export function clearModelSetup(storage = globalThis.localStorage) {
+  try { storage?.removeItem(SETUP_KEY); } catch { /* storage blocked */ }
+}
+
+function readRouterModel(router, storage = globalThis.localStorage) {
+  try {
+    const map = JSON.parse(storage?.getItem(ROUTER_MODELS_KEY) || "null");
+    return typeof map?.[router] === "string" ? map[router] : "";
+  } catch {
+    return "";
+  }
+}
+
+function saveRouterModel(router, model, storage = globalThis.localStorage) {
+  if (!router || !model) return;
+  try {
+    const map = JSON.parse(storage?.getItem(ROUTER_MODELS_KEY) || "{}") || {};
+    map[router] = model;
+    storage?.setItem(ROUTER_MODELS_KEY, JSON.stringify(map));
+  } catch { /* storage blocked */ }
 }
 
 /**
@@ -276,7 +299,7 @@ const hostOf = (url) => { try { return new URL(url).host; } catch { return ""; }
  * :param options: {engine, providers, app, vault, setup, legacy}. engine is null when the
  *   runtime failed to load; vault.status is null when the vault did not load.
  */
-export function mountModelPicker(root, { engine, providers, app, vault, setup = null, legacy = null }) {
+export function mountModelPicker(root, { engine, providers, app, vault, setup = null, legacy = null, onSetup = null }) {
   const $ = (selector) => root.querySelector(selector);
   const cards = $("#mp-cards");
   const current = $("#mp-current");
@@ -291,6 +314,8 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const safety = $("#mp-safety");
   const legacyNote = $("#mp-legacy");
 
+  let currentSetup = setup;
+  if (currentSetup?.router && currentSetup?.model) saveRouterModel(currentSetup.router, currentSetup.model);
   const held = () => vault?.status || null;
   const selection = () => held()?.selection || null;
   // A key with no card of its own (Otari's) goes under "Other", by its provider's name.
@@ -302,11 +327,21 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     return sel && (sel.provider !== CUSTOM_SERVICE || sel.router) ? sel.name : "that service";
   };
   const choiceOf = (entry) => (entry && !entry.custom && choiceForProvider(entry.name)) || OTHER;
-  const setupChoice = setup ? choiceOf({ name: setup.provider, custom: setup.provider === CUSTOM_SERVICE }) : null;
+  let setupChoice = currentSetup ? choiceOf({ name: currentSetup.provider, custom: currentSetup.provider === CUSTOM_SERVICE }) : null;
+  let hadSavedKeys = !!(held()?.saved?.length);
   const savedModelFor = (choice) => {
     if (setupChoice?.id !== choice.id) return "";
-    if (choice.custom && (otherProvider || CUSTOM_SERVICE) !== setup.provider) return "";
-    return setup.model;
+    if (choice.custom && (otherProvider || CUSTOM_SERVICE) !== currentSetup.provider) return "";
+    return currentSetup.model;
+  };
+  const fallbackModelFor = (entry) => {
+    if (!entry) return "";
+    const remembered = readRouterModel(entry.router);
+    if (remembered) return remembered;
+    const known = providers.find((p) => p.router === entry.router);
+    if (known?.model) return known.model;
+    const card = choiceOf(entry);
+    return card?.models?.[0]?.id || "";
   };
   const hasSaved = (choice) => (held()?.saved || []).some((s) => choiceOf(s).id === choice.id);
   const savedOtherProvider = (preferred = "") => {
@@ -359,7 +394,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     const result = await vault.ask("models");
     if (result?.ok) return { models: chatModels(result.ids) };
     const code = result?.code ?? (typeof result?.status === "number" ? result.status : undefined);
-    if (code === 401 || code === 403) return { rejected: true };
+    if (result?.rejected || code === 401 || code === 403) return { rejected: true };
     if (code === 0) return { models: null, unreachable: true };
     return { models: null, reason: result?.reason || "", status: code || 0 };
   };
@@ -448,8 +483,8 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       return "closed";
     }
     const active = s.active;
-    const model = modelLabel(setup?.model) || "the site's model";
-    if (setup && active && active.router === setup.router) {
+    const model = modelLabel(currentSetup?.model) || "the site's model";
+    if (currentSetup && active && active.router === currentSetup.router) {
       const via = active.custom ? hostOf(active.router) : active.name;
       if (s.state === "locked") {
         current.dataset.tone = "warn";
@@ -459,8 +494,8 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       current.textContent = `In use: ${model}, through ${via}. Your key is in the key vault.`;
       return "in-use";
     }
-    if (setup) {
-      const via = setup.provider === CUSTOM_SERVICE ? hostOf(setup.router) : setup.provider;
+    if (currentSetup) {
+      const via = currentSetup.provider === CUSTOM_SERVICE ? hostOf(currentSetup.router) : currentSetup.provider;
       current.textContent = `The key vault has no ${via} key in this tab. Paste it below to use ${model} again.`;
       return "open";
     }
@@ -478,8 +513,47 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     change.textContent = body.hidden ? "Change model" : "Keep this model";
   };
 
+  const applyRuntimeModel = (model) => {
+    if (engine) engine.modelOverride = model;
+    const input = app?.querySelector("#ns-model");
+    if (input) input.value = model;
+  };
+  const reconcileSetup = () => {
+    const saved = held()?.saved || [];
+    if (saved.length) hadSavedKeys = true;
+    const active = held()?.active || null;
+    if (!currentSetup || saved.some((s) => s.router === currentSetup.router)) return null;
+    if (active && active.router !== currentSetup.router) {
+      const nextModel = fallbackModelFor(active);
+      currentSetup = { provider: active.custom ? CUSTOM_SERVICE : active.name, router: active.router, model: nextModel };
+      setupChoice = choiceOf(active);
+      saveModelSetup(currentSetup);
+      applyRuntimeModel(nextModel);
+      onSetup?.(currentSetup);
+      return { kind: "switched", active, model: nextModel };
+    }
+    if (hadSavedKeys && !saved.length && !active) {
+      clearModelSetup();
+      currentSetup = null;
+      setupChoice = null;
+      hadSavedKeys = false;
+      applyRuntimeModel("");
+      onSetup?.(null);
+      return { kind: "cleared" };
+    }
+    return null;
+  };
+
   vault?.on((event, data) => {
     if (event === "status") {
+      const reconciled = reconcileSetup();
+      if (reconciled?.kind === "switched") {
+        const { active, model } = reconciled;
+        refreshCards();
+        layout(refreshCurrent());
+        show(setupChoice, { provider: active.custom ? "" : active.name, model, note: `Switched back to ${active.name}.` });
+        return;
+      }
       if (selected().custom && otherProvider && data?.selection?.provider === CUSTOM_SERVICE) {
         otherProvider = "";
         keyLink.hidden = true;
@@ -518,7 +592,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
         for (const node of record.addedNodes) {
           if (!(node instanceof HTMLElement) || !node.classList.contains("ns-msg") || node.dataset.explained) continue;
           const via = held()?.active?.name;
-          const info = explainProviderError(node.textContent, via, modelLabel(setup?.model) || undefined);
+          const info = explainProviderError(node.textContent, via, modelLabel(currentSetup?.model) || undefined);
           if (!info) continue;
           node.dataset.explained = "true";
           const advice = document.createElement("p");
@@ -531,7 +605,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
           more.append(label, code);
           node.replaceChildren(advice, more);
           current.dataset.tone = "warn";
-          current.textContent = `In use: ${modelLabel(setup?.model) || "the site's model"}. Its last request failed; see the chat, or choose another model.`;
+          current.textContent = `In use: ${modelLabel(currentSetup?.model) || "the site's model"}. Its last request failed; see the chat, or choose another model.`;
         }
       }
     }).observe(msgs, { childList: true });
@@ -598,7 +672,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
       // A key pasted for another provider: its own card is selected in a moment, with its models.
       if (result.reason === "mismatch") { say("That key belongs to another provider, so its card is selected. Check the model, then press Save and start.", "warn"); return; }
-      if (result.unreachable && choice.custom) { say(unreachableNote(choice), "warn"); vault.focus(); return; }
+      if (result.unreachable) { say(unreachableNote(choice), "warn"); if (choice.custom) vault.focus(); return; }
       if (result.models?.length) {
         if (!model) {
           renderModels(mergeModels(choice.models, result.models), "");
@@ -618,6 +692,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       if (!done?.ok || !done.status?.active) { say(commitProblem(done?.reason, choice), "warn"); vault.focus(); return; }
       const active = done.status.active;
       saveModelSetup({ provider: active.custom ? CUSTOM_SERVICE : active.name, router: active.router, model });
+      saveRouterModel(active.router, model);
       // Come back here after the reload, without the browser restoring the old position.
       try {
         sessionStorage.setItem(RETURN_KEY, String(Date.now()));
@@ -637,14 +712,20 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!body.hidden) listForKey(selected());
   });
 
+  const switchedOnLoad = reconcileSetup();
   const mode = refreshCurrent();
   body.hidden = mode !== "open";
   layout(mode);
   refreshCards();
   // A key under "Other" that belongs to a service the vault knows by name (Otari) keeps that name
   // while that key is still saved in the vault.
-  const initialOther = setupChoice === OTHER && setup.provider !== CUSTOM_SERVICE ? savedOtherProvider(setup.provider) : "";
-  show(setupChoice || choiceForProvider("Google AI Studio"), { provider: initialOther });
+  const initialOther = setupChoice === OTHER && currentSetup?.provider !== CUSTOM_SERVICE
+    ? savedOtherProvider(currentSetup?.provider)
+    : "";
+  show(setupChoice || choiceForProvider("Google AI Studio"), {
+    provider: initialOther,
+    ...(switchedOnLoad?.kind === "switched" ? { model: switchedOnLoad.model, note: `Switched back to ${switchedOnLoad.active.name}.` } : {}),
+  });
 
   // Back from Save and start's reload. view.js reopened the Officer tab before anything drew;
   // the status line above the picker may have changed height since, so settle once more.
