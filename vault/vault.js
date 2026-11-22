@@ -503,12 +503,16 @@ async function newPasskeyLock() {
       user: { id: randomBytes(16), name: "Agent Customs key vault", displayName: "Agent Customs key vault" },
       challenge: randomBytes(32),
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-      authenticatorSelection: { userVerification: "required", residentKey: "discouraged" },
-      extensions: { prf: { eval: { first: prfSalt } } },
+      authenticatorSelection: { userVerification: "required", residentKey: "preferred" },
+      extensions: { prf: {} },
     },
   });
   const prf = credential.getClientExtensionResults().prf;
-  if (!prf?.enabled) throw new Error("This passkey cannot lock the vault. Choose a password instead.");
+  if (!prf?.enabled) {
+    const err = new Error("This passkey cannot lock the vault. Choose a password below instead.");
+    err.usePassword = true;
+    throw err;
+  }
   const id = new Uint8Array(credential.rawId);
   const output = prf.results?.first || await passkeyOutput(id, prfSalt);
   return { kind: "passkey", key: await passkeyLock(output), credential: toBase64(id), prfSalt: toBase64(prfSalt) };
@@ -560,7 +564,8 @@ function showOnly(text) {
 }
 
 function focusField() {
-  const target = $("#vault [data-focus]")
+  const target = (panel === "replace" && keyInput.isConnected && keyInput)
+    || $("#vault [data-focus]")
     || (selection.provider === CUSTOM && draftKey && !ownProviderForDraft() && !selectedRouter() ? addressInput : keyInput);
   target.focus({ preventScroll: true });
   if (window.scrollY) window.scrollTo(0, 0);
@@ -570,16 +575,23 @@ async function run(label, work) {
   if (busy) return;
   busy = label;
   render();
+  let focusPassword = false;
   try {
     await work();
   } catch (error) {
+    if (error?.usePassword) {
+      lockChoice = "password";
+      panel = "remember";
+      focusPassword = true;
+    }
     const message = error?.name === "NotAllowedError" ? "The passkey was cancelled."
-      : error?.name === "SecurityError" ? "Passkeys need localhost or a domain name (not an IP address). Choose a password, or open localhost instead."
+      : error?.name === "SecurityError" ? "Passkeys need localhost or a domain name (not an IP address). Choose a password instead."
       : String(error?.message || error);
     say(message, "warn");
   } finally {
     busy = "";
     changed();
+    if (focusPassword && passwordInput.isConnected) passwordInput.focus({ preventScroll: true });
   }
 }
 
@@ -635,7 +647,7 @@ function render() {
       el("span", { class: "dot", "aria-hidden": "true" }),
       `The vault sends your key only to ${name}.`));
     if (panel === "replace" && !draftKey) {
-      rows.push(el("div", { class: "actions" }, button("Cancel", () => { panel = ""; changed(); })));
+      rows.push(el("div", { class: "actions" }, button("Cancel", () => { panel = ""; notice = { text: "", tone: "" }; changed(); })));
     }
   } else {
     rows.push(el("p", { id: "key-note", class: "note" },
@@ -696,6 +708,7 @@ function replaceButton() {
 function visitRow(name) {
   const rememberClick = () => {
     panel = "remember";
+    lockChoice = "";
     notice = { text: "", tone: "" };
     render();
     if (panelLock() === "password") passwordInput.focus();
@@ -728,13 +741,18 @@ function lockedRow(name, box, router) {
   else delete unlockInput.dataset.focus;
   return el("div", { class: "state" },
     el("p", null, el("strong", null, `Your saved ${name} key is locked.`), passkey ? " Your passkey opens it." : " Type the vault password to open it."),
-    el("div", { class: "actions" }, passkey ? null : unlockInput, unlockButton, replaceButton(), anotherAddressButton()),
-    el("div", { class: "actions" }, forgetButton(name)));
+    el("div", { class: "actions" },
+      passkey ? null : unlockInput,
+      unlockButton,
+      passkey ? replaceButton() : null,
+      passkey ? anotherAddressButton() : null,
+      passkey ? forgetButton(name) : null),
+    passkey ? null : el("div", { class: "actions" }, replaceButton(), anotherAddressButton(), forgetButton(name)));
 }
 
 function rememberPanel() {
   const choose = (kind) => el("label", { class: "choice" },
-    el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: render }),
+    el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: (e) => { lockChoice = e.target.value; render(); } }),
     kind === "passkey" ? "With a passkey: your fingerprint, face or device PIN" : "With a password");
   const usePassword = panelLock() === "password";
   return el("div", { class: "state" },
@@ -746,15 +764,13 @@ function rememberPanel() {
       el("p", { class: "hint" }, "Nobody can recover it. If you forget it, paste your key again.")) : null,
     el("div", { class: "actions" },
       button(busy === "remember" ? "Locking…" : "Remember it", () => run("remember", () => remember(panelLock())), { kind: "primary" }),
-      button("Cancel", () => { panel = ""; passwordInput.value = ""; render(); })),
+      button("Cancel", () => { panel = ""; lockChoice = ""; notice = { text: "", tone: "" }; passwordInput.value = ""; render(); })),
     el("p", { class: "hint" }, "Safest: a free-tier key, or one with a spending limit."));
 }
 
 let lockChoice = "";
 function panelLock() {
   if (!passkeyReady) return "password";
-  const picked = document.querySelector('#vault input[name="lock"]:checked')?.value;
-  if (picked) lockChoice = picked;
   return lockChoice || "passkey";
 }
 
