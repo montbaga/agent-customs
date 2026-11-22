@@ -199,12 +199,14 @@ try {
   const again = await chat("hello once more");
   check(/stand-in AI/.test(again), "after unlocking, the officer answers again", again.slice(0, 80));
 
-  // 5. Switch to another card while a saved key is active: kept notice shows cleanly without duplicating the vault state.
+  // 5. Collapsed bar shows Forget for the active service; open card switching hides it so empty cards never show a phantom Forget button.
+  await b.evaluate("if (!document.querySelector('#mp-body').hidden) document.querySelector('#mp-change')?.click(); true");
+  await b.waitFor("!document.querySelector('#mp-forget').hidden && /Forget 127\\.0\\.0\\.1:8099 key/.test(document.querySelector('#mp-forget').textContent)", 10000);
   await b.evaluate("if (document.querySelector('#mp-body').hidden) document.querySelector('#mp-change')?.click(); true");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"gemini\"]').click(); true");
-  await b.waitFor("!document.querySelector('#mp-forget').hidden", 10000);
+  await b.waitFor("document.querySelector('#mp-forget').hidden", 10000);
   await waitInVault("/Your saved 127\\.0\\.0\\.1:8099 key stays stored when you switch\\./.test(document.body.textContent) && !document.body.querySelector('.state')", 10000);
-  check(true, "switching cards shows one header Forget button and the kept-key notice without duplicating the vault state");
+  check(true, "collapsed header names its Forget button and open card switching keeps Forget inside saved cards only");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
   await b.waitFor("document.querySelector('#mp-forget').hidden", 10000);
   await waitInVault("/Forget this key/.test(document.body.textContent)", 10000);

@@ -437,6 +437,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     ? `Could not reach ${nameOf(choice)} at that address. Check the service address (for example https://api.example.com/v1) and that it allows browser requests.`
     : `Could not reach ${nameOf(choice)}. Check the service address or your connection, then try again.`;
 
+  const saveActionWords = () => (change.hidden ? "Save and start" : "Keep this model or Save and start");
   // Show the key's models in the list, keeping the chosen one when the key can use it.
   let request = 0;
   const listForKey = async (choice) => {
@@ -448,7 +449,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
         say(`Your ${nameOf(choice)} key is ready in the vault. Pick a model above, then press Save and start.`);
       } else if (inactiveSaved) {
         const modelText = chosenModel() ? ` (${modelLabel(chosenModel())})` : "";
-        say(`Saved ${nameOf(choice)} key${modelText}. Press Keep this model or Save and start to use it.`);
+        say(`Saved ${nameOf(choice)} key${modelText}. Press ${saveActionWords()} to use it.`);
       } else if (savedEntry && sel?.locked && !sel.draft) {
         const modelText = chosenModel() ? ` (${modelLabel(chosenModel())})` : "";
         say(`Locked ${nameOf(choice)} key${modelText}. Unlock below to use it.`);
@@ -464,13 +465,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
     if (result.unreachable) { say(unreachableNote(choice), "warn"); return; }
     if (!result.models?.length) {
-      say(inactiveSaved && wanted ? `Saved ${nameOf(choice)} key (${modelLabel(wanted)}). Press Keep this model or Save and start to use it.` : "");
+      say(inactiveSaved && wanted ? `Saved ${nameOf(choice)} key (${modelLabel(wanted)}). Press ${saveActionWords()} to use it.` : "");
       return;
     }
     const kept = renderModels(mergeModels(choice.models, result.models), wanted);
     const count = `${result.models.length} model${result.models.length === 1 ? "" : "s"}`;
     say(kept || !wanted
-      ? `Your key can use ${count}. Pick one, then press Keep this model or Save and start.`
+      ? `Your key can use ${count}. Pick one, then press ${saveActionWords()}.`
       : `Your key cannot use ${modelLabel(wanted)}. It can use the ${count} in the list; ${modelLabel(chosenModel())} is selected.`);
   };
 
@@ -550,7 +551,10 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       const via = active.custom ? hostOf(active.router) : active.name;
       if (s.state === "locked") {
         current.dataset.tone = "warn";
-        current.textContent = `Chosen: ${model}, through ${via}. Its saved key is locked; unlock it below.`;
+        const viewingActive = body.hidden || selection()?.router === active.router;
+        current.textContent = viewingActive
+          ? `Chosen: ${model}, through ${via}. Its saved key is locked; unlock it below.`
+          : `Chosen: ${model}, through ${via} (locked). Select ${choiceOf(active).title} to unlock it, or switch below.`;
         return "open";
       }
       current.textContent = `In use: ${model}, through ${via}. Your key is in the key vault.`;
@@ -565,18 +569,18 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     return "open";
   };
   let forgetArmed = 0;
+  const activeVia = (active) => (active ? (active.custom ? hostOf(active.router) : active.name) : "");
+  const headerForgetLabel = (active) => (active ? `Forget ${activeVia(active)} key` : "Forget key");
   const syncForget = () => {
     if (!forgetBtn) return;
     const active = held()?.active;
-    const sel = selection();
-    const inVaultHasForget = !body.hidden && !!(sel?.saved || sel?.locked);
-    const showHeader = !!active && !inVaultHasForget;
+    const showHeader = !!active && body.hidden;
     forgetBtn.hidden = !showHeader;
     if (!showHeader && forgetArmed) {
       clearTimeout(forgetArmed);
       forgetArmed = 0;
-      forgetBtn.textContent = "Forget key";
     }
+    if (!forgetArmed) forgetBtn.textContent = headerForgetLabel(active);
   };
   const syncActions = () => {
     const sel = selection();
@@ -834,14 +838,14 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!forgetArmed) {
       forgetArmed = setTimeout(() => {
         forgetArmed = 0;
-        forgetBtn.textContent = "Forget key";
+        forgetBtn.textContent = headerForgetLabel(held()?.active);
       }, 4000);
-      forgetBtn.textContent = "Click again to forget";
+      forgetBtn.textContent = `Click again to forget ${activeVia(active)}`;
       return;
     }
     clearTimeout(forgetArmed);
     forgetArmed = 0;
-    forgetBtn.textContent = "Forget key";
+    forgetBtn.textContent = headerForgetLabel(held()?.active);
     forgetBtn.disabled = true;
     try {
       await vault?.ask("forget", { router: active.router });
