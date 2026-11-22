@@ -379,11 +379,14 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       if (!tag) continue;
       const entry = saved.find((s) => choiceOf(s).id === choice.id);
       if (active && choiceOf(active).id === choice.id) {
-        tag.textContent = active.locked || statusNow.state === "locked" ? "Locked" : "In use";
+        const locked = active.locked || statusNow.state === "locked";
+        tag.textContent = locked ? "Locked" : "In use";
+        tag.dataset.state = locked ? "locked" : "active";
         tag.hidden = false;
         continue;
       }
       tag.textContent = entry?.locked ? "Locked" : "Saved";
+      tag.dataset.state = entry?.locked ? "locked" : "saved";
       tag.hidden = !entry;
     }
   };
@@ -533,9 +536,16 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     syncActions();
   });
 
+  const officerTab = document.querySelector("#tab-officer");
+  const syncOfficerTab = (locked) => {
+    if (!officerTab) return;
+    if (locked) officerTab.dataset.state = "locked";
+    else delete officerTab.dataset.state;
+  };
   // What the officer uses now, and whether the steps need to be open.
   const refreshCurrent = () => {
     current.dataset.tone = "";
+    syncOfficerTab(false);
     if (!engine) {
       current.textContent = "The assistant could not load. Report, Compare and Verify still work.";
       return "closed";
@@ -555,6 +565,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (currentSetup && active && active.router === currentSetup.router) {
       const via = active.custom ? hostOf(active.router) : active.name;
       const mode = s.state === "locked" ? "open" : "in-use";
+      syncOfficerTab(s.state === "locked");
       if (body.hidden || sel?.router === active.router) {
         if (s.state === "locked") {
           current.dataset.tone = "warn";
@@ -603,7 +614,10 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       clearTimeout(forgetArmed);
       forgetArmed = 0;
     }
-    if (!forgetArmed) forgetBtn.textContent = headerForgetLabel(active);
+    if (!forgetArmed) {
+      delete forgetBtn.dataset.armed;
+      forgetBtn.textContent = headerForgetLabel(active);
+    }
   };
   const syncActions = () => {
     const sel = selection();
@@ -861,13 +875,16 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!forgetArmed) {
       forgetArmed = setTimeout(() => {
         forgetArmed = 0;
+        delete forgetBtn.dataset.armed;
         forgetBtn.textContent = headerForgetLabel(held()?.active);
       }, 4000);
+      forgetBtn.dataset.armed = "true";
       forgetBtn.textContent = `Click again to forget ${activeVia(active)}`;
       return;
     }
     clearTimeout(forgetArmed);
     forgetArmed = 0;
+    delete forgetBtn.dataset.armed;
     forgetBtn.textContent = headerForgetLabel(held()?.active);
     forgetBtn.disabled = true;
     try {

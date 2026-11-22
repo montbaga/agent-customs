@@ -611,8 +611,8 @@ async function run(label, work) {
   }
 }
 
-function button(text, onclick, { kind = "ghost", focus = false } = {}) {
-  return el("button", { type: "button", class: `${kind} small`, onclick, disabled: !!busy, "data-focus": focus || null }, text);
+function button(text, onclick, { kind = "ghost", focus = false, armed: isArmed = false } = {}) {
+  return el("button", { type: "button", class: `${kind} small`, onclick, disabled: !!busy, "data-focus": focus || null, "data-armed": isArmed ? "true" : null }, text);
 }
 
 function clearDraftAndNotify() {
@@ -778,13 +778,13 @@ function visitRow(name) {
     if (panelLock() === "password") passwordInput.focus({ preventScroll: true });
   };
   return stateCard(name, `Your ${name} key is in the vault for this visit.`, " It is forgotten when you close this tab or switch to another model.",
-    button("Remember on this computer", rememberClick));
+    button("Remember on this computer", rememberClick, { kind: "soft" }));
 }
 
 function rememberedRow(name, box, router) {
   const how = box?.kind === "passkey" ? "your passkey" : "your password";
   return stateCard(name, `Saved on this computer, locked with ${how}.`, " Unlocked now; locks automatically after 15 minutes without using this AI.",
-    button("Lock now", () => { lockNow(router); clearTimeout(armed); armed = 0; say(`Locked ${name}.`); changed(); }));
+    button("Lock now", () => { lockNow(router); clearTimeout(armed); armed = 0; say(`Locked ${name}.`); changed(); }, { kind: "soft" }));
 }
 
 function lockedRow(name, box, router) {
@@ -827,7 +827,7 @@ function forgetButton(name) {
     clearTimeout(armed);
     armed = 0;
     run("forget", () => forget());
-  }, { kind: "ghost" });
+  }, { kind: "danger", armed: !!armed });
 }
 
 let typing = 0;
