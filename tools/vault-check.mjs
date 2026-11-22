@@ -21,8 +21,8 @@ import { fileURLToPath } from "node:url";
 import { findBrowser, openBrowser, sleep } from "./cdp.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SITE = "http://127.0.0.1:8087/";
-const VAULT_ORIGIN = "http://127.0.0.1:8090";
+const SITE = "http://localhost:8087/";
+const VAULT_ORIGIN = "http://localhost:8090";
 const AI = "http://127.0.0.1:8099/v1";
 const KEY = "stand-in-secret-key-4b1d";
 const PASSWORD = "correct horse battery";
@@ -167,15 +167,16 @@ try {
   await b.evaluate("document.querySelector('#mp-change')?.hidden || document.querySelector('#mp-change').click(); true");
   await inVault("[...document.querySelectorAll('button')].find((x) => /Remember on this computer/.test(x.textContent)).click(); true");
   await waitInVault("!!document.querySelector('input[name=\"lock\"]')");
-  check(await inVault("(() => { const p = document.querySelector('input[name=\"lock\"][value=\"passkey\"]'); return (!p || p.disabled) && document.querySelector('input[name=\"lock\"][value=\"password\"]')?.checked; })()"),
-    "on raw IP addresses passkey cannot be selected and password is checked");
+  check(await inVault("(() => { const r = [...document.querySelectorAll('input[name=\"lock\"]')]; return r.length === 2 && r[0].value === 'passkey' && !r[0].disabled && r[0].checked && r[1].value === 'password'; })()"),
+    "both lock options stay visible with passkey first and enabled on localhost");
   await inVault("document.querySelector('input[name=\"lock\"][value=\"password\"]').click(); true");
   await waitInVault("!!document.querySelector('#password')");
   await inVault(`(() => { document.querySelector('#password').value = ${JSON.stringify(PASSWORD)};
     [...document.querySelectorAll('button')].find((x) => /Remember it/.test(x.textContent)).click(); return true; })()`);
   await waitInVault("/Saved on this computer, locked with your password/.test(document.body.textContent)", 20000);
   const box = await inVault("localStorage.getItem('vault-box') || ''");
-  check(box.length > 0 && !box.includes(KEY), "the remembered key is stored only encrypted", `${box.length} characters, PBKDF2 rounds ${JSON.parse(box).rounds}`);
+  const rounds = (() => { const b = JSON.parse(box); return (Object.values(b.entries || {})[0] || b).rounds; })();
+  check(box.length > 0 && !box.includes(KEY), "the remembered key is stored only encrypted", `${box.length} characters, PBKDF2 rounds ${rounds}`);
   // A new visit: the tab's copy is gone, the encrypted record stays.
   await inVault("sessionStorage.clear(); true");
   await b.evaluate("window.beforeReload = true");

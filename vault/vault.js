@@ -7,8 +7,8 @@
 
 import {
   CUSTOM, IDLE_LOCK_MS, MIN_PASSWORD, PASSWORD_ROUNDS, PROVIDERS, RateLimit, allowedPage, checkRequest, cleanTheme,
-  fromBase64, lockKeys, openKeys, passkeyLock, passwordLock, providerForKey, providerHeaders, providerNamed,
-  randomBytes, relockKeys, serviceAddress, toBase64, unlockKeys,
+  fromBase64, lockKeys, passkeyLock, passwordLock, providerForKey, providerHeaders, providerNamed,
+  randomBytes, serviceAddress, toBase64, unlockKeys,
 } from "./vault-core.js";
 
 const SESSION = "vault-session";
@@ -39,18 +39,36 @@ function writeSession(s) {
   try { sessionStorage.setItem(SESSION, JSON.stringify(s)); } catch { /* storage blocked */ }
 }
 
-function readBox() {
+function readBoxes() {
   try {
-    const box = JSON.parse(localStorage.getItem(BOX) || "null");
-    return box?.v === 1 && box.wrapped && box.keys ? box : null;
-  } catch {
-    return null;
-  }
+    const raw = JSON.parse(localStorage.getItem(BOX) || "null");
+    if (raw?.v === 2 && raw.entries && typeof raw.entries === "object") {
+      const entries = {};
+      for (const [router, entry] of Object.entries(raw.entries)) {
+        if (entry?.v === 1 && entry.wrapped && entry.keys) entries[router] = entry;
+      }
+      return entries;
+    }
+    if (raw?.v === 1 && raw.wrapped && raw.keys) {
+      const entries = {};
+      for (const item of raw.saved || []) entries[item.router] = raw;
+      return entries;
+    }
+  } catch { /* storage blocked or damaged */ }
+  return {};
 }
 
-function writeBox(box) {
+function boxFor(router) {
+  return router ? readBoxes()[router] || null : null;
+}
+
+function writeRouterBox(router, box) {
+  if (!router) return;
+  const entries = readBoxes();
+  if (box) entries[router] = box;
+  else delete entries[router];
   try {
-    if (box) localStorage.setItem(BOX, JSON.stringify(box));
+    if (Object.keys(entries).length) localStorage.setItem(BOX, JSON.stringify({ v: 2, entries }));
     else localStorage.removeItem(BOX);
   } catch { /* storage blocked */ }
 }
@@ -64,8 +82,6 @@ let panel = ""; // "remember" while choosing how to lock, or "replace" while swa
 let armed = 0; // the first click of a two-click forget
 let notice = { text: "", tone: "" };
 let passkeyReady = false;
-let prfSupported = false;
-let isIpLiteral = false;
 
 const keyInput = el("input", { id: "key", type: "password", autocomplete: "off", spellcheck: "false", "aria-describedby": "key-note" });
 const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://api.example.com/v1 or http://127.0.0.1:11434/v1" });
@@ -94,9 +110,11 @@ function selectedName() {
 // Every service the vault holds a key for: this visit's keys and the remembered ones.
 function held() {
   const s = readSession();
-  const box = readBox();
   const map = new Map();
-  for (const entry of box?.saved || []) map.set(entry.router, entry.name);
+  for (const [router, box] of Object.entries(readBoxes())) {
+    const saved = box.saved?.find((e) => e.router === router) || box.saved?.[0];
+    map.set(router, saved?.name || nameFor(router));
+  }
   for (const [router, entry] of Object.entries(s.keys)) map.set(router, entry.name);
   return map;
 }
@@ -104,20 +122,18 @@ function held() {
 function lockIfIdle() {
   const s = readSession();
   const now = Date.now();
-  const expiredAll = !!(s.until && now >= s.until);
   let changedSession = false;
   for (const [router, entry] of Object.entries(s.keys)) {
     if (!entry.remembered) continue;
-    if (expiredAll || (entry.touchedAt && now - entry.touchedAt >= IDLE_LOCK_MS)) {
+    if (entry.touchedAt && now - entry.touchedAt >= IDLE_LOCK_MS) {
       delete s.keys[router];
       changedSession = true;
     }
   }
-  const hasUnlockedRemembered = Object.values(s.keys).some((e) => e.remembered);
-  if (expiredAll || (s.raw && !hasUnlockedRemembered)) {
-    if (s.raw || s.until) changedSession = true;
+  if (s.raw || s.until) {
     s.raw = "";
     s.until = 0;
+    changedSession = true;
   }
   if (!changedSession) return false;
   writeSession(s);
@@ -126,18 +142,10 @@ function lockIfIdle() {
 
 function touch(router = "") {
   const s = readSession();
-  const now = Date.now();
-  let dirty = false;
   const target = router || s.active;
-  if (target && s.keys[target]) {
-    s.keys[target].touchedAt = now;
-    dirty = true;
-  }
-  if (s.raw) {
-    s.until = now + IDLE_LOCK_MS;
-    dirty = true;
-  }
-  if (dirty) writeSession(s);
+  if (!target || !s.keys[target]) return;
+  s.keys[target].touchedAt = Date.now();
+  writeSession(s);
 }
 
 function lockNow(router = "") {
@@ -147,23 +155,24 @@ function lockNow(router = "") {
   } else {
     for (const [r, entry] of Object.entries(s.keys)) if (entry.remembered) delete s.keys[r];
   }
-  if (!Object.values(s.keys).some((e) => e.remembered)) {
-    s.raw = "";
-    s.until = 0;
-  }
   writeSession(s);
 }
 
 function status() {
   lockIfIdle();
   const s = readSession();
-  const box = readBox();
+  const boxes = readBoxes();
   const router = selectedRouter();
-  const boxHas = (r) => !!box?.saved?.some((entry) => entry.router === r);
+  const box = router ? boxes[router] || null : null;
+  const nameInBox = (r) => {
+    const b = boxes[r];
+    const item = b?.saved?.find((e) => e.router === r) || b?.saved?.[0];
+    return item?.name || nameFor(r);
+  };
   const entryFor = (r) => (r ? s.keys[r] : null);
-  const active = s.active && (s.keys[s.active] || boxHas(s.active))
+  const active = s.active && (s.keys[s.active] || boxes[s.active])
     ? {
-      name: s.keys[s.active]?.name || box.saved.find((e) => e.router === s.active).name,
+      name: s.keys[s.active]?.name || nameInBox(s.active),
       router: s.active,
       custom: !providerAt(s.active),
       locked: !s.keys[s.active],
@@ -177,12 +186,12 @@ function status() {
       name: selectedName(),
       router,
       draft: !!draftKey,
-      saved: !!entryFor(router) || boxHas(router),
-      locked: !entryFor(router) && boxHas(router),
+      saved: !!entryFor(router) || !!box,
+      locked: !entryFor(router) && !!box,
     },
     saved: [...held()].map(([r, name]) => ({ name, router: r, custom: !providerAt(r), locked: !s.keys[r] })),
     lock: box?.kind || "",
-    unlocked: !!s.raw,
+    unlocked: router ? !!s.keys[router] : false,
   };
 }
 
@@ -239,7 +248,7 @@ async function handle(type, message) {
     case "flush": flushInputs({ notify: true, draft: message.draft !== false }); return { ok: true };
     case "models": flushInputs({ notify: false }); return listModels();
     case "commit": { flushInputs({ notify: false }); const done = await commit(); changed(); return done; }
-    case "forget": { await forget(message.router || readSession().active || readBox()?.saved?.[0]?.router); changed(); return { ok: true }; }
+    case "forget": { await forget(message.router || readSession().active || Object.keys(readBoxes())[0]); changed(); return { ok: true }; }
     default: return { ok: false, reason: "unknown" };
   }
 }
@@ -342,6 +351,7 @@ async function commit() {
   const now = Date.now();
   const kept = Object.fromEntries(Object.entries(s.keys).filter(([, entry]) => entry.remembered));
   if (draftKey) {
+    writeRouterBox(router, null);
     kept[router] = { name: nameFor(router), key: draftKey, remembered: false, touchedAt: now };
     clearDraft();
     panel = "";
@@ -382,7 +392,7 @@ async function relay(port, { path, method, body }) {
   const s = readSession();
   const entry = s.keys[s.active];
   if (!entry) {
-    if (s.active && readBox()?.saved?.some((e) => e.router === s.active)) {
+    if (s.active && boxFor(s.active)) {
       refuse(423, "Your saved key is locked in the key vault. Unlock it under AI model settings, then try again.");
       changed();
     } else {
@@ -415,30 +425,11 @@ async function relay(port, { path, method, body }) {
   }
 }
 
-async function rememberIn(box) {
-  const s = readSession();
-  const router = selectedRouter();
-  const entry = router ? s.keys[router] : null;
-  if (!box || !s.raw || !entry) return;
-  entry.remembered = true;
-  entry.touchedAt = Date.now();
-  s.until = Date.now() + IDLE_LOCK_MS;
-  writeSession(s);
-  const saved = { ...(await openKeys(box, fromBase64(s.raw))), [router]: { name: entry.name, key: entry.key } };
-  writeBox(await relockKeys(box, fromBase64(s.raw), saved));
-  say(`Saved on this computer, locked with ${box.kind === "passkey" ? "your passkey" : "your password"}.`);
-}
-
-function plain(keys) {
-  return Object.fromEntries(Object.entries(keys).map(([router, { name, key }]) => [router, { name, key }]));
-}
-
 async function remember(kind) {
   const s = readSession();
   const router = selectedRouter();
   const entry = router ? s.keys[router] : null;
-  const keys = Object.fromEntries(Object.entries(s.keys).filter(([r, v]) => v.remembered || r === router));
-  if (!entry || !Object.keys(keys).length) return;
+  if (!entry) return;
   let lock;
   if (kind === "password") {
     const password = passwordInput.value;
@@ -448,25 +439,18 @@ async function remember(kind) {
   } else {
     lock = await newPasskeyLock();
   }
-  const { box, raw } = await lockKeys(lock, plain(keys));
-  writeBox(box);
-  const now = Date.now();
-  for (const r of Object.keys(keys)) {
-    if (s.keys[r]) {
-      s.keys[r].remembered = true;
-      s.keys[r].touchedAt = now;
-    }
-  }
-  s.raw = toBase64(raw);
-  s.until = now + IDLE_LOCK_MS;
+  const { box } = await lockKeys(lock, { [router]: { name: entry.name, key: entry.key } });
+  writeRouterBox(router, box);
+  entry.remembered = true;
+  entry.touchedAt = Date.now();
   writeSession(s);
   passwordInput.value = "";
   panel = "";
   say(kind === "password" ? "Saved on this computer, locked with your password." : "Saved on this computer, locked with your passkey.");
 }
 
-async function unlock() {
-  const box = readBox();
+async function unlock(router = selectedRouter()) {
+  const box = boxFor(router);
   if (!box) return;
   let lockKey;
   if (box.kind === "password") {
@@ -485,54 +469,28 @@ async function unlock() {
   }
   const s = readSession();
   const now = Date.now();
-  for (const [router, entry] of Object.entries(opened.keys)) {
-    if (!s.keys[router]) s.keys[router] = { ...entry, remembered: true, touchedAt: now };
-  }
-  s.raw = toBase64(opened.raw);
-  s.until = now + IDLE_LOCK_MS;
+  const entry = opened.keys[router] || Object.values(opened.keys)[0];
+  if (entry) s.keys[router] = { ...entry, remembered: true, touchedAt: now };
   writeSession(s);
   unlockInput.value = "";
-  say("Unlocked. Locks after 15 minutes without using an AI.");
+  say("Unlocked. Locks after 15 minutes without using this AI.");
 }
 
 async function forget(router = selectedRouter()) {
   if (!router) return;
   const removedName = nameFor(router);
   const s = readSession();
-  const box = readBox();
-  const remembered = !!s.keys[router]?.remembered || !!box?.saved?.some((e) => e.router === router);
-  const wasActive = s.active === router || !s.active;
   const hadDraftForRemoved = router === selectedRouter();
   delete s.keys[router];
   if (s.active === router) s.active = "";
   writeSession(s);
-  if (remembered && box) {
-    if (s.raw) {
-      const rest = await openKeys(box, fromBase64(s.raw));
-      delete rest[router];
-      if (Object.keys(rest).length) writeBox(await relockKeys(box, fromBase64(s.raw), rest));
-      else forgetBox();
-    } else {
-      forgetBox();
-    }
-  }
-  const latest = readSession();
-  const nextBox = readBox();
-  if (wasActive) {
-    latest.active = Object.keys(latest.keys)[0] || nextBox?.saved?.[0]?.router || "";
-    writeSession(latest);
-  }
+  writeRouterBox(router, null);
   if (hadDraftForRemoved) {
     clearDraft();
     if (selection.provider.startsWith("Otari")) selection = { provider: CUSTOM };
   }
-  if (!Object.keys(latest.keys).length) panel = "";
+  panel = "";
   say(`The ${removedName} key is gone from the vault.`);
-}
-
-function forgetBox() {
-  writeBox(null);
-  lockNow();
 }
 
 // With the PRF extension, the authenticator turns a salt into 32 secret bytes after the
@@ -572,14 +530,16 @@ async function passkeyOutput(credentialId, prfSalt) {
 
 async function checkPasskeys() {
   const host = location.hostname || "";
-  isIpLiteral = !host || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(":");
+  if (!host || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(":")) {
+    passkeyReady = false;
+    return;
+  }
   try {
     const caps = await window.PublicKeyCredential?.getClientCapabilities?.();
-    prfSupported = caps?.["extension:prf"] === true;
+    passkeyReady = caps?.["extension:prf"] === true;
   } catch {
-    prfSupported = false;
+    passkeyReady = false;
   }
-  passkeyReady = prfSupported && !isIpLiteral;
 }
 
 function applyTheme(theme) {
@@ -644,7 +604,7 @@ function render() {
   const name = sel.name;
   const custom = selection.provider === CUSTOM;
   const entry = sel.router ? readSession().keys[sel.router] : null;
-  const box = readBox();
+  const box = boxFor(sel.router);
   const wrong = wrongCardProvider();
   const showInputs = !!draftKey || panel === "replace" || (!entry && !sel.locked);
 
@@ -683,12 +643,12 @@ function render() {
       `The vault sends your key only to ${name}.`));
   }
 
-  if (sel.locked && !draftKey && panel !== "replace") rows.push(lockedRow(name, box));
+  if (sel.locked && !draftKey && panel !== "replace") rows.push(lockedRow(name, box, sel.router));
   else if (entry && panel === "remember") rows.push(rememberPanel());
-  else if (entry && !draftKey && panel !== "replace") rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name, box));
+  else if (entry && !draftKey && panel !== "replace") rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name));
   else if (s.active && s.active.router !== sel.router && !entry && !sel.locked) {
     const activeEntry = readSession().keys[s.active.router];
-    const activeLocked = !!(activeEntry?.remembered || box?.saved?.some((e) => e.router === s.active.router));
+    const activeLocked = !!(activeEntry?.remembered || boxFor(s.active.router));
     rows.push(el("p", { class: "hint" },
       activeLocked
         ? `Your saved ${s.active.name} key stays stored when you switch.`
@@ -733,26 +693,17 @@ function replaceButton() {
   });
 }
 
-function visitRow(name, box) {
-  const unlockedBox = box && !!readSession().raw;
-  const lockedBox = box && !unlockedBox;
+function visitRow(name) {
   const rememberClick = () => {
-    if (unlockedBox) {
-      run("remember", () => rememberIn(readBox()));
-      return;
-    }
     panel = "remember";
     notice = { text: "", tone: "" };
     render();
-    passwordInput.focus();
+    if (panelLock() === "password") passwordInput.focus();
   };
   return el("div", { class: "state" },
-    el("p", null, el("strong", null, `Your ${name} key is in the vault for this visit.`), " It is forgotten when you close this tab or switch to another model.",
-      lockedBox ? " Unlock your saved keys below to remember this one with the same lock." : null),
+    el("p", null, el("strong", null, `Your ${name} key is in the vault for this visit.`), " It is forgotten when you close this tab or switch to another model."),
     el("div", { class: "actions" },
-      lockedBox && box.kind !== "passkey" ? unlockInput : null,
-      lockedBox ? button(busy === "unlock" ? "Unlocking…" : box.kind === "passkey" ? "Unlock with your passkey" : "Unlock", () => run("unlock", unlock), { kind: "primary" }) : null,
-      lockedBox ? null : button("Remember on this computer", rememberClick),
+      button("Remember on this computer", rememberClick),
       replaceButton(),
       anotherAddressButton(),
       forgetButton(name)));
@@ -769,33 +720,27 @@ function rememberedRow(name, box, router) {
       forgetButton(name)));
 }
 
-function lockedRow(name, box) {
+function lockedRow(name, box, router) {
   const passkey = box?.kind === "passkey";
   const unlockButton = button(busy === "unlock" ? "Unlocking…" : passkey ? "Unlock with your passkey" : "Unlock",
-    () => run("unlock", unlock), { kind: "primary", focus: passkey });
+    () => run("unlock", () => unlock(router)), { kind: "primary", focus: passkey });
   if (!passkey) unlockInput.dataset.focus = "true";
   else delete unlockInput.dataset.focus;
   return el("div", { class: "state" },
     el("p", null, el("strong", null, `Your saved ${name} key is locked.`), passkey ? " Your passkey opens it." : " Type the vault password to open it."),
     el("div", { class: "actions" }, passkey ? null : unlockInput, unlockButton, replaceButton(), anotherAddressButton()),
-    el("div", { class: "actions" }, forgetBoxButton(box)));
+    el("div", { class: "actions" }, forgetButton(name)));
 }
 
 function rememberPanel() {
-  const choose = (kind, disabled = false) => el("label", { class: "choice" },
-    el("input", { type: "radio", name: "lock", value: kind, disabled, checked: (!disabled && panelLock() === kind) || null, onchange: render }),
+  const choose = (kind) => el("label", { class: "choice" },
+    el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: render }),
     kind === "passkey" ? "With a passkey: your fingerprint, face or device PIN" : "With a password");
   const usePassword = panelLock() === "password";
-  const showPasskeyRow = prfSupported || !isIpLiteral;
   return el("div", { class: "state" },
     el("p", null, el("strong", null, "Lock it, so a copied file is useless."), " You unlock it once each visit."),
     el("div", { class: "choices", role: "radiogroup", "aria-label": "Lock" },
-      showPasskeyRow ? choose("passkey", !passkeyReady) : null,
-      showPasskeyRow && !passkeyReady ? el("div", { class: "choice-note" },
-        el("span", null, isIpLiteral
-          ? "Fingerprint, face or PIN requires localhost or https:// (not 127.0.0.1)."
-          : "Passkey lock is unavailable on this browser."),
-        isIpLiteral ? button("Open localhost", () => tell({ event: "open-localhost" })) : null) : null,
+      passkeyReady ? choose("passkey") : null,
       choose("password")),
     usePassword ? el("div", { class: "field" }, el("label", { for: "password" }, `Vault password (at least ${MIN_PASSWORD} characters)`), passwordInput,
       el("p", { class: "hint" }, "Nobody can recover it. If you forget it, paste your key again.")) : null,
@@ -819,18 +764,6 @@ function forgetButton(name) {
     clearTimeout(armed);
     armed = 0;
     run("forget", () => forget());
-  }, { kind: "ghost" });
-}
-
-function forgetBoxButton(box) {
-  const plural = (box?.saved?.length || 0) > 1;
-  return button(armed ? (plural ? "Click again to forget the saved keys" : "Click again to forget it") : (plural ? "Forget the saved keys" : "Forget this key"), () => {
-    if (!armed) { armed = setTimeout(() => { armed = 0; render(); }, 4000); render(); return; }
-    clearTimeout(armed);
-    armed = 0;
-    forgetBox();
-    say(plural ? "The saved keys are gone from this computer." : "The saved key is gone from this computer.");
-    changed();
   }, { kind: "ghost" });
 }
 

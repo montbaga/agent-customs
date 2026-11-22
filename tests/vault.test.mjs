@@ -55,6 +55,7 @@ test("only Agent Customs may use the published vault; pages on this computer may
     assert.equal(allowedPage(other, "agent-customs-vault.github.io"), false, other);
   }
   assert.equal(allowedPage("http://127.0.0.1:8080", "127.0.0.1"), true);
+  assert.equal(allowedPage("http://127.0.0.1:8080", "localhost"), true);
   assert.equal(allowedPage("http://localhost:8080", "localhost"), true);
   assert.equal(allowedPage("https://evil.example", "127.0.0.1"), false);
 });
@@ -123,7 +124,7 @@ test("a passkey's secret bytes open the box; other bytes do not", async () => {
 
 test("a published page uses the published vault; a page on this computer uses a local one", () => {
   assert.equal(vaultAddress({ hostname: "montbaga.github.io" }), "https://agent-customs-vault.github.io/");
-  assert.equal(vaultAddress({ hostname: "127.0.0.1" }), "http://127.0.0.1:8090/");
+  assert.equal(vaultAddress({ hostname: "127.0.0.1" }), "http://localhost:8090/");
   assert.equal(vaultAddress({ hostname: "localhost" }), "http://localhost:8090/");
   assert.equal(CUSTOM_SERVICE, "custom");
   assert.notEqual(VAULT_KEY, "demo", "the runtime treats 'demo' as no key at all");

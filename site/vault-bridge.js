@@ -17,7 +17,7 @@ const NO_BODY = new Set([101, 204, 205, 304]);
 /** A page on this computer uses the local vault (npm run serve:vault); a published page, the published one. */
 export function vaultAddress(loc = globalThis.location) {
   const host = loc?.hostname || "";
-  if (LOOPBACK.has(host)) return `http://${host}:8090/`;
+  if (LOOPBACK.has(host)) return "http://localhost:8090/";
   return "https://agent-customs-vault.github.io/";
 }
 

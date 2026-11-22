@@ -600,20 +600,11 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (saved.length) hadSavedKeys = true;
     const active = held()?.active || null;
     if (!currentSetup || saved.some((s) => s.router === currentSetup.router)) return null;
-    if (active && active.router !== currentSetup.router) {
-      const nextModel = fallbackModelFor(active);
-      currentSetup = { provider: active.custom ? CUSTOM_SERVICE : active.name, router: active.router, model: nextModel };
-      setupChoice = choiceOf(active);
-      saveModelSetup(currentSetup);
-      applyRuntimeModel(nextModel);
-      onSetup?.(currentSetup);
-      return { kind: "switched", active, model: nextModel };
-    }
-    if (hadSavedKeys && !saved.length && !active) {
+    if (hadSavedKeys || !active) {
       clearModelSetup();
       currentSetup = null;
       setupChoice = null;
-      hadSavedKeys = false;
+      if (!saved.length && !active) hadSavedKeys = false;
       applyRuntimeModel("");
       onSetup?.(null);
       return { kind: "cleared" };
@@ -623,14 +614,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
 
   vault?.on((event, data) => {
     if (event === "status") {
-      const reconciled = reconcileSetup();
-      if (reconciled?.kind === "switched") {
-        const { active, model } = reconciled;
-        refreshCards();
-        layout(refreshCurrent());
-        show(setupChoice, { provider: active.custom ? "" : active.name, model, note: `Switched back to ${active.name}.` });
-        return;
-      }
+      reconcileSetup();
       if (selected().custom && otherProvider && data?.selection?.provider === CUSTOM_SERVICE) {
         otherProvider = "";
         keyLink.hidden = true;
@@ -658,12 +642,6 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     } else if (event === "draft-cleared") {
       renderModels(selected().models, savedModelFor(selected()));
       say("");
-    } else if (event === "open-localhost") {
-      if (location.protocol === "http:" && (location.hostname === "127.0.0.1" || location.hostname === "::1" || location.hostname === "[::1]")) {
-        const url = new URL(location.href);
-        url.hostname = "localhost";
-        location.assign(url.href);
-      }
     } else if (event === "submit") {
       start.click();
     }
