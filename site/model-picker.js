@@ -488,22 +488,27 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     safety.replaceChildren(...parts);
   };
 
-  const show = (choice, { fromKey = false, note = "", model = "", provider = "" } = {}) => {
-    otherProvider = provider || (fromKey ? otherProvider : "");
-    const radio = root.querySelector(`input[name="mp-model"][value="${choice.id}"]`);
-    if (radio) radio.checked = true;
-    const providerName = choice.provider || otherProvider;
+  const syncKeyLink = (providerName) => {
     const known = providers.find((p) => p.name === providerName);
     keyLink.hidden = !known?.keyUrl;
     if (keyOther) keyOther.hidden = !!known?.keyUrl;
     keyLink.href = known?.keyUrl || "#";
     keyLink.querySelector("[data-mp-provider]").textContent = providerName;
+  };
+  const renderSavedModels = (choice, want = savedModelFor(choice)) => {
+    const inUse = want && !listedId(want, choice.models.map((m) => m.id)) ? [{ id: want, name: modelLabel(want) }] : [];
+    renderModels([...inUse, ...choice.models], want);
+  };
+
+  const show = (choice, { fromKey = false, note = "", model = "", provider = "" } = {}) => {
+    otherProvider = provider || (fromKey ? otherProvider : "");
+    const radio = root.querySelector(`input[name="mp-model"][value="${choice.id}"]`);
+    if (radio) radio.checked = true;
+    syncKeyLink(choice.provider || otherProvider);
     showSafety(choice);
     modelOther.value = "";
     // The model saved with this provider leads the list, even when it is not a suggestion.
-    const want = model || savedModelFor(choice);
-    const inUse = want && !listedId(want, choice.models.map((m) => m.id)) ? [{ id: want, name: modelLabel(want) }] : [];
-    renderModels([...inUse, ...choice.models], want);
+    renderSavedModels(choice, model || savedModelFor(choice));
     say(note);
     // A key typed for another provider is cleared, unless that key chose this card.
     const asked = vault ? vault.ask("select", { provider: vaultName(choice), keepDraft: fromKey }) : Promise.resolve();
@@ -615,18 +620,24 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   vault?.on((event, data) => {
     if (event === "status") {
       reconcileSetup();
-      if (selected().custom && otherProvider && data?.selection?.provider === CUSTOM_SERVICE) {
+      let otherRestored = false;
+      const selProvider = data?.selection?.provider || "";
+      if (selected().custom && otherProvider && selProvider === CUSTOM_SERVICE) {
         otherProvider = "";
-        keyLink.hidden = true;
-        if (keyOther) keyOther.hidden = false;
+        syncKeyLink("");
         renderModels([], "");
         say("");
+      } else if (selected().custom && selProvider && selProvider !== CUSTOM_SERVICE && otherProvider !== selProvider) {
+        otherProvider = selProvider;
+        syncKeyLink(selProvider);
+        renderSavedModels(selected());
+        otherRestored = true;
       }
       const unlockedNow = wasSelectionLocked && !selection()?.locked && !!selection()?.saved;
       wasSelectionLocked = !!selection()?.locked;
       refreshCards();
       layout(refreshCurrent());
-      if (unlockedNow && !body.hidden) listForKey(selected());
+      if ((unlockedNow || otherRestored) && !body.hidden) listForKey(selected());
     } else if (event === "detected") {
       const match = choiceForProvider(data.provider);
       if (!match && selected().custom) {
@@ -640,8 +651,10 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     } else if (event === "draft") {
       listForKey(selected());
     } else if (event === "draft-cleared") {
-      renderModels(selected().models, savedModelFor(selected()));
+      renderSavedModels(selected());
       say("");
+      const sel = selection();
+      if (!body.hidden && sel?.saved && !sel.draft) listForKey(selected());
     } else if (event === "submit") {
       start.click();
     }

@@ -259,6 +259,9 @@ function select({ provider, keepDraft = false }) {
     if (!(keepDraft && providerForKey(draftKey)?.name === next)) clearDraft();
     notice = { text: "", tone: "" };
   }
+  if ((panel === "custom" || panel === "replace") && !keepDraft) {
+    addressInput.value = next === CUSTOM ? (backTarget?.address || "") : "";
+  }
   selection = { provider: next };
   clearTimeout(armed);
   armed = 0;
@@ -269,6 +272,8 @@ function select({ provider, keepDraft = false }) {
     if (custom) addressInput.value = custom;
   }
   panel = "";
+  lockChoice = "";
+  backTarget = null;
 }
 
 function use({ provider, router }) {
@@ -276,6 +281,9 @@ function use({ provider, router }) {
   if (!target || !held().has(target)) return;
   clearTimeout(armed);
   armed = 0;
+  panel = "";
+  lockChoice = "";
+  backTarget = null;
   selection = { provider: provider === CUSTOM ? CUSTOM : provider };
   if (provider === CUSTOM) addressInput.value = target;
   const s = readSession();
@@ -355,6 +363,8 @@ async function commit() {
     kept[router] = { name: nameFor(router), key: draftKey, remembered: false, touchedAt: now };
     clearDraft();
     panel = "";
+    lockChoice = "";
+    backTarget = null;
     s.keys = kept;
     s.active = router;
     writeSession(s);
@@ -363,6 +373,8 @@ async function commit() {
   if (!s.keys[router]) return { ok: false, reason: status().selection.locked ? "locked" : "empty" };
   kept[router] = { ...s.keys[router], touchedAt: now };
   panel = "";
+  lockChoice = "";
+  backTarget = null;
   s.keys = kept;
   s.active = router;
   writeSession(s);
@@ -446,6 +458,8 @@ async function remember(kind) {
   writeSession(s);
   passwordInput.value = "";
   panel = "";
+  lockChoice = "";
+  backTarget = null;
   say(kind === "password" ? "Saved on this computer, locked with your password." : "Saved on this computer, locked with your passkey.");
 }
 
@@ -490,6 +504,8 @@ async function forget(router = selectedRouter()) {
     if (selection.provider.startsWith("Otari")) selection = { provider: CUSTOM };
   }
   panel = "";
+  lockChoice = "";
+  backTarget = null;
   say(`The ${removedName} key is gone from the vault.`);
 }
 
@@ -601,7 +617,7 @@ function button(text, onclick, { kind = "ghost", focus = false } = {}) {
 
 function clearDraftAndNotify() {
   clearDraft();
-  if (selection.provider.startsWith("Otari") && !status().selection.saved) {
+  if (panel === "custom" || (selection.provider.startsWith("Otari") && !status().selection.saved)) {
     selection = { provider: CUSTOM };
   }
   notice = { text: "", tone: "" };
@@ -618,7 +634,7 @@ function render() {
   const entry = sel.router ? readSession().keys[sel.router] : null;
   const box = boxFor(sel.router);
   const wrong = wrongCardProvider();
-  const showInputs = !!draftKey || panel === "replace" || (!entry && !sel.locked);
+  const showInputs = !!draftKey || panel === "replace" || panel === "custom" || (!entry && !sel.locked);
 
   if (draftKey) keyInput.dataset.state = wrong ? "warn" : "ready";
   else delete keyInput.dataset.state;
@@ -646,8 +662,8 @@ function render() {
     rows.push(el("p", { id: "key-note", class: "note" },
       el("span", { class: "dot", "aria-hidden": "true" }),
       `The vault sends your key only to ${name}.`));
-    if (panel === "replace" && !draftKey) {
-      rows.push(el("div", { class: "actions" }, button("Cancel", () => { panel = ""; notice = { text: "", tone: "" }; changed(); })));
+    if (panel === "replace" || (panel === "custom" && backTarget)) {
+      rows.push(el("div", { class: "actions" }, button("Cancel", cancelSubPanel)));
     }
   } else {
     rows.push(el("p", { id: "key-note", class: "note" },
@@ -655,9 +671,9 @@ function render() {
       `The vault sends your key only to ${name}.`));
   }
 
-  if (sel.locked && !draftKey && panel !== "replace") rows.push(lockedRow(name, box, sel.router));
+  if (panel !== "replace" && panel !== "custom" && sel.locked && !draftKey) rows.push(lockedRow(name, box, sel.router));
   else if (entry && panel === "remember") rows.push(rememberPanel());
-  else if (entry && !draftKey && panel !== "replace") rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name));
+  else if (panel !== "replace" && panel !== "custom" && entry && !draftKey) rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name));
   else if (s.active && s.active.router !== sel.router && !entry && !sel.locked) {
     const activeEntry = readSession().keys[s.active.router];
     const activeLocked = !!(activeEntry?.remembered || boxFor(s.active.router));
@@ -680,10 +696,33 @@ function render() {
   }
 }
 
-function useCustomAddress() {
+let backTarget = null;
+
+function cancelSubPanel() {
+  const hadDraft = !!draftKey;
+  clearDraft();
+  if (backTarget) {
+    selection = { provider: backTarget.provider };
+    addressInput.value = backTarget.address;
+    backTarget = null;
+  }
   panel = "";
   clearTimeout(armed);
   armed = 0;
+  notice = { text: "", tone: "" };
+  changed();
+  if (hadDraft) tell({ event: "draft-cleared" });
+  const next = unlockInput.isConnected ? unlockInput : $("#vault button, #vault input");
+  next?.focus({ preventScroll: true });
+}
+
+function useCustomAddress() {
+  backTarget = { provider: selection.provider, address: addressInput.value };
+  panel = "custom";
+  clearDraft();
+  clearTimeout(armed);
+  armed = 0;
+  notice = { text: "", tone: "" };
   selection = { provider: CUSTOM };
   addressInput.value = "";
   changed();
@@ -691,46 +730,48 @@ function useCustomAddress() {
 }
 
 function anotherAddressButton() {
-  return selection.provider.startsWith("Otari")
+  return selection.provider.startsWith("Otari") || selection.provider === CUSTOM
     ? button("Use another address", useCustomAddress)
     : null;
 }
 
 function replaceButton() {
   return button("Replace key", () => {
+    backTarget = { provider: selection.provider, address: addressInput.value };
     panel = "replace";
+    clearTimeout(armed);
+    armed = 0;
     notice = { text: "", tone: "" };
-    render();
+    changed();
     keyInput.focus({ preventScroll: true });
   });
+}
+
+function stateCard(name, title, detail, ...primary) {
+  return el("div", { class: "state" },
+    el("p", null, el("strong", null, title), detail),
+    el("div", { class: "actions" }, ...primary),
+    el("div", { class: "actions" }, replaceButton(), anotherAddressButton(), forgetButton(name)));
 }
 
 function visitRow(name) {
   const rememberClick = () => {
     panel = "remember";
     lockChoice = "";
+    clearTimeout(armed);
+    armed = 0;
     notice = { text: "", tone: "" };
-    render();
-    if (panelLock() === "password") passwordInput.focus();
+    changed();
+    if (panelLock() === "password") passwordInput.focus({ preventScroll: true });
   };
-  return el("div", { class: "state" },
-    el("p", null, el("strong", null, `Your ${name} key is in the vault for this visit.`), " It is forgotten when you close this tab or switch to another model."),
-    el("div", { class: "actions" },
-      button("Remember on this computer", rememberClick),
-      replaceButton(),
-      anotherAddressButton(),
-      forgetButton(name)));
+  return stateCard(name, `Your ${name} key is in the vault for this visit.`, " It is forgotten when you close this tab or switch to another model.",
+    button("Remember on this computer", rememberClick));
 }
 
 function rememberedRow(name, box, router) {
   const how = box?.kind === "passkey" ? "your passkey" : "your password";
-  return el("div", { class: "state" },
-    el("p", null, el("strong", null, `Saved on this computer, locked with ${how}.`), " Unlocked now; locks automatically after 15 minutes without using this AI."),
-    el("div", { class: "actions" },
-      button("Lock now", () => { lockNow(router); say(`Locked ${name}.`); changed(); }),
-      replaceButton(),
-      anotherAddressButton(),
-      forgetButton(name)));
+  return stateCard(name, `Saved on this computer, locked with ${how}.`, " Unlocked now; locks automatically after 15 minutes without using this AI.",
+    button("Lock now", () => { lockNow(router); clearTimeout(armed); armed = 0; say(`Locked ${name}.`); changed(); }));
 }
 
 function lockedRow(name, box, router) {
@@ -739,20 +780,13 @@ function lockedRow(name, box, router) {
     () => run("unlock", () => unlock(router)), { kind: "primary", focus: passkey });
   if (!passkey) unlockInput.dataset.focus = "true";
   else delete unlockInput.dataset.focus;
-  return el("div", { class: "state" },
-    el("p", null, el("strong", null, `Your saved ${name} key is locked.`), passkey ? " Your passkey opens it." : " Type the vault password to open it."),
-    el("div", { class: "actions" },
-      passkey ? null : unlockInput,
-      unlockButton,
-      passkey ? replaceButton() : null,
-      passkey ? anotherAddressButton() : null,
-      passkey ? forgetButton(name) : null),
-    passkey ? null : el("div", { class: "actions" }, replaceButton(), anotherAddressButton(), forgetButton(name)));
+  return stateCard(name, `Your saved ${name} key is locked.`, passkey ? " Your passkey opens it." : " Type the vault password to open it.",
+    passkey ? null : unlockInput, unlockButton);
 }
 
 function rememberPanel() {
   const choose = (kind) => el("label", { class: "choice" },
-    el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: (e) => { lockChoice = e.target.value; render(); } }),
+    el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: (e) => { lockChoice = e.target.value; changed(); } }),
     kind === "passkey" ? "With a passkey: your fingerprint, face or device PIN" : "With a password");
   const usePassword = panelLock() === "password";
   return el("div", { class: "state" },
@@ -764,7 +798,7 @@ function rememberPanel() {
       el("p", { class: "hint" }, "Nobody can recover it. If you forget it, paste your key again.")) : null,
     el("div", { class: "actions" },
       button(busy === "remember" ? "Locking…" : "Remember it", () => run("remember", () => remember(panelLock())), { kind: "primary" }),
-      button("Cancel", () => { panel = ""; lockChoice = ""; notice = { text: "", tone: "" }; passwordInput.value = ""; render(); })),
+      button("Cancel", () => { panel = ""; lockChoice = ""; notice = { text: "", tone: "" }; passwordInput.value = ""; changed(); })),
     el("p", { class: "hint" }, "Safest: a free-tier key, or one with a spending limit."));
 }
 
@@ -789,7 +823,7 @@ let typingAddress = 0;
 function applyDraftInput({ notify = true, draft = true } = {}) {
   draftKey = keyInput.value.trim();
   const prevProvider = selection.provider;
-  if (!draftKey && selection.provider.startsWith("Otari") && !status().selection.saved) {
+  if (!draftKey && (panel === "custom" || (selection.provider.startsWith("Otari") && !status().selection.saved))) {
     selection = { provider: CUSTOM };
   }
   const wrong = wrongCardProvider();
