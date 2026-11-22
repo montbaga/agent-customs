@@ -377,13 +377,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     for (const choice of MODEL_CHOICES) {
       const tag = root.querySelector(`input[name="mp-model"][value="${choice.id}"]`)?.closest(".mp-card")?.querySelector(".mp-saved");
       if (!tag) continue;
+      const entry = saved.find((s) => choiceOf(s).id === choice.id);
       if (active && choiceOf(active).id === choice.id) {
-        tag.textContent = statusNow.state === "locked" ? "Locked" : "In use";
+        tag.textContent = active.locked || statusNow.state === "locked" ? "Locked" : "In use";
         tag.hidden = false;
         continue;
       }
-      const entry = saved.find((s) => choiceOf(s).id === choice.id);
-      tag.textContent = statusNow?.unlocked ? "Saved" : "Locked";
+      tag.textContent = entry?.locked ? "Locked" : "Saved";
       tag.hidden = !entry;
     }
   };
@@ -399,7 +399,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const renderModels = (models, want) => {
     modelSelect.replaceChildren();
     for (const m of models) modelSelect.append(new Option(m.name, m.id));
-    modelSelect.append(new Option(models.length ? "Other: type a model name" : "Paste your key below to load models, or type a model name", ""));
+    modelSelect.append(new Option(models.length ? "Other: type a model name" : "Paste your AI model key below to load models, or type a model name", ""));
     const match = models.find((m) => m.id === want || bare(m.id) === bare(want));
     modelSelect.value = match ? match.id : (models[0]?.id || "");
     modelOther.hidden = !!modelSelect.value;
@@ -421,12 +421,12 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!providerName) return `That key does not match ${nameOf(selected())}.`;
     const a = (n) => (/^[aeiou]/i.test(n) ? "an" : "a");
     if (providerName.startsWith("Otari")) {
-      return `${providerName} keys only work under the Other card. Select Other to use this key.`;
+      return `That key does not belong to ${nameOf(selected())}. Select the Other card to use a third-party key.`;
     }
     const target = choiceForProvider(providerName);
     if (selected().custom) {
       return target
-        ? `That is ${a(providerName)} ${providerName} key. Select the ${target.title} card, or type a custom service address below.`
+        ? `That is ${a(providerName)} ${providerName} key. Select the ${target.title} card — Other is only for keys not from the cards above.`
         : `That key belongs to ${providerName}.`;
     }
     return target
@@ -434,7 +434,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       : `That key belongs to ${providerName}, not ${nameOf(selected())}.`;
   };
   const unreachableNote = (choice) => choice.custom && !otherProvider
-    ? `Could not reach ${nameOf(choice)} at that address. Check the service address (for example https://api.otari.ai/api/v1) and that it allows browser requests.`
+    ? `Could not reach ${nameOf(choice)} at that address. Check the service address (for example https://api.example.com/v1) and that it allows browser requests.`
     : `Could not reach ${nameOf(choice)}. Check the service address or your connection, then try again.`;
 
   // Show the key's models in the list, keeping the chosen one when the key can use it.
@@ -444,9 +444,11 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     const savedEntry = savedEntryForChoice(choice);
     const inactiveSaved = !!(sel?.saved && !sel.locked && !sel.draft && held()?.active?.router !== sel.router);
     if (choice.live === false || !sel || !(sel.draft || (sel.saved && !sel.locked))) {
-      if (inactiveSaved) {
+      if (choice.live === false && sel?.draft) {
+        say(`Your ${nameOf(choice)} key is ready in the vault. Pick a model above, then press Save and start.`);
+      } else if (inactiveSaved) {
         const modelText = chosenModel() ? ` (${modelLabel(chosenModel())})` : "";
-        say(`Saved ${nameOf(choice)} key${modelText}. Press Save and start to use it.`);
+        say(`Saved ${nameOf(choice)} key${modelText}. Press Keep this model or Save and start to use it.`);
       } else if (savedEntry && sel?.locked && !sel.draft) {
         const modelText = chosenModel() ? ` (${modelLabel(chosenModel())})` : "";
         say(`Locked ${nameOf(choice)} key${modelText}. Unlock below to use it.`);
@@ -462,13 +464,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (result.rejected) { say(rejectedNote(choice), "warn"); return; }
     if (result.unreachable) { say(unreachableNote(choice), "warn"); return; }
     if (!result.models?.length) {
-      say(inactiveSaved && wanted ? `Saved ${nameOf(choice)} key (${modelLabel(wanted)}). Press Save and start to use it.` : "");
+      say(inactiveSaved && wanted ? `Saved ${nameOf(choice)} key (${modelLabel(wanted)}). Press Keep this model or Save and start to use it.` : "");
       return;
     }
     const kept = renderModels(mergeModels(choice.models, result.models), wanted);
     const count = `${result.models.length} model${result.models.length === 1 ? "" : "s"}`;
     say(kept || !wanted
-      ? `Your key can use ${count}. Pick one, then press Save and start.`
+      ? `Your key can use ${count}. Pick one, then press Keep this model or Save and start.`
       : `Your key cannot use ${modelLabel(wanted)}. It can use the ${count} in the list; ${modelLabel(chosenModel())} is selected.`);
   };
 
@@ -510,6 +512,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     asked.then(() => {
       wasSelectionLocked = !!selection()?.locked;
       refreshCards();
+      syncActions();
       if (seq === request && !body.hidden) listForKey(choice);
     });
   };
@@ -521,6 +524,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   modelSelect.addEventListener("change", () => {
     modelOther.hidden = !!modelSelect.value;
     if (!modelSelect.value) modelOther.focus();
+    syncActions();
   });
 
   // What the officer uses now, and whether the steps need to be open.
@@ -569,6 +573,13 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       forgetBtn.textContent = "Forget key";
     }
   };
+  const syncActions = () => {
+    const sel = selection();
+    const readySaved = !!(sel?.saved && !sel.locked && !sel.draft);
+    change.setAttribute("aria-expanded", String(!body.hidden));
+    change.textContent = body.hidden ? "Change model" : (readySaved ? "Keep this model" : "Cancel");
+    syncForget();
+  };
   const layout = (mode) => {
     change.hidden = mode !== "in-use";
     if (mode === "closed") body.hidden = true;
@@ -576,9 +587,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       body.hidden = false;
       listForKey(selected());
     }
-    change.setAttribute("aria-expanded", String(!body.hidden));
-    change.textContent = body.hidden ? "Change model" : "Keep this model";
-    syncForget();
+    syncActions();
   };
 
   const applyRuntimeModel = (model) => {
@@ -635,18 +644,26 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       layout(refreshCurrent());
       if (unlockedNow && !body.hidden) listForKey(selected());
     } else if (event === "detected") {
-      // Otari keys belong under "Other" with their gateway address and default model.
       const match = choiceForProvider(data.provider);
       if (!match && selected().custom) {
         const known = providers.find((p) => p.name === data.provider);
         const savedModel = readRouterModel(known?.router);
         show(OTHER, { fromKey: true, provider: data.provider, model: savedModel || known?.model || "",
-          note: `That is ${data.provider === "Otari EU" ? "an Otari EU" : "an Otari"} key, so Other uses ${data.provider}.` });
+          note: `Key detected for ${data.provider}; address filled automatically.` });
       }
     } else if (event === "mismatch") {
       say(mismatchNote(data.provider), "warn");
     } else if (event === "draft") {
       listForKey(selected());
+    } else if (event === "draft-cleared") {
+      renderModels(selected().models, savedModelFor(selected()));
+      say("");
+    } else if (event === "open-localhost") {
+      if (location.protocol === "http:" && (location.hostname === "127.0.0.1" || location.hostname === "::1" || location.hostname === "[::1]")) {
+        const url = new URL(location.href);
+        url.hostname = "localhost";
+        location.assign(url.href);
+      }
     } else if (event === "submit") {
       start.click();
     }
@@ -709,8 +726,52 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const commitProblem = (reason, choice) => ({
     address: "Type the service's address in the vault box first. It starts with https://.",
     locked: `Your saved ${nameOf(choice)} key is locked. Unlock it in the vault box first.`,
-    empty: `Paste your ${nameOf(choice)} key first.`,
+    empty: choice.custom ? "Paste your AI model key first." : `Paste your ${nameOf(choice)} key first.`,
   }[reason] || "The key vault did not take the key. Reload the page and try again.");
+
+  const activateSavedChoice = async (choice) => {
+    const sel = selection();
+    let model = chosenModel();
+    if (!sel || !sel.saved || sel.locked || sel.draft) return false;
+    if (!model) { say("Choose a model, or type its name.", "warn"); modelOther.hidden = false; modelOther.focus(); return false; }
+    if (choice.live !== false) {
+      say(`Checking ${modelLabel(model)} with ${nameOf(choice)}…`);
+      const result = await modelsFor(choice);
+      if (result.reason === "mismatch") { say(mismatchNote(result.provider), "warn"); return false; }
+      if (result.rejected) { say(rejectedNote(choice), "warn"); return false; }
+      if (result.unreachable) { say(unreachableNote(choice), "warn"); return false; }
+      if (result.models?.length) {
+        const listed = listedId(model, result.models);
+        if (!listed) {
+          renderModels(mergeModels(choice.models, result.models), "");
+          say(`Your key cannot use ${modelLabel(model)}. Pick one of the ${result.models.length} models in the list, then press Keep this model or Save and start.`, "warn");
+          modelSelect.focus();
+          return false;
+        }
+        model = listed;
+      }
+    }
+    const done = await vault.ask("commit");
+    if (!done?.ok || !done.status?.active) {
+      say(done?.reason === "mismatch" ? mismatchNote(done.provider) : commitProblem(done?.reason, choice), "warn");
+      return false;
+    }
+    request += 1;
+    const active = done.status.active;
+    currentSetup = { provider: active.custom ? CUSTOM_SERVICE : active.name, router: active.router, model };
+    setupChoice = choiceOf(active);
+    saveModelSetup(currentSetup);
+    saveRouterModel(active.router, model);
+    applyRuntimeModel(model);
+    onSetup?.(currentSetup);
+    const assistantStatus = document.querySelector("#assistant-status");
+    if (assistantStatus) assistantStatus.hidden = false;
+    say("");
+    body.hidden = true;
+    refreshCards();
+    layout(refreshCurrent());
+    return true;
+  };
 
   start.addEventListener("click", async () => {
     // Save speaks for itself: a list still loading must not talk over it.
@@ -726,7 +787,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       if (!sel) { say("The key vault could not load, so a key cannot be saved. Reload the page to try again.", "warn"); return; }
       if (!sel.draft && !sel.saved) {
         say(choice.custom && !otherProvider && !sel.router
-          ? "Paste your key first (for Otari, leave the address blank; for another service, type its https:// address too)."
+          ? "Paste your AI model key first, then type its https:// service address below (unless your key fills it automatically)."
           : commitProblem("empty", choice), "warn");
         vault.focus();
         return;
@@ -798,12 +859,34 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     }
   });
 
-  change.addEventListener("click", () => {
-    body.hidden = !body.hidden;
-    change.setAttribute("aria-expanded", String(!body.hidden));
-    change.textContent = body.hidden ? "Change model" : "Keep this model";
-    syncForget();
-    if (!body.hidden) listForKey(selected());
+  change.addEventListener("click", async () => {
+    if (body.hidden) {
+      body.hidden = false;
+      syncActions();
+      listForKey(selected());
+      return;
+    }
+    const sel = selection();
+    const readySaved = !!(sel?.saved && !sel.locked && !sel.draft);
+    if (!readySaved) {
+      body.hidden = true;
+      if (setupChoice) show(setupChoice, setupChoice.custom ? { provider: savedOtherProvider(currentSetup?.provider) } : {});
+      syncActions();
+      return;
+    }
+    const sameRouter = sel.router === currentSetup?.router;
+    const sameModel = chosenModel() === currentSetup?.model;
+    if (sameRouter && sameModel && held()?.active?.router === currentSetup?.router) {
+      body.hidden = true;
+      syncActions();
+      return;
+    }
+    change.disabled = true;
+    try {
+      await activateSavedChoice(selected());
+    } finally {
+      change.disabled = false;
+    }
   });
 
   const switchedOnLoad = reconcileSetup();

@@ -60,13 +60,15 @@ let page = null; // the port to Agent Customs, once it said hello
 let selection = { provider: "Google AI Studio" };
 let draftKey = "";
 let busy = "";
-let panel = ""; // "remember" while the visitor chooses how to lock
+let panel = ""; // "remember" while choosing how to lock, or "replace" while swapping a saved key
 let armed = 0; // the first click of a two-click forget
 let notice = { text: "", tone: "" };
 let passkeyReady = false;
+let prfSupported = false;
+let isIpLiteral = false;
 
 const keyInput = el("input", { id: "key", type: "password", autocomplete: "off", spellcheck: "false", "aria-describedby": "key-note" });
-const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://api.otari.ai/api/v1 or http://127.0.0.1:11434/v1" });
+const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://api.example.com/v1 or http://127.0.0.1:11434/v1" });
 const passwordInput = el("input", { id: "password", type: "password", autocomplete: "new-password", spellcheck: "false" });
 const unlockInput = el("input", { id: "unlock-password", type: "password", autocomplete: "current-password", spellcheck: "false", "aria-label": "Vault password" });
 
@@ -101,23 +103,54 @@ function held() {
 
 function lockIfIdle() {
   const s = readSession();
-  if (!s.raw || !s.until || Date.now() < s.until) return false;
-  lockNow();
+  const now = Date.now();
+  const expiredAll = !!(s.until && now >= s.until);
+  let changedSession = false;
+  for (const [router, entry] of Object.entries(s.keys)) {
+    if (!entry.remembered) continue;
+    if (expiredAll || (entry.touchedAt && now - entry.touchedAt >= IDLE_LOCK_MS)) {
+      delete s.keys[router];
+      changedSession = true;
+    }
+  }
+  const hasUnlockedRemembered = Object.values(s.keys).some((e) => e.remembered);
+  if (expiredAll || (s.raw && !hasUnlockedRemembered)) {
+    if (s.raw || s.until) changedSession = true;
+    s.raw = "";
+    s.until = 0;
+  }
+  if (!changedSession) return false;
+  writeSession(s);
   return true;
 }
 
-function touch() {
+function touch(router = "") {
   const s = readSession();
-  if (!s.raw) return;
-  s.until = Date.now() + IDLE_LOCK_MS;
-  writeSession(s);
+  const now = Date.now();
+  let dirty = false;
+  const target = router || s.active;
+  if (target && s.keys[target]) {
+    s.keys[target].touchedAt = now;
+    dirty = true;
+  }
+  if (s.raw) {
+    s.until = now + IDLE_LOCK_MS;
+    dirty = true;
+  }
+  if (dirty) writeSession(s);
 }
 
-function lockNow() {
+function lockNow(router = "") {
   const s = readSession();
-  for (const [router, entry] of Object.entries(s.keys)) if (entry.remembered) delete s.keys[router];
-  s.raw = "";
-  s.until = 0;
+  if (router) {
+    if (s.keys[router]?.remembered) delete s.keys[router];
+  } else {
+    for (const [r, entry] of Object.entries(s.keys)) if (entry.remembered) delete s.keys[r];
+  }
+  if (!Object.values(s.keys).some((e) => e.remembered)) {
+    s.raw = "";
+    s.until = 0;
+  }
   writeSession(s);
 }
 
@@ -129,7 +162,12 @@ function status() {
   const boxHas = (r) => !!box?.saved?.some((entry) => entry.router === r);
   const entryFor = (r) => (r ? s.keys[r] : null);
   const active = s.active && (s.keys[s.active] || boxHas(s.active))
-    ? { name: s.keys[s.active]?.name || box.saved.find((e) => e.router === s.active).name, router: s.active, custom: !providerAt(s.active) }
+    ? {
+      name: s.keys[s.active]?.name || box.saved.find((e) => e.router === s.active).name,
+      router: s.active,
+      custom: !providerAt(s.active),
+      locked: !s.keys[s.active],
+    }
     : null;
   return {
     state: !active ? "empty" : s.keys[active.router] ? "ready" : "locked",
@@ -142,7 +180,7 @@ function status() {
       saved: !!entryFor(router) || boxHas(router),
       locked: !entryFor(router) && boxHas(router),
     },
-    saved: [...held()].map(([r, name]) => ({ name, router: r, custom: !providerAt(r) })),
+    saved: [...held()].map(([r, name]) => ({ name, router: r, custom: !providerAt(r), locked: !s.keys[r] })),
     lock: box?.kind || "",
     unlocked: !!s.raw,
   };
@@ -233,6 +271,7 @@ function use({ provider, router }) {
   if (provider === CUSTOM) addressInput.value = target;
   const s = readSession();
   s.active = target;
+  if (s.keys[target]) s.keys[target].touchedAt = Date.now();
   writeSession(s);
 }
 
@@ -246,9 +285,7 @@ function wrongCardProvider() {
   if (!own) return "";
   if (own.name === selection.provider) return "";
   if (selection.provider === CUSTOM || selection.provider.startsWith("Otari")) {
-    if (own.name.startsWith("Otari")) return "";
-    const router = selectedRouter();
-    if (selection.provider === CUSTOM && router && router !== own.router) return "";
+    return own.name.startsWith("Otari") ? "" : own.name;
   }
   return own.name;
 }
@@ -276,7 +313,7 @@ async function listModels() {
   const key = keyForSelection();
   if (!key) return { ok: false, reason: status().selection.locked ? "locked" : "empty" };
   if (!limit.take()) return { ok: false, code: 429 };
-  touch();
+  touch(draftKey ? "" : router);
   try {
     const response = await fetch(`${router}/models`, { cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", headers: providerHeaders(router, key, false) });
     if (!response.ok) {
@@ -302,21 +339,24 @@ async function commit() {
   const router = selectedRouter();
   if (!router) return { ok: false, reason: "address" };
   const s = readSession();
+  const now = Date.now();
   const kept = Object.fromEntries(Object.entries(s.keys).filter(([, entry]) => entry.remembered));
   if (draftKey) {
-    kept[router] = { name: nameFor(router), key: draftKey, remembered: false };
+    kept[router] = { name: nameFor(router), key: draftKey, remembered: false, touchedAt: now };
     clearDraft();
+    panel = "";
     s.keys = kept;
     s.active = router;
     writeSession(s);
     return { ok: true };
   }
   if (!s.keys[router]) return { ok: false, reason: status().selection.locked ? "locked" : "empty" };
-  kept[router] = s.keys[router];
+  kept[router] = { ...s.keys[router], touchedAt: now };
+  panel = "";
   s.keys = kept;
   s.active = router;
   writeSession(s);
-  touch();
+  touch(router);
   return { ok: true };
 }
 
@@ -351,7 +391,7 @@ async function relay(port, { path, method, body }) {
     return;
   }
   if (!limit.take()) { refuse(429, "The key vault paused this request: more than 60 AI requests in one minute."); return; }
-  touch();
+  touch(s.active);
   try {
     const response = await fetch(`${s.active}${path}`, {
       method, body: method === "POST" ? body : undefined, signal: controller.signal, cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer",
@@ -381,6 +421,8 @@ async function rememberIn(box) {
   const entry = router ? s.keys[router] : null;
   if (!box || !s.raw || !entry) return;
   entry.remembered = true;
+  entry.touchedAt = Date.now();
+  s.until = Date.now() + IDLE_LOCK_MS;
   writeSession(s);
   const saved = { ...(await openKeys(box, fromBase64(s.raw))), [router]: { name: entry.name, key: entry.key } };
   writeBox(await relockKeys(box, fromBase64(s.raw), saved));
@@ -408,9 +450,15 @@ async function remember(kind) {
   }
   const { box, raw } = await lockKeys(lock, plain(keys));
   writeBox(box);
-  for (const r of Object.keys(keys)) if (s.keys[r]) s.keys[r].remembered = true;
+  const now = Date.now();
+  for (const r of Object.keys(keys)) {
+    if (s.keys[r]) {
+      s.keys[r].remembered = true;
+      s.keys[r].touchedAt = now;
+    }
+  }
   s.raw = toBase64(raw);
-  s.until = Date.now() + IDLE_LOCK_MS;
+  s.until = now + IDLE_LOCK_MS;
   writeSession(s);
   passwordInput.value = "";
   panel = "";
@@ -436,14 +484,15 @@ async function unlock() {
     return;
   }
   const s = readSession();
+  const now = Date.now();
   for (const [router, entry] of Object.entries(opened.keys)) {
-    if (!s.keys[router]) s.keys[router] = { ...entry, remembered: true };
+    if (!s.keys[router]) s.keys[router] = { ...entry, remembered: true, touchedAt: now };
   }
   s.raw = toBase64(opened.raw);
-  s.until = Date.now() + IDLE_LOCK_MS;
+  s.until = now + IDLE_LOCK_MS;
   writeSession(s);
   unlockInput.value = "";
-  say("Unlocked. It locks again after 15 minutes without use.");
+  say("Unlocked. Locks after 15 minutes without using an AI.");
 }
 
 async function forget(router = selectedRouter()) {
@@ -523,17 +572,14 @@ async function passkeyOutput(credentialId, prfSalt) {
 
 async function checkPasskeys() {
   const host = location.hostname || "";
-  // WebAuthn rejects IP literals like 127.0.0.1 with "This is an invalid domain".
-  if (!host || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(":")) {
-    passkeyReady = false;
-    return;
-  }
+  isIpLiteral = !host || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(":");
   try {
     const caps = await window.PublicKeyCredential?.getClientCapabilities?.();
-    passkeyReady = caps?.["extension:prf"] === true;
+    prfSupported = caps?.["extension:prf"] === true;
   } catch {
-    passkeyReady = false;
+    prfSupported = false;
   }
+  passkeyReady = prfSupported && !isIpLiteral;
 }
 
 function applyTheme(theme) {
@@ -568,7 +614,7 @@ async function run(label, work) {
     await work();
   } catch (error) {
     const message = error?.name === "NotAllowedError" ? "The passkey was cancelled."
-      : error?.name === "SecurityError" ? "Passkeys need a domain name or localhost (not an IP address). Choose a password instead."
+      : error?.name === "SecurityError" ? "Passkeys need localhost or a domain name (not an IP address). Choose a password, or open localhost instead."
       : String(error?.message || error);
     say(message, "warn");
   } finally {
@@ -581,6 +627,17 @@ function button(text, onclick, { kind = "ghost", focus = false } = {}) {
   return el("button", { type: "button", class: `${kind} small`, onclick, disabled: !!busy, "data-focus": focus || null }, text);
 }
 
+function clearDraftAndNotify() {
+  clearDraft();
+  if (selection.provider.startsWith("Otari") && !status().selection.saved) {
+    selection = { provider: CUSTOM };
+  }
+  notice = { text: "", tone: "" };
+  changed();
+  tell({ event: "draft-cleared" });
+  keyInput.focus({ preventScroll: true });
+}
+
 function render() {
   const s = status();
   const sel = s.selection;
@@ -588,28 +645,53 @@ function render() {
   const custom = selection.provider === CUSTOM;
   const entry = sel.router ? readSession().keys[sel.router] : null;
   const box = readBox();
+  const wrong = wrongCardProvider();
+  const showInputs = !!draftKey || panel === "replace" || (!entry && !sel.locked);
 
-  keyInput.placeholder = sel.locked ? `Or paste a new ${name} key`
-    : sel.saved ? `Saved ${name} key will be used` : `Paste your ${custom ? "service's" : name} key`;
+  if (draftKey) keyInput.dataset.state = wrong ? "warn" : "ready";
+  else delete keyInput.dataset.state;
+
+  keyInput.placeholder = panel === "replace" ? `Paste a new ${name} key`
+    : custom ? "Paste your AI model key" : `Paste your ${name} key`;
   keyInput.setAttribute("aria-label", `${name} key`);
 
-  const rows = [keyInput];
-  if (custom) {
-    rows.push(el("div", { class: "field" }, el("label", { for: "address" }, "Service address (leave blank for an Otari otk_ key)"), addressInput));
+  const rows = [];
+  if (showInputs) {
+    rows.push(keyInput);
+    if (draftKey) {
+      rows.push(el("div", { class: "draft-row", "data-tone": wrong ? "warn" : null },
+        el("span", { class: "dot", "aria-hidden": "true" }),
+        el("span", null, wrong
+          ? "This key belongs to another card and cannot be used here."
+          : custom && !sel.router
+            ? `Key entered (${draftKey.length} characters, hidden). Add the service address below.`
+            : `Key entered (${draftKey.length} characters, hidden). Press Save and start below.`),
+        button("Clear", clearDraftAndNotify)));
+    }
+    if (custom) {
+      rows.push(el("div", { class: "field" }, el("label", { for: "address" }, "Service address (https://... or http://127.0.0.1:...)"), addressInput));
+    }
+    rows.push(el("p", { id: "key-note", class: "note" },
+      el("span", { class: "dot", "aria-hidden": "true" }),
+      `The vault sends your key only to ${name}.`));
+    if (panel === "replace" && !draftKey) {
+      rows.push(el("div", { class: "actions" }, button("Cancel", () => { panel = ""; changed(); })));
+    }
+  } else {
+    rows.push(el("p", { id: "key-note", class: "note" },
+      el("span", { class: "dot", "aria-hidden": "true" }),
+      `The vault sends your key only to ${name}.`));
   }
-  rows.push(el("p", { id: "key-note", class: "note" },
-    el("span", { class: "dot", "aria-hidden": "true" }),
-    `The vault sends your key only to ${name}.`));
 
-  if (sel.locked && !draftKey) rows.push(lockedRow(name, box));
+  if (sel.locked && !draftKey && panel !== "replace") rows.push(lockedRow(name, box));
   else if (entry && panel === "remember") rows.push(rememberPanel());
-  else if (entry) rows.push(entry.remembered ? rememberedRow(name, box) : visitRow(name, box));
-  else if (s.active && s.active.router !== sel.router) {
+  else if (entry && !draftKey && panel !== "replace") rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name, box));
+  else if (s.active && s.active.router !== sel.router && !entry && !sel.locked) {
     const activeEntry = readSession().keys[s.active.router];
     const activeLocked = !!(activeEntry?.remembered || box?.saved?.some((e) => e.router === s.active.router));
     rows.push(el("p", { class: "hint" },
       activeLocked
-        ? `Your locked ${s.active.name} key stays saved when you switch.`
+        ? `Your saved ${s.active.name} key stays stored when you switch.`
         : `Saving here replaces your temporary ${s.active.name} key.`));
   }
 
@@ -642,6 +724,15 @@ function anotherAddressButton() {
     : null;
 }
 
+function replaceButton() {
+  return button("Replace key", () => {
+    panel = "replace";
+    notice = { text: "", tone: "" };
+    render();
+    keyInput.focus({ preventScroll: true });
+  });
+}
+
 function visitRow(name, box) {
   const unlockedBox = box && !!readSession().raw;
   const lockedBox = box && !unlockedBox;
@@ -662,16 +753,18 @@ function visitRow(name, box) {
       lockedBox && box.kind !== "passkey" ? unlockInput : null,
       lockedBox ? button(busy === "unlock" ? "Unlocking…" : box.kind === "passkey" ? "Unlock with your passkey" : "Unlock", () => run("unlock", unlock), { kind: "primary" }) : null,
       lockedBox ? null : button("Remember on this computer", rememberClick),
+      replaceButton(),
       anotherAddressButton(),
       forgetButton(name)));
 }
 
-function rememberedRow(name, box) {
+function rememberedRow(name, box, router) {
   const how = box?.kind === "passkey" ? "your passkey" : "your password";
   return el("div", { class: "state" },
-    el("p", null, el("strong", null, `Saved on this computer, locked with ${how}.`), " Unlocked now; it locks again after 15 minutes without use."),
+    el("p", null, el("strong", null, `Saved on this computer, locked with ${how}.`), " Unlocked now; locks automatically after 15 minutes without using this AI."),
     el("div", { class: "actions" },
-      button("Lock now", () => { lockNow(); say("Locked."); changed(); }),
+      button("Lock now", () => { lockNow(router); say(`Locked ${name}.`); changed(); }),
+      replaceButton(),
       anotherAddressButton(),
       forgetButton(name)));
 }
@@ -684,18 +777,26 @@ function lockedRow(name, box) {
   else delete unlockInput.dataset.focus;
   return el("div", { class: "state" },
     el("p", null, el("strong", null, `Your saved ${name} key is locked.`), passkey ? " Your passkey opens it." : " Type the vault password to open it."),
-    el("div", { class: "actions" }, passkey ? null : unlockInput, unlockButton, anotherAddressButton()),
-    el("div", { class: "actions" }, forgetBoxButton()));
+    el("div", { class: "actions" }, passkey ? null : unlockInput, unlockButton, replaceButton(), anotherAddressButton()),
+    el("div", { class: "actions" }, forgetBoxButton(box)));
 }
 
 function rememberPanel() {
-  const choose = (kind) => el("label", { class: "choice" },
-    el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: render }),
+  const choose = (kind, disabled = false) => el("label", { class: "choice" },
+    el("input", { type: "radio", name: "lock", value: kind, disabled, checked: (!disabled && panelLock() === kind) || null, onchange: render }),
     kind === "passkey" ? "With a passkey: your fingerprint, face or device PIN" : "With a password");
   const usePassword = panelLock() === "password";
+  const showPasskeyRow = prfSupported || !isIpLiteral;
   return el("div", { class: "state" },
     el("p", null, el("strong", null, "Lock it, so a copied file is useless."), " You unlock it once each visit."),
-    el("div", { class: "choices", role: "radiogroup", "aria-label": "Lock" }, passkeyReady ? choose("passkey") : null, choose("password")),
+    el("div", { class: "choices", role: "radiogroup", "aria-label": "Lock" },
+      showPasskeyRow ? choose("passkey", !passkeyReady) : null,
+      showPasskeyRow && !passkeyReady ? el("div", { class: "choice-note" },
+        el("span", null, isIpLiteral
+          ? "Fingerprint, face or PIN requires localhost or https:// (not 127.0.0.1)."
+          : "Passkey lock is unavailable on this browser."),
+        isIpLiteral ? button("Open localhost", () => tell({ event: "open-localhost" })) : null) : null,
+      choose("password")),
     usePassword ? el("div", { class: "field" }, el("label", { for: "password" }, `Vault password (at least ${MIN_PASSWORD} characters)`), passwordInput,
       el("p", { class: "hint" }, "Nobody can recover it. If you forget it, paste your key again.")) : null,
     el("div", { class: "actions" },
@@ -706,9 +807,9 @@ function rememberPanel() {
 
 let lockChoice = "";
 function panelLock() {
+  if (!passkeyReady) return "password";
   const picked = document.querySelector('#vault input[name="lock"]:checked')?.value;
   if (picked) lockChoice = picked;
-  if (!passkeyReady) return "password";
   return lockChoice || "passkey";
 }
 
@@ -721,13 +822,14 @@ function forgetButton(name) {
   }, { kind: "ghost" });
 }
 
-function forgetBoxButton() {
-  return button(armed ? "Click again to forget the saved keys" : "Forget the saved keys", () => {
+function forgetBoxButton(box) {
+  const plural = (box?.saved?.length || 0) > 1;
+  return button(armed ? (plural ? "Click again to forget the saved keys" : "Click again to forget it") : (plural ? "Forget the saved keys" : "Forget this key"), () => {
     if (!armed) { armed = setTimeout(() => { armed = 0; render(); }, 4000); render(); return; }
     clearTimeout(armed);
     armed = 0;
     forgetBox();
-    say("The saved keys are gone from this computer.");
+    say(plural ? "The saved keys are gone from this computer." : "The saved key is gone from this computer.");
     changed();
   }, { kind: "ghost" });
 }
@@ -737,15 +839,24 @@ let typingAddress = 0;
 
 function applyDraftInput({ notify = true, draft = true } = {}) {
   draftKey = keyInput.value.trim();
+  const prevProvider = selection.provider;
   if (!draftKey && selection.provider.startsWith("Otari") && !status().selection.saved) {
     selection = { provider: CUSTOM };
   }
   const wrong = wrongCardProvider();
   const own = wrong ? null : ownProviderForDraft();
+  if (own && own.name !== selection.provider && (selection.provider === CUSTOM || selection.provider.startsWith("Otari"))) {
+    selection = { provider: own.name };
+  }
+  const detected = !!(own && own.name !== prevProvider);
   changed();
-  if (!notify || !draftKey) return;
+  if (!notify) return;
+  if (!draftKey) {
+    tell({ event: "draft-cleared" });
+    return;
+  }
   if (wrong) tell({ event: "mismatch", provider: wrong });
-  else if (own && own.name !== selection.provider) tell({ event: "detected", provider: own.name });
+  else if (detected) tell({ event: "detected", provider: own.name });
   else if (draft) tell({ event: "draft" });
 }
 

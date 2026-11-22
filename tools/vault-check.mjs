@@ -112,7 +112,7 @@ try {
   const fieldOrder = await inVault("!!(document.querySelector('#key').compareDocumentPosition(document.querySelector('#address')) & Node.DOCUMENT_POSITION_FOLLOWING)");
   check(fieldOrder, "on Other the key field comes before the optional service address");
   await b.evaluate("document.querySelector('#mp-start').click(); true");
-  await b.waitFor("/Paste your key first/.test(document.querySelector('#mp-status').textContent)", 5000);
+  await b.waitFor("/Paste your AI model key first/.test(document.querySelector('#mp-status').textContent)", 5000);
   check((await inVault("document.activeElement?.id")) === "key", "an empty Other form asks for the key first and focuses it");
 
   // A rejected key (401 or 400 INVALID_ARGUMENT) surfaces its refusal instead of saving.
@@ -167,7 +167,8 @@ try {
   await b.evaluate("document.querySelector('#mp-change')?.hidden || document.querySelector('#mp-change').click(); true");
   await inVault("[...document.querySelectorAll('button')].find((x) => /Remember on this computer/.test(x.textContent)).click(); true");
   await waitInVault("!!document.querySelector('input[name=\"lock\"]')");
-  check(!(await inVault("!!document.querySelector('input[name=\"lock\"][value=\"passkey\"]')")), "the passkey lock option is hidden on raw IP addresses");
+  check(await inVault("(() => { const p = document.querySelector('input[name=\"lock\"][value=\"passkey\"]'); return (!p || p.disabled) && document.querySelector('input[name=\"lock\"][value=\"password\"]')?.checked; })()"),
+    "on raw IP addresses passkey cannot be selected and password is checked");
   await inVault("document.querySelector('input[name=\"lock\"][value=\"password\"]').click(); true");
   await waitInVault("!!document.querySelector('#password')");
   await inVault(`(() => { document.querySelector('#password').value = ${JSON.stringify(PASSWORD)};
@@ -197,12 +198,12 @@ try {
   const again = await chat("hello once more");
   check(/stand-in AI/.test(again), "after unlocking, the officer answers again", again.slice(0, 80));
 
-  // 5. Switch to another card while a locked key is active: kept notice shows cleanly without duplicating the vault state.
+  // 5. Switch to another card while a saved key is active: kept notice shows cleanly without duplicating the vault state.
   await b.evaluate("if (document.querySelector('#mp-body').hidden) document.querySelector('#mp-change')?.click(); true");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"gemini\"]').click(); true");
   await b.waitFor("!document.querySelector('#mp-forget').hidden", 10000);
-  await waitInVault("/Your locked 127\\.0\\.0\\.1:8099 key stays saved when you switch\\./.test(document.body.textContent) && !document.body.querySelector('.state')", 10000);
-  check(true, "switching cards shows one header Forget button and the locked-key notice without duplicating the vault state");
+  await waitInVault("/Your saved 127\\.0\\.0\\.1:8099 key stays stored when you switch\\./.test(document.body.textContent) && !document.body.querySelector('.state')", 10000);
+  check(true, "switching cards shows one header Forget button and the kept-key notice without duplicating the vault state");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
   await b.waitFor("document.querySelector('#mp-forget').hidden", 10000);
   await waitInVault("/Forget this key/.test(document.body.textContent)", 10000);
