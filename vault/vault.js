@@ -241,25 +241,38 @@ function keyForSelection() {
   return readSession().keys[selectedRouter()]?.key || "";
 }
 
-function ownProviderForDraft() {
+function wrongCardProvider() {
   const own = providerForKey(draftKey);
-  if (!own) return null;
-  if (selection.provider !== CUSTOM) return own;
-  const router = selectedRouter();
-  if (!router || router === own.router || own.name.startsWith("Otari")) return own;
-  return null;
+  if (!own) return "";
+  if (own.name === selection.provider) return "";
+  if (selection.provider === CUSTOM || selection.provider.startsWith("Otari")) {
+    if (own.name.startsWith("Otari")) return "";
+    const router = selectedRouter();
+    if (selection.provider === CUSTOM && router && router !== own.router) return "";
+  }
+  return own.name;
 }
 
-// A key with another provider's prefix is not sent until that provider is selected.
+function ownProviderForDraft() {
+  if (wrongCardProvider()) return null;
+  const own = providerForKey(draftKey);
+  if (!own) return null;
+  if (selection.provider === CUSTOM || selection.provider.startsWith("Otari")) {
+    return own.name.startsWith("Otari") ? own : null;
+  }
+  return own;
+}
+
+// A key with another provider's prefix is not sent until its own card is selected.
 function mismatched() {
-  const own = ownProviderForDraft();
-  return !!own && own.name !== selection.provider;
+  return !!wrongCardProvider();
 }
 
 async function listModels() {
   const router = selectedRouter();
   if (!router) return { ok: false, reason: "address" };
-  if (mismatched()) return { ok: false, reason: "mismatch" };
+  const wrong = wrongCardProvider();
+  if (wrong) return { ok: false, reason: "mismatch", provider: wrong };
   const key = keyForSelection();
   if (!key) return { ok: false, reason: status().selection.locked ? "locked" : "empty" };
   if (!limit.take()) return { ok: false, code: 429 };
@@ -282,28 +295,27 @@ async function listModels() {
 
 // A key with a known prefix is kept for its own provider, whatever the page selected.
 async function commit() {
+  const wrong = wrongCardProvider();
+  if (wrong) return { ok: false, reason: "mismatch", provider: wrong };
   const own = draftKey ? ownProviderForDraft() : null;
   if (own) selection = { provider: own.name };
   const router = selectedRouter();
   if (!router) return { ok: false, reason: "address" };
   const s = readSession();
-  const box = readBox();
+  const kept = Object.fromEntries(Object.entries(s.keys).filter(([, entry]) => entry.remembered));
   if (draftKey) {
-    s.keys = { [router]: { name: nameFor(router), key: draftKey, remembered: false } };
+    kept[router] = { name: nameFor(router), key: draftKey, remembered: false };
     clearDraft();
+    s.keys = kept;
     s.active = router;
     writeSession(s);
-    if (box) {
-      if (s.raw) await rememberIn(box);
-      else writeBox(null);
-    }
     return { ok: true };
   }
   if (!s.keys[router]) return { ok: false, reason: status().selection.locked ? "locked" : "empty" };
-  s.keys = { [router]: s.keys[router] };
+  kept[router] = s.keys[router];
+  s.keys = kept;
   s.active = router;
   writeSession(s);
-  if (box && s.raw) await rememberIn(box);
   touch();
   return { ok: true };
 }
@@ -365,10 +377,14 @@ async function relay(port, { path, method, body }) {
 
 async function rememberIn(box) {
   const s = readSession();
-  if (!box || !s.raw) return;
-  for (const entry of Object.values(s.keys)) entry.remembered = true;
+  const router = selectedRouter();
+  const entry = router ? s.keys[router] : null;
+  if (!box || !s.raw || !entry) return;
+  entry.remembered = true;
   writeSession(s);
-  writeBox(await relockKeys(box, fromBase64(s.raw), plain(s.keys)));
+  const saved = { ...(await openKeys(box, fromBase64(s.raw))), [router]: { name: entry.name, key: entry.key } };
+  writeBox(await relockKeys(box, fromBase64(s.raw), saved));
+  say(`Saved on this computer, locked with ${box.kind === "passkey" ? "your passkey" : "your password"}.`);
 }
 
 function plain(keys) {
@@ -377,8 +393,10 @@ function plain(keys) {
 
 async function remember(kind) {
   const s = readSession();
-  const keys = plain(s.keys);
-  if (!Object.keys(keys).length) return;
+  const router = selectedRouter();
+  const entry = router ? s.keys[router] : null;
+  const keys = Object.fromEntries(Object.entries(s.keys).filter(([r, v]) => v.remembered || r === router));
+  if (!entry || !Object.keys(keys).length) return;
   let lock;
   if (kind === "password") {
     const password = passwordInput.value;
@@ -388,9 +406,9 @@ async function remember(kind) {
   } else {
     lock = await newPasskeyLock();
   }
-  const { box, raw } = await lockKeys(lock, keys);
+  const { box, raw } = await lockKeys(lock, plain(keys));
   writeBox(box);
-  for (const entry of Object.values(s.keys)) entry.remembered = true;
+  for (const r of Object.keys(keys)) if (s.keys[r]) s.keys[r].remembered = true;
   s.raw = toBase64(raw);
   s.until = Date.now() + IDLE_LOCK_MS;
   writeSession(s);
@@ -434,6 +452,8 @@ async function forget(router = selectedRouter()) {
   const s = readSession();
   const box = readBox();
   const remembered = !!s.keys[router]?.remembered || !!box?.saved?.some((e) => e.router === router);
+  const wasActive = s.active === router || !s.active;
+  const hadDraftForRemoved = router === selectedRouter();
   delete s.keys[router];
   if (s.active === router) s.active = "";
   writeSession(s);
@@ -447,11 +467,17 @@ async function forget(router = selectedRouter()) {
       forgetBox();
     }
   }
-  if (router === selectedRouter()) {
+  const latest = readSession();
+  const nextBox = readBox();
+  if (wasActive) {
+    latest.active = Object.keys(latest.keys)[0] || nextBox?.saved?.[0]?.router || "";
+    writeSession(latest);
+  }
+  if (hadDraftForRemoved) {
     clearDraft();
     if (selection.provider.startsWith("Otari")) selection = { provider: CUSTOM };
   }
-  if (!Object.keys(readSession().keys).length) panel = "";
+  if (!Object.keys(latest.keys).length) panel = "";
   say(`The ${removedName} key is gone from the vault.`);
 }
 
@@ -496,6 +522,12 @@ async function passkeyOutput(credentialId, prfSalt) {
 }
 
 async function checkPasskeys() {
+  const host = location.hostname || "";
+  // WebAuthn rejects IP literals like 127.0.0.1 with "This is an invalid domain".
+  if (!host || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(":")) {
+    passkeyReady = false;
+    return;
+  }
   try {
     const caps = await window.PublicKeyCredential?.getClientCapabilities?.();
     passkeyReady = caps?.["extension:prf"] === true;
@@ -535,7 +567,10 @@ async function run(label, work) {
   try {
     await work();
   } catch (error) {
-    say(error?.name === "NotAllowedError" ? "The passkey was cancelled." : String(error?.message || error), "warn");
+    const message = error?.name === "NotAllowedError" ? "The passkey was cancelled."
+      : error?.name === "SecurityError" ? "Passkeys need a domain name or localhost (not an IP address). Choose a password instead."
+      : String(error?.message || error);
+    say(message, "warn");
   } finally {
     busy = "";
     changed();
@@ -570,7 +605,12 @@ function render() {
   else if (entry && panel === "remember") rows.push(rememberPanel());
   else if (entry) rows.push(entry.remembered ? rememberedRow(name, box) : visitRow(name, box));
   else if (s.active && s.active.router !== sel.router) {
-    rows.push(el("p", { class: "hint" }, `Saving here replaces your current ${s.active.name} key.`));
+    const activeEntry = readSession().keys[s.active.router];
+    const activeLocked = !!(activeEntry?.remembered || box?.saved?.some((e) => e.router === s.active.router));
+    rows.push(el("p", { class: "hint" },
+      activeLocked
+        ? `Your locked ${s.active.name} key stays saved when you switch.`
+        : `Saving here replaces your temporary ${s.active.name} key.`));
   }
 
   if (notice.text) rows.push(el("p", { class: "notice", "data-tone": notice.tone || null, role: "status" }, notice.text));
@@ -603,12 +643,25 @@ function anotherAddressButton() {
 }
 
 function visitRow(name, box) {
-  const lockedBox = box && !readSession().raw;
+  const unlockedBox = box && !!readSession().raw;
+  const lockedBox = box && !unlockedBox;
+  const rememberClick = () => {
+    if (unlockedBox) {
+      run("remember", () => rememberIn(readBox()));
+      return;
+    }
+    panel = "remember";
+    notice = { text: "", tone: "" };
+    render();
+    passwordInput.focus();
+  };
   return el("div", { class: "state" },
-    el("p", null, el("strong", null, `Your ${name} key is in the vault for this visit.`), " It is forgotten when you close this tab.",
-      lockedBox ? " To remember it too, first unlock the keys saved on this computer." : null),
+    el("p", null, el("strong", null, `Your ${name} key is in the vault for this visit.`), " It is forgotten when you close this tab or switch to another model.",
+      lockedBox ? " Unlock your saved keys below to remember this one with the same lock." : null),
     el("div", { class: "actions" },
-      lockedBox ? null : button("Remember on this computer", () => { panel = "remember"; notice = { text: "", tone: "" }; render(); passwordInput.focus(); }),
+      lockedBox && box.kind !== "passkey" ? unlockInput : null,
+      lockedBox ? button(busy === "unlock" ? "Unlocking…" : box.kind === "passkey" ? "Unlock with your passkey" : "Unlock", () => run("unlock", unlock), { kind: "primary" }) : null,
+      lockedBox ? null : button("Remember on this computer", rememberClick),
       anotherAddressButton(),
       forgetButton(name)));
 }
@@ -687,10 +740,12 @@ function applyDraftInput({ notify = true, draft = true } = {}) {
   if (!draftKey && selection.provider.startsWith("Otari") && !status().selection.saved) {
     selection = { provider: CUSTOM };
   }
-  const own = ownProviderForDraft();
+  const wrong = wrongCardProvider();
+  const own = wrong ? null : ownProviderForDraft();
   changed();
   if (!notify || !draftKey) return;
-  if (own && own.name !== selection.provider) tell({ event: "detected", provider: own.name });
+  if (wrong) tell({ event: "mismatch", provider: wrong });
+  else if (own && own.name !== selection.provider) tell({ event: "detected", provider: own.name });
   else if (draft) tell({ event: "draft" });
 }
 
