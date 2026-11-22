@@ -674,13 +674,16 @@ function render() {
   if (panel !== "replace" && panel !== "custom" && sel.locked && !draftKey) rows.push(lockedRow(name, box, sel.router));
   else if (entry && panel === "remember") rows.push(rememberPanel());
   else if (panel !== "replace" && panel !== "custom" && entry && !draftKey) rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name));
-  else if (s.active && s.active.router !== sel.router && !entry && !sel.locked) {
-    const activeEntry = readSession().keys[s.active.router];
-    const activeLocked = !!(activeEntry?.remembered || boxFor(s.active.router));
-    rows.push(el("p", { class: "hint" },
-      activeLocked
-        ? `Your saved ${s.active.name} key stays stored when you switch.`
-        : `Saving here replaces your temporary ${s.active.name} key.`));
+  else if (!entry && !sel.locked) {
+    const activeSaved = s.active && (boxFor(s.active.router) || readSession().keys[s.active.router]?.remembered);
+    const otherSaved = [...held()].filter(([r]) => r !== sel.router && (boxFor(r) || readSession().keys[r]?.remembered)).map(([, label]) => label);
+    if (s.active && s.active.router !== sel.router && !activeSaved) {
+      rows.push(el("p", { class: "hint" }, `Saving here replaces your temporary ${s.active.name} key.`));
+    } else if (otherSaved.length === 1) {
+      rows.push(el("p", { class: "hint" }, `Your saved ${otherSaved[0]} key stays stored when you switch.`));
+    } else if (otherSaved.length > 1) {
+      rows.push(el("p", { class: "hint" }, `Your saved keys (${otherSaved.slice(0, -1).join(", ")} and ${otherSaved.at(-1)}) stay stored when you switch.`));
+    }
   }
 
   if (notice.text) rows.push(el("p", { class: "notice", "data-tone": notice.tone || null, role: "status" }, notice.text));

@@ -547,25 +547,48 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     }
     const active = s.active;
     const model = modelLabel(currentSetup?.model) || "the site's model";
+    const sel = selection();
+    const selLabel = nameOf(selected());
+    const needPhrase = selected().custom && !sel?.router && selLabel === "that service"
+      ? "Other needs a service address and key below."
+      : `${selected().title} (${selLabel}) needs a key below.`;
     if (currentSetup && active && active.router === currentSetup.router) {
       const via = active.custom ? hostOf(active.router) : active.name;
-      if (s.state === "locked") {
-        current.dataset.tone = "warn";
-        const viewingActive = body.hidden || selection()?.router === active.router;
-        current.textContent = viewingActive
-          ? `Chosen: ${model}, through ${via}. Its saved key is locked; unlock it below.`
-          : `Chosen: ${model}, through ${via} (locked). Select ${choiceOf(active).title} to unlock it, or switch below.`;
-        return "open";
+      const mode = s.state === "locked" ? "open" : "in-use";
+      if (body.hidden || sel?.router === active.router) {
+        if (s.state === "locked") {
+          current.dataset.tone = "warn";
+          current.textContent = `Chosen: ${model}, through ${via}. Its saved key is locked; unlock it below.`;
+          return "open";
+        }
+        current.textContent = `In use: ${model}, through ${via}. Your key is in the key vault.`;
+        return "in-use";
       }
-      current.textContent = `In use: ${model}, through ${via}. Your key is in the key vault.`;
-      return "in-use";
+      const nowNote = `Current model: ${model}, through ${via}${s.state === "locked" ? " (locked)" : ""}.`;
+      if (sel?.locked) {
+        current.dataset.tone = "warn";
+        current.textContent = `Your saved ${selLabel} key is locked; unlock it below. (${nowNote})`;
+      } else if (sel?.saved && !sel.draft) {
+        const action = mode === "in-use" ? "Keep this model or Save and start" : "Save and start";
+        current.textContent = `Your saved ${selLabel} key is unlocked; press ${action} below to use it. (${nowNote})`;
+      } else {
+        current.textContent = `${needPhrase} (${nowNote})`;
+      }
+      return mode;
     }
     if (currentSetup) {
       const via = currentSetup.provider === CUSTOM_SERVICE ? hostOf(currentSetup.router) : currentSetup.provider;
       current.textContent = `The key vault has no ${via} key in this tab. Paste it below to use ${model} again.`;
       return "open";
     }
-    current.textContent = "No model chosen yet. Report, Compare and Verify work without one.";
+    if (!body.hidden && sel?.locked) {
+      current.dataset.tone = "warn";
+      current.textContent = `Your saved ${selLabel} key is locked; unlock it below.`;
+    } else if (!body.hidden && sel?.saved && !sel.draft) {
+      current.textContent = `Your saved ${selLabel} key is unlocked; press Save and start below to use it.`;
+    } else {
+      current.textContent = "No model chosen yet. Report, Compare and Verify work without one.";
+    }
     return "open";
   };
   let forgetArmed = 0;
