@@ -120,13 +120,14 @@ try {
     const a = document.querySelector('#address'); a.value = ${JSON.stringify(AI)}; a.dispatchEvent(new Event('change'));
     const k = document.querySelector('#key'); k.value = "wrong-key-400"; k.dispatchEvent(new Event('input')); return true; })()`);
   await b.evaluate("document.querySelector('#mp-start').click(); true");
-  await b.waitFor("/did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
-  check(true, "a 400 invalid-key refusal is shown and never saves");
+  await b.waitFor("!document.querySelector('#mp-start').disabled && /did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
+  check(seen.some((s) => s.auth === "Bearer wrong-key-400"), "a 400 invalid-key refusal is shown and never saves");
+  await b.evaluate("document.querySelector('#mp-status').textContent = ''; true");
   await inVault(`(() => {
     const k = document.querySelector('#key'); k.value = "wrong-stand-in-key"; k.dispatchEvent(new Event('input')); return true; })()`);
   await b.evaluate("document.querySelector('#mp-start').click(); true");
-  await b.waitFor("/did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
-  check(true, "a 401 key refusal is shown instead of being lost in the vault reply");
+  await b.waitFor("!document.querySelector('#mp-start').disabled && /did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
+  check(seen.some((s) => s.auth === "Bearer wrong-stand-in-key"), "a 401 key refusal is shown instead of being lost in the vault reply");
 
   // Pasting a valid key and immediately pressing Save and start works without waiting for the debounce timer.
   await inVault(`(() => {
@@ -195,12 +196,14 @@ try {
   const again = await chat("hello once more");
   check(/stand-in AI/.test(again), "after unlocking, the officer answers again", again.slice(0, 80));
 
-  // 5. Switch to another card while active: Forget and Remember stay reachable, then forget.
-  await b.evaluate("document.querySelector('#mp-change')?.hidden || document.querySelector('#mp-change').click(); true");
+  // 5. Switch to another card while active: header Forget stays visible without duplicating the vault panel, then forget.
+  await b.evaluate("if (document.querySelector('#mp-body').hidden) document.querySelector('#mp-change')?.click(); true");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"gemini\"]').click(); true");
-  await waitInVault("/Forget 127\\.0\\.0\\.1:8099 key/.test(document.body.textContent) && /Lock now/.test(document.body.textContent)", 10000);
-  check(true, "switching to another provider card keeps Lock and Forget visible for the active key");
+  await b.waitFor("!document.querySelector('#mp-forget').hidden", 10000);
+  await waitInVault("/Saving here replaces your current/.test(document.body.textContent) && !document.body.querySelector('.state')", 10000);
+  check(true, "switching cards shows one header Forget button and a replace notice without duplicating the vault state");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
+  await b.waitFor("document.querySelector('#mp-forget').hidden", 10000);
   await waitInVault("/Forget this key/.test(document.body.textContent)", 10000);
   await inVault("[...document.querySelectorAll('button')].find((x) => /Forget this key/.test(x.textContent)).click(); true");
   await inVault("[...document.querySelectorAll('button')].find((x) => /Click again/.test(x.textContent)).click(); true");

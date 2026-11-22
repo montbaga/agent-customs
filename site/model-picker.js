@@ -226,7 +226,6 @@ export function explainProviderError(text, provider = "The AI provider", model =
 }
 
 const SETUP_KEY = "agent-customs-model";
-const ROUTER_MODELS_KEY = "agent-customs-router-models";
 
 /** {provider, router, model} saved with Save and start, or null. provider may be "custom". */
 export function readModelSetup(storage = globalThis.localStorage) {
@@ -245,24 +244,6 @@ export function saveModelSetup({ provider, router, model }, storage = globalThis
 
 export function clearModelSetup(storage = globalThis.localStorage) {
   try { storage?.removeItem(SETUP_KEY); } catch { /* storage blocked */ }
-}
-
-function readRouterModel(router, storage = globalThis.localStorage) {
-  try {
-    const map = JSON.parse(storage?.getItem(ROUTER_MODELS_KEY) || "null");
-    return typeof map?.[router] === "string" ? map[router] : "";
-  } catch {
-    return "";
-  }
-}
-
-function saveRouterModel(router, model, storage = globalThis.localStorage) {
-  if (!router || !model) return;
-  try {
-    const map = JSON.parse(storage?.getItem(ROUTER_MODELS_KEY) || "{}") || {};
-    map[router] = model;
-    storage?.setItem(ROUTER_MODELS_KEY, JSON.stringify(map));
-  } catch { /* storage blocked */ }
 }
 
 /**
@@ -304,6 +285,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const cards = $("#mp-cards");
   const current = $("#mp-current");
   const change = $("#mp-change");
+  const forgetBtn = $("#mp-forget");
   const body = $("#mp-body");
   const modelSelect = $("#mp-model");
   const modelOther = $("#mp-model-other");
@@ -315,7 +297,6 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const legacyNote = $("#mp-legacy");
 
   let currentSetup = setup;
-  if (currentSetup?.router && currentSetup?.model) saveRouterModel(currentSetup.router, currentSetup.model);
   const held = () => vault?.status || null;
   const selection = () => held()?.selection || null;
   // A key with no card of its own (Otari's) goes under "Other", by its provider's name.
@@ -336,14 +317,15 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   };
   const fallbackModelFor = (entry) => {
     if (!entry) return "";
-    const remembered = readRouterModel(entry.router);
-    if (remembered) return remembered;
     const known = providers.find((p) => p.router === entry.router);
     if (known?.model) return known.model;
-    const card = choiceOf(entry);
-    return card?.models?.[0]?.id || "";
+    return choiceOf(entry)?.models?.[0]?.id || "";
   };
-  const hasSaved = (choice) => (held()?.saved || []).some((s) => choiceOf(s).id === choice.id);
+  const hasSaved = (choice) => {
+    const active = held()?.active;
+    if (active) return choiceOf(active).id === choice.id;
+    return (held()?.saved || []).some((s) => choiceOf(s).id === choice.id);
+  };
   const savedOtherProvider = (preferred = "") => {
     const saved = held()?.saved || [];
     if (preferred) return saved.some((s) => s.name === preferred) ? preferred : "";
@@ -353,20 +335,23 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     return match && !match.custom ? match.name : "";
   };
 
-  // Cards: native radio buttons, so arrow keys and screen readers work as usual. A card whose
-  // provider has a key in the vault says so.
+  // Cards: native radio buttons, so arrow keys and screen readers work as usual. Only the
+  // single active card carries a badge.
   for (const choice of MODEL_CHOICES) {
     const label = document.createElement("label");
     label.className = "mp-card";
     label.innerHTML = `<input type="radio" name="mp-model" value="${choice.id}">`
       + `<span class="mp-title">${choice.title}</span><span class="mp-by">${choice.by}</span><span class="mp-cost">${choice.cost}</span>`
-      + `<span class="mp-saved" hidden>Key in vault</span>`;
+      + `<span class="mp-saved" hidden>In use</span>`;
     cards.append(label);
   }
   const refreshCards = () => {
+    const locked = held()?.state === "locked";
     for (const choice of MODEL_CHOICES) {
       const tag = root.querySelector(`input[name="mp-model"][value="${choice.id}"]`)?.closest(".mp-card")?.querySelector(".mp-saved");
-      if (tag) tag.hidden = !hasSaved(choice);
+      if (!tag) continue;
+      tag.textContent = locked ? "Saved (locked)" : "In use";
+      tag.hidden = !hasSaved(choice);
     }
   };
 
@@ -502,6 +487,19 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     current.textContent = "No model chosen yet. Report, Compare and Verify work without one.";
     return "open";
   };
+  let forgetArmed = 0;
+  const syncForget = () => {
+    if (!forgetBtn) return;
+    const active = held()?.active;
+    const inVaultHere = !body.hidden && !!active && selection()?.router === active.router;
+    const showHeader = !!active && !inVaultHere;
+    forgetBtn.hidden = !showHeader;
+    if (!showHeader && forgetArmed) {
+      clearTimeout(forgetArmed);
+      forgetArmed = 0;
+      forgetBtn.textContent = "Forget key";
+    }
+  };
   const layout = (mode) => {
     change.hidden = mode !== "in-use";
     if (mode === "closed") body.hidden = true;
@@ -511,6 +509,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     }
     change.setAttribute("aria-expanded", String(!body.hidden));
     change.textContent = body.hidden ? "Change model" : "Keep this model";
+    syncForget();
   };
 
   const applyRuntimeModel = (model) => {
@@ -651,7 +650,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (!selection()) { say("The key vault could not load, so a key cannot be saved. Reload the page to try again.", "warn"); return; }
     start.disabled = true;
     try {
-      await vault.ask("flush");
+      await vault.ask("flush", { draft: false });
       request += 1;
       const choice = selected();
       const sel = selection();
@@ -692,7 +691,6 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
       if (!done?.ok || !done.status?.active) { say(commitProblem(done?.reason, choice), "warn"); vault.focus(); return; }
       const active = done.status.active;
       saveModelSetup({ provider: active.custom ? CUSTOM_SERVICE : active.name, router: active.router, model });
-      saveRouterModel(active.router, model);
       // Come back here after the reload, without the browser restoring the old position.
       try {
         sessionStorage.setItem(RETURN_KEY, String(Date.now()));
@@ -705,10 +703,33 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     }
   });
 
+  forgetBtn?.addEventListener("click", async () => {
+    const active = held()?.active;
+    if (!active) return;
+    if (!forgetArmed) {
+      forgetArmed = setTimeout(() => {
+        forgetArmed = 0;
+        forgetBtn.textContent = "Forget key";
+      }, 4000);
+      forgetBtn.textContent = "Click again to forget";
+      return;
+    }
+    clearTimeout(forgetArmed);
+    forgetArmed = 0;
+    forgetBtn.textContent = "Forget key";
+    forgetBtn.disabled = true;
+    try {
+      await vault?.ask("forget", { router: active.router });
+    } finally {
+      forgetBtn.disabled = false;
+    }
+  });
+
   change.addEventListener("click", () => {
     body.hidden = !body.hidden;
     change.setAttribute("aria-expanded", String(!body.hidden));
     change.textContent = body.hidden ? "Change model" : "Keep this model";
+    syncForget();
     if (!body.hidden) listForKey(selected());
   });
 
