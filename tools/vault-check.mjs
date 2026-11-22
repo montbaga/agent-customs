@@ -105,11 +105,23 @@ try {
   // 1. Save a key through the vault box.
   await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
   await waitInVault("!!document.querySelector('#address')");
+  const fieldOrder = await inVault("!!(document.querySelector('#key').compareDocumentPosition(document.querySelector('#address')) & Node.DOCUMENT_POSITION_FOLLOWING)");
+  check(fieldOrder, "on Other the key field comes before the optional service address");
+  await b.evaluate("document.querySelector('#mp-start').click(); true");
+  await b.waitFor("/Paste your key first/.test(document.querySelector('#mp-status').textContent)", 5000);
+  check((await inVault("document.activeElement?.id")) === "key", "an empty Other form asks for the key first and focuses it");
+
+  // A rejected key surfaces its 401 refusal instead of failing silently, and does not save.
   await inVault(`(() => {
     const a = document.querySelector('#address'); a.value = ${JSON.stringify(AI)}; a.dispatchEvent(new Event('change'));
+    const k = document.querySelector('#key'); k.value = "wrong-stand-in-key"; k.dispatchEvent(new Event('input')); return true; })()`);
+  await b.evaluate("document.querySelector('#mp-start').click(); true");
+  await b.waitFor("/did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
+  check(true, "a 401 key refusal is shown instead of being lost in the vault reply");
+
+  // Pasting a valid key and immediately pressing Save and start works without waiting for the debounce timer.
+  await inVault(`(() => {
     const k = document.querySelector('#key'); k.value = ${JSON.stringify(KEY)}; k.dispatchEvent(new Event('input')); return true; })()`);
-  await b.waitFor("document.querySelector('#mp-model').value === 'stand-in-model'", 15000);
-  check(true, "the vault listed the key's models", await b.evaluate("document.querySelector('#mp-status').textContent"));
   await b.evaluate("window.beforeSave = true; document.querySelector('#mp-start').click(); true");
   try {
     await b.waitFor("!window.beforeSave && document.readyState === 'complete'", 20000);
@@ -119,6 +131,7 @@ try {
   await officer();
   const inUse = await b.evaluate("document.querySelector('#mp-current').textContent");
   check(/In use: .*127\.0\.0\.1:8099.*key vault/.test(inUse), "after Save and start the officer uses the key from the vault", inUse);
+  check(seen.some((s) => s.path === "/v1/models" && s.auth === `Bearer ${KEY}`), "the vault listed the key's models from the stand-in");
 
   // 2. Where the key is.
   const pageHas = (await b.evaluate(pageStorage)).includes(KEY);
@@ -173,7 +186,13 @@ try {
   const again = await chat("hello once more");
   check(/stand-in AI/.test(again), "after unlocking, the officer answers again", again.slice(0, 80));
 
-  // 5. Forget.
+  // 5. Switch to another card while active: Forget and Remember stay reachable, then forget.
+  await b.evaluate("document.querySelector('#mp-change')?.hidden || document.querySelector('#mp-change').click(); true");
+  await b.evaluate("document.querySelector('#mp-cards input[value=\"gemini\"]').click(); true");
+  await waitInVault("/Forget 127\\.0\\.0\\.1:8099 key/.test(document.body.textContent) && /Lock now/.test(document.body.textContent)", 10000);
+  check(true, "switching to another provider card keeps Lock and Forget visible for the active key");
+  await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
+  await waitInVault("/Forget this key/.test(document.body.textContent)", 10000);
   await inVault("[...document.querySelectorAll('button')].find((x) => /Forget this key/.test(x.textContent)).click(); true");
   await inVault("[...document.querySelectorAll('button')].find((x) => /Click again/.test(x.textContent)).click(); true");
   await waitInVault("/gone from the vault/.test(document.body.textContent)", 10000);

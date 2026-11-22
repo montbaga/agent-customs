@@ -309,6 +309,14 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     return setup.model;
   };
   const hasSaved = (choice) => (held()?.saved || []).some((s) => choiceOf(s).id === choice.id);
+  const savedOtherProvider = (preferred = "") => {
+    const saved = held()?.saved || [];
+    if (preferred) return saved.some((s) => s.name === preferred) ? preferred : "";
+    const active = held()?.active;
+    const underOther = (entry) => entry && choiceOf(entry).id === OTHER.id;
+    const match = underOther(active) ? active : saved.find(underOther);
+    return match && !match.custom ? match.name : "";
+  };
 
   // Cards: native radio buttons, so arrow keys and screen readers work as usual. A card whose
   // provider has a key in the vault says so.
@@ -350,9 +358,10 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (choice.live === false || !vault) return { models: null };
     const result = await vault.ask("models");
     if (result?.ok) return { models: chatModels(result.ids) };
-    if (result?.status === 401 || result?.status === 403) return { rejected: true };
-    if (result?.status === 0) return { models: null, unreachable: true };
-    return { models: null, reason: result?.reason || "", status: result?.status || 0 };
+    const code = result?.code ?? (typeof result?.status === "number" ? result.status : undefined);
+    if (code === 401 || code === 403) return { rejected: true };
+    if (code === 0) return { models: null, unreachable: true };
+    return { models: null, reason: result?.reason || "", status: code || 0 };
   };
   const rejectedNote = (choice) => `${nameOf(choice)} did not accept this key. Check that you copied all of it.`;
   const unreachableNote = (choice) => choice.custom && !otherProvider
@@ -412,13 +421,14 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     say(note);
     // A key typed for another provider is cleared, unless that key chose this card.
     const asked = vault ? vault.ask("select", { provider: vaultName(choice), keepDraft: fromKey }) : Promise.resolve();
+    const seq = request;
     // Ask the provider only while the steps are open, never on a plain page load.
-    asked.then(() => { refreshCards(); if (!body.hidden) listForKey(choice); });
+    asked.then(() => { refreshCards(); if (seq === request && !body.hidden) listForKey(choice); });
   };
 
-  cards.addEventListener("change", () => show(selected()));
-  root.querySelector('input[name="mp-model"][value="other"]')?.closest(".mp-card")?.addEventListener("click", () => {
-    if (selected().custom && otherProvider) show(OTHER);
+  cards.addEventListener("change", () => {
+    const choice = selected();
+    show(choice, choice.custom ? { provider: savedOtherProvider() } : {});
   });
   modelSelect.addEventListener("change", () => {
     modelOther.hidden = !!modelSelect.value;
@@ -563,16 +573,25 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   start.addEventListener("click", async () => {
     // Save speaks for itself: a list still loading must not talk over it.
     request += 1;
-    const choice = selected();
-    const sel = selection();
     if (!engine) { say("The assistant could not load, so a model cannot be set here. Reload the page to try again.", "warn"); return; }
-    if (!sel) { say("The key vault could not load, so a key cannot be saved. Reload the page to try again.", "warn"); return; }
-    if (choice.custom && !otherProvider && !sel.router) { say(commitProblem("address", choice), "warn"); vault.focus(); return; }
-    if (!sel.draft && !sel.saved) { say(commitProblem("empty", choice), "warn"); vault.focus(); return; }
-    if (!sel.draft && sel.locked) { say(commitProblem("locked", choice), "warn"); vault.focus(); return; }
-    let model = chosenModel();
+    if (!selection()) { say("The key vault could not load, so a key cannot be saved. Reload the page to try again.", "warn"); return; }
     start.disabled = true;
     try {
+      await vault.ask("flush");
+      request += 1;
+      const choice = selected();
+      const sel = selection();
+      if (!sel) { say("The key vault could not load, so a key cannot be saved. Reload the page to try again.", "warn"); return; }
+      if (!sel.draft && !sel.saved) {
+        say(choice.custom && !otherProvider && !sel.router
+          ? "Paste your key first (for Otari, leave the address blank; for another service, type its https:// address too)."
+          : commitProblem("empty", choice), "warn");
+        vault.focus();
+        return;
+      }
+      if (choice.custom && !otherProvider && !sel.router) { say(commitProblem("address", choice), "warn"); vault.focus(); return; }
+      if (!sel.draft && sel.locked) { say(commitProblem("locked", choice), "warn"); vault.focus(); return; }
+      let model = chosenModel();
       // Save under the name the provider lists, which is the only name it accepts.
       say(model ? `Checking ${modelLabel(model)} with ${nameOf(choice)}…` : `Asking ${nameOf(choice)} which models your key can use…`);
       const result = await modelsFor(choice);
@@ -624,11 +643,8 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   refreshCards();
   // A key under "Other" that belongs to a service the vault knows by name (Otari) keeps that name
   // while that key is still saved in the vault.
-  const savedOtherProvider = setupChoice === OTHER && setup.provider !== CUSTOM_SERVICE
-    && (held()?.saved || []).some((s) => s.name === setup.provider)
-    ? setup.provider
-    : "";
-  show(setupChoice || choiceForProvider("Google AI Studio"), { provider: savedOtherProvider });
+  const initialOther = setupChoice === OTHER && setup.provider !== CUSTOM_SERVICE ? savedOtherProvider(setup.provider) : "";
+  show(setupChoice || choiceForProvider("Google AI Studio"), { provider: initialOther });
 
   // Back from Save and start's reload. view.js reopened the Officer tab before anything drew;
   // the status line above the picker may have changed height since, so settle once more.

@@ -252,3 +252,22 @@ test("both pages allow only their own scripts, and all HTML the site writes goes
   assert.match(vaultPolicy, /base-uri 'none'/);
   assert.match(vaultPolicy, /require-trusted-types-for 'script'; trusted-types 'none'/, "the vault writes no HTML at all");
 });
+
+test("model-list errors keep their HTTP code separately from the vault status", async () => {
+  const { vault } = connectedVault((data, _port, main) => {
+    if (data.type === "models") {
+      main.postMessage({ id: data.id, reply: { ok: false, code: 401, status: { state: "empty", active: null, saved: [] } } });
+    } else if (data.type === "flush") {
+      main.postMessage({ id: data.id, reply: { ok: true, status: { state: "empty", active: null, saved: [], selection: { provider: "Otari", draft: true } } } });
+    }
+  });
+  await vault.ready;
+  const flushed = await vault.ask("flush");
+  assert.equal(flushed.ok, true);
+  assert.equal(flushed.status.selection.provider, "Otari");
+  const models = await vault.ask("models");
+  assert.equal(models.ok, false);
+  assert.equal(models.code, 401);
+  assert.equal(models.status.state, "empty");
+  vault.port.close();
+});
