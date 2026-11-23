@@ -36,7 +36,7 @@ class SiteActions {
   static stateAction() {
     return {
       name: "get_desk_state",
-      description: "Read the desk: the latest inspection summary, the network versions approved in this browser, the test-range networks with their page links, and recent guard decisions. Changes nothing.",
+      description: "Read the desk: the latest inspection summary, all networks inspected in this visit, the network versions approved in this browser, the test-range networks with their page links, and recent guard decisions. Changes nothing.",
       effect: "read",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       execute: () => desk.state(),

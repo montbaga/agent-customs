@@ -25,6 +25,92 @@ import { legacyKeys, mountModelPicker, readModelSetup } from "./model-picker.js"
 import { KeyVault, VAULT_KEY, VAULT_ROUTER, pageTheme, routeVaultFetch } from "./vault-bridge.js";
 
 /**
+ * Limit which website actions named sub-agents can see and execute.
+ *
+ * :param engine: The runtime engine, or an object with actions, trace and top.
+ * :param allowByAgent: Map of agent name to allowed website action names.
+ * :return: {uninstall()}
+ */
+export function scopeAgentActions(engine, allowByAgent = {}) {
+  const actions = engine?.actions;
+  const trace = engine?.trace;
+  if (!actions || !trace || typeof actions.catalog !== "function" || typeof actions.execute !== "function") {
+    return { uninstall() {} };
+  }
+  const allow = new Map(
+    Object.entries(allowByAgent).map(([agent, names]) => [agent, new Set(names || [])]),
+  );
+  if (!allow.size) return { uninstall() {} };
+
+  const agentStack = [];
+  const websiteToolStack = [];
+  const removeById = (stack, id) => {
+    for (let i = stack.length - 1; i >= 0; i -= 1) {
+      if (stack[i].id === id) { stack.splice(i, 1); return; }
+    }
+  };
+  const onEvent = (event) => {
+    const ev = event?.detail;
+    if (!ev) return;
+    if (ev.phase === "start") {
+      if (ev.kind === "agent") {
+        agentStack.push({ id: ev.id, agent: ev.agent, network: ev.network || "" });
+      } else if (ev.kind === "tool" && ev.toolKind === "agent") {
+        const parent = trace.spans?.get(ev.parent);
+        agentStack.push({ id: ev.id, agent: ev.tool, network: parent?.network || "" });
+      } else if (ev.kind === "tool" && ev.toolKind === "website") {
+        websiteToolStack.push({ id: ev.id, parent: ev.parent });
+      }
+    } else if (ev.phase === "end") {
+      removeById(agentStack, ev.id);
+      removeById(websiteToolStack, ev.id);
+    }
+  };
+  trace.addEventListener("event", onEvent);
+
+  const originalCatalog = actions.catalog;
+  actions.catalog = function scopedCatalog(scope) {
+    const list = originalCatalog.call(this, scope);
+    const active = agentStack[agentStack.length - 1];
+    if (!active) return list;
+    const topNetwork = engine.top?.network?.name || "";
+    if (topNetwork && active.network && active.network !== topNetwork) return list;
+    if (scope?.network && active.network && scope.network !== active.network) return list;
+    const allowed = allow.get(active.agent);
+    return allowed ? list.filter((action) => allowed.has(action.name)) : list;
+  };
+
+  const originalExecute = actions.execute;
+  actions.execute = async function scopedExecute(plan, confirm, invocationId) {
+    const toolSpan = websiteToolStack[websiteToolStack.length - 1];
+    if (toolSpan) {
+      const parent = trace.spans?.get(toolSpan.parent);
+      const topNetwork = engine.top?.network?.name || "";
+      if (parent?.kind === "agent" && (!topNetwork || !parent.network || parent.network === topNetwork)) {
+        const allowed = allow.get(parent.agent);
+        if (allowed) {
+          for (const item of plan || []) {
+            const name = item?.entry?.name;
+            if (!allowed.has(name)) {
+              throw new Error(`${parent.agent} is not allowed to call ${name}.`);
+            }
+          }
+        }
+      }
+    }
+    return originalExecute.call(this, plan, confirm, invocationId);
+  };
+
+  return {
+    uninstall() {
+      trace.removeEventListener("event", onEvent);
+      actions.catalog = originalCatalog;
+      actions.execute = originalExecute;
+    },
+  };
+}
+
+/**
  * Boots the browser runtime in the page's assistant section.
  */
 export class AssistantMount {
@@ -84,6 +170,9 @@ export class AssistantMount {
         openReport: (url) => document.dispatchEvent(new CustomEvent("customs:inspect", { detail: { url } })),
         // 4. The same switch turns the AI double-check on for partners.
         semanticJudge: () => desk.aiCheckOn,
+      });
+      AssistantMount.actionScope = scopeAgentActions(engine, {
+        instruction_analyst: ["get_inspection_details"],
       });
 
       // The AI is ready once the vault holds the key the setup uses; a saved key may be locked.

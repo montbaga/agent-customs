@@ -369,3 +369,99 @@ test("a model outside a free-tier key is explained as a billing matter", async (
   const ordinary = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded, limit: 10, model: x"}}');
   assert.match(ordinary.advice, /reached its limit/);
 });
+
+test("instruction_analyst is scoped to read-only inspection details and cannot inspect or overwrite the desk", async () => {
+  const { scopeAgentActions } = await import("../site/site.js");
+  const sunny = `${RANGE}/sunny_bakery/sunny_bakery`;
+  const shady = `${RANGE}/shady_pizza/shady_pizza`;
+  desk.askContact = async () => true;
+  await desk.inspect(sunny);
+  assert.equal(desk.latest.target.url, sunny);
+
+  const trace = new TraceBus();
+  const scopedRegistry = new ActionRegistry();
+  await registerActions({ register: scopedRegistry.register.bind(scopedRegistry, { base: BASE, network: NETWORK }) });
+  const scope = scopeAgentActions(
+    { actions: scopedRegistry, trace, top: { network } },
+    { instruction_analyst: ["get_inspection_details"] },
+  );
+
+  let askedContact = 0;
+  desk.askContact = async () => { askedContact += 1; return true; };
+  const beforeRequests = requests.length;
+
+  try {
+    const model = new ScriptedModel([
+      { tool: "instruction_analyst", arguments: { request: `Read ${shady} agent shady_pizza_assistant` } },
+      { tool: "website_inspect_agent_network", arguments: { url: shady } },
+      { text: "Network has not been inspected in this visit." },
+      { text: "Not inspected yet." },
+    ]);
+    const ctx = {
+      network, manifest, actions: scopedRegistry, baseOrigin: BASE, displayOrigin: new URL(BASE).host,
+      trace, isTop: true, frontMan: network.findFrontMan(), history: [], llm: model,
+      confirmWebsiteActions: async () => true, requestConsent: async () => "allow",
+    };
+    await runAgent(ctx, "customs_officer", "Check shady pizza instructions", null, []);
+
+    const officerTools = model.calls[0].tools.map((t) => t.function.name);
+    const analystTools = model.calls[1].tools.map((t) => t.function.name);
+    assert.ok(officerTools.includes("website_inspect_agent_network"));
+    assert.ok(analystTools.includes("website_get_inspection_details"));
+    for (const forbidden of ["website_inspect_agent_network", "website_compare_networks", "website_pin_network", "website_unpin_network", "website_get_desk_state"]) {
+      assert.equal(analystTools.includes(forbidden), false, `analyst must not see ${forbidden}`);
+    }
+    assert.equal(askedContact, 0, "analyst must never trigger a contact prompt");
+    assert.equal(requests.length, beforeRequests, "analyst must not fetch external URLs");
+    assert.equal(desk.latest.target.url, sunny, "latest report on desk stays intact");
+
+    const agentSpan = trace.start("agent", { parent: null, origin: new URL(BASE).host, agent: "instruction_analyst", network: NETWORK });
+    const toolSpan = trace.start("tool", { parent: agentSpan, origin: new URL(BASE).host, tool: "website_inspect_agent_network", toolKind: "website" });
+    try {
+      const plan = scopedRegistry.prepare({ kind: "action", action: `${BASE}/${NETWORK}#inspect_agent_network`, arguments: { url: shady } });
+      await assert.rejects(() => scopedRegistry.execute(plan, async () => true, "req-1"), /instruction_analyst is not allowed to call inspect_agent_network/);
+    } finally {
+      trace.end(toolSpan);
+      trace.end(agentSpan);
+    }
+
+    const readSpan = trace.start("agent", { parent: null, origin: new URL(BASE).host, agent: "instruction_analyst", network: NETWORK });
+    const readTool = trace.start("tool", { parent: readSpan, origin: new URL(BASE).host, tool: "website_get_inspection_details", toolKind: "website" });
+    try {
+      const plan = scopedRegistry.prepare({ kind: "action", action: `${BASE}/${NETWORK}#get_inspection_details`, arguments: { url: sunny } });
+      const receipts = await scopedRegistry.execute(plan, async () => true, "req-2");
+      assert.equal(receipts[0].status, "succeeded");
+      assert.equal(receipts[0].result.ok, true);
+    } finally {
+      trace.end(readTool);
+      trace.end(readSpan);
+    }
+
+    const officerTable = await buildToolTable(ctx, network.getAgentSpec("customs_officer"), [], null);
+    assert.ok(officerTable.toolByName.has("website_inspect_agent_network"));
+  } finally {
+    scope.uninstall();
+  }
+});
+
+test("desk.state lists every network inspected in this visit, newest first, without duplicates", async () => {
+  desk.askContact = async () => true;
+  const sunny = `${RANGE}/sunny_bakery/sunny_bakery`;
+  const shady = `${RANGE}/shady_pizza/shady_pizza`;
+  await desk.inspect(sunny);
+  await desk.inspect(shady);
+
+  const state = await callTool("get_desk_state", {});
+  assert.equal(state.latestReport.network, shady);
+  const urls = state.inspectedReports.map((r) => r.url);
+  assert.equal(urls[0], shady);
+  assert.equal(urls[1], sunny);
+  assert.equal(state.inspectedReports[0].verdict, "DENIED");
+  assert.equal(state.inspectedReports[1].verdict, "CLEARED");
+
+  await desk.inspect(sunny);
+  const after = await callTool("get_desk_state", {});
+  const afterUrls = after.inspectedReports.map((r) => r.url);
+  assert.equal(afterUrls[0], sunny);
+  assert.equal(afterUrls.filter((u) => u === sunny).length, 1);
+});
