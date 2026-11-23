@@ -22,7 +22,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 88.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-88.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 205 passing" src="https://img.shields.io/badge/tests-205_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 219 passing" src="https://img.shields.io/badge/tests-219_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -110,7 +110,7 @@ import { installCustomsGuard } from "./customs/guard.js";
 installCustomsGuard(booted.engine);
 ```
 
-**See it live:** [Main Street Guide](https://montbaga.github.io/agent-customs/practice/) is an ordinary site with the guard added the fourth way. **Before you publish:** `npx agent-customs check <url>` or the [GitHub Action](#run-it-anywhere-command-line-github-action-browser-extension) checks your own network. **As a visitor:** the [browser extension](#run-it-anywhere-command-line-github-action-browser-extension) checks agents on any site. Every setting and detail: [Install details](#install-details).
+**See it live:** [Main Street Guide](https://montbaga.github.io/agent-customs/practice/) is an ordinary site with the guard added the fourth way. **Before you publish:** `npx agent-customs check <url>` or the [GitHub Action](#run-it-anywhere-command-line-mcp-server-github-action-browser-extension) checks your own network. **Inside your AI editor:** use the [MCP server](#run-it-anywhere-command-line-mcp-server-github-action-browser-extension). **As a visitor:** the [browser extension](#run-it-anywhere-command-line-mcp-server-github-action-browser-extension) checks agents on any site. Every setting and detail: [Install details](#install-details).
 
 <br>
 
@@ -238,7 +238,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  205 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the extension, the practice site, the key vault, the one-line install and its one-file build.
+  219 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -338,7 +338,7 @@ An ordinary town-guide site built with Cognizant's kit, in its own colours ([`pr
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="docs/images/phase2-attack-lab.jpg" alt="Attack lab and benchmark scorecard"><br><sub><b>Attack lab and benchmark:</b> the same attacks with and without Agent Customs, next to the benchmark scorecard.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Protect your assistant in one line: three steps, and the one-line install with its fingerprint"><br><sub><b>Add it to your site:</b> three steps and the one line to copy, with tabs for two lines, npm, the command line tool, the GitHub Action and the extension.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/phase3-builders.jpg" alt="Protect your assistant in one line: three steps, and the one-line install with its fingerprint"><br><sub><b>Add it to your site:</b> three steps and the one line to copy, with tabs for two lines, npm, the command line tool, the GitHub Action, the extension and the MCP server.</sub></td>
   </tr>
 </table>
 
@@ -453,27 +453,35 @@ A second site, https://agent-customs-range.github.io/, hosts sample networks, so
 
 ---
 
-## Run it anywhere: command line, GitHub Action, browser extension
+## Run it anywhere: command line, MCP server, GitHub Action, browser extension
 
 Needs Node 22 or newer and no npm packages.
 
 <table width="100%">
 <tr>
-<td width="33.3%" valign="top">
+<td width="50%" valign="top">
   <strong>1 · Command line and benchmark</strong><br><br>
   Check addresses, folders, MCP and A2A files, or verify stamps:<br><br>
   <code>npm test</code><br>
   <code>npm run bench -- --verbose</code><br>
   <code>node bin/agent-customs.mjs check https://raw.githubusercontent.com/microsoft/playwright-mcp/main/server.json</code>
 </td>
-<td width="33.3%" valign="top">
-  <strong>2 · GitHub Action (<code>action.yml</code>)</strong><br><br>
+<td width="50%" valign="top">
+  <strong>2 · MCP server (<code>agent-customs mcp</code>)</strong><br><br>
+  Full inspection desk inside Claude Code, Cursor, Claude Desktop or Antigravity (all 11 tools and 4 resources):<br><br>
+  <code>node bin/agent-customs.mjs mcp</code><br>
+  <code>npx -y agent-customs mcp</code>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+  <strong>3 · GitHub Action (<code>action.yml</code>)</strong><br><br>
   Stops pull requests that add hidden prompts, leaked keys or risky MCP setups, with SARIF results in the Security tab:<br><br>
   <code>uses: montbaga/agent-customs@main</code><br>
   Options: <code>strict</code>, <code>allow-hold</code>, <code>transitive</code>, <code>sarif-file</code>.
 </td>
-<td width="33.3%" valign="top">
-  <strong>3 · Chrome or Edge extension</strong><br><br>
+<td width="50%" valign="top">
+  <strong>4 · Chrome or Edge extension</strong><br><br>
   Inspects live <code>https://</code> sites that block cross-site reads, asking for access to one site at a time:<br><br>
   1. Run <code>npm run extension</code><br>
   2. Open <code>chrome://extensions</code> (Developer mode)<br>
@@ -485,12 +493,40 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 205 tests
+npm test                                # 219 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
 node bin/agent-customs.mjs verify site/receipts/agent-customs-range.github.io/sunny_bakery/sunny_bakery.json --live
 ```
+
+**In Claude Code, Cursor, Claude Desktop, or Antigravity** (add to your MCP config; optional `AGENT_CUSTOMS_AI_KEY` turns on AI double-check):
+
+```json
+{
+  "mcpServers": {
+    "agent-customs": {
+      "command": "npx",
+      "args": ["-y", "agent-customs", "mcp"]
+    }
+  }
+}
+```
+
+<details>
+<summary><b>MCP tools included (full website parity)</b></summary>
+
+| What the website does | MCP tool | Notes |
+| :--- | :--- | :--- |
+| Inspect URL, folder, sample ID, or pasted config | `inspect_agent` | Supports Open Agentic Web, Google A2A, MCP, `deep` checks, drift & signed stamps |
+| Read finding evidence & decoded hidden text | `get_inspection_details` | Reveals invisible Unicode/tag text quoted as untrusted data |
+| Compare two versions (or against saved pin) | `compare_networks` | Pass `before: "pinned"` to diff any target against its stored approval |
+| Save or forget version pins (`~/.agent-customs/pins.json`) | `approve_network`, `forget_approval` | Persistent across restarts; refuses `DENIED`, `INVALID`, and `UNREADABLE` |
+| Read desk state, examples, log & AI double-check toggle | `get_desk_state`, `configure_ai_check` | Uses optional `AGENT_CUSTOMS_AI_KEY` when enabled |
+| Generate or check SVG/HTML/JSON/PDF certificates | `issue_certificate`, `verify_certificate` | Checks ES256 signatures offline and optionally live |
+| Replay Attack Lab & run runtime Locks 1–3 | `run_attack_lab`, `sanitize_exchange` | Live scenarios plus PII/canary redaction & reply beacon sanitization |
+
+</details>
 
 **In a GitHub workflow** (keep `if: always()` so the SARIF file uploads even when a check holds or denies):
 
@@ -608,12 +644,12 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`vault/`](vault/) | The key vault: a separate site that keeps the visitor's AI key, published at `agent-customs-vault.github.io` with `npm run vault` |
 | [`practice/`](practice/) | Main Street Guide, built by `tools/make-practice.mjs` |
 | [`extension/`](extension/) | The Chrome and Edge extension, built by `tools/make-extension.mjs` |
-| [`bin/`](bin/) and [`action.yml`](action.yml) | The command line tool (`check`, `verify`, `bench`) and the GitHub Action |
+| [`bin/`](bin/) and [`action.yml`](action.yml) | The command line tool (`check`, `verify`, `bench`, `mcp`) and the GitHub Action |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | How it works, in plain words, with diagrams |
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
-| [`tools/`](tools/) | The benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 205 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tools/`](tools/) | The MCP server (`mcp-server.mjs`), the benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
+| [`tests/`](tests/) | 219 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>
