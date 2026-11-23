@@ -1293,7 +1293,7 @@ function wireBuilderCodeTabs() {
   const snippets = {
     twolines: [
       "// At the top of site.js",
-      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/site/customs/guard.js\";",
+      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.0/site/customs/guard.js\";",
       "",
       "// Right after boot(), with any of the guard's options",
       "installCustomsGuard(booted.engine, { strict: true });",

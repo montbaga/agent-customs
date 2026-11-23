@@ -14,6 +14,7 @@
 
 [**Add it to your site**](#add-it-to-your-site) &nbsp;·&nbsp;
 [**Live desk**](https://montbaga.github.io/agent-customs/) &nbsp;·&nbsp;
+[**MCP server**](#use-it-as-an-mcp-server) &nbsp;·&nbsp;
 [**Practice site**](https://montbaga.github.io/agent-customs/practice/) &nbsp;·&nbsp;
 [**Test range**](https://agent-customs-range.github.io/) &nbsp;·&nbsp;
 [**Contact**](#lets-talk)
@@ -61,8 +62,8 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/dist/agent-customs.js"
-  integrity="sha384-U/g95JwFs9P5R5SIoA1A4D3/pP9/Py0ReE6Cpi8/6ussBoITrRYXq8lOVF04SLWp"
+  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.0/dist/agent-customs.js"
+  integrity="sha384-AW1RkNRdWpin4qCfIlZm6AzAwfz6cT8dq2e2LK6d/gXaLZqD09R61ikluiCiiPPl"
   crossorigin="anonymous"></script>
 ```
 
@@ -75,7 +76,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```js
 // At the top of site.js
 import { installCustomsGuard }
-  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/site/customs/guard.js";
+  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.0/site/customs/guard.js";
 
 // Right after boot()
 installCustomsGuard(booted.engine, { strict: true });
@@ -172,16 +173,16 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/dist/agent-customs.js" integrity="sha384-U/g95JwFs9P5R5SIoA1A4D3/pP9/Py0ReE6Cpi8/6ussBoITrRYXq8lOVF04SLWp" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.0/dist/agent-customs.js" integrity="sha384-AW1RkNRdWpin4qCfIlZm6AzAwfz6cT8dq2e2LK6d/gXaLZqD09R61ikluiCiiPPl" crossorigin="anonymous"></script>
 ```
 
-`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.1.2` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.0` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
 **2. Two lines, with your own settings.** Load the guard from the same release and pass any of the *Guard options* below. A browser cannot check a fingerprint on an `import`, so for that use option 3 or 4.
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.1.2/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.0/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
