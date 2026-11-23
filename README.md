@@ -500,7 +500,19 @@ node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
 node bin/agent-customs.mjs verify site/receipts/agent-customs-range.github.io/sunny_bakery/sunny_bakery.json --live
 ```
 
-**In Claude Code, Cursor, Claude Desktop, or Antigravity** (add to your MCP config; optional `AGENT_CUSTOMS_AI_KEY` turns on AI double-check):
+### Use it as an MCP server
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/mcp-steps-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/mcp-steps-light.svg">
+  <img src="docs/images/mcp-steps-dark.svg" alt="Use Agent Customs as an MCP server inside Claude Code, Cursor, or Antigravity" width="100%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/mcp-way-1-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/mcp-way-1-light.svg">
+  <img src="docs/images/mcp-way-1-dark.svg" alt="Option 1: MCP config JSON. Paste into Claude Desktop, Cursor, or Antigravity via npx." width="100%">
+</picture>
 
 ```json
 {
@@ -513,8 +525,22 @@ node bin/agent-customs.mjs verify site/receipts/agent-customs-range.github.io/su
 }
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/mcp-way-2-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/mcp-way-2-light.svg">
+  <img src="docs/images/mcp-way-2-dark.svg" alt="Option 2: Claude Code or local clone. Register with one CLI command, or run directly from a local clone." width="100%">
+</picture>
+
+```sh
+# Claude Code (one command)
+claude mcp add agent-customs -- npx -y agent-customs mcp
+
+# Or run from a local clone (optional: set AGENT_CUSTOMS_AI_KEY for AI double-check)
+node bin/agent-customs.mjs mcp
+```
+
 <details>
-<summary><b>MCP tools included (full website parity)</b></summary>
+<summary><b>MCP tools included (11 tools and 4 resources — full website parity)</b></summary>
 
 | What the website does | MCP tool | Notes |
 | :--- | :--- | :--- |
