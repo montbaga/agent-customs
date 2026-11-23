@@ -218,6 +218,7 @@ export class CustomsDesk {
 
   remember(input, report) {
     const key = normalize(report.target.url || input);
+    this.reports.delete(key);
     this.reports.set(key, report);
     this.aliases.set(normalize(input), key);
   }
@@ -400,11 +401,30 @@ export class CustomsDesk {
   }
 
   /**
+   * Compact summaries of every network inspected in this visit, newest first.
+   */
+  inspectedReports(limit = 12) {
+    return [...this.reports.values()]
+      .reverse()
+      .slice(0, limit)
+      .map((r) => ({
+        url: r.target.url,
+        brand: r.identity.brand || "",
+        verdict: r.verdict.code,
+        stamp: r.verdict.stamp,
+        fingerprint: r.identity.short || "",
+        inspectedAt: r.inspectedAt,
+        agents: r.identity.agents || [],
+      }));
+  }
+
+  /**
    * The desk's state for the read tool.
    */
   state() {
     return {
       latestReport: this.latest ? compact(this.latest, 6) : null,
+      inspectedReports: this.inspectedReports(),
       aiDoubleCheck: this.aiCheckState(),
       approvedVersions: this.pins.list().map((p) => ({ url: p.url, brand: p.brand, fingerprint: p.short, verdictWhenApproved: p.verdict, approvedAt: p.pinnedAt, how: p.how })),
       testRange: EXAMPLES.map((e) => ({ name: e.label, kind: e.note, networkUrl: e.url, page: e.page })),

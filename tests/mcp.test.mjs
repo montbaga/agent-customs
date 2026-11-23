@@ -176,6 +176,10 @@ test("approvals persist on disk across MCP restarts and catch overnight rug pull
     assert.equal(forgot.data.ok, true);
     const stateAfterForget = await callTool(session2, "get_desk_state");
     assert.equal(stateAfterForget.data.approvedVersions.length, 0);
+    assert.ok(Array.isArray(stateAfterForget.data.inspectedReports));
+    assert.ok(stateAfterForget.data.inspectedReports.length >= 2);
+    assert.ok(stateAfterForget.data.inspectedReports.some((r) => r.url.includes("rugpull") && r.verdict === "HOLD"));
+    assert.ok(stateAfterForget.data.inspectedReports.some((r) => r.url.includes("sunny_bakery")));
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }

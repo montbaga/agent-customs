@@ -793,7 +793,7 @@ export function createAgentCustomsMcp(options = {}) {
     {
       name: "get_desk_state",
       description:
-        "Read the Agent Customs desk state: latest inspection report, AI double-check status, saved approvals, built-in test-range examples, protocol samples, Attack Lab scenarios, border log, and benchmark metrics.",
+        "Read the Agent Customs desk state: latest inspection report, all networks inspected in this session, AI double-check status, saved approvals, built-in test-range examples, protocol samples, Attack Lab scenarios, border log, and benchmark metrics.",
       inputSchema: { type: "object", additionalProperties: false, properties: {} },
       async execute() {
         const ai = refreshDeskAi();
@@ -806,6 +806,7 @@ export function createAgentCustomsMcp(options = {}) {
         const rawPins = pins.all();
         return {
           latestReport: desk.latest ? compactReport(desk.latest, 6) : null,
+          inspectedReports: desk.inspectedReports(),
           aiDoubleCheck: {
             enabled: desk.aiCheckOn,
             state: ai ? (desk.aiCheckOn ? "ready" : "off-configured") : desk.aiCheckOn ? "needs-key" : "off",
