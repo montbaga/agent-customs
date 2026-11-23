@@ -1,11 +1,6 @@
-// install-art.mjs: the README's install art, in the README banners' style (forest palette,
-// faint grid, rounded cards), each in a dark and a light version for <picture>.
+// install-art.mjs: dark and light SVG headers/diagrams for the README install and MCP sections.
 //
 //   node tools/install-art.mjs
-//
-// Writes docs/images/install-steps-{dark,light}.svg (copy, paste, done) and
-// docs/images/install-way-{1..4}-{dark,light}.svg (the header card above each way's code).
-// The code itself stays as text in the README, so GitHub gives it a Copy button.
 
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -43,6 +38,8 @@ const ICONS = {
   sliders: '<path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h4"/><path d="M12 17h8"/><circle cx="10" cy="17" r="2"/>',
   box: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5"/><path d="M12 12v9"/>',
   folder: '<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/>',
+  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
 };
 const icon = (name, x, y, size, color) =>
   `<g transform="translate(${x} ${y}) scale(${size / 24})" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</g>`;
@@ -67,34 +64,53 @@ ${body}
 `;
 }
 
-function steps(t) {
+function renderSteps(t, { eyebrow, title, subtitle, cards, label }) {
   const W = 1200;
   const H = 330;
-  const cards = [
-    ["copy", "Copy the line", "The whole guard as one file,", "with a fingerprint checked."],
-    ["paste", "Paste above your scripts", "In the page that holds your", "assistant, before its scripts."],
-    ["check", "Every partner is checked", "Before it runs; visitors", "see the stamp in the chat."],
-  ];
   const cw = 352;
   const gap = 36;
   const x0 = (W - (cw * 3 + gap * 2)) / 2;
   const y0 = 122;
-  let body = `    <text x="${x0}" y="50" class="mono" font-size="14" font-weight="700" letter-spacing="1.8" fill="${t.accent}">ADD IT TO YOUR SITE</text>
-    <text x="${x0}" y="92" class="sans" font-size="36" font-weight="600" letter-spacing="-0.6" fill="${t.ink}">Protect your assistant in one line</text>
-    <text x="${W - x0}" y="92" text-anchor="end" class="sans" font-size="17" fill="${t.muted}">No server · no build step · runtime unchanged</text>\n`;
-  cards.forEach(([ic, title, l1, l2], i) => {
+  let body = `    <text x="${x0}" y="50" class="mono" font-size="14" font-weight="700" letter-spacing="1.8" fill="${t.accent}">${esc(eyebrow)}</text>
+    <text x="${x0}" y="92" class="sans" font-size="36" font-weight="600" letter-spacing="-0.6" fill="${t.ink}">${esc(title)}</text>
+    <text x="${W - x0}" y="92" text-anchor="end" class="sans" font-size="17" fill="${t.muted}">${esc(subtitle)}</text>\n`;
+  cards.forEach(([ic, cardTitle, l1, l2], i) => {
     const x = x0 + i * (cw + gap);
     body += `    <rect x="${x}" y="${y0}" width="${cw}" height="176" rx="16" fill="${t.card}" fill-opacity="${t.cardOpacity}" stroke="${t.line}" stroke-opacity="${t.lineOpacity}"/>
     <circle cx="${x + 38}" cy="${y0 + 40}" r="19" fill="${t.tagFill}"/>
     <text x="${x + 38}" y="${y0 + 47}" text-anchor="middle" class="sans" font-size="18" font-weight="700" fill="${t.tagText}">${i + 1}</text>
     ${icon(ic, x + cw - 56, y0 + 24, 32, t.accent)}
-    <text x="${x + 24}" y="${y0 + 96}" class="sans" font-size="23" font-weight="600" fill="${t.ink}">${esc(title)}</text>
+    <text x="${x + 24}" y="${y0 + 96}" class="sans" font-size="23" font-weight="600" fill="${t.ink}">${esc(cardTitle)}</text>
     <text x="${x + 24}" y="${y0 + 128}" class="sans" font-size="18" fill="${t.muted}">${esc(l1)}</text>
     <text x="${x + 24}" y="${y0 + 153}" class="sans" font-size="18" fill="${t.muted}">${esc(l2)}</text>\n`;
     if (i < 2) body += `    ${icon("line", x + cw + 5, y0 + 74, 26, t.accent)}\n`;
   });
-  return frame(t, W, H, body, "Add it to your site: copy the line, paste it above your scripts, and every partner is checked");
+  return frame(t, W, H, body, label);
 }
+
+const INSTALL_STEPS = {
+  eyebrow: "ADD IT TO YOUR SITE",
+  title: "Protect your assistant in one line",
+  subtitle: "No server · no build step · runtime unchanged",
+  cards: [
+    ["copy", "Copy the line", "The whole guard as one file,", "with a fingerprint checked."],
+    ["paste", "Paste above your scripts", "In the page that holds your", "assistant, before its scripts."],
+    ["check", "Every partner is checked", "Before it runs; visitors", "see the stamp in the chat."],
+  ],
+  label: "Add it to your site: copy the line, paste it above your scripts, and every partner is checked",
+};
+
+const MCP_STEPS = {
+  eyebrow: "MCP SERVER · CLAUDE, CURSOR & ANTIGRAVITY",
+  title: "Use Agent Customs in your AI editor",
+  subtitle: "Stdio JSON-RPC · zero dependencies · local pins",
+  cards: [
+    ["copy", "Paste five lines of JSON", "Add the server block once", "to your client's MCP config."],
+    ["plug", "Ask your AI in chat", "Inspect links, verify certs,", "or replay the Attack Lab."],
+    ["check", "Pins stay on your disk", "Approved versions persist in", "~/.agent-customs/pins.json."],
+  ],
+  label: "Use Agent Customs as an MCP server inside Claude Code, Cursor, or Antigravity",
+};
 
 const WAYS = [
   ["line", "One line", "EASIEST", "Paste it above your page's other scripts. The guard turns itself on."],
@@ -103,8 +119,12 @@ const WAYS = [
   ["folder", "Copy the folder", "SELF-HOSTED", "Copy customs/ beside your runtime/ folder. Nothing loads from outside."],
 ];
 
-function way(t, n) {
-  const [ic, title, tag, text] = WAYS[n - 1];
+const MCP_WAYS = [
+  ["plug", "MCP config JSON", "ZERO INSTALL", "Paste into Claude Desktop, Cursor, or Antigravity via npx."],
+  ["terminal", "Claude Code or local clone", "CLI & GIT", "Register with one CLI command, or run directly from a local clone."],
+];
+
+function renderWay(t, n, [ic, title, tag, text], labelPrefix = "Way") {
   const W = 1200;
   const H = 120;
   const tagW = tag.length * 10.4 + 32;
@@ -115,11 +135,21 @@ function way(t, n) {
     <rect x="${W - 96 - tagW}" y="42" width="${tagW}" height="36" rx="18" fill="none" stroke="${t.accent}" stroke-opacity="0.7" stroke-width="1.5"/>
     <text x="${W - 96 - tagW / 2}" y="65" text-anchor="middle" class="mono" font-size="14" font-weight="700" letter-spacing="1.4" fill="${t.accent}">${esc(tag)}</text>
     ${icon(ic, W - 72, 44, 32, t.accent)}`;
-  return frame(t, W, H, body, `Way ${n}: ${title}. ${text}`);
+  return frame(t, W, H, body, `${labelPrefix} ${n}: ${title}. ${text}`);
 }
 
+let written = 0;
 for (const [name, t] of Object.entries(THEMES)) {
-  await writeFile(path.join(OUT, `install-steps-${name}.svg`), steps(t));
-  for (let n = 1; n <= WAYS.length; n += 1) await writeFile(path.join(OUT, `install-way-${n}-${name}.svg`), way(t, n));
+  await writeFile(path.join(OUT, `install-steps-${name}.svg`), renderSteps(t, INSTALL_STEPS));
+  await writeFile(path.join(OUT, `mcp-steps-${name}.svg`), renderSteps(t, MCP_STEPS));
+  written += 2;
+  for (let n = 1; n <= WAYS.length; n += 1) {
+    await writeFile(path.join(OUT, `install-way-${n}-${name}.svg`), renderWay(t, n, WAYS[n - 1], "Way"));
+    written += 1;
+  }
+  for (let n = 1; n <= MCP_WAYS.length; n += 1) {
+    await writeFile(path.join(OUT, `mcp-way-${n}-${name}.svg`), renderWay(t, n, MCP_WAYS[n - 1], "Option"));
+    written += 1;
+  }
 }
-console.log(`Wrote ${2 * (1 + WAYS.length)} SVGs to docs/images/`);
+console.log(`Wrote ${written} SVGs to docs/images/`);
