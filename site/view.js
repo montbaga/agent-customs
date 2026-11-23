@@ -1328,6 +1328,16 @@ function wireBuilderCodeTabs() {
       "# Edge / Chrome -> chrome://extensions",
       "# Enable Developer mode -> Load unpacked -> select extension/",
     ].join("\n"),
+    mcp: [
+      "{",
+      '  "mcpServers": {',
+      '    "agent-customs": {',
+      '      "command": "npx",',
+      '      "args": ["-y", "agent-customs", "mcp"]',
+      "    }",
+      "  }",
+      "}",
+    ].join("\n"),
   };
 
   for (const tab of tabs) {

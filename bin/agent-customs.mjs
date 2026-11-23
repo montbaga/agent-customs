@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// agent-customs CLI: inspect agent networks in CI/local folders, verify certificates, or run benchmarks.
+// agent-customs CLI: inspect agent networks, verify certificates, run benchmarks, or serve MCP.
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyDroppedArtifact } from "../site/certificate.js";
 import { inspectTarget, inspectWeb } from "../tools/inspect-local.mjs";
 import { formatBenchReport, runBenchmark } from "../tools/bench.mjs";
+import { serveMcpStdio } from "../tools/mcp-server.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC_KEY_FILE = path.join(ROOT, "site", ".well-known", "agent-customs-key.json");
@@ -69,7 +70,7 @@ function parseFlags(args) {
   const positionals = [];
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
-    if (a === "--out" || a === "--sarif-file") {
+    if (a === "--out" || a === "--sarif-file" || a === "--pins") {
       values.set(a, args[i + 1] || "");
       i += 1;
     } else if (a.startsWith("--")) {
@@ -87,6 +88,7 @@ function helpText() {
     "  agent-customs check <url-or-path...> [--strict] [--allow-hold] [--transitive] [--json] [--sarif]",
     "  agent-customs verify <file> [--live] [--json]",
     "  agent-customs bench [--json] [--write]",
+    "  agent-customs mcp [--pins <file>]",
   ].join("\n");
 }
 
@@ -184,6 +186,11 @@ export async function runCli(argv = process.argv.slice(2), io = { out: console.l
   if (cmd === "check") return cmdCheck(positionals, flags, io);
   if (cmd === "verify") return cmdVerify(positionals, flags, io);
   if (cmd === "bench") return cmdBench(flags, values, io);
+  if (cmd === "mcp") {
+    const pinsFile = values.get("--pins");
+    await serveMcpStdio(pinsFile ? { pinsFile } : {});
+    return 0;
+  }
   io.error(`Unknown command "${cmd}".\n${helpText()}`);
   return 2;
 }
