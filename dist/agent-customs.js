@@ -1,4 +1,4 @@
-// Agent Customs 1.2.2: the one-line install and the guard, in one file.
+// Agent Customs 1.2.3: the one-line install and the guard, in one file.
 // Built by tools/make-bundle.mjs from these files; edit them, not this one.
 // Apache License 2.0. Files under site/runtime/ are Cognizant's Open Agentic Web runtime,
 // unmodified, also under the Apache License 2.0.

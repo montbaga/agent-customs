@@ -116,7 +116,7 @@ export class KeyVault {
     const path = target.pathname.slice(STAND_IN.pathname.length);
     const signal = init.signal;
     if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
-    if (!this.port) return Promise.resolve(refusal(503, "The key vault could not load, so no AI request can be sent. Reload the page to try again."));
+    if (!this.port) return Promise.resolve(refusal(503, "The key vault couldn't load, so no AI request can be sent. Reload the page to try again."));
     return new Promise((resolve, reject) => {
       const channel = new MessageChannel();
       const port = channel.port1;
@@ -149,7 +149,7 @@ export class KeyVault {
           stream?.close();
           finish();
         } else if (data?.error) {
-          fail(new TypeError("The key vault could not reach the AI provider."));
+          fail(new TypeError("Couldn't reach your AI service. Check your connection, and the service's address in AI model settings."));
         }
       };
       this.port.postMessage({ type: "fetch", path, method: String(init.method || "GET").toUpperCase(), body: typeof init.body === "string" ? init.body : null }, [channel.port2]);

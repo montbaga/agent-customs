@@ -5,14 +5,16 @@
 // Serves the site (port 8087) and the vault (port 8090, where a page on this computer looks for
 // it), plus a stand-in AI service on port 8099 that answers like an OpenAI-style provider and
 // records which key and which origin each request came with. Then, in a headless browser:
+//   0. pastes a Groq key and an Otari key on the Gemini card: each must pick its own card,
 //   1. saves a key through the vault box ("Other", the stand-in's address),
 //   2. checks that the page's own storage never holds the key and the vault's does,
 //   3. chats with the officer and runs the AI double-check on the VIP Points sample: every AI
 //      request must reach the stand-in from the vault's origin, with the key,
-//   4. remembers the key with a password, checks the stored record is encrypted, starts a new
-//      visit (locked), unlocks it, and chats again,
+//   4. remembers the key with a password from the header's Remember key button, checks the
+//      stored record is encrypted, starts a new visit (locked), unlocks it, and chats again,
 //   5. forgets the key.
-// Nothing leaves this computer: the stand-in is the only AI service, and it is local.
+// Nothing leaves this computer: the stand-in is the only AI service, and it is local. Requests to
+// the real Groq and Otari are blocked, so the made-up keys in step 0 go nowhere.
 
 import { spawn } from "node:child_process";
 import http from "node:http";
@@ -100,11 +102,30 @@ const chat = async (text) => {
 
 try {
   await b.viewport(1366, 1000);
+  await b.send("Network.enable", {});
+  await b.send("Network.setBlockedURLs", { urls: ["*api.groq.com*", "*otari.ai*"] });
   await b.send("Page.navigate", { url: SITE });
   await b.waitFor("document.readyState === 'complete'", 20000);
   await officer();
   await waitInVault("document.body.dataset.ready === 'true'");
   check(true, "the vault opened its private channel with the page");
+
+  // 0. A key from a known company picks its own card, whatever card was selected.
+  for (const [key, card, company] of [["gsk_madeup0000000000000000000000000000000000000000", "open", "Groq"], ["otk_v1_eu_madeup000000000000000000000000", "other", "Otari EU"]]) {
+    await b.evaluate("document.querySelector('#mp-cards input[value=\"gemini\"]').click(); true");
+    await waitInVault("/Google AI Studio/.test(document.querySelector('#key-note')?.textContent || '')");
+    await inVault(`(() => { const k = document.querySelector('#key'); k.value = ${JSON.stringify(key)}; k.dispatchEvent(new InputEvent('input', { inputType: 'insertFromPaste' })); return true; })()`);
+    await b.waitFor(`document.querySelector('#mp-cards input:checked')?.value === ${JSON.stringify(card)}`, 10000);
+    await waitInVault(`/sent only to ${company}/.test(document.querySelector('#key-note')?.textContent || '') && !document.querySelector('.draft-row[data-tone="warn"]')`, 10000);
+    const said = await b.evaluate("document.querySelector('#mp-status').textContent");
+    check(new RegExp(`Switched to .* for your ${company} key`).test(said), `${/^[aeiou]/i.test(company) ? "an" : "a"} ${company} key pasted on the Gemini card moves to its own card`, said.slice(0, 90));
+    await inVault("[...document.querySelectorAll('button')].find((x) => x.textContent === 'Clear').click(); true");
+  }
+  await b.evaluate("window.beforeReload = true");
+  await b.send("Page.reload", {});
+  await b.waitFor("!window.beforeReload && document.readyState === 'complete'", 20000);
+  await officer();
+  await waitInVault("document.body.dataset.ready === 'true'");
 
   // 1. Save a key through the vault box.
   await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
@@ -112,7 +133,7 @@ try {
   const fieldOrder = await inVault("!!(document.querySelector('#key').compareDocumentPosition(document.querySelector('#address')) & Node.DOCUMENT_POSITION_FOLLOWING)");
   check(fieldOrder, "on Other the key field comes before the optional service address");
   await b.evaluate("document.querySelector('#mp-start').click(); true");
-  await b.waitFor("/Paste your AI model key first/.test(document.querySelector('#mp-status').textContent)", 5000);
+  await b.waitFor("/Paste your key first/.test(document.querySelector('#mp-status').textContent)", 5000);
   check((await inVault("document.activeElement?.id")) === "key", "an empty Other form asks for the key first and focuses it");
 
   // A rejected key (401 or 400 INVALID_ARGUMENT) surfaces its refusal instead of saving.
@@ -120,13 +141,13 @@ try {
     const a = document.querySelector('#address'); a.value = ${JSON.stringify(AI)}; a.dispatchEvent(new Event('change'));
     const k = document.querySelector('#key'); k.value = "wrong-key-400"; k.dispatchEvent(new Event('input')); return true; })()`);
   await b.evaluate("document.querySelector('#mp-start').click(); true");
-  await b.waitFor("!document.querySelector('#mp-start').disabled && /did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
+  await b.waitFor("!document.querySelector('#mp-start').disabled && /didn't accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
   check(seen.some((s) => s.auth === "Bearer wrong-key-400"), "a 400 invalid-key refusal is shown and never saves");
   await b.evaluate("document.querySelector('#mp-status').textContent = ''; true");
   await inVault(`(() => {
     const k = document.querySelector('#key'); k.value = "wrong-stand-in-key"; k.dispatchEvent(new Event('input')); return true; })()`);
   await b.evaluate("document.querySelector('#mp-start').click(); true");
-  await b.waitFor("!document.querySelector('#mp-start').disabled && /did not accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
+  await b.waitFor("!document.querySelector('#mp-start').disabled && /didn't accept this key/.test(document.querySelector('#mp-status').textContent)", 10000);
   check(seen.some((s) => s.auth === "Bearer wrong-stand-in-key"), "a 401 key refusal is shown instead of being lost in the vault reply");
 
   // Pasting a valid key and immediately pressing Save and start works without waiting for the debounce timer.
@@ -140,7 +161,7 @@ try {
   }
   await officer();
   const inUse = await b.evaluate("document.querySelector('#mp-current').textContent");
-  check(/In use: .*127\.0\.0\.1:8099.*key vault/.test(inUse), "after Save and start the officer uses the key from the vault", inUse);
+  check(/Using .*127\.0\.0\.1:8099.*kept for this visit only/.test(inUse), "after Save and start the officer uses the key from the vault", inUse);
   check(seen.some((s) => s.path === "/v1/models" && s.auth === `Bearer ${KEY}`), "the vault listed the key's models from the stand-in");
 
   // 2. Where the key is.
@@ -162,18 +183,21 @@ try {
   check(aiRequests.length >= 2 && aiRequests.every((s) => s.auth === `Bearer ${KEY}` && s.origin === VAULT_ORIGIN),
     "every AI request came from the vault's origin with the key", `${aiRequests.length} requests, origins ${[...new Set(seen.map((s) => s.origin))].join(", ")}`);
 
-  // 4. Remember with a password, start a new visit, unlock.
+  // 4. Remember with a password from the header's button, start a new visit, unlock.
   await officer();
-  await b.evaluate("document.querySelector('#mp-change')?.hidden || document.querySelector('#mp-change').click(); true");
-  await inVault("[...document.querySelectorAll('button')].find((x) => /Remember on this computer/.test(x.textContent)).click(); true");
+  await b.waitFor("document.querySelector('#mp-body').hidden && !document.querySelector('#mp-remember').hidden", 10000);
+  check(true, "a key kept for this visit offers Remember key without opening the settings");
+  await b.evaluate("document.querySelector('#mp-remember').click(); true");
   await waitInVault("!!document.querySelector('input[name=\"lock\"]')");
   check(await inVault("(() => { const r = [...document.querySelectorAll('input[name=\"lock\"]')]; return r.length === 2 && r[0].value === 'passkey' && !r[0].disabled && r[0].checked && r[1].value === 'password'; })()"),
     "both lock options stay visible with passkey first and enabled on localhost");
   await inVault("document.querySelector('input[name=\"lock\"][value=\"password\"]').click(); true");
   await waitInVault("!!document.querySelector('#password')");
   await inVault(`(() => { document.querySelector('#password').value = ${JSON.stringify(PASSWORD)};
-    [...document.querySelectorAll('button')].find((x) => /Remember it/.test(x.textContent)).click(); return true; })()`);
-  await waitInVault("/Saved on this computer, locked with your password/.test(document.body.textContent)", 20000);
+    [...document.querySelectorAll('button')].find((x) => /Save and lock/.test(x.textContent)).click(); return true; })()`);
+  await waitInVault("/protected by your password/.test(document.body.textContent)", 20000);
+  await b.waitFor("document.querySelector('#mp-body').hidden && document.querySelector('#mp-remember').hidden && /saved on this device/.test(document.querySelector('#mp-current').textContent)", 10000);
+  check(true, "once saved, the settings fold again and the header says the key is saved on this device");
   const box = await inVault("localStorage.getItem('vault-box') || ''");
   const rounds = (() => { const b = JSON.parse(box); return (Object.values(b.entries || {})[0] || b).rounds; })();
   check(box.length > 0 && !box.includes(KEY), "the remembered key is stored only encrypted", `${box.length} characters, PBKDF2 rounds ${rounds}`);
@@ -190,12 +214,12 @@ try {
   check(/locked in the key vault/i.test(refused), "a chat while locked is refused in plain words", refused.slice(0, 90));
   await inVault(`(() => { document.querySelector('#unlock-password').value = "wrong password";
     [...document.querySelectorAll('button')].find((x) => /^Unlock$/.test(x.textContent)).click(); return true; })()`);
-  await waitInVault("/does not open the vault/.test(document.body.textContent)", 20000);
+  await waitInVault("/Wrong password/.test(document.body.textContent)", 20000);
   check(true, "a wrong password does not open it");
   await inVault(`(() => { document.querySelector('#unlock-password').value = ${JSON.stringify(PASSWORD)};
     [...document.querySelectorAll('button')].find((x) => /^Unlock$/.test(x.textContent)).click(); return true; })()`);
   await waitInVault("/Unlocked/.test(document.body.textContent)", 20000);
-  await b.waitFor("/In use/.test(document.querySelector('#mp-current').textContent)", 10000);
+  await b.waitFor("/Using/.test(document.querySelector('#mp-current').textContent)", 10000);
   const again = await chat("hello once more");
   check(/stand-in AI/.test(again), "after unlocking, the officer answers again", again.slice(0, 80));
 
@@ -205,14 +229,14 @@ try {
   await b.evaluate("if (document.querySelector('#mp-body').hidden) document.querySelector('#mp-change')?.click(); true");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"gemini\"]').click(); true");
   await b.waitFor("document.querySelector('#mp-forget').hidden", 10000);
-  await waitInVault("/Your saved 127\\.0\\.0\\.1:8099 key stays stored when you switch\\./.test(document.body.textContent) && !document.body.querySelector('.state')", 10000);
+  await waitInVault("/Your saved 127\\.0\\.0\\.1:8099 key stays saved when you switch\\./.test(document.body.textContent) && !document.body.querySelector('.state')", 10000);
   check(true, "collapsed header names its Forget button and open card switching keeps Forget inside saved cards only");
   await b.evaluate("document.querySelector('#mp-cards input[value=\"other\"]').click(); true");
   await b.waitFor("document.querySelector('#mp-forget').hidden", 10000);
   await waitInVault("/Forget this key/.test(document.body.textContent)", 10000);
   await inVault("[...document.querySelectorAll('button')].find((x) => /Forget this key/.test(x.textContent)).click(); true");
   await inVault("[...document.querySelectorAll('button')].find((x) => /Click again/.test(x.textContent)).click(); true");
-  await waitInVault("/gone from the vault/.test(document.body.textContent)", 10000);
+  await waitInVault("/key removed/.test(document.body.textContent)", 10000);
   const after = await inVault(vaultStorage);
   check(!after.includes(KEY) && !JSON.parse(after).local["vault-box"], "forgetting removes the key and the encrypted record", after.slice(0, 120));
 
@@ -223,7 +247,7 @@ try {
   const alone = await b.evaluate("document.body.textContent.trim() + ' | inputs: ' + document.querySelectorAll('input').length");
   check(/Open it from Agent Customs/.test(alone) && /inputs: 0/.test(alone), "the vault opened on its own takes no key", alone.slice(0, 90));
 
-  const problems = b.problems.filter((p) => !/the server responded with a status of (?:400|401)|ERR_NAME_NOT_RESOLVED/.test(p));
+  const problems = b.problems.filter((p) => !/the server responded with a status of (?:400|401)|ERR_NAME_NOT_RESOLVED|ERR_BLOCKED_BY_CLIENT/.test(p));
   check(problems.length === 0, "no page errors or blocked scripts", problems.slice(0, 3).join(" / "));
 } catch (error) {
   failures.push(String(error.message || error));
