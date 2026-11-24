@@ -281,7 +281,7 @@ const soften = (hit, why) => ({ ...hit, severity: "medium", detail: `Matched "${
 
 // Fill-in-the-blank slots that would put private data into a web address, such as
 // {conversation} or <api_key>. Slots like <owner> or {city} are ordinary link templates.
-const PRIVATE_SLOT = "[a-z_ ]*(?:conversation|chat|history|messages?|transcript|prompt|context|instructions|secrets?|keys?|tokens?|passwords?|cookies?|session|sly_?data|private|personal|user_?data|visitor_?data|e-?mail|phone|address|summary|memory|notes)[a-z_ ]*";
+const PRIVATE_SLOT = "[a-z_ ]*(?:conversation|chat|history|messages?|transcript|prompt|context|instructions|secrets?|keys?|tokens?|passwords?|cookies?|session|sly_?data|private|personal|user_?data|visitor_?data|e-?mail|phone|address|summary|memory|notes|passport|national_?id|ssn|iban|bank_?account|card_?number|cvv)[a-z_ ]*";
 
 const OUR_PERSONAL_INFO = /\b(?:our|the\s+(?:store|shop|bakery|company|business|restaurant|office|hotel|support|service|site)(?:'s)?)\s+(?:\w+\s+){0,2}$/i;
 
@@ -296,7 +296,7 @@ const EMAIL_CODE_PHISH_RE = /\b(?:visitors?|guests?|callers?|customers?|bank(?:i
 const SYSTEM_CHECK_TARGET_RE = /\b(?:quota|status|active|encrypted|connections?|health|available|preflight|audit)\b/i;
 const PERSON_REF_RE = /\b(?:your|their|his|her|visitors?|users?|customers?|guests?|clients?|callers?|holders?)\b/i;
 const HUMAN_SECRET_ONLY_RE = /\b(?:passwords?|passcodes?|passphrases?|card ?numbers?|cvv2?|cvc|pins?|otps?|seed phrases?|ssn)\b/i;
-const VISITOR_LEAK_SLOT_RE = /\b(?:conversation|chat(?:\s+history|\s+log|\s+so\s+far)?|message\s+history|previous\s+messages|(?:user|visitor|customer|guest)'?s?\s+messages|transcript|system\s+prompt|hidden\s+instructions|sly_data|private\s+context|credit\s*cards?|card\s*numbers?|cvv2?|cvc|passwords?|passcodes?|passphrases?|otps?|pins?|ssn|iban|seed\s+phrases?|recovery\s+phrases?|cookies?|api[_ ]keys?|access[_ ]tokens?|session[_ ]tokens?|auth[_ ]tokens?|secret[_ ]keys?|private[_ ]keys?|(?:user|visitor|personal)[_ ](?:data|details|info))\b/i;
+const VISITOR_LEAK_SLOT_RE = /\b(?:conversation|chat(?:\s+history|\s+log|\s+so\s+far)?|message\s+history|previous\s+messages|(?:user|visitor|customer|guest)'?s?\s+messages|transcript|system\s+prompt|hidden\s+instructions|sly_data|private\s+context|credit\s*cards?|card\s*numbers?|cvv2?|cvc|passwords?|passcodes?|passphrases?|otps?|pins?|ssn|social\s+security(?:\s+numbers?)?|iban|passport(?:\s+numbers?)?|national\s+id(?:\s+numbers?)?|tax\s+id(?:\s+numbers?)?|driver'?s\s+licen[cs]e(?:\s+numbers?)?|driving\s+licen[cs]e(?:\s+numbers?)?|bank\s+account(?:\s+(?:numbers?|details))?|routing\s+numbers?|seed\s+phrases?|recovery\s+phrases?|cookies?|api[_ ]keys?|access[_ ]tokens?|session[_ ]tokens?|auth[_ ]tokens?|secret[_ ]keys?|private[_ ]keys?|(?:user|visitor|personal)[_ ](?:data|details|info))\b/i;
 
 function hasOffOriginUrl(text, targetHost = "") {
   const urls = findUrls(text);
@@ -574,6 +574,37 @@ function followUpRequests(text) {
       const hit = detail || pronounAsk;
       if (!hit || NEGATION.test(parts[j].slice(0, hit.index))) continue;
       hits.push({ match: hit[0], excerpt: parts.slice(i, j + 1).join(" ") });
+      break;
+    }
+  }
+  return hits;
+}
+
+const EMAIL_DESTINATION = "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}";
+const HTTP_PREFIX = "(?:https?:\\/\\/|(?<![a-z0-9+.-]:)\\/\\/)";
+const EMAIL_VERB = "(?<!\\b(?:an?|the|your|their|our|his|her|my|by|via|with|from|for|to|of)\\s+)\\b(?:e-?mail|mail)\\b(?!\\s*(?:\\/|address(?:es)?|login|auth|id|account|verification|confirmation|inbox|client|server|provider|header|field|format|template|notifications?|messages?|lists?|marketing|campaigns?|updates?|alerts?)\\b)";
+const EXFIL_VERBS = `(?:\\b(?:include|append|embed|encode|send|post|forward|leak|exfiltrate|transmit|upload|put|add|copy|attach|summarize|submit|relay|pass|bcc|cc)\\b|${EMAIL_VERB})`;
+const EXFIL_SEND_VERBS = `(?:\\b(?:send|post|forward|upload|submit|transmit|pass|relay|put|append|add|attach|encode|exfiltrate|leak|bcc|cc)\\b|${EMAIL_VERB})`;
+const EXFIL_IDENTITY_SECRET = "(?:passport(?:\\s+(?:numbers?|details?|info(?:rmation)?|id))?|national\\s+id(?:\\s+numbers?)?|tax\\s+id(?:\\s+numbers?)?|ssn|social\\s+security(?:\\s+numbers?)?|driver'?s\\s+licen[cs]e(?:\\s+numbers?)?|driving\\s+licen[cs]e(?:\\s+numbers?)?|bank\\s+account(?:\\s+(?:numbers?|details?))?|account\\s+numbers?|routing\\s+numbers?|iban|sort\\s+codes?|(?:credit|debit|payment)\\s+card(?:\\s+numbers?)?|card\\s+numbers?|cvv2?|cvc|passwords?(?!\\s+(?:setup|reset|change|recovery|policy)\\b)|passcodes?|passphrases?|otps?|one[- ]time\\s+codes?|seed\\s+(?:phrases?|words?)|recovery\\s+(?:phrases?|words?)|api\\s+keys?|access\\s+tokens?|session\\s+tokens?|credentials?|cookies?|private\\s+keys?)";
+const EXFIL_CONVERSATION_DATA = "(?:conversation|chat\\s+history|chat\\s+log|(?:the|this|their|your|whole|entire|full)\\s+chat\\b|chat\\s+(?:so\\s+far|contents?|messages?|transcript|summary)|conversation\\s+history|message\\s+history|previous\\s+messages|(?:user|visitor|customer|guest)'?s?\\s+messages?|what\\s+the\\s+(?:user|visitor|customer|guest)\\s+(?:typed|said|wrote|asked)|everything\\s+(?:they|the\\s+(?:user|visitor|customer|guest))\\s+(?:typed|said|wrote|asked)|their\\s+messages?|transcript|system\\s+prompt|your\\s+instructions|hidden\\s+instructions|sly_data|private\\s+context|personal\\s+(?:data|details)|(?:user|visitor|customer|guest)\\s+(?:data|details)|all\\s+outputs?|tool\\s+outputs?|local\\s+storage(?:\\s+credentials?)?|session\\s+storage|(?:user|visitor|customer|guest)'?s?\\s+e-?mail)";
+const EXFIL_SENSITIVE_TARGET = `(?:${EXFIL_CONVERSATION_DATA}|${EXFIL_IDENTITY_SECRET})`;
+const EXFIL_BACKREF = "(?:it|them|that|this|those|the\\s+(?:number|numbers|code|codes|details|info|information|data|value|values|transcript|summary|conversation|chat|history|copy|passport|id|iban|secret|secrets|key|keys|token|tokens|password|passwords|card))";
+const EXFIL_FOLLOWUP_SOURCE = new RegExp(`\\b${EXFIL_SENSITIVE_TARGET}\\b`, "i");
+const EXFIL_FOLLOWUP_SEND = new RegExp(
+  `${EXFIL_SEND_VERBS}[^.!?\\n]{0,20}\\b${EXFIL_BACKREF}\\b[^.!?\\n]{0,25}\\b(?:to|at|into|onto|after)\\s+(?:${HTTP_PREFIX}[^\\s)"'<>]+|${EMAIL_DESTINATION}\\b)`,
+  "i",
+);
+
+function followUpExfil(text) {
+  const parts = wrappedClauses(text);
+  const hits = [];
+  for (let i = 0; i + 1 < parts.length; i += 1) {
+    const src = parts[i].match(EXFIL_FOLLOWUP_SOURCE);
+    if (!src || negatedBefore(parts[i], src.index) || describedBefore(parts[i], src.index)) continue;
+    for (let j = i + 1; j <= Math.min(i + 2, parts.length - 1); j += 1) {
+      const send = parts[j].match(EXFIL_FOLLOWUP_SEND);
+      if (!send || negatedBefore(parts[j], send.index) || describedBefore(parts[j], send.index)) continue;
+      hits.push({ match: send[0], excerpt: parts.slice(i, j + 1).join(" ") });
       break;
     }
   }
@@ -937,7 +968,9 @@ export const TEXT_RULES = [
     fix: "Remove it. Never build links or images from conversation content.",
     match: (text, { raw = text, targetHost = "" } = {}) => {
       const urlPatterns = [
-        /\b(include|append|embed|encode|send|post|forward|leak|exfiltrate|transmit|upload|put|add|copy|attach|summarize)\b[^.!?\n]{0,60}\b(conversation|chat history|chat log|(?:the|this|their|your|whole|entire|full)\s+chat\b|chat\s+(?:so\s+far|contents?|messages?|transcript)|conversation history|message history|previous messages|(?:user|visitor)'?s? messages|what\s+the\s+(?:user|visitor|customer|guest)\s+(?:typed|said|wrote|asked)|everything\s+(?:they|the\s+(?:user|visitor))\s+(?:typed|said|wrote|asked)|their\s+messages?|transcript|system prompt|your instructions|hidden instructions|sly_data|private context|api keys?|access tokens?|session tokens?|cookies?|personal (?:data|details)|(?:user|visitor) data|all\s+outputs?|tool\s+outputs?|local\s+storage(?:\s+credentials?)?|session\s+storage|(?:user|visitor)'?s?\s+e-?mail|chat\s+summary)\b[^.!?\n]{0,80}\b((?:https?:)?\/\/|url|link|image|query|parameter|base64|webhook)/i,
+        new RegExp(`${EXFIL_VERBS}[^.!?\\n]{0,60}\\b${EXFIL_SENSITIVE_TARGET}\\b[^.!?\\n]{0,80}(?:${HTTP_PREFIX}|\\b(?:url|link|image|query|parameter|base64|webhook)\\b|\\b${EMAIL_DESTINATION}\\b)`, "i"),
+        new RegExp(`\\b${EXFIL_SENSITIVE_TARGET}\\b[^.!?\\n]{0,80}${EXFIL_SEND_VERBS}[^.!?\\n]{0,20}\\b${EXFIL_BACKREF}\\b[^.!?\\n]{0,25}\\b(?:to|at|into|onto|after)\\s+(?:${HTTP_PREFIX}[^\\s)"'<>]+|${EMAIL_DESTINATION}\\b)`, "i"),
+        new RegExp(`${EXFIL_SEND_VERBS}\\s+(?:(?:to|at)\\s+)?(?:${HTTP_PREFIX}[^\\s)"'<>]+|${EMAIL_DESTINATION}\\b)\\s+(?:with\\s+|containing\\s+|including\\s+|carrying\\s+)?(?:a\\s+copy\\s+of\\s+|all\\s+|full\\s+|entire\\s+)?(?:the\\s+|their\\s+|your\\s+|(?:user|visitor|customer|guest)'?s?\\s+)?\\b${EXFIL_SENSITIVE_TARGET}\\b`, "i"),
         /\b(put|append|add|attach|encode)\s+(?:it|them|that|this)\s+(?:after|onto|into|to)\s+(?:https?:)?\/\//i,
         /!\[[^\]]*\]\(\s*(?:https?:)?\/\/[^)\s]*(?:\{[^}]*\}|\?[^)\s]*=)/i,
         /(?:https?:)?\/\/[^\s)"'<>]+\?[a-z0-9_.-]{1,24}=(?:[\s)"'<>]|$)|(?:https?:)?\/\/[^\s)"'<>]+&[a-z0-9_.-]{1,24}=(?:[\s)"'<>]|$)/i,
@@ -956,7 +989,7 @@ export const TEXT_RULES = [
         /\b(?:read|reads|collect|collects|fetch|fetches|gather|gathers|grab|grabs|extract|extracts|dump|dumps|inspect|inspects|access|accesses)\b[^.!?\n]{0,60}\b(?:secrets?|tokens?|keys?|credentials?|passwords?|env(?:ironment)?(?:\s+var(?:iable)?s?|\s+settings?)?|\.env|cookies?|private\s+(?:files?|data)|config(?:uration)?(?:\s+files?)?)\b[^.!?\n]{0,60}\b(?:post|posts|send|sends|upload|uploads|forward|forwards|relay|relays|transmit|transmits|ship|ships|push|pushes)\b[^.!?\n]{0,40}\b(?:to|toward|at)\b[^.!?\n]{0,40}\b(?:url|webhook|callback|endpoint|server|remote\s+host|address|destination)\b/i,
         /(?:(?:\b(?:href|src|action)\s*=\s*["']?|\[\s*[^\]]*\]\s*\(\s*|\b(?:drag|click|bookmark(?:s|\s+bar)?|paste|follow|visit|open|run|execute|navigate|redirect|load|link|url)\b[^.!?\n]{0,80})\b(?:javascript|vbscript):(?=[^\s'")\],.;])|(?:\b(?:href|src|action)\s*=\s*["']?|\[\s*[^\]]*\]\s*\(\s*)data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b|\bdata\s*:\s*(?:text\/html|application\/xhtml\+xml),[^\s'"])/i,
       ];
-      const urlHits = regexMatcher(urlPatterns, { negatable: true })(text).map((hit) => {
+      const urlHits = [...regexMatcher(urlPatterns, { negatable: true })(text), ...followUpExfil(text)].map((hit) => {
         if (isHttpHeaderAuthDoc(hit.excerpt, targetHost)) return soften(hit, "Documents a request header for this service's own key.");
         if (targetHost && allUrlsSameSite(hit.excerpt, targetHost)
           && !VISITOR_LEAK_SLOT_RE.test(hit.excerpt) && !/!\[[^\]]*\]\(/.test(hit.excerpt)
@@ -1556,6 +1589,11 @@ export function scanText(text, { skipLanguage = false, targetHost = "", fieldNam
   const deobfuscated = deobfuscateEnglish(inlineDecoded);
   const wrappedDeobf = deobfuscateEnglish(softJoinLines(inlineDecoded));
   const variants = [{ text: folded, raw: normalized, allowLanguage: !skipLanguage }];
+  const spacedHidden = normalizeForRules(text, { spaceInvisible: true });
+  if (spacedHidden !== normalized) {
+    const spacedFolded = foldConfusableTokens(spacedHidden);
+    if (spacedFolded !== folded) variants.push({ text: spacedFolded, raw: spacedHidden, allowLanguage: false });
+  }
   if (inlineDecoded !== folded) variants.push({ text: inlineDecoded, raw: normalized, allowLanguage: false });
   if (deobfuscated !== inlineDecoded) variants.push({ text: deobfuscated, raw: normalized, allowLanguage: false });
   if (wrappedDeobf !== inlineDecoded && wrappedDeobf !== deobfuscated) variants.push({ text: wrappedDeobf, raw: normalized, allowLanguage: false });

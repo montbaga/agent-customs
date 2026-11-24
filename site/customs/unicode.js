@@ -211,7 +211,7 @@ export function revealHidden(text) {
  * :param text: Any string.
  * :return: The visible text plus any tag-hidden text, on a line of its own.
  */
-export function normalizeForRules(text) {
+export function normalizeForRules(text, { spaceInvisible = false } = {}) {
   if (typeof text !== "string") return "";
   let visible = "";
   let hidden = "";
@@ -223,6 +223,7 @@ export function normalizeForRules(text) {
     else if (LINE_BREAKS.has(cp)) visible += "\n";
     else if (QUOTES.has(cp)) visible += QUOTES.get(cp);
     else if (!drawsNothing(cp, ch)) visible += ch;
+    else if (spaceInvisible) visible += " ";
   }
   hidden = hidden.replace(/\s+/g, " ").trim();
   // Keep newlines: the rules split clauses at them.
