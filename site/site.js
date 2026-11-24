@@ -202,9 +202,9 @@ export class AssistantMount {
     } catch (error) {
       // The page must keep working without the assistant.
       connectAi(null);
-      status.textContent = "The assistant could not load. You can still inspect networks with the form above.";
+      status.textContent = "The officer couldn't load. You can still inspect networks with the form above.";
       const current = document.querySelector("#mp-current");
-      if (current) current.textContent = "The assistant could not load, so no model can be set. The inspection tools above still work.";
+      if (current) current.textContent = "The officer couldn't load, so no model can be set. The inspection tools above still work.";
       console.error("Assistant startup failed", error);
       return null;
     }

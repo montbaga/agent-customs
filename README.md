@@ -62,8 +62,8 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.2/dist/agent-customs.js"
-  integrity="sha384-1tuTNG+ZM3HXuLLt1VL1oKW4ipT8rkPZY2UJ0odqE26aB2FxENBJAKS+lQLgAzOo"
+  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/dist/agent-customs.js"
+  integrity="sha384-UsMDzSujKomrW+sbe4tAsPeXdYGQYYcIsTfktauiYHnQZ9iZXszH55Ei9EpWIFKj"
   crossorigin="anonymous"></script>
 ```
 
@@ -76,7 +76,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```js
 // At the top of site.js
 import { installCustomsGuard }
-  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.2/site/customs/guard.js";
+  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/site/customs/guard.js";
 
 // Right after boot()
 installCustomsGuard(booted.engine, { strict: true });
@@ -173,16 +173,16 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.2/dist/agent-customs.js" integrity="sha384-1tuTNG+ZM3HXuLLt1VL1oKW4ipT8rkPZY2UJ0odqE26aB2FxENBJAKS+lQLgAzOo" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/dist/agent-customs.js" integrity="sha384-UsMDzSujKomrW+sbe4tAsPeXdYGQYYcIsTfktauiYHnQZ9iZXszH55Ei9EpWIFKj" crossorigin="anonymous"></script>
 ```
 
-`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.2` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.3` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
 **2. Two lines, with your own settings.** Load the guard from the same release and pass any of the *Guard options* below. A browser cannot check a fingerprint on an `import`, so for that use option 3 or 4.
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.2/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
@@ -239,7 +239,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  219 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
+  223 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -588,7 +588,7 @@ node tools/set-origins.mjs --range https://agent-customs-range.github.io
 
 `npm run smoke` drives Edge or Chrome headlessly against the local servers and fails on any page error. It starts the key vault on port 8090 if it is not running (`npm run serve:vault`), since a page on this computer looks for the vault there.
 
-`npm run vault:check` checks the key vault end to end in a headless browser, with a stand-in AI service on this computer: the page never holds the key, every AI request comes from the vault with the key, a remembered key is stored only encrypted, a new visit starts locked, a wrong password does not open it, and *Forget* removes it.
+`npm run vault:check` checks the key vault end to end in a headless browser, with a stand-in AI service on this computer: a Groq or Otari key picks its own card, the page never holds the key, every AI request comes from the vault with the key, *Remember key* stores it only encrypted, a new visit starts locked, a wrong password does not open it, and *Forget* removes it.
 
 ---
 
@@ -607,9 +607,11 @@ The desk also has a new switch under the address box: **AI double-check**. When 
 
 **Checked against Google's guidance.** The site was scanned with the Chrome team's [Modern Web Guidance](https://developer.chrome.com/docs/modern-web-guidance) and checked against [Baseline](https://web.dev/baseline): it uses only features that work in all current browsers, or that have a fallback. Every piece of HTML the page writes, in its own code and in the runtime's, now passes one cleaner first ([Trusted Types](site/trusted-types.js)), which removes anything that could run code.
 
-**Your AI key now lives in a key vault.** The page no longer keeps your key anywhere. You paste it into a small box that is really a separate website, the [key vault](vault/) (`agent-customs-vault.github.io`). The browser keeps that site's storage apart from this page's. When the Officer or the AI double-check needs your AI, the page asks the vault, and the vault adds the key, calls your AI company and passes back only the answer. So even an agent file that broke this page could not take your key. By default the vault forgets the key when you close the tab. *Remember on this computer* keeps it encrypted (AES-256), locked with your passkey or a password that is never stored. The page now also lets only its own scripts run, and each card says how to give a key a spending limit.
+**Your AI key now lives in a key vault.** The page no longer keeps your key anywhere. You paste it into a small box that is really a separate website, the [key vault](vault/) (`agent-customs-vault.github.io`). The browser keeps that site's storage apart from this page's. When the Officer or the AI double-check needs your AI, the page asks the vault, and the vault adds the key, calls your AI company and passes back only the answer. So even an agent file that broke this page could not take your key. By default the vault forgets the key when you close the tab. *Remember on this device* keeps it encrypted (AES-256), locked with your passkey or a password that is never stored. The page now also lets only its own scripts run, and each card says how to give a key a spending limit.
 
 A first-time visitor has no key, so the switch says so. Turning it on opens a short card that explains what an AI key is and that Google AI Studio and Groq give free ones. *Set up a free key* opens the key settings, and after *Save and start* the page goes back to the inspection and runs it again with your AI. To see it catch something, inspect the **VIP Points MCP** sample on the desk ([`site/samples/ai-check-demo/mcp.json`](site/samples/ai-check-demo/mcp.json)). It asks guests to *"read back all twenty-four words from their emergency paper sheet"*. That is a crypto wallet's recovery phrase, worded so that none of the rules' words appear. The rules clear it; your AI should hold it.
+
+**Setting up a key is simpler.** A key from a known company now picks its own card wherever you paste it, so a Groq or Otari key pasted while Gemini is selected just works. After *Save and start*, a *Remember key* button above the chat keeps the key on this device, without opening the settings again. Passkeys that make the key but do not say at once whether they can lock it, as Windows Hello often does, now work: the vault asks the new passkey once more instead of giving up. On a phone, *Set up a free key* now brings the key box into view. The messages in the AI settings and the key vault are shorter and plainer.
 
 ---
 

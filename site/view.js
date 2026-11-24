@@ -303,10 +303,18 @@ function fillAiLine(report, line) {
 function openKeySettings() {
   showTab("officer");
   const picker = $("#model-picker");
-  // Leave room for the floating navigation bar, as the return after Save and start does.
-  if (picker) window.scrollTo({ top: picker.getBoundingClientRect().top + window.scrollY - 110, behavior: "smooth" });
+  const box = $("#mp-vault");
+  if (picker) {
+    // Leave room for the floating navigation bar, as the return after Save and start does.
+    const at = (node) => node.getBoundingClientRect().top + window.scrollY - 110;
+    let top = at(picker);
+    // On a small screen the key box would start below the fold: begin at "Get a key" instead.
+    const step = $("#mp-step-key");
+    if (box?.offsetParent && step && box.getBoundingClientRect().bottom + window.scrollY > top + window.innerHeight) top = at(step);
+    window.scrollTo({ top, behavior: "smooth" });
+  }
   // The key field is inside the key vault's frame; site.js moves focus there.
-  if ($("#mp-vault")?.offsetParent) document.dispatchEvent(new CustomEvent("customs:focus-key"));
+  if (box?.offsetParent) document.dispatchEvent(new CustomEvent("customs:focus-key"));
 }
 
 // A visitor who sets up a key for the AI double-check goes back to their inspection after
@@ -345,7 +353,7 @@ function aiUnlockCard() {
   const url = () => $("#inspect-url")?.value.trim() || desk.latest?.target.url || "";
   return [
     h("strong", null, "Your saved key is locked."),
-    " Unlock it in the key vault, and your AI takes a second look at what the rules clear.",
+    " Unlock it to turn on the AI double-check.",
     h("span", { class: "ai-note-actions" },
       h("button", { type: "button", class: "primary small", onclick: () => startKeySetup(url()) }, "Unlock your key"),
       h("button", { type: "button", class: "ghost small", onclick: () => { clearAiSetup(); desk.setAiCheck(false); $("#ai-check")?.focus(); } }, "Not now")),
@@ -356,9 +364,9 @@ function aiSetupCard() {
   const url = () => $("#inspect-url")?.value.trim() || desk.latest?.target.url || "";
   return [
     h("strong", null, "Your own AI takes a second look."),
-    " It reads what the rules clear, and it can only make a verdict stricter.",
+    " It reads anything the rules clear and can only make a verdict stricter.",
     h("span", { class: "ai-note-more" },
-      "It needs an AI key: a code from an AI company that lets this page use its AI for you. Google AI Studio and Groq give free keys. Yours goes into a separate key vault, which this page cannot read."),
+      "It needs an AI key: a code that lets this page use an AI for you. Google and Groq give them free. Your key stays in a separate key vault that this page can't read."),
     h("span", { class: "ai-note-actions" },
       h("button", { type: "button", class: "primary small", onclick: () => startKeySetup(url()) }, "Set up a free key"),
       h("button", { type: "button", class: "ghost small", onclick: () => { clearAiSetup(); desk.setAiCheck(false); $("#ai-check")?.focus(); } }, "Not now")),
@@ -391,18 +399,18 @@ function syncAiCheck() {
     else if (state === "needs-key") note.replaceChildren(...aiSetupCard());
     else if (state === "locked") note.replaceChildren(...aiUnlockCard());
     else {
-      note.replaceChildren(aiJustReady ? "Your key is saved and the AI double-check is on. " : "",
-        "Your AI also reads anything the rules clear, and can only make a verdict stricter. The network's public text goes to your AI provider, on your key.");
+      note.replaceChildren(aiJustReady ? "Your key is set and the AI double-check is on. " : "",
+        "Your AI also reads anything the rules clear and can only make a verdict stricter. The network's public text goes to your AI provider, on your key.");
     }
   }
   const hint = $("#mp-ai-hint");
   if (hint) {
     hint.hidden = state !== "needs-key" && state !== "locked";
     hint.textContent = state === "locked"
-      ? (readAiSetup() ? "Unlock your key in the vault box. You then go straight back to your inspection." : "Unlock your key in the vault box to run the AI double-check.")
+      ? (readAiSetup() ? "Unlock your key below. You'll go straight back to your inspection." : "Unlock your key below to run the AI double-check.")
       : readAiSetup()
-        ? "This key will also run the AI double-check. After Save and start, you go straight back to your inspection."
-        : "This key will also run the AI double-check.";
+        ? "This key also runs the AI double-check. After Save and start, you'll go straight back to your inspection."
+        : "This key also runs the AI double-check.";
   }
   const fact = $("#privacy-fact");
   if (fact) fact.textContent = on ? "AI double-check on: public agent text also goes to your AI provider" : "No server: nothing you inspect leaves your browser";
@@ -1293,7 +1301,7 @@ function wireBuilderCodeTabs() {
   const snippets = {
     twolines: [
       "// At the top of site.js",
-      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.2/site/customs/guard.js\";",
+      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/site/customs/guard.js\";",
       "",
       "// Right after boot(), with any of the guard's options",
       "installCustomsGuard(booted.engine, { strict: true });",

@@ -1,6 +1,6 @@
 // vault.js: the key vault's box, and its end of the private channel with Agent Customs.
 //
-// The page may ask: select, use, models, commit, fetch, focus, theme, status.
+// The page may ask: select, use, models, commit, remember, fetch, focus, theme, status.
 // The vault tells it: status (never a key), detected, draft, submit, height.
 // Keys for this visit, and unlocked ones, are in sessionStorage "vault-session". Remembered
 // keys are in localStorage "vault-box", encrypted.
@@ -84,7 +84,7 @@ let notice = { text: "", tone: "" };
 let passkeyReady = false;
 
 const keyInput = el("input", { id: "key", type: "password", autocomplete: "off", spellcheck: "false", "aria-describedby": "key-note" });
-const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://api.example.com/v1 or http://127.0.0.1:11434/v1" });
+const addressInput = el("input", { id: "address", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", placeholder: "https://api.example.com/v1" });
 const passwordInput = el("input", { id: "password", type: "password", autocomplete: "new-password", spellcheck: "false" });
 const unlockInput = el("input", { id: "unlock-password", type: "password", autocomplete: "current-password", spellcheck: "false", "aria-label": "Vault password" });
 
@@ -176,6 +176,7 @@ function status() {
       router: s.active,
       custom: !providerAt(s.active),
       locked: !s.keys[s.active],
+      remembered: !!boxes[s.active],
     }
     : null;
   return {
@@ -248,6 +249,7 @@ async function handle(type, message) {
     case "flush": flushInputs({ notify: true, draft: message.draft !== false }); return { ok: true };
     case "models": flushInputs({ notify: false }); return listModels();
     case "commit": { flushInputs({ notify: false }); const done = await commit(); changed(); return done; }
+    case "remember": return openRemember();
     case "forget": { await forget(message.router || readSession().active || Object.keys(readBoxes())[0]); changed(); return { ok: true }; }
     default: return { ok: false, reason: "unknown" };
   }
@@ -297,29 +299,11 @@ function keyForSelection() {
   return readSession().keys[selectedRouter()]?.key || "";
 }
 
+// A key with a known prefix goes only to its own provider. Pasting one selects that provider
+// (applyDraftInput), so this is only a last check before the key is used.
 function wrongCardProvider() {
   const own = providerForKey(draftKey);
-  if (!own) return "";
-  if (own.name === selection.provider) return "";
-  if (selection.provider === CUSTOM || selection.provider.startsWith("Otari")) {
-    return own.name.startsWith("Otari") ? "" : own.name;
-  }
-  return own.name;
-}
-
-function ownProviderForDraft() {
-  if (wrongCardProvider()) return null;
-  const own = providerForKey(draftKey);
-  if (!own) return null;
-  if (selection.provider === CUSTOM || selection.provider.startsWith("Otari")) {
-    return own.name.startsWith("Otari") ? own : null;
-  }
-  return own;
-}
-
-// A key with another provider's prefix is not sent until its own card is selected.
-function mismatched() {
-  return !!wrongCardProvider();
+  return own && own.name !== selection.provider ? own.name : "";
 }
 
 async function listModels() {
@@ -347,12 +331,9 @@ async function listModels() {
   }
 }
 
-// A key with a known prefix is kept for its own provider, whatever the page selected.
 async function commit() {
   const wrong = wrongCardProvider();
   if (wrong) return { ok: false, reason: "mismatch", provider: wrong };
-  const own = draftKey ? ownProviderForDraft() : null;
-  if (own) selection = { provider: own.name };
   const router = selectedRouter();
   if (!router) return { ok: false, reason: "address" };
   const s = readSession();
@@ -405,14 +386,14 @@ async function relay(port, { path, method, body }) {
   const entry = s.keys[s.active];
   if (!entry) {
     if (s.active && boxFor(s.active)) {
-      refuse(423, "Your saved key is locked in the key vault. Unlock it under AI model settings, then try again.");
+      refuse(423, "Your saved key is locked in the key vault. Unlock it in AI model settings, then try again.");
       changed();
     } else {
-      refuse(401, "There is no key in the key vault yet. Paste your key under AI model settings.");
+      refuse(401, "There's no key in the key vault yet. Add one in AI model settings.");
     }
     return;
   }
-  if (!limit.take()) { refuse(429, "The key vault paused this request: more than 60 AI requests in one minute."); return; }
+  if (!limit.take()) { refuse(429, "The key vault paused this request: more than 60 AI requests in a minute. Wait a moment, then try again."); return; }
   touch(s.active);
   try {
     const response = await fetch(`${s.active}${path}`, {
@@ -460,7 +441,27 @@ async function remember(kind) {
   panel = "";
   lockChoice = "";
   backTarget = null;
-  say(kind === "password" ? "Saved on this computer, locked with your password." : "Saved on this computer, locked with your passkey.");
+  say(kind === "password" ? "Done. It's protected by your password." : "Done. It's protected by your passkey.");
+}
+
+// The page's "Remember key" button, shown once a key is in use: the lock choices for that key.
+function openRemember() {
+  const s = readSession();
+  const router = s.active;
+  const entry = router ? s.keys[router] : null;
+  if (!entry || entry.remembered) return { ok: false, reason: "none" };
+  const known = providerAt(router);
+  selection = { provider: known ? known.name : CUSTOM };
+  if (!known) addressInput.value = router;
+  clearDraft();
+  clearTimeout(armed);
+  armed = 0;
+  panel = "remember";
+  lockChoice = "";
+  backTarget = null;
+  notice = { text: "", tone: "" };
+  changed();
+  return { ok: true };
 }
 
 async function unlock(router = selectedRouter()) {
@@ -471,13 +472,15 @@ async function unlock(router = selectedRouter()) {
     if (!unlockInput.value) { unlockInput.focus(); return; }
     lockKey = await passwordLock(unlockInput.value, fromBase64(box.salt), box.rounds);
   } else {
-    lockKey = await passkeyLock(await passkeyOutput(fromBase64(box.credential), fromBase64(box.prfSalt)));
+    const output = await passkeyOutput(fromBase64(box.credential), fromBase64(box.prfSalt));
+    if (!output) throw new Error("This passkey can't unlock your key. Try again.");
+    lockKey = await passkeyLock(output);
   }
   let opened;
   try {
     opened = await unlockKeys(box, lockKey);
   } catch {
-    say(box.kind === "password" ? "That password does not open the vault. Try again." : "That passkey does not open the vault.", "warn");
+    say(box.kind === "password" ? "Wrong password. Try again." : "That passkey didn't unlock your key.", "warn");
     unlockInput.select();
     return;
   }
@@ -487,7 +490,7 @@ async function unlock(router = selectedRouter()) {
   if (entry) s.keys[router] = { ...entry, remembered: true, touchedAt: now };
   writeSession(s);
   unlockInput.value = "";
-  say("Unlocked. Locks after 15 minutes without using this AI.");
+  say("Unlocked. It locks again after 15 minutes without use.");
 }
 
 async function forget(router = selectedRouter()) {
@@ -506,11 +509,13 @@ async function forget(router = selectedRouter()) {
   panel = "";
   lockChoice = "";
   backTarget = null;
-  say(`The ${removedName} key is gone from the vault.`);
+  say(`${removedName} key removed.`);
 }
 
 // With the PRF extension, the authenticator turns a salt into 32 secret bytes after the
-// visitor's fingerprint, face or PIN. Those bytes are the lock.
+// visitor's fingerprint, face or PIN. Those bytes are the lock. Some authenticators, Windows
+// Hello among them, make the passkey without saying whether PRF works, so the new passkey is
+// asked once more before falling back to a password.
 async function newPasskeyLock() {
   const prfSalt = randomBytes(32);
   const credential = await navigator.credentials.create({
@@ -523,17 +528,28 @@ async function newPasskeyLock() {
       extensions: { prf: {} },
     },
   });
-  const prf = credential.getClientExtensionResults().prf;
-  if (!prf?.enabled) {
-    const err = new Error("This passkey cannot lock the vault. Choose a password below instead.");
+  const id = new Uint8Array(credential.rawId);
+  let output = credential.getClientExtensionResults().prf?.results?.first || null;
+  if (!output) {
+    say("One more check to finish.");
+    changed();
+    try {
+      output = await passkeyOutput(id, prfSalt);
+    } catch (error) {
+      forgetPasskey(id);
+      throw error;
+    }
+  }
+  if (!output) {
+    forgetPasskey(id);
+    const err = new Error("This device can't lock keys with a passkey. Use a password instead.");
     err.usePassword = true;
     throw err;
   }
-  const id = new Uint8Array(credential.rawId);
-  const output = prf.results?.first || await passkeyOutput(id, prfSalt);
   return { kind: "passkey", key: await passkeyLock(output), credential: toBase64(id), prfSalt: toBase64(prfSalt) };
 }
 
+// The PRF output for this salt, or null when the passkey gives none.
 async function passkeyOutput(credentialId, prfSalt) {
   const assertion = await navigator.credentials.get({
     publicKey: {
@@ -543,9 +559,16 @@ async function passkeyOutput(credentialId, prfSalt) {
       extensions: { prf: { eval: { first: prfSalt } } },
     },
   });
-  const output = assertion.getClientExtensionResults().prf?.results?.first;
-  if (!output) throw new Error("This passkey did not give the vault its lock.");
-  return output;
+  return assertion.getClientExtensionResults().prf?.results?.first || null;
+}
+
+// A passkey that cannot lock anything is of no use; ask the device to remove it, where the
+// browser supports that.
+function forgetPasskey(id) {
+  try {
+    const credentialId = toBase64(id).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    PublicKeyCredential.signalUnknownCredential?.({ rpId: location.hostname, credentialId })?.catch?.(() => {});
+  } catch { /* not supported */ }
 }
 
 async function checkPasskeys() {
@@ -581,8 +604,9 @@ function showOnly(text) {
 
 function focusField() {
   const target = (panel === "replace" && keyInput.isConnected && keyInput)
+    || (panel === "remember" && ($("#vault #password") || $("#vault input[name='lock']:checked")))
     || $("#vault [data-focus]")
-    || (selection.provider === CUSTOM && draftKey && !ownProviderForDraft() && !selectedRouter() ? addressInput : keyInput);
+    || (selection.provider === CUSTOM && draftKey && !selectedRouter() ? addressInput : keyInput);
   target.focus({ preventScroll: true });
   if (window.scrollY) window.scrollTo(0, 0);
 }
@@ -596,12 +620,14 @@ async function run(label, work) {
     await work();
   } catch (error) {
     if (error?.usePassword) {
+      // This device's passkeys cannot lock a key, so stop offering them for this visit.
+      passkeyReady = false;
       lockChoice = "password";
       panel = "remember";
       focusPassword = true;
     }
-    const message = error?.name === "NotAllowedError" ? "The passkey was cancelled."
-      : error?.name === "SecurityError" ? "Passkeys need localhost or a domain name (not an IP address). Choose a password instead."
+    const message = error?.name === "NotAllowedError" ? (label === "remember" ? "Passkey cancelled. Try again, or use a password." : "Passkey cancelled. Try again.")
+      : error?.name === "SecurityError" ? "Passkeys don't work on this address. Use a password instead."
       : String(error?.message || error);
     say(message, "warn");
   } finally {
@@ -640,7 +666,7 @@ function render() {
   else delete keyInput.dataset.state;
 
   keyInput.placeholder = panel === "replace" ? `Paste a new ${name} key`
-    : custom ? "Paste your AI model key" : `Paste your ${name} key`;
+    : custom ? "Paste your key" : `Paste your ${name} key`;
   keyInput.setAttribute("aria-label", `${name} key`);
 
   const rows = [];
@@ -650,44 +676,43 @@ function render() {
       rows.push(el("div", { class: "draft-row", "data-tone": wrong ? "warn" : null },
         el("span", { class: "dot", "aria-hidden": "true" }),
         el("span", null, wrong
-          ? "This key belongs to another card and cannot be used here."
+          ? `This key is for ${wrong}, not ${name}.`
           : custom && !sel.router
-            ? `Key entered (${draftKey.length} characters, hidden). Add the service address below.`
-            : `Key entered (${draftKey.length} characters, hidden). Press Save and start below.`),
+            ? "Key added. Now add the service's address below."
+            : "Key added. Press Save and start below."),
         button("Clear", clearDraftAndNotify)));
     }
     if (custom) {
-      rows.push(el("div", { class: "field" }, el("label", { for: "address" }, "Service address (https://... or http://127.0.0.1:...)"), addressInput));
+      rows.push(el("div", { class: "field" }, el("label", { for: "address" }, "Service address"), addressInput));
     }
     rows.push(el("p", { id: "key-note", class: "note" },
       el("span", { class: "dot", "aria-hidden": "true" }),
-      `The vault sends your key only to ${name}.`));
+      `Your key is sent only to ${name}.`));
     if (panel === "replace" || (panel === "custom" && backTarget)) {
       rows.push(el("div", { class: "actions" }, button("Cancel", cancelSubPanel)));
     }
   } else {
     rows.push(el("p", { id: "key-note", class: "note" },
       el("span", { class: "dot", "aria-hidden": "true" }),
-      `The vault sends your key only to ${name}.`));
+      `Your key is sent only to ${name}.`));
   }
 
   if (panel !== "replace" && panel !== "custom" && sel.locked && !draftKey) rows.push(lockedRow(name, box, sel.router));
   else if (entry && panel === "remember") rows.push(rememberPanel());
-  else if (panel !== "replace" && panel !== "custom" && entry && !draftKey) rows.push(entry.remembered ? rememberedRow(name, box, sel.router) : visitRow(name));
+  else if (panel !== "replace" && panel !== "custom" && entry && !draftKey) rows.push(entry.remembered ? rememberedRow(name, sel.router) : visitRow(name));
   else if (!entry && !sel.locked) {
     const activeSaved = s.active && (boxFor(s.active.router) || readSession().keys[s.active.router]?.remembered);
     const otherSaved = [...held()].filter(([r]) => r !== sel.router && (boxFor(r) || readSession().keys[r]?.remembered)).map(([, label]) => label);
     if (s.active && s.active.router !== sel.router && !activeSaved) {
-      rows.push(el("p", { class: "hint" }, `Saving here replaces your temporary ${s.active.name} key.`));
+      rows.push(el("p", { class: "hint" }, `Saving here replaces the ${s.active.name} key you added for this visit.`));
     } else if (otherSaved.length === 1) {
-      rows.push(el("p", { class: "hint" }, `Your saved ${otherSaved[0]} key stays stored when you switch.`));
+      rows.push(el("p", { class: "hint" }, `Your saved ${otherSaved[0]} key stays saved when you switch.`));
     } else if (otherSaved.length > 1) {
-      rows.push(el("p", { class: "hint" }, `Your saved keys (${otherSaved.slice(0, -1).join(", ")} and ${otherSaved.at(-1)}) stay stored when you switch.`));
+      rows.push(el("p", { class: "hint" }, `Your saved keys (${otherSaved.slice(0, -1).join(", ")} and ${otherSaved.at(-1)}) stay saved when you switch.`));
     }
   }
 
   if (notice.text) rows.push(el("p", { class: "notice", "data-tone": notice.tone || null, role: "status" }, notice.text));
-  rows.push(el("p", { class: "foot" }, `Key vault · ${location.host}`));
 
   const focused = document.activeElement;
   const keepFocus = focused === keyInput || focused === addressInput || focused === passwordInput || focused === unlockInput;
@@ -777,42 +802,40 @@ function visitRow(name) {
     changed();
     if (panelLock() === "password") passwordInput.focus({ preventScroll: true });
   };
-  return stateCard(name, `Your ${name} key is in the vault for this visit.`, " It is forgotten when you close this tab or switch to another model.",
-    button("Remember on this computer", rememberClick, { kind: "soft" }));
+  return stateCard(name, `${name} key added for this visit.`, " It's removed when you close this tab or save another key.",
+    button("Remember on this device", rememberClick, { kind: "soft" }));
 }
 
-function rememberedRow(name, box, router) {
-  const how = box?.kind === "passkey" ? "your passkey" : "your password";
-  return stateCard(name, `Saved on this computer, locked with ${how}.`, " Unlocked now; locks automatically after 15 minutes without using this AI.",
-    button("Lock now", () => { lockNow(router); clearTimeout(armed); armed = 0; say(`Locked ${name}.`); changed(); }, { kind: "soft" }));
+function rememberedRow(name, router) {
+  return stateCard(name, `${name} key saved on this device.`, " Unlocked now. It locks again after 15 minutes without use.",
+    button("Lock now", () => { lockNow(router); clearTimeout(armed); armed = 0; say(`${name} key locked.`); changed(); }, { kind: "soft" }));
 }
 
 function lockedRow(name, box, router) {
   const passkey = box?.kind === "passkey";
-  const unlockButton = button(busy === "unlock" ? "Unlocking…" : passkey ? "Unlock with your passkey" : "Unlock",
+  const unlockButton = button(busy === "unlock" ? "Unlocking…" : passkey ? "Unlock with passkey" : "Unlock",
     () => run("unlock", () => unlock(router)), { kind: "primary", focus: passkey });
   if (!passkey) unlockInput.dataset.focus = "true";
   else delete unlockInput.dataset.focus;
-  return stateCard(name, `Your saved ${name} key is locked.`, passkey ? " Your passkey opens it." : " Type the vault password to open it.",
+  return stateCard(name, `Your saved ${name} key is locked.`, passkey ? " Unlock it with your passkey." : " Enter your password to unlock it.",
     passkey ? null : unlockInput, unlockButton);
 }
 
 function rememberPanel() {
   const choose = (kind) => el("label", { class: "choice" },
     el("input", { type: "radio", name: "lock", value: kind, checked: (panelLock() === kind) || null, onchange: (e) => { lockChoice = e.target.value; changed(); } }),
-    kind === "passkey" ? "With a passkey: your fingerprint, face or device PIN" : "With a password");
+    kind === "passkey" ? "Passkey (fingerprint, face or PIN)" : "Password");
   const usePassword = panelLock() === "password";
   return el("div", { class: "state" },
-    el("p", null, el("strong", null, "Lock it, so a copied file is useless."), " You unlock it once each visit."),
-    el("div", { class: "choices", role: "radiogroup", "aria-label": "Lock" },
+    el("p", null, el("strong", null, "Save it on this device."), " You'll unlock it once per visit, so no one else using this device can use it."),
+    el("div", { class: "choices", role: "radiogroup", "aria-label": "Protect it with" },
       passkeyReady ? choose("passkey") : null,
       choose("password")),
-    usePassword ? el("div", { class: "field" }, el("label", { for: "password" }, `Vault password (at least ${MIN_PASSWORD} characters)`), passwordInput,
-      el("p", { class: "hint" }, "Nobody can recover it. If you forget it, paste your key again.")) : null,
+    usePassword ? el("div", { class: "field" }, el("label", { for: "password" }, `Password (at least ${MIN_PASSWORD} characters)`), passwordInput,
+      el("p", { class: "hint" }, "It can't be reset. If you forget it, just paste your key again.")) : null,
     el("div", { class: "actions" },
-      button(busy === "remember" ? "Locking…" : "Remember it", () => run("remember", () => remember(panelLock())), { kind: "primary" }),
-      button("Cancel", () => { panel = ""; lockChoice = ""; notice = { text: "", tone: "" }; passwordInput.value = ""; changed(); })),
-    el("p", { class: "hint" }, "Safest: a free-tier key, or one with a spending limit."));
+      button(busy === "remember" ? "Saving…" : "Save and lock", () => run("remember", () => remember(panelLock())), { kind: "primary" }),
+      button("Cancel", () => { panel = ""; lockChoice = ""; notice = { text: "", tone: "" }; passwordInput.value = ""; changed(); })));
 }
 
 let lockChoice = "";
@@ -839,11 +862,9 @@ function applyDraftInput({ notify = true, draft = true } = {}) {
   if (!draftKey && (panel === "custom" || (selection.provider.startsWith("Otari") && !status().selection.saved))) {
     selection = { provider: CUSTOM };
   }
-  const wrong = wrongCardProvider();
-  const own = wrong ? null : ownProviderForDraft();
-  if (own && own.name !== selection.provider && (selection.provider === CUSTOM || selection.provider.startsWith("Otari"))) {
-    selection = { provider: own.name };
-  }
+  // A key with a known prefix selects its own provider, and the page follows with its card.
+  const own = providerForKey(draftKey);
+  if (own && own.name !== selection.provider) selection = { provider: own.name };
   const detected = !!(own && own.name !== prevProvider);
   changed();
   if (!notify) return;
@@ -851,8 +872,7 @@ function applyDraftInput({ notify = true, draft = true } = {}) {
     tell({ event: "draft-cleared" });
     return;
   }
-  if (wrong) tell({ event: "mismatch", provider: wrong });
-  else if (detected) tell({ event: "detected", provider: own.name });
+  if (detected) tell({ event: "detected", provider: own.name });
   else if (draft) tell({ event: "draft" });
 }
 
@@ -902,7 +922,7 @@ setInterval(() => { if (lockIfIdle()) { say("Locked after 15 minutes without use
 
 checkPasskeys().then(() => { if (page) render(); });
 if (window.parent === window) {
-  showOnly("This is the Agent Customs key vault. It keeps your AI key apart from the page. Open it from Agent Customs: montbaga.github.io/agent-customs.");
+  showOnly("This is the Agent Customs key vault. It keeps your AI key apart from the page. Open it from Agent Customs at montbaga.github.io/agent-customs.");
 } else {
   showOnly("Opening the key vault…");
   setTimeout(() => { if (!page) showOnly("This key vault works only inside Agent Customs."); }, 8000);

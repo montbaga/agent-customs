@@ -317,7 +317,7 @@ test("keys an older version saved outside the vault are counted, and deleted onl
 test("every card says how to keep a lost key from costing much", async () => {
   const { MODEL_CHOICES } = await import("../site/model-picker.js");
   for (const choice of MODEL_CHOICES) {
-    assert.match(choice.safety, /^Safest: /, choice.id);
+    assert.match(choice.safety, /^Tip: /, choice.id);
     if (choice.limitUrl) assert.ok(choice.limitUrl.startsWith("https://"), choice.id);
   }
   assert.ok(MODEL_CHOICES.filter((c) => c.limitUrl).length >= 2, "the paid providers link to their spending limits");
@@ -346,28 +346,28 @@ test("a provider's refusal reads as advice, with its own words kept as details",
   const { explainProviderError } = await import("../site/model-picker.js");
   const quota = explainProviderError('LLM HTTP 429: [{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details.","status":"RESOURCE_EXHAUSTED"}}]', "Google AI Studio", "Gemini 4 Argon");
   assert.equal(quota.status, 429);
-  assert.match(quota.advice, /Gemini 4 Argon has reached its limit/);
+  assert.match(quota.advice, /Gemini 4 Argon hit its limit/);
   assert.equal(quota.detail, "You exceeded your current quota, please check your plan and billing details.");
-  assert.match(explainProviderError('LLM HTTP 400: {"error":{"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"}}', "Google AI Studio").advice, /did not accept the key/);
-  assert.match(explainProviderError('LLM HTTP 404: {"error":{"message":"models/gemini-4-argon is not found for API version v1main"}}', "Google AI Studio", "Gemini 4 Argon").advice, /does not offer Gemini 4 Argon/);
+  assert.match(explainProviderError('LLM HTTP 400: {"error":{"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"}}', "Google AI Studio").advice, /didn't accept your key/);
+  assert.match(explainProviderError('LLM HTTP 404: {"error":{"message":"models/gemini-4-argon is not found for API version v1main"}}', "Google AI Studio", "Gemini 4 Argon").advice, /doesn't offer Gemini 4 Argon/);
   assert.match(explainProviderError('LLM HTTP 403: {"error":{"status":"PERMISSION_DENIED"}}', "Google AI Studio", "Gemini 4 Argon").advice, /billing/);
   assert.match(explainProviderError("LLM HTTP 503: overloaded").advice, /Try again in a minute/);
   assert.equal(explainProviderError("Something else went wrong"), null);
   // The key vault's own refusals are plain words already, and stay as they are.
-  const locked = explainProviderError('LLM HTTP 423: {"error":{"message":"Your saved key is locked in the key vault. Unlock it under AI model settings, then try again."}}', "Groq");
-  assert.equal(locked.advice, "Your saved key is locked in the key vault. Unlock it under AI model settings, then try again.");
+  const locked = explainProviderError('LLM HTTP 423: {"error":{"message":"Your saved key is locked in the key vault. Unlock it in AI model settings, then try again."}}', "Groq");
+  assert.equal(locked.advice, "Your saved key is locked in the key vault. Unlock it in AI model settings, then try again.");
 });
 
 test("a model outside a free-tier key is explained as a billing matter", async () => {
   const { explainProviderError } = await import("../site/model-picker.js");
   const info = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-4-argon","status":"RESOURCE_EXHAUSTED"}}', "Google AI Studio", "Gemini 4 Argon");
-  assert.match(info.advice, /not part of this key's free tier/);
+  assert.match(info.advice, /isn't in your key's free tier/);
   assert.match(info.advice, /billing/);
   // Google sometimes says only "limit: 0".
   const bare = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded, limit: 0, model: gemini-4-argon"}}', "Google AI Studio", "Gemini 4 Argon");
-  assert.match(bare.advice, /not part of this key's free tier/);
+  assert.match(bare.advice, /isn't in your key's free tier/);
   const ordinary = explainProviderError('LLM HTTP 429: {"error":{"message":"Quota exceeded, limit: 10, model: x"}}');
-  assert.match(ordinary.advice, /reached its limit/);
+  assert.match(ordinary.advice, /hit its limit/);
 });
 
 test("instruction_analyst is scoped to read-only inspection details and cannot inspect or overwrite the desk", async () => {

@@ -165,7 +165,8 @@ sequenceDiagram
 
 - The runtime starts with a stand-in key and a stand-in address (`key-vault.invalid`, which can never reach a real server). Every request for that address goes to the vault. The runtime's code is unchanged.
 - The vault answers only Agent Customs, and only two requests: list the models, and chat, at most 60 a minute. It sends a key only to the AI company it belongs to, or to the address typed into the vault itself, so the page cannot redirect a key.
-- By default the key is kept for this visit and forgotten when the tab closes. *Remember on this computer* encrypts it with AES-256. The lock comes from a passkey (WebAuthn PRF) or a password (PBKDF2, 600,000 rounds), and neither is ever stored. It locks again after 15 minutes without use.
+- By default the key is kept for this visit and forgotten when the tab closes. *Remember on this device* (or *Remember key* above the chat, once a key is in use) encrypts it with AES-256. The lock comes from a passkey (WebAuthn PRF) or a password (PBKDF2, 600,000 rounds), and neither is ever stored. Some passkeys, Windows Hello among them, do not say at creation whether they support PRF; the vault then asks the new passkey once more, and falls back to a password only if that gives no lock. It locks again after 15 minutes without use.
+- A key with a known prefix (Groq, OpenAI, Anthropic, Google, OpenRouter, Otari) selects its own card wherever it is pasted, since the vault sends it only to that company.
 - The page itself allows only its own scripts, and every piece of HTML it writes passes one cleaner first (Trusted Types, `site/trusted-types.js`).
 - What it cannot stop: a virus or a harmful browser extension while the key is unlocked, or a page that was taken over showing a fake key box. A free-tier key, or one with a spending limit, keeps that loss small.
 

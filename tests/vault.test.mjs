@@ -212,7 +212,7 @@ test("without a vault, the runtime's AI requests get a plain refusal", async () 
   assert.equal(await vault.ready, null);
   const response = await vault.fetch(`${VAULT_ROUTER}/chat/completions`, { method: "POST", body: "{}" });
   assert.equal(response.status, 503);
-  assert.match((await response.json()).error.message, /key vault could not load/);
+  assert.match((await response.json()).error.message, /key vault couldn't load/);
   assert.deepEqual(await vault.ask("models"), { ok: false, reason: "unavailable" });
 });
 

@@ -16,7 +16,7 @@ Agent Customs reads agent files written by strangers. If one of them ever found 
 | Choice | Where | How long |
 | :--- | :--- | :--- |
 | Just this visit (the default) | This tab's storage, for this site only | Until you close the tab |
-| Remember on this computer | This site's storage, **encrypted** with AES-256 | Until you click *Forget* |
+| Remember on this device | This site's storage, **encrypted** with AES-256 | Until you click *Forget* |
 
 A remembered key is locked with your **passkey** (fingerprint, face or device PIN, through the WebAuthn PRF extension) or a **password** (PBKDF2-SHA-256, 600,000 rounds per guess). Neither the passkey's secret nor the password is ever stored, so a copy of the browser's files holds only scrambled text. After you unlock it, it locks again after 15 minutes without use.
 
