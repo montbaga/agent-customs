@@ -193,11 +193,20 @@ export async function analyzeNetwork(input) {
 
   // ---- Contraband: hidden characters ---------------------------------------
   const hiddenByPlace = new Map();
-  walkStrings({ manifest, network: config, ...(rawDoc ? { rawDoc } : {}) }, (text, path) => {
+  const seenForeignHidden = new Set();
+  const visitHidden = (text, path) => {
     // Shared text is expanded into each agent's instructions, which are scanned there.
     if (path[0] === "network" && path[1] === "commondefs") return;
+    // Foreign manifests embed rawDoc under manifest.mcp or manifest.a2a.
+    if (path[0] === "manifest" && (path[1] === "mcp" || path[1] === "a2a")) return;
     const h = scanHidden(text);
     if (!h.total) return;
+    if (rawDoc) {
+      const isNonToolCopy = path[0] !== "network" || path[1] !== "tools";
+      const isEntryMirroredDesc = path[0] === "network" && path[1] === "tools" && path[2] === 0 && path[3] === "function" && path[4] === "description";
+      if ((isNonToolCopy || isEntryMirroredDesc) && seenForeignHidden.has(text)) return;
+      seenForeignHidden.add(text);
+    }
     const place = placeOf(path, config);
     const agg = hiddenByPlace.get(place.key) || { ...place, tags: 0, tagText: [], bidi: 0, bidiNames: new Set(),
       invisible: 0, invisibleNames: new Set(), variation: 0, variationSupplement: 0, privateUse: 0, control: 0, sample: "" };
@@ -209,7 +218,14 @@ export async function analyzeNetwork(input) {
     agg.privateUse += h.privateUse; agg.control += h.control;
     if (!agg.sample) agg.sample = sampleAroundHidden(text);
     hiddenByPlace.set(place.key, agg);
-  });
+  };
+  walkStrings(config.tools || [], visitHidden, ["network", "tools"]);
+  for (const [k, v] of Object.entries(config || {})) {
+    if (k === "tools" || k === "commondefs") continue;
+    walkStrings(v, visitHidden, ["network", k]);
+  }
+  walkStrings(manifest, visitHidden, ["manifest"]);
+  if (rawDoc) walkStrings(rawDoc, visitHidden, ["rawDoc"]);
   for (const agg of hiddenByPlace.values()) {
     const where = { agent: agg.agent, field: agg.field };
     if (agg.tags) {
@@ -337,11 +353,11 @@ export async function analyzeNetwork(input) {
     } else if (hit.rule.id === "C-EXFIL" && !isInstructionField && severity !== "medium") {
       const ex = hit.excerpt || "";
       const hardLeak = Boolean(hit.language) || Boolean(hit.hard)
-        || /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|\b(?:https?:)?\/\/|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex)
+        || /\b(?:conversation|chat|history|messages?|transcript|system\s+prompt|sly_data|cookie)\b|(?:https?:)?\/\/|\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b|\b(?:javascript|vbscript):[^\s'")\],.;]|data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)(?:;[^,\s]+)?,[^\s'"]|\bwebhook\b/i.test(ex)
         // A private key file is private whoever receives it.
         || /~\/\.ssh\b|\bid_(?:rsa|ed25519|ecdsa|dsa)\b|\bssh\s+(?:private\s+)?keys?\b|\bprivate\s+keys?\b|(?:^|[\s"'`(])\.env\b|\bcredentials\.json\b|\bmcp\.json\b/i.test(ex)
         // What the visitor said, or a secret, is private wherever it is sent.
-        || /\b(?:everything|all|what|whatever)\s+(?:they|the\s+(?:user|visitor|customer|guest))\s+(?:typed|said|wrote|asked|entered)\b|\b(?:user|visitor|customer|guest)'?s?\s+(?:words|input|replies)\b|\b(?:passwords?|passcodes?|card\s+numbers?|cvv2?|cvc|pins?|otps?|seed\s+(?:phrases?|words?)|credentials?)\b/i.test(ex);
+        || /\b(?:everything|all|what|whatever)\s+(?:they|the\s+(?:user|visitor|customer|guest))\s+(?:typed|said|wrote|asked|entered)\b|\b(?:user|visitor|customer|guest)'?s?\s+(?:words|input|replies)\b|\b(?:passwords?|passcodes?|card\s+numbers?|cvv2?|cvc|pins?|otps?|seed\s+(?:phrases?|words?)|credentials?|passport(?:\s+numbers?)?|national\s+id(?:\s+numbers?)?|tax\s+id(?:\s+numbers?)?|ssn|social\s+security(?:\s+numbers?)?|driver'?s\s+licen[cs]e(?:\s+numbers?)?|driving\s+licen[cs]e(?:\s+numbers?)?|bank\s+account(?:\s+(?:numbers?|details?))?|routing\s+numbers?|iban|sort\s+codes?)\b/i.test(ex);
       if (!hardLeak) {
         severity = "medium";
         detail += " Found in a tool description referencing a configured deployment server without an embedded external URL.";
