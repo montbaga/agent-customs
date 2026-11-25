@@ -23,7 +23,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 88.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-88.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 224 passing" src="https://img.shields.io/badge/tests-224_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 228 passing" src="https://img.shields.io/badge/tests-228_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -239,7 +239,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  224 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
+  228 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -494,7 +494,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 224 tests
+npm test                                # 228 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -588,7 +588,7 @@ node tools/set-origins.mjs --range https://agent-customs-range.github.io
 
 `npm run smoke` drives Edge or Chrome headlessly against the local servers and fails on any page error. It starts the key vault on port 8090 if it is not running (`npm run serve:vault`), since a page on this computer looks for the vault there.
 
-`npm run vault:check` checks the key vault end to end in a headless browser, with a stand-in AI service on this computer: a Groq or Otari key picks its own card, the page never holds the key, every AI request comes from the vault with the key, *Remember key* stores it only encrypted, a new visit starts locked, a wrong password does not open it, and *Forget* removes it.
+`npm run vault:check` checks the key vault end to end in a headless browser, with a stand-in AI service on this computer: a Groq or Otari key picks its own card, the page never holds the key, every AI request comes from the vault with the key, *Remember key* stores it only encrypted, a new visit starts locked, a wrong password does not open it, and *Forget* removes it. It also runs *Connect with Otari* against a stand-in for otari.ai: a blocked window, a closed window, a cancel and two forged replies save nothing, and an approval saves the new key for the visit and chats with it.
 
 ---
 
@@ -602,6 +602,8 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 - Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
 
 **Private data sent to another site is caught in any wording (1.2.4).** A QA tester found that a hotel tool asking for the guest's passport number and sending it to an outside address was only *Held for review*, without the leak finding (C-EXFIL). The leak check matched a short list of phrases, such as "send it to". It now looks for the private data and an address on another site together, with any verb that moves data, in any order: "share it with …", "log it at …", "it is forwarded to …", "send … the passport number", "make a request to … with it". Private data here means identity documents, card and bank details, passwords, one-time codes and the conversation. Of 30 wordings written before the change, 10 were denied before and 29 are now (the 30th, "verify it via …", is still held). The 870 real-world MCP servers and A2A cards in [`tests/fixtures/realworld`](tests/fixtures/realworld/) get exactly the same findings as before, and the benchmark results are unchanged.
+
+**Connect with Otari, without copying a key.** On the *Other* card, the key vault now has a *Connect with Otari* button. It opens otari.ai in a small window. You sign in there and approve a key for Agent Customs with a spending limit you choose (otari.ai suggests $5 for 30 days). The key goes straight back to the key vault, and Agent Customs starts with it. The page never sees the key or the sign-in: the vault itself asks otari.ai for the key, and the one-time code is useless without a secret the vault keeps (OAuth with PKCE). Pasting a key still works for every service. See [how it works](vault/README.md#connect-with-otari).
 
 The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
 
@@ -680,7 +682,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The MCP server (`mcp-server.mjs`), the benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 224 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 228 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>

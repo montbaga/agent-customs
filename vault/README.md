@@ -6,7 +6,7 @@ Agent Customs reads agent files written by strangers. If one of them ever found 
 
 ## How it works
 
-1. You paste your key into the vault's box. The page around it never sees it.
+1. You paste your key into the vault's box. The page around it never sees it. With an [Otari](https://otari.ai) account you can press *Connect with Otari* instead: otari.ai opens in a small window, you approve a key with a spending limit, and the key comes straight back to the vault.
 2. When Agent Customs needs the AI, it asks the vault. The vault adds the key, sends the request to your AI company, and passes back only the answer.
 3. The vault sends a key only to the AI company it belongs to, or to the one address you typed into the vault yourself. The page cannot choose where a key goes.
 4. The vault only answers Agent Customs (`montbaga.github.io`), and only two kinds of request: list the models, and chat. It sends at most 60 a minute.
@@ -20,6 +20,15 @@ Agent Customs reads agent files written by strangers. If one of them ever found 
 
 A remembered key is locked with your **passkey** (fingerprint, face or device PIN, through the WebAuthn PRF extension) or a **password** (PBKDF2-SHA-256, 600,000 rounds per guess). Neither the passkey's secret nor the password is ever stored, so a copy of the browser's files holds only scrambled text. After you unlock it, it locks again after 15 minutes without use.
 
+## Connect with Otari
+
+The vault itself is the app that asks otari.ai for a key (OAuth with PKCE), so the page is never part of it:
+
+- The vault's address is the client ID, and otari.ai sends the window back to `otari.html` on the vault's address.
+- `otari.html` passes the one-time code to the vault that opened the window, and to no other page, then closes.
+- The vault takes the reply only if it carries this sign-in's random state and names `https://otari.ai` as its sender. It then swaps the code for the key, using a secret that never left the vault.
+- The key is kept like a pasted one: for this visit, until you choose *Remember on this device*.
+
 ## What it cannot stop
 
 - A virus on your computer, or a harmful browser extension, while the key is unlocked.
@@ -30,6 +39,6 @@ So use a free-tier key, or one with a spending limit. Then even a lost key costs
 
 ## Files
 
-`index.html`, `vault.js` (the box and the private channel), `vault-core.js` (the rules and the encryption), `vault.css`, and the Geist fonts (SIL Open Font License). There are no outside scripts, and the page allows none.
+`index.html`, `vault.js` (the box and the private channel), `vault-core.js` (the rules, the encryption and the Otari sign-in), `otari.html` and `otari.js` (where the Otari window comes back), `vault.css`, and the Geist fonts (SIL Open Font License). There are no outside scripts, and the page allows none.
 
 The source lives in the Agent Customs repository, in [`vault/`](https://github.com/montbaga/agent-customs/tree/main/vault), with its tests. This repository only publishes it. Licensed under the [Apache License 2.0](LICENSE).
