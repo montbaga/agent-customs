@@ -12,11 +12,15 @@
 //      request must reach the stand-in from the vault's origin, with the key,
 //   4. remembers the key with a password from the header's Remember key button, checks the
 //      stored record is encrypted, starts a new visit (locked), unlocks it, and chats again,
-//   5. forgets the key.
+//   5. forgets the key,
+//   6. connects with Otari: a blocked window, a closed window, a cancel, two forged replies, then
+//      a real approval that saves the new key for this visit and chats with it.
 // Nothing leaves this computer: the stand-in is the only AI service, and it is local. Requests to
-// the real Groq and Otari are blocked, so the made-up keys in step 0 go nowhere.
+// the real Groq and Otari are blocked, so the made-up keys in step 0 go nowhere. In step 6 a
+// stand-in plays otari.ai inside the vault's frame (OTARI_STAND_IN below).
 
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +32,64 @@ const VAULT_ORIGIN = "http://localhost:8090";
 const AI = "http://127.0.0.1:8099/v1";
 const KEY = "stand-in-secret-key-4b1d";
 const PASSWORD = "correct horse battery";
+const OTARI_KEY = "otk_v1_stand_in_connected_7c2e";
+
+// Plays otari.ai in the vault's frame. The vault's own code runs unchanged: only window.open
+// and fetch calls for otari.ai addresses are answered here, and each is logged in the vault's
+// sessionStorage. The Otari window opens for real, then goes straight to the vault's
+// otari.html with the reply that data-otari-mode on the vault's <html> asks for.
+const OTARI_STAND_IN = `(() => {
+  if (location.origin !== ${JSON.stringify(VAULT_ORIGIN)}) return;
+  const log = (entry) => {
+    const all = JSON.parse(sessionStorage.getItem("otari-stand-in") || "[]");
+    all.push(entry);
+    sessionStorage.setItem("otari-stand-in", JSON.stringify(all));
+  };
+  const open = window.open;
+  window.open = function (url, name, features) {
+    if (!String(url).startsWith("https://otari.ai/")) return open.apply(this, arguments);
+    const popup = open.call(window, "about:blank", name, features);
+    if (!popup) return null;
+    log({ open: String(url) });
+    const asked = new URL(url).searchParams;
+    const mode = document.documentElement.dataset.otariMode || "approve";
+    setTimeout(() => {
+      if (mode === "close") { popup.close(); return; }
+      const answer = {
+        state: mode === "other-state" ? "not-this-sign-in" : asked.get("state"),
+        iss: mode === "other-issuer" ? "https://otari.example" : "https://otari.ai",
+      };
+      if (mode === "deny") answer.error = "access_denied";
+      else answer.code = "stand-in-code";
+      const back = new URL(asked.get("redirect_uri"));
+      back.search = new URLSearchParams(answer).toString();
+      popup.location.href = back.href;
+    }, mode === "close" ? 1200 : 400);
+    return popup;
+  };
+  const realFetch = window.fetch;
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  window.fetch = async function (input, init = {}) {
+    const url = String(input instanceof Request ? input.url : input);
+    if (!["https://otari.ai/", "https://api.otari.ai/", "https://eu.api.otari.ai/"].some((start) => url.startsWith(start))) return realFetch.apply(this, arguments);
+    const headers = new Headers(init.headers || {});
+    const body = init.body ? String(init.body) : "";
+    log({ fetch: url, method: init.method || "GET", auth: headers.get("Authorization") || "", body: url.endsWith("/token") ? body : "" });
+    if (url === "https://otari.ai/api/v1/oauth/apps/token") {
+      return new URLSearchParams(body).get("code") === "stand-in-code"
+        ? json({ access_token: ${JSON.stringify(OTARI_KEY)}, token_type: "Bearer" })
+        : json({ error: "invalid_grant", error_description: "Unknown code." }, 400);
+    }
+    if (headers.get("Authorization") !== "Bearer " + ${JSON.stringify(OTARI_KEY)}) return json({ error: { message: "invalid api key" } }, 401);
+    if (url.endsWith("/models")) return json({ data: [{ id: "alibaba/qwen3.8-flash" }, { id: "openai/gpt-oss-120b" }] });
+    if (url.endsWith("/chat/completions")) {
+      const chunk = (delta, finish = null) => "data: " + JSON.stringify({ model: "alibaba/qwen3.8-flash", choices: [{ index: 0, delta, finish_reason: finish }] }) + String.fromCharCode(10, 10);
+      return new Response(chunk({ role: "assistant", content: "Hello from the stand-in AI, through Otari." }) + chunk({}, "stop") + "data: [DONE]" + String.fromCharCode(10, 10),
+        { headers: { "Content-Type": "text/event-stream" } });
+    }
+    return json({}, 404);
+  };
+})();`;
 
 // The stand-in AI service.
 const seen = [];
@@ -69,13 +131,13 @@ const check = (ok, what, detail = "") => {
   if (!ok) failures.push(what);
 };
 
-// Runs code inside the vault's frame.
-async function inVault(expression) {
+// Runs code inside the vault's frame. gesture: as if the visitor clicked, so a window may open.
+async function inVault(expression, { gesture = false } = {}) {
   const { frameTree } = await b.send("Page.getFrameTree");
   const frame = (frameTree.childFrames || []).find((f) => f.frame.url.startsWith(VAULT_ORIGIN));
   if (!frame) throw new Error("The vault's frame is not on the page.");
   const { executionContextId } = await b.send("Page.createIsolatedWorld", { frameId: frame.frame.id, worldName: "vault-check" });
-  const r = await b.send("Runtime.evaluate", { expression, contextId: executionContextId, awaitPromise: true, returnByValue: true });
+  const r = await b.send("Runtime.evaluate", { expression, contextId: executionContextId, awaitPromise: true, returnByValue: true, userGesture: gesture });
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
   return r.result.value;
 }
@@ -104,6 +166,7 @@ try {
   await b.viewport(1366, 1000);
   await b.send("Network.enable", {});
   await b.send("Network.setBlockedURLs", { urls: ["*api.groq.com*", "*otari.ai*"] });
+  await b.send("Page.addScriptToEvaluateOnNewDocument", { source: OTARI_STAND_IN });
   await b.send("Page.navigate", { url: SITE });
   await b.waitFor("document.readyState === 'complete'", 20000);
   await officer();
@@ -239,6 +302,81 @@ try {
   await waitInVault("/key removed/.test(document.body.textContent)", 10000);
   const after = await inVault(vaultStorage);
   check(!after.includes(KEY) && !JSON.parse(after).local["vault-box"], "forgetting removes the key and the encrypted record", after.slice(0, 120));
+
+  // 6. Connect with Otari, on the Other card.
+  const connectButton = "[...document.querySelectorAll('button')].find((x) => x.textContent === 'Connect with Otari')";
+  const pressConnect = async (mode, gesture = true) => {
+    await waitInVault(`${connectButton} && !${connectButton}.disabled`, 10000);
+    await inVault(`document.documentElement.dataset.otariMode = ${JSON.stringify(mode)}; ${connectButton}.click(); true`, { gesture });
+  };
+  const notice = "document.querySelector('.notice')?.textContent || ''";
+  // Other windows still open after a moment for the browser to close them.
+  const otariWindows = async () => {
+    let open = [];
+    for (let i = 0; i < 20; i += 1) {
+      // Edge's own pages (edge://...) are not ours.
+      open = (await (await fetch("http://127.0.0.1:9365/json/list")).json())
+        .filter((t) => t.type === "page" && /^(?:https?:|about:)/.test(t.url) && !t.url.startsWith("http://localhost:8087"));
+      if (!open.length) break;
+      await sleep(150);
+    }
+    return open.map((t) => t.url || "(blank)").join(", ");
+  };
+  const keyHeld = async () => {
+    const stored = JSON.parse(await inVault(vaultStorage));
+    return `${stored.session["vault-session"] || ""}${stored.local["vault-box"] || ""}`.includes(OTARI_KEY);
+  };
+  check(await inVault(`!!${connectButton} && !!(${connectButton}.compareDocumentPosition(document.querySelector('#key')) & Node.DOCUMENT_POSITION_FOLLOWING)`),
+    "Other offers Connect with Otari above the key field");
+  await pressConnect("approve", false);
+  await waitInVault(`/blocked the Otari window/.test(${notice})`, 5000);
+  check(true, "a window opened without a click is blocked, and the vault says how to allow it");
+  await pressConnect("close");
+  await waitInVault("/Cancel Otari sign-in/.test(document.body.textContent)", 3000);
+  await waitInVault(`/Otari sign-in cancelled/.test(${notice})`, 6000);
+  check(true, "closing the Otari window cancels the sign-in");
+  await pressConnect("deny");
+  await waitInVault(`/Otari sign-in cancelled/.test(${notice})`, 6000);
+  check(true, "cancelling on otari.ai's screen comes back as cancelled");
+  await pressConnect("other-state");
+  await waitInVault(`/didn't match this sign-in/.test(${notice})`, 6000);
+  await pressConnect("other-issuer");
+  await waitInVault(`/didn't come from otari.ai/.test(${notice})`, 6000);
+  const forgedLog = await inVault("sessionStorage.getItem('otari-stand-in') || '[]'");
+  check(!forgedLog.includes("/token"), "a reply for another sign-in, or not from otari.ai, is never swapped for a key");
+  const leftOpen = await otariWindows();
+  check(!leftOpen, "every Otari window is closed again", leftOpen);
+
+  await b.evaluate("window.beforeSave = true");
+  await pressConnect("approve");
+  try {
+    await b.waitFor("!window.beforeSave && document.readyState === 'complete'", 20000);
+  } catch {
+    throw new Error(`Connect with Otari did not save and start: ${await b.evaluate("document.querySelector('#mp-status').textContent")} | ${await inVault(notice)}`);
+  }
+  await officer();
+  const usingOtari = await b.evaluate("document.querySelector('#mp-current').textContent");
+  check(/Using .+ on Otari\. Your key is kept for this visit only/.test(usingOtari), "after approving, the officer uses the new Otari key at once", usingOtari);
+  const otariLog = JSON.parse(await inVault("sessionStorage.getItem('otari-stand-in') || '[]'"));
+  const asked = new URL(otariLog.filter((e) => e.open).at(-1).open).searchParams;
+  const swap = new URLSearchParams(otariLog.find((e) => e.fetch?.endsWith("/token")).body);
+  check(asked.get("client_id") === VAULT_ORIGIN && asked.get("redirect_uri") === `${VAULT_ORIGIN}/otari.html` && asked.get("code_challenge_method") === "S256",
+    "otari.ai is asked for a key for the vault, and sends the visitor back to the vault", `${asked.get("client_id")} → ${asked.get("redirect_uri")}`);
+  check(createHash("sha256").update(swap.get("code_verifier")).digest("base64url") === asked.get("code_challenge") && swap.get("code") === "stand-in-code",
+    "the code is swapped with the secret that matches the challenge");
+  const otariApi = otariLog.filter((e) => e.fetch?.startsWith("https://api.otari.ai/api/v1/"));
+  check(otariApi.length > 0 && otariApi.every((e) => e.auth === `Bearer ${OTARI_KEY}`), "the new key is used only at Otari's own address", otariApi.map((e) => e.fetch.split("/").pop()).join(", "));
+  check(!(await b.evaluate(pageStorage)).includes(OTARI_KEY) && (await keyHeld()), "the page never holds the Otari key; the vault does");
+  const stillOpen = await otariWindows();
+  check(!stillOpen, "the Otari window closed itself after handing the reply back", stillOpen);
+  const otariAnswer = await chat("hello through otari");
+  check(/through Otari/.test(otariAnswer), "the officer answers with the connected key", otariAnswer.slice(0, 80));
+  await b.evaluate("if (document.querySelector('#mp-body').hidden) document.querySelector('#mp-change')?.click(); true");
+  await waitInVault("/Forget this key/.test(document.body.textContent)", 10000);
+  await inVault("[...document.querySelectorAll('button')].find((x) => /Forget this key/.test(x.textContent)).click(); true");
+  await inVault("[...document.querySelectorAll('button')].find((x) => /Click again/.test(x.textContent)).click(); true");
+  await waitInVault("/Otari key removed/.test(document.body.textContent) && !!document.querySelector('.connect')", 10000);
+  check(!(await keyHeld()), "forgetting the Otari key removes it and offers Connect with Otari again");
 
   // The vault opened on its own explains itself instead of taking a key.
   await b.send("Page.navigate", { url: `${VAULT_ORIGIN}/` });

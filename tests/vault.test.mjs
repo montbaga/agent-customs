@@ -2,13 +2,15 @@
 // locked, and the page's side of the private channel.
 // Run from the project folder: node --test "tests/*.test.mjs"
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  PASSWORD_ROUNDS, PROVIDERS, RateLimit, allowedPage, checkRequest, cleanTheme, fromBase64, lockKeys, openKeys,
-  passkeyLock, passwordLock, providerForKey, providerHeaders, relockKeys, serviceAddress, toBase64, unlockKeys,
+  OTARI, PASSWORD_ROUNDS, PROVIDERS, RateLimit, allowedPage, checkRequest, cleanTheme, fromBase64, lockKeys, openKeys,
+  otariAuthorizeUrl, otariKey, otariReply, otariSignIn, passkeyLock, passwordLock, providerForKey, providerHeaders,
+  relockKeys, serviceAddress, toBase64, unlockKeys,
 } from "../vault/vault-core.js";
 import { CUSTOM_SERVICE, KeyVault, VAULT_KEY, VAULT_ROUTER, routeVaultFetch, vaultAddress } from "../site/vault-bridge.js";
 
@@ -252,6 +254,75 @@ test("both pages allow only their own scripts, and all HTML the site writes goes
   assert.match(vaultPolicy, /default-src 'none'; script-src 'self'; style-src 'self'/);
   assert.match(vaultPolicy, /base-uri 'none'/);
   assert.match(vaultPolicy, /require-trusted-types-for 'script'; trusted-types 'none'/, "the vault writes no HTML at all");
+});
+
+test("Connect with Otari: the vault is the app, and otari.ai sends the visitor back to the vault", async () => {
+  const vaultOrigin = "https://agent-customs-vault.github.io";
+  const signIn = await otariSignIn();
+  const hashed = createHash("sha256").update(signIn.verifier).digest("base64url");
+  assert.equal(signIn.challenge, hashed, "S256: the challenge is the verifier's hash");
+  assert.match(signIn.verifier, /^[\w-]{43}$/);
+  assert.notEqual((await otariSignIn()).state, signIn.state, "every sign-in has its own state");
+  const url = new URL(otariAuthorizeUrl(vaultOrigin, signIn));
+  assert.equal(url.origin + url.pathname, OTARI.authorize);
+  assert.deepEqual(Object.fromEntries(url.searchParams), {
+    client_id: vaultOrigin,
+    redirect_uri: `${vaultOrigin}/otari.html`,
+    response_type: "code",
+    state: signIn.state,
+    code_challenge: signIn.challenge,
+    code_challenge_method: "S256",
+    limit: "5",
+    expiration: "30-days",
+  });
+  assert.ok(!url.href.includes(signIn.verifier), "the secret half never goes in an address");
+});
+
+test("an Otari reply counts only with this sign-in's state and otari.ai's name", () => {
+  const ok = { code: "c1", state: "s1", iss: "https://otari.ai" };
+  assert.deepEqual(otariReply(ok, "s1"), { code: "c1" });
+  assert.equal(otariReply({ ...ok, state: "s2" }, "s1").code, undefined, "another sign-in's reply");
+  assert.equal(otariReply({ ...ok, iss: "https://otari.example" }, "s1").code, undefined, "another issuer");
+  assert.equal(otariReply({ ...ok, iss: undefined }, "s1").code, undefined, "no issuer");
+  assert.deepEqual(otariReply({ error: "access_denied", state: "s1" }, "s1"), { problem: "Otari sign-in cancelled." });
+  assert.match(otariReply({ state: "s1" }, "s1").problem, /didn't finish/);
+  assert.match(otariReply(null, "s1").problem, /didn't finish/);
+});
+
+test("the vault swaps the one-time code for an Otari key, and nothing else counts as one", async () => {
+  const vaultOrigin = "http://localhost:8090";
+  const calls = [];
+  const answer = (status, body) => async (url, init) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  };
+  assert.equal(await otariKey("c1", "v1", vaultOrigin, answer(200, { access_token: " otk_v1_eu_new " })), "otk_v1_eu_new");
+  const { url, init } = calls[0];
+  assert.equal(url, OTARI.token);
+  assert.equal(init.method, "POST");
+  assert.equal(init.credentials, "omit");
+  assert.deepEqual(Object.fromEntries(init.body), {
+    grant_type: "authorization_code", client_id: vaultOrigin, redirect_uri: `${vaultOrigin}/otari.html`, code: "c1", code_verifier: "v1",
+  });
+  await assert.rejects(otariKey("c1", "v1", vaultOrigin, answer(400, { error: "invalid_grant", error_description: "Code expired." })), { message: "Code expired" });
+  await assert.rejects(otariKey("c1", "v1", vaultOrigin, answer(500, null)), { message: "otari.ai answered 500" });
+  await assert.rejects(otariKey("c1", "v1", vaultOrigin, answer(200, { access_token: "sk-proj-not-otari" })), { message: "otari.ai sent no key" });
+  await assert.rejects(otariKey("c1", "v1", vaultOrigin, answer(200, {})), { message: "otari.ai sent no key" });
+  await assert.rejects(otariKey("c1", "v1", vaultOrigin, async () => { throw new TypeError("offline"); }), { message: "couldn't reach otari.ai" });
+});
+
+test("the Otari window's page fetches nothing and hands its reply only to a vault on its own address", async () => {
+  const html = await readFile(path.join(ROOT, "vault", "otari.html"), "utf8");
+  const policy = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  assert.match(policy, /default-src 'none'; script-src 'self'/);
+  assert.doesNotMatch(policy, /connect-src/, "no requests from this page");
+  assert.match(html, /<meta name="referrer" content="no-referrer">/, "otari.ai's code never leaks in a Referer");
+  const script = await readFile(path.join(ROOT, "vault", "otari.js"), "utf8");
+  assert.match(script, /history\.replaceState\(null, "", location\.pathname\)/, "the code leaves the address bar at once");
+  assert.match(script, /opener\.postMessage\(reply, location\.origin\)/);
+  assert.equal([...script.matchAll(/postMessage\(/g)].length, 1);
+  const vault = await readFile(path.join(ROOT, "vault", "vault.js"), "utf8");
+  assert.match(vault, /event\.source !== otari\.popup \|\| event\.origin !== location\.origin/, "the vault listens only to its own Otari window");
 });
 
 test("model-list errors keep their HTTP code separately from the vault status", async () => {

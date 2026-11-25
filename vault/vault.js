@@ -4,11 +4,13 @@
 // The vault tells it: status (never a key), detected, draft, submit, height.
 // Keys for this visit, and unlocked ones, are in sessionStorage "vault-session". Remembered
 // keys are in localStorage "vault-box", encrypted.
+// Connect with Otari opens otari.ai in a window of its own. otari.html, on the vault's own
+// address, hands the one-time code back here, and the vault swaps it for the key.
 
 import {
-  CUSTOM, IDLE_LOCK_MS, MIN_PASSWORD, PASSWORD_ROUNDS, PROVIDERS, RateLimit, allowedPage, checkRequest, cleanTheme,
-  fromBase64, lockKeys, passkeyLock, passwordLock, providerForKey, providerHeaders, providerNamed,
-  randomBytes, serviceAddress, toBase64, unlockKeys,
+  CUSTOM, IDLE_LOCK_MS, MIN_PASSWORD, OTARI, PASSWORD_ROUNDS, PROVIDERS, RateLimit, allowedPage, checkRequest, cleanTheme,
+  fromBase64, lockKeys, otariAuthorizeUrl, otariKey, otariReply, otariSignIn, passkeyLock, passwordLock, providerForKey,
+  providerHeaders, providerNamed, randomBytes, serviceAddress, toBase64, unlockKeys,
 } from "./vault-core.js";
 
 const SESSION = "vault-session";
@@ -370,6 +372,91 @@ function clearDraft() {
   keyInput.value = "";
 }
 
+// Connect with Otari. Each sign-in's secret is made ahead, so a click opens the Otari window
+// at once: browsers block a window opened after a wait as a pop-up.
+let otariNext = null;
+let otari = null; // the sign-in waiting in the Otari window: {popup, verifier, state, watch}
+
+function prepareOtari() {
+  otariSignIn().then((signIn) => { otariNext = signIn; if (page) render(); }, () => {});
+}
+
+function connectOtari() {
+  const signIn = otariNext;
+  if (!signIn || otari || busy) return;
+  const popup = window.open(otariAuthorizeUrl(location.origin, signIn), "agent-customs-otari", "popup,width=520,height=720");
+  if (!popup) {
+    say("Your browser blocked the Otari window. Allow pop-ups for this page, then try again.", "warn");
+    changed();
+    return;
+  }
+  otariNext = null;
+  prepareOtari();
+  // otari.html posts its reply, then closes; the second look gives that reply time to arrive.
+  const watch = setInterval(() => {
+    if (!popup.closed) return;
+    if (otari.closing) endOtari("Otari sign-in cancelled.");
+    else otari.closing = true;
+  }, 500);
+  otari = { popup, verifier: signIn.verifier, state: signIn.state, watch };
+  say("");
+  changed();
+}
+
+function endOtari(text = "") {
+  if (!otari) return null;
+  const done = otari;
+  clearInterval(done.watch);
+  otari = null;
+  if (!done.popup.closed) done.popup.close();
+  say(text, text ? "warn" : "");
+  changed();
+  return done;
+}
+
+window.addEventListener("message", (event) => {
+  if (!otari || event.source !== otari.popup || event.origin !== location.origin || event.data?.type !== OTARI.reply) return;
+  const { verifier, state } = endOtari();
+  const reply = otariReply(event.data, state);
+  if (!reply.code) {
+    say(reply.problem, "warn");
+    changed();
+    return;
+  }
+  run("otari", async () => {
+    let key;
+    try {
+      key = await otariKey(reply.code, verifier, location.origin);
+    } catch (error) {
+      throw new Error(`Couldn't connect to Otari: ${error.message}. Try again.`);
+    }
+    // As if pasted, then Enter: the page shows the Otari key under Other, and Save and start
+    // lists its models and saves it for this visit.
+    keyInput.value = key;
+    applyDraftInput({ notify: true });
+    say("Connected to Otari.");
+    tell({ event: "submit" });
+  });
+});
+
+// The Otari button, then "or paste a key" above the key field.
+function otariRows() {
+  const waiting = !!otari;
+  return [
+    el("div", { class: "connect" },
+      el("button", {
+        type: "button",
+        class: waiting ? "ghost small" : "primary small",
+        onclick: waiting ? () => endOtari("Otari sign-in cancelled.") : connectOtari,
+        disabled: !waiting && (!otariNext || !!busy),
+      }, waiting ? "Cancel Otari sign-in" : busy === "otari" ? "Connecting…" : "Connect with Otari"),
+      el("p", { class: "hint" }, waiting
+        ? "Finish in the Otari window: sign in, then approve the key."
+        : "Sign in to otari.ai and approve a key. You set its spending limit there.")),
+    el("p", { class: "or" }, "or paste a key"),
+  ];
+}
+
 async function relay(port, { path, method, body }) {
   const controller = new AbortController();
   port.onmessage = (e) => { if (e.data?.abort) controller.abort(); };
@@ -671,6 +758,7 @@ function render() {
 
   const rows = [];
   if (showInputs) {
+    if (!draftKey && !panel && (custom || selection.provider.startsWith("Otari"))) rows.push(...otariRows());
     rows.push(keyInput);
     if (draftKey) {
       rows.push(el("div", { class: "draft-row", "data-tone": wrong ? "warn" : null },
@@ -921,6 +1009,7 @@ new ResizeObserver(tellHeight).observe($("#vault"));
 setInterval(() => { if (lockIfIdle()) { say("Locked after 15 minutes without use."); changed(); } }, 30_000);
 
 checkPasskeys().then(() => { if (page) render(); });
+prepareOtari();
 if (window.parent === window) {
   showOnly("This is the Agent Customs key vault. It keeps your AI key apart from the page. Open it from Agent Customs at montbaga.github.io/agent-customs.");
 } else {

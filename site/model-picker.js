@@ -71,7 +71,7 @@ export const MODEL_CHOICES = [
     safety: "Tip: Groq's free tier needs no card, so its key can't cost you anything." },
   { id: "any", title: "Any model", by: "OpenRouter", provider: "OpenRouter", cost: "One key for all", models: OPENROUTER_MODELS, live: false,
     safety: "Tip: give the key a credit limit when you create it." },
-  { id: "other", title: "Other", by: "Any AI service", provider: "", cost: "For developers", models: [], custom: true,
+  { id: "other", title: "Other", by: "Any AI service", provider: "", cost: "Otari sign-in", models: [], custom: true,
     safety: "Tip: if the service charges per use, set a spending limit there." },
 ];
 const OTHER = MODEL_CHOICES.find((c) => c.custom);

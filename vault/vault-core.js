@@ -129,6 +129,80 @@ export function randomBytes(length) {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 
+// Connect with Otari: Otari's app sign-in (OAuth with PKCE) gives the vault a key for the
+// visitor's own otari.ai workspace. The vault is the app: its origin is the client ID, and
+// otari.html on the vault receives the reply, so the page never sees the code or the key.
+export const OTARI = {
+  issuer: "https://otari.ai",
+  authorize: "https://otari.ai/api/v1/oauth/apps/authorize",
+  token: "https://otari.ai/api/v1/oauth/apps/token",
+  limit: "5",
+  expiration: "30-days",
+  reply: "agent-customs-vault:otari",
+};
+
+export const otariRedirect = (vaultOrigin) => `${vaultOrigin}/otari.html`;
+
+export function base64Url(bytes) {
+  return toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** A PKCE verifier, its S256 challenge, and a state for one sign-in. */
+export async function otariSignIn() {
+  const verifier = base64Url(randomBytes(32));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(verifier))));
+  return { verifier, challenge, state: base64Url(randomBytes(16)) };
+}
+
+/** Where the Otari window starts: otari.ai's consent screen, with a suggested spending limit. */
+export function otariAuthorizeUrl(vaultOrigin, { challenge, state }) {
+  const url = new URL(OTARI.authorize);
+  url.search = new URLSearchParams({
+    client_id: vaultOrigin,
+    redirect_uri: otariRedirect(vaultOrigin),
+    response_type: "code",
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    limit: OTARI.limit,
+    expiration: OTARI.expiration,
+  });
+  return url.href;
+}
+
+/** Check the reply otari.html passes on. {code}, or {problem} for the visitor. */
+export function otariReply(reply, state) {
+  if (!reply?.code) {
+    return { problem: reply?.error === "access_denied" ? "Otari sign-in cancelled." : "The Otari sign-in didn't finish. Try again." };
+  }
+  if (reply.state !== state) return { problem: "Couldn't connect to Otari: the reply didn't match this sign-in. Try again." };
+  if (reply.iss !== OTARI.issuer) return { problem: "Couldn't connect to Otari: the reply didn't come from otari.ai. Try again." };
+  return { code: reply.code };
+}
+
+/** Swap the one-time code for the key. Throws an Error with a reason in a few plain words. */
+export async function otariKey(code, verifier, vaultOrigin, fetchImpl = fetch) {
+  let response;
+  try {
+    response = await fetchImpl(OTARI.token, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "authorization_code", client_id: vaultOrigin, redirect_uri: otariRedirect(vaultOrigin), code, code_verifier: verifier }),
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new Error("couldn't reach otari.ai");
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(String(body?.error_description || `otari.ai answered ${response.status}`).replace(/\.$/, ""));
+  const key = typeof body?.access_token === "string" ? body.access_token.trim() : "";
+  if (!providerForKey(key)?.name.startsWith("Otari")) throw new Error("otari.ai sent no key");
+  return key;
+}
+
 /** The lock from a password. Each guess costs `rounds` rounds of PBKDF2-SHA-256. */
 export async function passwordLock(password, salt, rounds = PASSWORD_ROUNDS) {
   const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
