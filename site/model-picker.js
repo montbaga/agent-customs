@@ -774,14 +774,21 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   // Keys an older version or the practice site saved outside the vault. The note sits above
   // the settings, so it shows even while they are folded away with a key in use.
   if (legacyNote && legacy?.count) {
-    const text = legacyNote.querySelector("[data-mp-legacy]");
+    const title = legacyNote.querySelector("[data-mp-legacy-title]");
+    const why = legacyNote.querySelector("[data-mp-legacy-why]");
+    const button = legacyNote.querySelector("button");
     const one = legacy.count === 1;
-    text.textContent = `${one ? "1 key from an older version is" : `${legacy.count} keys from an older version are`} still saved in this browser, outside the key vault.`;
+    title.textContent = one ? "An old key is still saved in this browser" : `${legacy.count} old keys are still saved in this browser`;
+    why.textContent = `An older version of this site or the practice site kept ${one ? "it" : "them"} outside the key vault, where scripts on this site can read ${one ? "it" : "them"}.`;
+    button.textContent = one ? "Delete old key" : "Delete old keys";
     legacyNote.hidden = false;
-    legacyNote.querySelector("button")?.addEventListener("click", (event) => {
+    button.addEventListener("click", () => {
       legacy.clear();
-      event.currentTarget.remove();
-      text.textContent = `${one ? "Old copy" : "Old copies"} deleted. Your keys now stay only in the key vault.`;
+      button.remove();
+      legacyNote.dataset.done = "";
+      legacyNote.querySelector("use").setAttribute("href", "#i-check");
+      title.textContent = one ? "Old key deleted" : "Old keys deleted";
+      why.textContent = `Only the key vault holds your ${one ? "key" : "keys"} now.`;
     });
   }
 

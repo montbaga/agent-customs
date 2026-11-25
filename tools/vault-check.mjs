@@ -244,10 +244,10 @@ try {
   await officer();
   await b.waitFor("document.querySelector('#mp-body').hidden && /Using/.test(document.querySelector('#mp-current').textContent)", 10000);
   const oldNote = await b.evaluate("document.querySelector('#mp-legacy').checkVisibility() ? document.querySelector('#mp-legacy').textContent.trim() : ''");
-  check(/1 key from an older version/.test(oldNote), "an old key in the page's storage is pointed out while the settings are folded", oldNote.slice(0, 90));
+  check(/An old key is still saved/.test(oldNote), "an old key in the page's storage is pointed out while the settings are folded", oldNote.slice(0, 90));
   await b.evaluate("document.querySelector('#mp-legacy button').click(); true");
   const cleaned = await b.evaluate(`document.querySelector('#mp-legacy').textContent.trim() + " | " + ${pageStorage}`);
-  check(/Old copy deleted/.test(cleaned) && !cleaned.includes(OLD_KEY), "Delete the old copy removes it from the page's storage and says so", cleaned.slice(0, 60));
+  check(/Old key deleted/.test(cleaned) && !cleaned.includes(OLD_KEY), "Delete old key removes it from the page's storage and says so", cleaned.slice(0, 60));
 
   // 3. Chat, and the AI double-check.
   const answer = await chat("hello");
