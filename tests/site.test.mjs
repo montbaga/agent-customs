@@ -314,6 +314,12 @@ test("keys an older version saved outside the vault are counted, and deleted onl
   assert.equal(legacyKeys({ loadByokStore: () => { throw new Error("blocked"); } }).count, 0);
 });
 
+test("the note about keys left outside the vault is not folded away with the settings", async () => {
+  const site = await readFile(path.join(ROOT, "site", "index.html"), "utf8");
+  const note = site.indexOf('id="mp-legacy"');
+  assert.ok(note > 0 && note < site.indexOf('id="mp-body"'), "#mp-legacy comes before #mp-body, not inside it");
+});
+
 test("every card says how to keep a lost key from costing much", async () => {
   const { MODEL_CHOICES } = await import("../site/model-picker.js");
   for (const choice of MODEL_CHOICES) {

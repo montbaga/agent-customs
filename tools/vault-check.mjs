@@ -234,6 +234,21 @@ try {
   const runtimeKey = await b.evaluate("window.__nsweb?.engine?.byokKey");
   check(runtimeKey === "kept-in-the-key-vault", "the runtime holds only the stand-in key", runtimeKey);
 
+  // A key the practice site or an older version left in the page's storage is pointed out,
+  // even with the settings folded, and one click removes it.
+  const OLD_KEY = "otk_v1_madeup_left_by_the_practice_site";
+  await b.evaluate(`localStorage.setItem("nsweb-byok-profiles-v1", JSON.stringify({ version: 1, selectedId: "old", updatedAt: "",
+    profiles: [{ id: "old", key: ${JSON.stringify(OLD_KEY)}, router: "https://api.otari.ai/api/v1", model: "alibaba/qwen3.8-flash" }] })); window.beforeReload = true`);
+  await b.send("Page.reload", {});
+  await b.waitFor("!window.beforeReload && document.readyState === 'complete'", 20000);
+  await officer();
+  await b.waitFor("document.querySelector('#mp-body').hidden && /Using/.test(document.querySelector('#mp-current').textContent)", 10000);
+  const oldNote = await b.evaluate("document.querySelector('#mp-legacy').checkVisibility() ? document.querySelector('#mp-legacy').textContent.trim() : ''");
+  check(/1 key from an older version/.test(oldNote), "an old key in the page's storage is pointed out while the settings are folded", oldNote.slice(0, 90));
+  await b.evaluate("document.querySelector('#mp-legacy button').click(); true");
+  const cleaned = await b.evaluate(`document.querySelector('#mp-legacy').textContent.trim() + " | " + ${pageStorage}`);
+  check(/Old copy deleted/.test(cleaned) && !cleaned.includes(OLD_KEY), "Delete the old copy removes it from the page's storage and says so", cleaned.slice(0, 60));
+
   // 3. Chat, and the AI double-check.
   const answer = await chat("hello");
   check(/stand-in AI/.test(answer), "the officer answers through the vault", answer.slice(0, 80));
