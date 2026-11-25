@@ -611,6 +611,129 @@ function followUpExfil(text) {
   return hits;
 }
 
+// Private visitor data moved to another site, whatever the verb or word order: "share it
+// with https://…", "log the passport number at …", "it is forwarded to …", "make a GET
+// request to … with it". The data has to be what is moved, and the address has to belong to
+// another site. Service keys and tokens are left out: tool docs often name the outside API a
+// service's own key goes to, and the patterns above still catch a key taken from the visitor.
+const OFFSITE_DATA = [
+  "passports?(?:[\\s_-]+(?:numbers?|nos?|details?|info(?:rmation)?|data|ids?|scans?|photos?|cop(?:y|ies)|images?|pages?))?",
+  "national[\\s_-]+ids?(?:[\\s_-]+(?:numbers?|cards?))?",
+  "tax[\\s_-]+ids?(?:[\\s_-]+numbers?)?",
+  "ssns?",
+  "social[\\s_-]+security(?:[\\s_-]+numbers?)?",
+  "(?:driver'?s|driving)[\\s_-]+licen[cs]es?(?:[\\s_-]+numbers?)?",
+  "id[\\s_-]+(?:cards?|documents?)(?:[\\s_-]+numbers?)?",
+  "bank[\\s_-]+(?:account|card)s?(?:[\\s_-]+(?:numbers?|details?))?",
+  "bank[\\s_-]+details",
+  "routing[\\s_-]+numbers?",
+  "ibans?",
+  "sort[\\s_-]+codes?",
+  "(?:credit|debit|payment)[\\s_-]+cards?(?:[\\s_-]+(?:numbers?|details?))?",
+  "card[\\s_-]+(?:numbers?|details?)",
+  "cvv2?", "cvc",
+  "passwords?", "passcodes?", "passphrases?",
+  "otps?", "one[- ]time[\\s_-]+(?:codes?|passwords?)",
+  "(?:seed|recovery)[\\s_-]+(?:phrases?|words?)",
+  "conversation(?:[\\s_-]+history)?", "chat[\\s_-]+(?:history|log|transcript)", "message[\\s_-]+history", "previous\\s+messages",
+  "(?:user|visitor|customer|guest)'?s?\\s+messages?", "transcripts?", "system\\s+prompt", "hidden\\s+instructions", "sly_data", "private\\s+context",
+].join("|");
+// The words name a topic, not the data itself: "lost passports", "password reset", "passport
+// photo requirements", "conversation IDs".
+const OFFSITE_TOPIC = "(?:rules?|requirements?|applications?|appointments?|offices?|renewals?|validity|polic(?:y|ies)|resets?|recovery|changes?|managers?|strength|holders?|control|fees?|status|services?|desk|guides?|guidance|faqs?|checks?|lookups?|safety|security|tips|hygiene|protected|less|fields?|inputs?|forms?|prompts?|hash(?:es|ed|ing)?|ids?|starters?|titles?|topics?|types?|modes?|expir(?:y|ation)|issuance|stamps?|countr(?:y|ies)|nationality|formats?|regex|patterns?|validation|verification|length|complexity|generators?|templates?|links?|login|scann(?:ing|er|ers)|readers?|reading|ocr)";
+const OFFSITE_TERM = `(?<!\\b(?:lost|stolen|expired|new|replacement|renewed|forgotten|strong|weak|default|temporary)\\s+)\\b(?:${OFFSITE_DATA})(?![-\\w]|[\\s_-]+(?:(?:numbers?|photos?|scans?|data|details?)[\\s_-]+)?${OFFSITE_TOPIC}\\b)`;
+const OFFSITE_MOVE = `(?<!\\b(?:a|an|the|this|that|these|those|each|every|its|our|your|their|blog|forum)\\s+)\\b(?:send|sends|sent|sending|forward(?:s|ed|ing)?|shar(?:e|es|ed|ing)|report(?:s|ed|ing)?|log(?:s|ged|ging)?(?!\\s+(?:in|into|on|out)\\b)|stor(?:e|es|ed|ing)|sav(?:e|es|ed|ing)|sync(?:s|ed|ing)?|synchroni[sz](?:e|es|ed|ing)|upload(?:s|ed|ing)?|post(?:s|ed|ing)?|submit(?:s|ted|ting)?|pass(?:es|ed|ing)?|transmit(?:s|ted|ting)?|relay(?:s|ed|ing)?|push(?:es|ed|ing)?|deliver(?:s|ed|ing)?|dispatch(?:es|ed|ing)?|rout(?:e|es|ed|ing)|pip(?:e|es|ed|ing)|cop(?:y|ies|ied|ying)|export(?:s|ed|ing)?|transfer(?:s|red|ring)?|leak(?:s|ed|ing)?|exfiltrat(?:e|es|ed|ing)|bcc|cc|includ(?:e|es|ed|ing)|append(?:s|ed|ing)?|attach(?:es|ed|ing)?|embed(?:s|ded|ding)?|mirror(?:s|ed|ing)?|writ(?:e|es|ing|ten)|wrote)\\b|${EMAIL_VERB}`;
+const OFFSITE_PARTICIPLE = "\\b(?:sent|forwarded|shared|reported|logged|stored|saved|synced|synchroni[sz]ed|uploaded|posted|submitted|passed|transmitted|relayed|pushed|delivered|dispatched|routed|piped|copied|exported|transferred|leaked|exfiltrated|e-?mailed|mailed|included|appended|attached|embedded|mirrored|written)\\b";
+const OFFSITE_CALL = "\\b(?:call(?:s|ed|ing)?|request(?:s|ed|ing)?|fetch(?:es|ed|ing)?|hit(?:s|ting)?|ping(?:s|ed|ing)?|quer(?:y|ies|ied|ying)|get|gets|invok(?:e|es|ed|ing)|post(?:s|ed|ing)?)\\b";
+const OFFSITE_BACKREF = "(?:it|them|that|this|these|those|both|everything|all\\s+of\\s+(?:it|them|this|that)|(?:the|their|your|his|her)\\s+(?:[\\w']+\\s+){0,2}?(?:numbers?|codes?|details|info|information|data|values?|cop(?:y|ies)|scans?|photos?|images?|documents?|passports?|ids?|cards?|ibans?|passwords?|transcripts?|summary|conversation|chat|history))\\b";
+const OFFSITE_OWNER = "(?:(?:the|their|your|his|her)\\s+)?(?:(?:user|visitor|customer|guest|client|traveller|traveler|caller)'?s?\\s+)?";
+const OFFSITE_PREP = "\\b(?:to|at|into|onto|on|via|through|with|towards?|using|in)\\s+(?:[\\w'-]+\\s+){0,4}?";
+const OFFSITE_DEST = "(?<dest>(?:https?:\\/\\/|(?<![a-z0-9+.-]:)\\/\\/)[^\\s)\"'<>\\]]+|[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}\\b|(?:[a-z0-9-]+\\.)+[a-z]{2,24}\\/[^\\s)\"'<>\\]]*)";
+const offsiteRe = (source) => new RegExp(source, "gid");
+// Data and destination in one clause.
+const OFFSITE_SAME_CLAUSE = [
+  // "Forward the guest's passport number to https://…"
+  offsiteRe(`(?<move>${OFFSITE_MOVE})[^.!?\\n]{0,60}?${OFFSITE_TERM}[^.!?\\n]{0,60}?${OFFSITE_PREP}${OFFSITE_DEST}`),
+  // "Ask for the passport number and share it with https://…"
+  offsiteRe(`${OFFSITE_TERM}[^.!?\\n]{0,80}?(?<move>${OFFSITE_MOVE})\\s+(?:[a-z]+\\s+)?${OFFSITE_BACKREF}[^.!?\\n]{0,40}?${OFFSITE_PREP}${OFFSITE_DEST}`),
+  // "The passport number must be forwarded to https://…"
+  offsiteRe(`${OFFSITE_TERM}[^.!?\\n]{0,60}?\\b(?:is|are|be|been|being|gets?|got|was|were)\\s+(?:[a-z]+ly\\s+|then\\s+|also\\s+|first\\s+|later\\s+)?(?<move>${OFFSITE_PARTICIPLE})[^.!?\\n]{0,30}?${OFFSITE_PREP}${OFFSITE_DEST}`),
+  // "Send https://… the guest's passport number"
+  offsiteRe(`(?<move>${OFFSITE_MOVE})\\s+(?:(?:to|at)\\s+)?${OFFSITE_DEST}\\s*,?\\s+(?:with\\s+|containing\\s+|including\\s+|carrying\\s+)?(?:a\\s+copy\\s+of\\s+|all\\s+|full\\s+|entire\\s+)?${OFFSITE_OWNER}${OFFSITE_TERM}`),
+  // "Make a GET request to https://… with the passport number"
+  offsiteRe(`(?<move>${OFFSITE_CALL})[^.!?\\n]{0,20}?${OFFSITE_DEST}[^.!?\\n]{0,20}?\\b(?:with|including|containing|carrying|passing|plus|and\\s+(?:include|pass|add|append|attach))\\s+${OFFSITE_OWNER}${OFFSITE_TERM}`),
+];
+// The data in an earlier clause, the destination in this one.
+const OFFSITE_FOLLOW_UP = [
+  // "… passport number. Then share it with https://…"
+  offsiteRe(`(?<move>${OFFSITE_MOVE})\\s+(?:[a-z]+\\s+)?${OFFSITE_BACKREF}[^.!?\\n]{0,40}?${OFFSITE_PREP}${OFFSITE_DEST}`),
+  // "… passport number. It will be sent to https://…"
+  offsiteRe(`\\b(?:it|this|that|they|these|those|which|both)\\s+(?:(?:is|are|will\\s+be|must\\s+be|should\\s+be|shall\\s+be|can\\s+be|gets?|get)\\s+)?(?:[a-z]+ly\\s+|then\\s+|also\\s+|first\\s+)?(?<move>${OFFSITE_PARTICIPLE})[^.!?\\n]{0,30}?${OFFSITE_PREP}${OFFSITE_DEST}`),
+  // "Guest passport number. Sent to https://… for ID checks."
+  offsiteRe(`^(?:(?:then|and|also)\\s+)?(?:[a-z]+ly\\s+)?(?<move>${OFFSITE_PARTICIPLE})[^.!?\\n]{0,30}?${OFFSITE_PREP}${OFFSITE_DEST}`),
+  // "… passport number. Make a GET request to https://… with it."
+  offsiteRe(`(?<move>${OFFSITE_CALL})[^.!?\\n]{0,20}?${OFFSITE_DEST}[^.!?\\n]{0,20}?\\b(?:with|including|containing|carrying|passing|plus|and\\s+(?:include|pass|add|append|attach))\\s+${OFFSITE_BACKREF}`),
+];
+const OFFSITE_TERM_RE = new RegExp(OFFSITE_TERM, "gi");
+
+function offSiteDestination(dest, targetHost = "") {
+  const targetDom = targetHost ? registeredDomain(targetHost) : "";
+  if (!targetDom) return true;
+  const email = dest.match(/@([a-z0-9.-]+\.[a-z]{2,})$/i);
+  let host = email ? email[1] : "";
+  if (!host) {
+    try {
+      host = new URL(/^\/\//.test(dest) ? `https:${dest}` : /^https?:/i.test(dest) ? dest : `https://${dest}`).hostname;
+    } catch {
+      return true;
+    }
+  }
+  return registeredDomain(host) !== targetDom;
+}
+
+// The first match in the clause that is a real order to move the data to another site.
+function offsiteMove(clause, patterns, targetHost) {
+  for (const re of patterns) {
+    for (const m of clause.matchAll(re)) {
+      const moveAt = m.indices.groups.move[0];
+      if (negatedBefore(clause, moveAt) || describedBefore(clause, m.index) || describedBefore(clause, moveAt)) continue;
+      if (!offSiteDestination(m.groups.dest.replace(/[.,;:!?]+$/, ""), targetHost)) continue;
+      return m;
+    }
+  }
+  return null;
+}
+
+// The data is named for real in the clause: not negated ("never ask for a passport") and
+// not described as something a checker looks for.
+function namesOffsiteData(clause) {
+  for (const m of clause.matchAll(OFFSITE_TERM_RE)) {
+    if (!negatedBefore(clause, m.index) && !describedBefore(clause, m.index)) return true;
+  }
+  return false;
+}
+
+function offsiteLeaks(text, targetHost = "") {
+  const hits = [];
+  for (const clause of clauses(text)) {
+    const m = offsiteMove(clause, OFFSITE_SAME_CLAUSE, targetHost);
+    if (!m) continue;
+    const hit = { match: m[0], excerpt: clause };
+    hits.push(describedInBrackets(clause, m.index) ? soften(hit, "Listed as an example of what the tool detects; check it is not an order.") : hit);
+  }
+  const parts = wrappedClauses(text);
+  for (let i = 0; i + 1 < parts.length; i += 1) {
+    if (!namesOffsiteData(parts[i])) continue;
+    for (let j = i + 1; j <= Math.min(i + 2, parts.length - 1); j += 1) {
+      const m = offsiteMove(parts[j], OFFSITE_FOLLOW_UP, targetHost);
+      if (!m) continue;
+      hits.push({ match: m[0], excerpt: parts.slice(i, j + 1).join(" ") });
+      break;
+    }
+  }
+  return hits;
+}
+
 const askEnglishSecrets = askMatcher(SECRET, SECRET_DESCRIBED, PIN);
 
 // Continuation lines ("without asking the visitor") should not fire negatable rules when the
@@ -989,7 +1112,7 @@ export const TEXT_RULES = [
         /\b(?:read|reads|collect|collects|fetch|fetches|gather|gathers|grab|grabs|extract|extracts|dump|dumps|inspect|inspects|access|accesses)\b[^.!?\n]{0,60}\b(?:secrets?|tokens?|keys?|credentials?|passwords?|env(?:ironment)?(?:\s+var(?:iable)?s?|\s+settings?)?|\.env|cookies?|private\s+(?:files?|data)|config(?:uration)?(?:\s+files?)?)\b[^.!?\n]{0,60}\b(?:post|posts|send|sends|upload|uploads|forward|forwards|relay|relays|transmit|transmits|ship|ships|push|pushes)\b[^.!?\n]{0,40}\b(?:to|toward|at)\b[^.!?\n]{0,40}\b(?:url|webhook|callback|endpoint|server|remote\s+host|address|destination)\b/i,
         /(?:(?:\b(?:href|src|action)\s*=\s*["']?|\[\s*[^\]]*\]\s*\(\s*|\b(?:drag|click|bookmark(?:s|\s+bar)?|paste|follow|visit|open|run|execute|navigate|redirect|load|link|url)\b[^.!?\n]{0,80})\b(?:javascript|vbscript):(?=[^\s'")\],.;])|(?:\b(?:href|src|action)\s*=\s*["']?|\[\s*[^\]]*\]\s*\(\s*)data\s*:\s*(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b|\bdata\s*:\s*(?:text\/html|application\/xhtml\+xml),[^\s'"])/i,
       ];
-      const urlHits = [...regexMatcher(urlPatterns, { negatable: true })(text), ...followUpExfil(text)].map((hit) => {
+      const urlHits = [...regexMatcher(urlPatterns, { negatable: true })(text), ...followUpExfil(text), ...offsiteLeaks(text, targetHost)].map((hit) => {
         if (isHttpHeaderAuthDoc(hit.excerpt, targetHost)) return soften(hit, "Documents a request header for this service's own key.");
         if (targetHost && allUrlsSameSite(hit.excerpt, targetHost)
           && !VISITOR_LEAK_SLOT_RE.test(hit.excerpt) && !/!\[[^\]]*\]\(/.test(hit.excerpt)
