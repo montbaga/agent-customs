@@ -23,7 +23,7 @@
 
 <a href="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml"><img alt="Tests and publish" src="https://github.com/montbaga/agent-customs/actions/workflows/pages.yml/badge.svg"></a>
 <a href="#how-well-it-works"><img alt="Bench: 88.8% blocked, 0% false blocks" src="https://img.shields.io/badge/bench-88.8%25_blocked_%C2%B7_0%25_FP-c8f03c?labelColor=0c1d18"></a>
-<a href="#try-it-yourself"><img alt="Tests: 219 passing" src="https://img.shields.io/badge/tests-219_passing-ece4d3?labelColor=0c1d18"></a>
+<a href="#try-it-yourself"><img alt="Tests: 224 passing" src="https://img.shields.io/badge/tests-224_passing-ece4d3?labelColor=0c1d18"></a>
 <a href="LICENSE.md"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-c8f03c?labelColor=0c1d18"></a>
 <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-ece4d3?labelColor=0c1d18">
 <a href="#lets-talk"><img alt="Built by Monty Bagati" src="https://img.shields.io/badge/say_hello-Monty_Bagati-c8f03c?labelColor=132d25"></a>
@@ -62,8 +62,8 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/dist/agent-customs.js"
-  integrity="sha384-UsMDzSujKomrW+sbe4tAsPeXdYGQYYcIsTfktauiYHnQZ9iZXszH55Ei9EpWIFKj"
+  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.4/dist/agent-customs.js"
+  integrity="sha384-toEesUAwzeCPTz+C+0SW9WUp/7KUqG71ZH79hAHaDDOc4xdGOoxPdnCqH9g0CyK2"
   crossorigin="anonymous"></script>
 ```
 
@@ -76,7 +76,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```js
 // At the top of site.js
 import { installCustomsGuard }
-  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/site/customs/guard.js";
+  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.4/site/customs/guard.js";
 
 // Right after boot()
 installCustomsGuard(booted.engine, { strict: true });
@@ -173,16 +173,16 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/dist/agent-customs.js" integrity="sha384-UsMDzSujKomrW+sbe4tAsPeXdYGQYYcIsTfktauiYHnQZ9iZXszH55Ei9EpWIFKj" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.4/dist/agent-customs.js" integrity="sha384-toEesUAwzeCPTz+C+0SW9WUp/7KUqG71ZH79hAHaDDOc4xdGOoxPdnCqH9g0CyK2" crossorigin="anonymous"></script>
 ```
 
-`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.3` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.4` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
 **2. Two lines, with your own settings.** Load the guard from the same release and pass any of the *Guard options* below. A browser cannot check a fingerprint on an `import`, so for that use option 3 or 4.
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.3/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.4/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
@@ -239,7 +239,7 @@ Three ways in, fastest first:
   <strong>1 · The test suite</strong><br><br>
   No browser and no API key:<br><br>
   <code>npm test</code><br><br>
-  223 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
+  224 tests: the attack sentences, every frozen attack set, five batches of real MCP servers and A2A cards, the locks, the canary, the signed stamps, the benchmark, the command line tool, the MCP server, the extension, the practice site, the key vault, the one-line install and its one-file build.
 </td>
 <td width="33.3%" valign="top">
   <strong>2 · The inspection desk (no key)</strong><br><br>
@@ -494,7 +494,7 @@ Needs Node 22 or newer and no npm packages.
 ```sh
 git clone https://github.com/montbaga/agent-customs.git
 cd agent-customs
-npm test                                # 219 tests
+npm test                                # 224 tests
 npm run bench -- --verbose              # the benchmark, with every flagged case
 npm run check && npm run check:practice # both networks pass Cognizant's build check
 node bin/agent-customs.mjs check site/samples/mcp-poisoned --sarif
@@ -601,6 +601,8 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 - Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
 - Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
 
+**Private data sent to another site is caught in any wording (1.2.4).** A QA tester found that a hotel tool asking for the guest's passport number and sending it to an outside address was only *Held for review*, without the leak finding (C-EXFIL). The leak check matched a short list of phrases, such as "send it to". It now looks for the private data and an address on another site together, with any verb that moves data, in any order: "share it with …", "log it at …", "it is forwarded to …", "send … the passport number", "make a request to … with it". Private data here means identity documents, card and bank details, passwords, one-time codes and the conversation. Of 30 wordings written before the change, 10 were denied before and 29 are now (the 30th, "verify it via …", is still held). The 870 real-world MCP servers and A2A cards in [`tests/fixtures/realworld`](tests/fixtures/realworld/) get exactly the same findings as before, and the benchmark results are unchanged.
+
 The desk also has a new switch under the address box: **AI double-check**. When it is on, your own AI reads every network the rules clear, and every partner the Officer is about to call. It can only make a verdict stricter. If your AI flags something, *Cleared* becomes *Held for review*; if it finds nothing, the verdict stays as it was. Networks the rules already stopped are never sent to it, so they cost no tokens. The switch is off until you turn it on and uses the key you set on the Officer tab. While it is on, the network's public text goes to your AI provider. When your AI has read a network, a round seal countersigns the verdict stamp, and a flag quotes the sentence that worried it (only words the network really wrote are shown).
 
 **Adding the guard now takes one line.** Paste one `<script>` tag into your page and the guard switches itself on, or install it with `npm install agent-customs`. See [Add the guard to your site](#add-it-to-your-site). The line carries a fingerprint (Subresource Integrity), so a browser refuses the file if it was ever changed; the whole guard is one file, so the fingerprint covers all of it.
@@ -678,7 +680,7 @@ The full picture, with diagrams, is in [**How it works**](ARCHITECTURE.md).
 | [`PAPER.md`](PAPER.md) | The research note: threat model, method, results and limits |
 | [`LICENSE.md`](LICENSE.md) | The license in plain words, with the full text |
 | [`tools/`](tools/) | The MCP server (`mcp-server.mjs`), the benchmark and its frozen sets, the stamp signer, the local server, the builders and the smoke test |
-| [`tests/`](tests/) | 219 tests, the frozen attack sets and the five batches of real-world snapshots |
+| [`tests/`](tests/) | 224 tests, the frozen attack sets and the five batches of real-world snapshots |
 | [`vendor/agentify-website/`](vendor/agentify-website/) | Cognizant's kit scripts and templates, unmodified |
 
 </details>
