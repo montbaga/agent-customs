@@ -771,15 +771,17 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     tech.hidden = true;
   }
 
-  // Keys an older version saved outside the vault: say so once, and offer to delete them.
+  // Keys an older version or the practice site saved outside the vault. The note sits above
+  // the settings, so it shows even while they are folded away with a key in use.
   if (legacyNote && legacy?.count) {
     const text = legacyNote.querySelector("[data-mp-legacy]");
-    if (text) text.textContent = `${legacy.count === 1 ? "1 key from an older version is" : `${legacy.count} keys from an older version are`} still saved in this browser, outside the key vault.`;
+    const one = legacy.count === 1;
+    text.textContent = `${one ? "1 key from an older version is" : `${legacy.count} keys from an older version are`} still saved in this browser, outside the key vault.`;
     legacyNote.hidden = false;
-    legacyNote.querySelector("button")?.addEventListener("click", () => {
+    legacyNote.querySelector("button")?.addEventListener("click", (event) => {
       legacy.clear();
-      legacyNote.hidden = true;
-      say("Old copies deleted. Your keys now stay only in the key vault.");
+      event.currentTarget.remove();
+      text.textContent = `${one ? "Old copy" : "Old copies"} deleted. Your keys now stay only in the key vault.`;
     });
   }
 
