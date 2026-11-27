@@ -1,11 +1,13 @@
 // Tests for Phase 3 deliverables: CLI + SARIF + GitHub Action, Agent Customs Bench, and MV3 Extension.
 // Run from the project folder: node --test tests/phase3.test.mjs
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { exitCodeForReports, formatSarif, runCli } from "../bin/agent-customs.mjs";
 import { inspectOriginAgents } from "../extension/inspector.js";
 import { certificateSvg } from "../site/certificate.js";
@@ -15,6 +17,7 @@ import { fsFetch } from "../tools/fs-fetch.mjs";
 import { EXTENSION_COPIED_FOLDERS } from "../tools/make-extension.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
 
 async function filesUnder(dir, prefix = "") {
   const out = [];
@@ -65,6 +68,26 @@ test("CLI check handles cleared, held, denied, JSON, and SARIF output accurately
 
   const sarifEmpty = formatSarif([{ target: { url: "https://clean.invalid" }, findings: [] }]);
   assert.equal(sarifEmpty.runs[0].results.length, 0);
+});
+
+test("CLI runs when started through a link, as npx and global installs start it", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "agent-customs-link-"));
+  try {
+    const link = path.join(dir, "agent-customs");
+    await symlink(ROOT, link, "junction");
+    const card = path.join(ROOT, "site/samples/a2a-clean/.well-known/agent.json");
+    const { stdout } = await execFileAsync(process.execPath, [path.join(link, "bin", "agent-customs.mjs"), "check", card]);
+    assert.match(stdout, /^CLEARED /);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI prints why a check failed", async () => {
+  const run = makeIo();
+  assert.equal(await runCli(["check", path.join(ROOT, "site/samples/no-such-folder/network")], run.io), 2);
+  assert.match(run.stdout[0], /^INVALID /);
+  assert.match(run.stdout[1], /^ {2}No AI agents are published here/);
 });
 
 test("CLI verify validates authentic ES256 artifacts and rejects tampered copies", async () => {

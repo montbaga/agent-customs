@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // agent-customs CLI: inspect agent networks, verify certificates, run benchmarks, or serve MCP.
+import { realpathSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,6 +123,7 @@ async function cmdCheck(positionals, flags, log) {
   } else {
     for (const r of reports) {
       log.out(`${r.verdict.code.padEnd(10)} ${r.target?.url || "unknown"} (${r.conformance?.passed}/${r.conformance?.total} checks, ${r.identity?.short || "no hash"})`);
+      if (r.failure && r.verdict.summary) log.out(`  ${r.verdict.summary}`);
       for (const f of r.findings || []) {
         log.out(`  [${f.severity}] ${f.rule}: ${f.title}`);
       }
@@ -195,7 +197,12 @@ export async function runCli(argv = process.argv.slice(2), io = { out: console.l
   return 2;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// npx and global installs start this file through a link.
+function startedDirectly(argvPath) {
+  try { return realpathSync(argvPath) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+}
+
+if (process.argv[1] && startedDirectly(process.argv[1])) {
   const exitCode = await runCli();
   if (exitCode) process.exit(exitCode);
 }
