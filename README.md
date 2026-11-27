@@ -63,7 +63,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/dist/agent-customs.js"
-  integrity="sha384-o71RiozGvw/oKRIsGfjRGwPkX9ogcXo/my1jmQze65HauQ4cGWPaC/+Es2XIrXJJ"
+  integrity="sha384-Efcs0bxLKLEKhUXHchUo/4P4HS0aEb8xq89D1Zwxv1AdHshQ7dVxlzo63tArMqL3"
   crossorigin="anonymous"></script>
 ```
 
@@ -173,7 +173,7 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/dist/agent-customs.js" integrity="sha384-o71RiozGvw/oKRIsGfjRGwPkX9ogcXo/my1jmQze65HauQ4cGWPaC/+Es2XIrXJJ" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/dist/agent-customs.js" integrity="sha384-Efcs0bxLKLEKhUXHchUo/4P4HS0aEb8xq89D1Zwxv1AdHshQ7dVxlzo63tArMqL3" crossorigin="anonymous"></script>
 ```
 
 `integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.5` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.

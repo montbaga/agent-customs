@@ -166,7 +166,7 @@ function resolveKnownSample(raw) {
 
 function buildInstallSnippets() {
   return {
-    oneLineScript: `<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v${PKG_VERSION}/dist/agent-customs.js" integrity="sha384-o71RiozGvw/oKRIsGfjRGwPkX9ogcXo/my1jmQze65HauQ4cGWPaC/+Es2XIrXJJ" crossorigin="anonymous"></script>`,
+    oneLineScript: `<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v${PKG_VERSION}/dist/agent-customs.js" integrity="sha384-Efcs0bxLKLEKhUXHchUo/4P4HS0aEb8xq89D1Zwxv1AdHshQ7dVxlzo63tArMqL3" crossorigin="anonymous"></script>`,
     twoLines: `import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v${PKG_VERSION}/site/customs/guard.js";\ninstallCustomsGuard(booted.engine, { strict: true });`,
     npm: `npm install agent-customs\nimport { installCustomsGuard } from "agent-customs";\ninstallCustomsGuard(booted.engine);`,
     cli: `npx agent-customs check https://your-site.example/\nnpx agent-customs check ./my-network --strict\nnpx agent-customs mcp`,

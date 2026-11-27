@@ -14,7 +14,6 @@ const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSITIVE_CHILDREN = 6;
 const DIRECT_FOREIGN_URL = /(?:\/\.well-known\/agent(?:-card)?\.json|\/agent(?:-card)?\.json|\/\.well-known\/mcp\.json|\/mcp\.json|\/tools\/list)$/i;
-// A live MCP server's address: it talks only to MCP apps and publishes no file there.
 const LIVE_MCP_PATH = /\/(?:mcp|sse)\/?$/i;
 
 /**
@@ -106,8 +105,7 @@ async function fetchPublic(url, fetchImpl, timeoutMs) {
   }
 }
 
-// A no-cors request reaches the server but cannot read its answer, so it succeeds exactly
-// when the server answered and only the CORS rule kept the answer from this page.
+// A no-cors request reaches the server without reading the answer, so it fails only when nothing answered.
 async function serverAnswered(url, fetchImpl, timeoutMs) {
   const controller = typeof AbortController === "function" ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -121,16 +119,6 @@ async function serverAnswered(url, fetchImpl, timeoutMs) {
   }
 }
 
-/**
- * Say why a file could not be read: the site was too slow, nothing answered, or the site
- * answered but sends no CORS header.
- *
- * :param error: The error fetchPublic threw, with the url it tried.
- * :param input: The address the person pasted, for the terminal command.
- * :param agenticSite: True for an agentic website's files, which other sites' agents read
- *   in their visitors' browsers.
- * :return: {summary, title, detail, fix} for the report.
- */
 async function unreadableReason(error, input, { fetchImpl, timeoutMs, agenticSite }) {
   const host = hostOf(error.url) || "this address";
   if (error.timedOut) {
@@ -154,8 +142,6 @@ async function unreadableReason(error, input, { fetchImpl, timeoutMs, agenticSit
   };
 }
 
-// The inspection ignores ?query and #hash, and characters such as & would break the
-// command in a terminal.
 function commandAddress(input) {
   try {
     const u = new URL(String(input).trim());

@@ -365,8 +365,6 @@ test("a site the browser cannot read gets 'could not inspect', not a verdict on 
   assert.match(r.verdict.summary, /^Nothing answered at unreachable\.example\. Check the address for typos/);
 });
 
-// The browser reaches a site that sends no CORS header, but keeps the answer from the page:
-// a normal request fails, a no-cors request gets an opaque answer.
 const corsBlocked = async (url, init = {}) => {
   if (init.mode === "no-cors") return { ok: false, status: 0, type: "opaque", url, redirected: false, text: async () => "" };
   throw new TypeError("Failed to fetch");

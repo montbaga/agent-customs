@@ -197,8 +197,7 @@ export async function runCli(argv = process.argv.slice(2), io = { out: console.l
   return 2;
 }
 
-// npx and global installs on macOS and Linux start this file through a link, and npx in
-// this repository links the folder itself, so compare real paths.
+// npx and global installs start this file through a link.
 function startedDirectly(argvPath) {
   try { return realpathSync(argvPath) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
 }

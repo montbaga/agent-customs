@@ -113,7 +113,6 @@ export async function buildBundle() {
 // The integrity attribute next to the bundle's address, in the README or in the site's
 // highlighted code (where <span> tags sit between them).
 export const INTEGRITY_NEAR_BUNDLE = /(dist\/agent-customs\.js"[\s\S]{0,120}?integrity=(?:<span class="s">)?")(sha384-[A-Za-z0-9+/=]+|sha384-PENDING)(")/g;
-// Every file that shows the one-line install, including the MCP server's install snippet.
 export const INTEGRITY_DOCS = ["README.md", "site/index.html", "tools/mcp-server.mjs"];
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
