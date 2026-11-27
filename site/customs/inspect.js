@@ -14,6 +14,8 @@ const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSITIVE_CHILDREN = 6;
 const DIRECT_FOREIGN_URL = /(?:\/\.well-known\/agent(?:-card)?\.json|\/agent(?:-card)?\.json|\/\.well-known\/mcp\.json|\/mcp\.json|\/tools\/list)$/i;
+// A live MCP server's address: it talks only to MCP apps and publishes no file there.
+const LIVE_MCP_PATH = /\/(?:mcp|sse)\/?$/i;
 
 /**
  * Work out the site base and network name from what a person pasted: a network URL,
@@ -95,11 +97,78 @@ async function fetchPublic(url, fetchImpl, timeoutMs) {
     return { ok: resp.ok, status: resp.status, text, finalUrl: resp.url || url, redirected: !!resp.redirected };
   } catch (error) {
     if (error instanceof FileTooLarge) throw error;
-    if (error?.name === "AbortError") throw new Error(`No answer from ${hostOf(url)} within ${Math.round(timeoutMs / 1000)} s`);
-    throw new Error(`Could not read ${url}: the server is down or unreachable, or it does not allow other sites to read it (no CORS header).`);
+    if (error?.name === "AbortError") {
+      throw Object.assign(new Error(`No answer from ${hostOf(url)} within ${Math.round(timeoutMs / 1000)} s.`), { url, timedOut: true });
+    }
+    throw Object.assign(new Error(`Could not read ${url}: the server is down or unreachable, or it does not allow other sites to read it (no CORS header).`), { url });
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+// A no-cors request reaches the server but cannot read its answer, so it succeeds exactly
+// when the server answered and only the CORS rule kept the answer from this page.
+async function serverAnswered(url, fetchImpl, timeoutMs) {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    await fetchImpl(url, { mode: "no-cors", credentials: "omit", cache: "no-store", redirect: "follow", referrerPolicy: "no-referrer", signal: controller?.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Say why a file could not be read: the site was too slow, nothing answered, or the site
+ * answered but sends no CORS header.
+ *
+ * :param error: The error fetchPublic threw, with the url it tried.
+ * :param input: The address the person pasted, for the terminal command.
+ * :param agenticSite: True for an agentic website's files, which other sites' agents read
+ *   in their visitors' browsers.
+ * :return: {summary, title, detail, fix} for the report.
+ */
+async function unreadableReason(error, input, { fetchImpl, timeoutMs, agenticSite }) {
+  const host = hostOf(error.url) || "this address";
+  if (error.timedOut) {
+    return { summary: `${error.message} The site may be slow or down. Try again later.`, title: "The site answers", detail: error.message, fix: "" };
+  }
+  if (!await serverAnswered(error.url, fetchImpl, timeoutMs)) {
+    return { summary: `Nothing answered at ${host}. Check the address for typos, or try again later if the site is down.`, title: "The site answers", detail: `Nothing answered at ${error.url}.`, fix: "" };
+  }
+  return {
+    summary: [
+      agenticSite
+        ? `${host} answered, but it doesn't let web pages read its files (it sends no CORS header), so your browser can't tell whether it publishes any agents. Most websites have none yet. If it does, agents on other websites can't call them either, because they run in their visitors' browsers too (spec sections 3.3 and 3.4).`
+        : `${host} answered, but it doesn't let web pages read this address (it sends no CORS header), so your browser kept the answer from this page.`,
+      `To check it anyway, run this in a terminal: npx -y agent-customs check ${commandAddress(input)}`,
+    ].join(" "),
+    title: "Public files readable by other sites (CORS)",
+    detail: `${error.url} answered without an Access-Control-Allow-Origin header.`,
+    fix: agenticSite
+      ? "If this is your site: serve agent-manifest.json, the network file and links.json with Access-Control-Allow-Origin: *."
+      : "If this is your site: serve this file with Access-Control-Allow-Origin: *.",
+  };
+}
+
+// The inspection ignores ?query and #hash, and characters such as & would break the
+// command in a terminal.
+function commandAddress(input) {
+  try {
+    const u = new URL(String(input).trim());
+    u.search = "";
+    u.hash = "";
+    return u.href;
+  } catch {
+    return String(input).trim();
+  }
+}
+
+function isLiveMcpAddress(input) {
+  try { return LIVE_MCP_PATH.test(new URL(String(input).trim()).pathname); } catch { return false; }
 }
 
 /**
@@ -134,6 +203,7 @@ export async function inspectNetworkUrl(input, options = {}) {
   const redirects = [];
   let manifestInfo = null;
   let lastError = null;
+  let unreadError = null;
   let unreachable = false;
   let sawTooLarge = false;
   let chosen = null;
@@ -174,11 +244,13 @@ export async function inspectNetworkUrl(input, options = {}) {
         return failureReport(directUrl, "P-MANIFEST-FOUND", "Size", "File within 2 MB limit", error.message);
       }
       if (strictForeign) {
-        const rep = failureReport(directUrl, "P-CORS", "Discovery", "Public files readable by other sites (CORS)", error.message);
-        rep.verdict = { ...VERDICTS.UNREADABLE, summary: error.message };
+        const reason = await unreadableReason(error, input, { fetchImpl, timeoutMs, agenticSite: false });
+        const rep = failureReport(directUrl, "P-CORS", "Discovery", reason.title, reason.detail, reason.fix);
+        rep.verdict = { ...VERDICTS.UNREADABLE, summary: reason.summary };
         return rep;
       }
       lastError = error.message;
+      unreadError = error;
       unreachable = true;
     }
   }
@@ -205,7 +277,7 @@ export async function inspectNetworkUrl(input, options = {}) {
       if (error instanceof FileTooLarge) { lastError = error.message; unreachable = false; sawTooLarge = true; continue; }
       // The browser could not read it at all: down, unreachable, or no CORS header.
       // That says nothing about the network itself, so it gets its own verdict.
-      if (!lastError || unreachable) { lastError = error.message; unreachable = true; }
+      if (!lastError || unreachable) { lastError = error.message; unreadError = unreadError || error; unreachable = true; }
     }
   }
 
@@ -231,10 +303,14 @@ export async function inspectNetworkUrl(input, options = {}) {
   if (!manifestInfo) {
     const report = failureReport(String(input), "P-MANIFEST-FOUND", "3.2, 3.3", "agent-manifest.json is published", lastError || "No manifest found.",
       "Publish agent-manifest.json in the folder of the network URL, with Access-Control-Allow-Origin: *.");
-    if (unreachable) {
-      report.verdict = { ...VERDICTS.UNREADABLE, summary: "Your browser could not read any agent files at this address. There may be none here (most websites have none yet), the site may be down, or it may not let other websites read its files (no CORS header). In that last case no caller can run it either (spec sections 3.3 and 3.4)." };
-      report.conformance.checks[0] = { id: "P-CORS", section: "3.3, 3.4", title: "Public files readable by other sites (CORS)", status: "fail",
-        detail: lastError, fix: "If this is your site: serve agent-manifest.json, the network file and links.json with Access-Control-Allow-Origin: *." };
+    if (isLiveMcpAddress(input)) {
+      report.verdict = { ...VERDICTS.UNREADABLE, summary: "This is the address of a live MCP server, which only MCP apps can talk to. Agent Customs reads the files a server publishes: paste the address of its server.json instead. Publishers usually keep it in their GitHub repository, such as https://raw.githubusercontent.com/github/github-mcp-server/main/server.json." };
+      report.conformance.checks[0] = { id: unreachable ? "P-CORS" : "P-MANIFEST-FOUND", section: "Discovery", title: "A published file to inspect", status: "fail",
+        detail: lastError, fix: "Paste the address of the server's server.json or mcp.json." };
+    } else if (unreachable) {
+      const reason = await unreadableReason(unreadError, input, { fetchImpl, timeoutMs, agenticSite: true });
+      report.verdict = { ...VERDICTS.UNREADABLE, summary: reason.summary };
+      report.conformance.checks[0] = { id: "P-CORS", section: "3.3, 3.4", title: reason.title, status: "fail", detail: reason.detail, fix: reason.fix };
     }
     return report;
   }

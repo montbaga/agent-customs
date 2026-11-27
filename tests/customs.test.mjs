@@ -362,7 +362,56 @@ test("a site the browser cannot read gets 'could not inspect', not a verdict on 
   const r = await inspect("https://unreachable.example/some/network");
   assert.equal(r.verdict.code, "UNREADABLE");
   assert.equal(r.conformance.checks[0].id, "P-CORS");
-  assert.match(r.verdict.summary, /no caller can run it/);
+  assert.match(r.verdict.summary, /^Nothing answered at unreachable\.example\. Check the address for typos/);
+});
+
+// The browser reaches a site that sends no CORS header, but keeps the answer from the page:
+// a normal request fails, a no-cors request gets an opaque answer.
+const corsBlocked = async (url, init = {}) => {
+  if (init.mode === "no-cors") return { ok: false, status: 0, type: "opaque", url, redirected: false, text: async () => "" };
+  throw new TypeError("Failed to fetch");
+};
+
+test("a site that answers without a CORS header is told apart from one that is down", async () => {
+  const site = await inspectNetworkUrl("https://blocked.example/shop/network", { fetchImpl: corsBlocked, pageOrigin: SITE });
+  assert.equal(site.verdict.code, "UNREADABLE");
+  assert.equal(site.conformance.checks[0].id, "P-CORS");
+  assert.match(site.verdict.summary, /^blocked\.example answered, but it doesn't let web pages read its files/);
+  assert.match(site.verdict.summary, /Most websites have none yet\. If it does, agents on other websites can't call them either/);
+  assert.ok(site.verdict.summary.endsWith("run this in a terminal: npx -y agent-customs check https://blocked.example/shop/network"));
+
+  const card = await inspectNetworkUrl("https://blocked.example/.well-known/agent-card.json", { fetchImpl: corsBlocked, pageOrigin: SITE });
+  assert.equal(card.verdict.code, "UNREADABLE");
+  assert.match(card.verdict.summary, /doesn't let web pages read this address \(/);
+  assert.doesNotMatch(card.verdict.summary, /agents on other websites/);
+  assert.ok(card.verdict.summary.endsWith("npx -y agent-customs check https://blocked.example/.well-known/agent-card.json"));
+  assert.match(card.conformance.checks[0].fix, /serve this file with Access-Control-Allow-Origin/);
+
+  const query = await inspectNetworkUrl("https://blocked.example/shop/network?a=1&b=2#top", { fetchImpl: corsBlocked, pageOrigin: SITE });
+  assert.ok(query.verdict.summary.endsWith("npx -y agent-customs check https://blocked.example/shop/network"));
+});
+
+test("a site that does not answer in time says so", async () => {
+  const silent = (url, init = {}) => new Promise((resolve, reject) => {
+    init.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+  });
+  const r = await inspectNetworkUrl("https://slow.example/shop/network", { fetchImpl: silent, pageOrigin: SITE, timeoutMs: 30 });
+  assert.equal(r.verdict.code, "UNREADABLE");
+  assert.match(r.verdict.summary, /^No answer from slow\.example within \d+ s\. The site may be slow or down\. Try again later\.$/);
+});
+
+test("a live MCP server address says to paste its server.json, read or not", async () => {
+  const notFound = async (url) => ({ ok: false, status: 404, url, redirected: false, text: async () => "" });
+  for (const fetchImpl of [notFound, corsBlocked]) {
+    for (const address of ["https://learn.example/api/mcp", "https://mcp.example/mcp/", "https://tools.example/v1/sse"]) {
+      const r = await inspectNetworkUrl(address, { fetchImpl, pageOrigin: SITE });
+      assert.equal(r.verdict.code, "UNREADABLE", address);
+      assert.match(r.verdict.summary, /^This is the address of a live MCP server/, address);
+      assert.match(r.conformance.checks[0].fix, /server\.json or mcp\.json/);
+    }
+  }
+  const network = await inspect(`${RANGE}/sunny_bakery/sunny_bakery`);
+  assert.notEqual(network.verdict.code, "UNREADABLE");
 });
 
 test("a file over 2 MB is reported as too large, not as unreadable, and is not read to the end", async () => {

@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { BUNDLE, INTEGRITY_NEAR_BUNDLE, buildBundle } from "../tools/make-bundle.mjs";
+import { BUNDLE, INTEGRITY_DOCS, INTEGRITY_NEAR_BUNDLE, buildBundle } from "../tools/make-bundle.mjs";
 import { fsFetch } from "../tools/fs-fetch.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,8 +17,8 @@ test("the one-file build matches its sources (run npm run bundle after changing 
   assert.equal(onDisk, built.code);
 });
 
-test("the README and the site show the one-file build's real fingerprint", async () => {
-  for (const doc of ["README.md", "site/index.html"]) {
+test("the README, the site and the MCP server show the one-file build's real fingerprint", async () => {
+  for (const doc of INTEGRITY_DOCS) {
     const text = await readFile(path.join(ROOT, doc), "utf8");
     const found = [...text.matchAll(INTEGRITY_NEAR_BUNDLE)].map((m) => m[2]);
     assert.ok(found.length >= 1, `${doc} shows the one-line install with its fingerprint`);
