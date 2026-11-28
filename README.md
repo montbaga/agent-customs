@@ -324,7 +324,7 @@ An ordinary town-guide site built with Cognizant's kit, in its own colours ([`pr
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="docs/images/compare.jpg" alt="Compare view showing what changed in Sunny Bakery after a silent rug pull"><br><sub><b>Compare:</b> shows line by line what changed when a clean network later adds data-harvesting text or new partners.</sub></td>
-    <td width="50%" valign="top"><img src="docs/images/officer.jpg" alt="Officer tab with the bring-your-own-key model picker"><br><sub><b>Officer:</b> bring your own key (Claude, GPT, Gemini, Groq, OpenRouter or any compatible service) to have reports explained in plain words.</sub></td>
+    <td width="50%" valign="top"><img src="docs/images/officer.jpg" alt="Officer tab: the chat, with three steps to set up a model beside it"><br><sub><b>Officer:</b> the chat comes first, with three steps beside it to add your own key (Claude, GPT, Gemini, Groq, OpenRouter or any compatible service). It explains reports in plain words.</sub></td>
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="docs/images/ai-check-setup.jpg" alt="AI double-check switch waiting for a key, with a card that explains what an AI key is and offers to set up a free one"><br><sub><b>AI double-check, first visit:</b> with no key yet, the switch waits and a card explains what a key is, where to get a free one, and takes you there.</sub></td>
@@ -600,6 +600,8 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 - Signatures and data are recognised by what they are. Standard signatures on agent cards and Base64-encoded JSON are decoded and checked, wherever they appear, instead of being matched by field name.
 - Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
 - Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
+
+**A neater home page.** The two options under the address box are matching switches, side by side. The code box keeps all seven tabs in view and continues long lines indented under themselves, the benchmark numbers under the attack lab are in plain words, and the hidden-sentence section sits in the middle of the screen.
 
 **The inspection desk shows more at a glance.** The five tabs are now lanes that say what each one holds: the last verdict, whether the officer has a model, and your latest approval. The report puts *Approve*, *Ask the officer* and the certificate right under the verdict, and a small bar keeps them at the bottom of the screen while you read further down. Findings can be filtered by severity, and the facts read like the data page of a passport. On the Officer tab the chat comes first, with the model settings beside it, and approvals show as stamps.
 
