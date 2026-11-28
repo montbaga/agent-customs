@@ -46,6 +46,10 @@ export function detectProtocol(doc, url = "") {
   if (doc.serverInfo || Array.isArray(doc.prompts) || Array.isArray(doc.resources) || Array.isArray(doc.result?.prompts)) {
     return "mcp";
   }
+  return protocolFromUrl(url);
+}
+
+export function protocolFromUrl(url = "") {
   if (/(?:\/\.well-known\/agent(?:-card)?\.json|\/agent(?:-card)?\.json)$/i.test(url)) return "a2a";
   if (/(?:\/\.well-known\/mcp\.json|\/mcp\.json|\/tools\/list)$/i.test(url)) return "mcp";
   return null;

@@ -8,7 +8,7 @@
 import { parseHocon } from "../runtime/hocon.js";
 import { AgentNetwork, validateNetwork } from "../runtime/kernel.js";
 import { VERDICTS, analyzeNetwork, escalateReport } from "./analyze.js";
-import { detectProtocol, foreignDiscoveryCandidates, normalizeForeignSpec } from "./protocols.js";
+import { detectProtocol, foreignDiscoveryCandidates, normalizeForeignSpec, protocolFromUrl } from "./protocols.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -128,12 +128,10 @@ async function unreadableReason(error, input, { fetchImpl, timeoutMs, agenticSit
     return { summary: `Nothing answered at ${host}. Check the address for typos, or try again later if the site is down.`, title: "The site answers", detail: `Nothing answered at ${error.url}.`, fix: "" };
   }
   return {
-    summary: [
-      agenticSite
-        ? `${host} answered, but it doesn't let web pages read its files (it sends no CORS header), so your browser can't tell whether it publishes any agents. Most websites have none yet. If it does, agents on other websites can't call them either, because they run in their visitors' browsers too (spec sections 3.3 and 3.4).`
-        : `${host} answered, but it doesn't let web pages read this address (it sends no CORS header), so your browser kept the answer from this page.`,
-      `To check it anyway, run this in a terminal: npx -y agent-customs check ${commandAddress(input)}`,
-    ].join(" "),
+    summary: agenticSite
+      ? `${host} answered, but it doesn't let web pages read its files (it sends no CORS header), so your browser can't tell whether it publishes any agents. Most websites have none yet. If it does, agents on other websites can't call them either, because they run in their visitors' browsers too (spec sections 3.3 and 3.4).`
+      : `${host} answered, but it doesn't let web pages read this address (it sends no CORS header), so your browser kept the answer from this page.`,
+    command: `npx -y agent-customs check ${commandAddress(input)}`,
     title: "Public files readable by other sites (CORS)",
     detail: `${error.url} answered without an Access-Control-Allow-Origin header.`,
     fix: agenticSite
@@ -232,7 +230,7 @@ export async function inspectNetworkUrl(input, options = {}) {
       if (strictForeign) {
         const reason = await unreadableReason(error, input, { fetchImpl, timeoutMs, agenticSite: false });
         const rep = failureReport(directUrl, "P-CORS", "Discovery", reason.title, reason.detail, reason.fix);
-        rep.verdict = { ...VERDICTS.UNREADABLE, summary: reason.summary };
+        rep.verdict = { ...VERDICTS.UNREADABLE, summary: reason.summary, command: reason.command };
         return rep;
       }
       lastError = error.message;
@@ -290,24 +288,26 @@ export async function inspectNetworkUrl(input, options = {}) {
     const report = failureReport(String(input), "P-MANIFEST-FOUND", "3.2, 3.3", "agent-manifest.json is published", lastError || "No manifest found.",
       "Publish agent-manifest.json in the folder of the network URL, with Access-Control-Allow-Origin: *.");
     if (isLiveMcpAddress(input)) {
+      report.protocol = "mcp";
       report.verdict = { ...VERDICTS.UNREADABLE, summary: "This is the address of a live MCP server, which only MCP apps can talk to. Agent Customs reads the files a server publishes: paste the address of its server.json instead. Publishers usually keep it in their GitHub repository, such as https://raw.githubusercontent.com/github/github-mcp-server/main/server.json." };
       report.conformance.checks[0] = { id: unreachable ? "P-CORS" : "P-MANIFEST-FOUND", section: "Discovery", title: "A published file to inspect", status: "fail",
         detail: lastError, fix: "Paste the address of the server's server.json or mcp.json." };
     } else if (unreachable) {
       const reason = await unreadableReason(unreadError, input, { fetchImpl, timeoutMs, agenticSite: true });
-      report.verdict = { ...VERDICTS.UNREADABLE, summary: reason.summary };
+      report.verdict = { ...VERDICTS.UNREADABLE, summary: reason.summary, command: reason.command };
       report.conformance.checks[0] = { id: "P-CORS", section: "3.3, 3.4", title: reason.title, status: "fail", detail: reason.detail, fix: reason.fix };
     }
     return report;
   }
   const { manifest } = manifestInfo;
+  const failed = (...args) => ({ ...failureReport(...args), protocol: "open-agentic-web" });
   const networks = Array.isArray(manifest.networks) ? manifest.networks : [];
   let name = chosen.name;
   if (!name) {
     if (networks.length === 1 && networks[0]?.name) name = networks[0].name;
     else {
       const names = networks.map((n) => n?.name).filter(Boolean);
-      return failureReport(`${chosen.base}/`, "P-PICK", "3.2", "One network chosen",
+      return failed(`${chosen.base}/`, "P-PICK", "3.2", "One network chosen",
         names.length ? `This site publishes ${names.length} networks. Inspect one of: ${names.map((n) => `${chosen.base}/${n}`).join(", ")}` : "The manifest lists no networks.",
         "Use a network URL: the folder that holds agent-manifest.json, then the network name.", { choices: names.map((n) => `${chosen.base}/${n}`) });
     }
@@ -315,22 +315,22 @@ export async function inspectNetworkUrl(input, options = {}) {
   const networkUrl = `${chosen.base}/${name}`;
   const entry = networks.find((n) => n && n.name === name);
   if (!entry) {
-    return failureReport(networkUrl, "P-EXACT", "3.2", "The manifest publishes this exact network",
+    return failed(networkUrl, "P-EXACT", "3.2", "The manifest publishes this exact network",
       `No network named "${name}" at ${hostOf(networkUrl)}. A runtime must fail rather than run another one. Published: ${networks.map((n) => n?.name).filter(Boolean).join(", ") || "none"}.`,
       "Check the network name: it is the last part of the URL and must match networks[].name exactly.");
   }
   if (typeof entry.hocon !== "string" || !entry.hocon) {
-    return failureReport(networkUrl, "P-HOCON", "3.3", "The manifest says where the network file is", "The entry has no hocon path.", "Add \"hocon\": \"./<network>.network.json\".");
+    return failed(networkUrl, "P-HOCON", "3.3", "The manifest says where the network file is", "The entry has no hocon path.", "Add \"hocon\": \"./<network>.network.json\".");
   }
   const hoconUrl = resolveUrl(chosen.base, entry.hocon);
   let file;
   try {
     file = await fetchPublic(hoconUrl, fetchImpl, timeoutMs);
   } catch (error) {
-    return failureReport(networkUrl, "P-NETWORK-FOUND", "3.3", "The network file is published", error.message, "Publish the file the manifest names, with CORS.");
+    return failed(networkUrl, "P-NETWORK-FOUND", "3.3", "The network file is published", error.message, "Publish the file the manifest names, with CORS.");
   }
   if (!file.ok) {
-    return failureReport(networkUrl, "P-NETWORK-FOUND", "3.3", "The network file is published", `${hoconUrl} answered HTTP ${file.status}.`, "Publish the file the manifest names.");
+    return failed(networkUrl, "P-NETWORK-FOUND", "3.3", "The network file is published", `${hoconUrl} answered HTTP ${file.status}.`, "Publish the file the manifest names.");
   }
   if (file.redirected) redirects.push({ from: hoconUrl, to: file.finalUrl, crossOrigin: originOf(file.finalUrl) !== originOf(hoconUrl) });
 
@@ -338,10 +338,10 @@ export async function inspectNetworkUrl(input, options = {}) {
   try {
     config = parseHocon(file.text);
   } catch (error) {
-    return failureReport(networkUrl, "P-PARSE", "2, 2.2", "The network file parses", `${hoconUrl}: ${error.message}`, "Publish resolved JSON (or the runtime's HOCON subset) with no includes or substitutions.");
+    return failed(networkUrl, "P-PARSE", "2, 2.2", "The network file parses", `${hoconUrl}: ${error.message}`, "Publish resolved JSON (or the runtime's HOCON subset) with no includes or substitutions.");
   }
   if (!config || typeof config !== "object" || !Array.isArray(config.tools)) {
-    return failureReport(networkUrl, "P-PARSE", "2.1", "The network file has a tools list", "No top-level tools array.", "Put the agents in a top-level \"tools\" array.");
+    return failed(networkUrl, "P-PARSE", "2.1", "The network file has a tools list", "No top-level tools array.", "Put the agents in a top-level \"tools\" array.");
   }
 
   // links.json, merged the way the runtime merges it.
@@ -367,7 +367,7 @@ export async function inspectNetworkUrl(input, options = {}) {
     validation = validateNetwork(network);
     try { frontMan = network.findFrontMan(); } catch { frontMan = null; }
   } catch (error) {
-    return failureReport(networkUrl, "P-VALID", "3.1", "Network passes the runtime's validator", error.message, "Fix the network structure.");
+    return failed(networkUrl, "P-VALID", "3.1", "Network passes the runtime's validator", error.message, "Fix the network structure.");
   }
 
   const cors = !pageOrigin ? "unchecked" : originOf(networkUrl) === pageOrigin ? "same-origin" : "ok";
@@ -486,7 +486,7 @@ function failureReport(url, id, section, title, detail, fix = "", extra = {}) {
     counts: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
     conformance: { passed: 0, warned: 0, failed: 1, total: 1, score: 0, checks: [{ id, section, title, status: "fail", detail, fix }] },
     findings: [], itinerary: [], privacy: [], budget: {}, drift: null, conditions: [], snapshot: null,
-    failure: true, ...extra,
+    protocol: protocolFromUrl(url), failure: true, ...extra,
   };
 }
 

@@ -62,8 +62,8 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/dist/agent-customs.js"
-  integrity="sha384-Efcs0bxLKLEKhUXHchUo/4P4HS0aEb8xq89D1Zwxv1AdHshQ7dVxlzo63tArMqL3"
+  src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.6/dist/agent-customs.js"
+  integrity="sha384-WMl/1x9IOgwlSJuAl5nKo4CtY/x421qU9tkM8wWXyzImP1odffmefCeSm3lfLZgj"
   crossorigin="anonymous"></script>
 ```
 
@@ -76,7 +76,7 @@ Pick one of four ways. Each works with any site made with Cognizant's `agentify-
 ```js
 // At the top of site.js
 import { installCustomsGuard }
-  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/site/customs/guard.js";
+  from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.6/site/customs/guard.js";
 
 // Right after boot()
 installCustomsGuard(booted.engine, { strict: true });
@@ -173,16 +173,16 @@ Each way to add the guard, step by step. All of them work with any site built wi
 **1. One line (easiest).** Paste this into your page, above your other `<script>` tags. The guard switches itself on when your assistant starts.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/dist/agent-customs.js" integrity="sha384-Efcs0bxLKLEKhUXHchUo/4P4HS0aEb8xq89D1Zwxv1AdHshQ7dVxlzo63tArMqL3" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.6/dist/agent-customs.js" integrity="sha384-WMl/1x9IOgwlSJuAl5nKo4CtY/x421qU9tkM8wWXyzImP1odffmefCeSm3lfLZgj" crossorigin="anonymous"></script>
 ```
 
-`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.5` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
+`integrity` is the file's fingerprint. If the file were ever changed, on the CDN or on the way, the browser would refuse to run it. The whole guard is in this one file ([`dist/agent-customs.js`](dist/agent-customs.js), built by `npm run bundle`), so the fingerprint covers all of it. `@v1.2.6` is a fixed version; to update, take the new line from the next release. Above the other tags, the browser runs it before your page starts the assistant, and chats wait until the guard is on. If your page has a `Content-Security-Policy` with `script-src`, add `https://cdn.jsdelivr.net` to it.
 
 **2. Two lines, with your own settings.** Load the guard from the same release and pass any of the *Guard options* below. A browser cannot check a fingerprint on an `import`, so for that use option 3 or 4.
 
 ```js
 // At the top of site.js
-import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/site/customs/guard.js";
+import { installCustomsGuard } from "https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.6/site/customs/guard.js";
 
 // Right after the boot(...) call
 installCustomsGuard(booted.engine, { strict: true });
@@ -600,6 +600,8 @@ This round fixed a weakness in how the rules handled their own exceptions, and i
 - Signatures and data are recognised by what they are. Standard signatures on agent cards and Base64-encoded JSON are decoded and checked, wherever they appear, instead of being matched by field name.
 - Two more languages. Dutch and Indonesian requests for passwords and card numbers are now read word by word. Takeover, chat-leak and "download and run" orders are caught in 14 languages.
 - Honest numbers. False alarms on tools never seen before dropped from about 1 in 10 to about 1 in 18. New attack sets written after the changes were measured once before they were used. The details are in [How well it works](#how-well-it-works) and the [paper](PAPER.md#5--results).
+
+**The terminal command gets its own window, and failed checks name their protocol (1.2.6).** When a site answers but the browser can't read it, the report now shows the command in a small terminal window with a *Copy* button, under the message instead of inside it. Paste it into PowerShell on Windows or Terminal on a Mac (it needs Node.js). In the report's JSON, the command is `verdict.command`. A failed check on an A2A Agent Card or an MCP file now shows *Google A2A* or *MCP Catalog* as its protocol, not *Open Agentic Web*, and an address where nothing was found shows no protocol.
 
 **"Could not inspect" now says why, and the command line runs everywhere (1.2.5).** When the page could not read an address, it listed three possible reasons. It now finds the real one and says what to do:
 - The site answered, but it sends no CORS header, so the browser kept the answer from the page. The message gives the command that checks it from a terminal instead: `npx -y agent-customs check <address>`.
