@@ -31,20 +31,13 @@ function showTab(name, { focus = false } = {}) {
     }
     if (panel) panel.hidden = !active;
   }
-  const resetBtn = $("#report-reset");
-  if (resetBtn) resetBtn.hidden = name !== "report" || !$("#report") || $("#report").hidden;
-  moveHighlight();
 }
 
-function moveHighlight() {
-  const list = document.querySelector(".tabs");
-  const highlight = list?.querySelector(".tabs-highlight");
-  const selected = list?.querySelector('[role="tab"][aria-selected="true"]');
-  if (!highlight || !selected) return;
-  list.style.setProperty("--tabs-w", `${list.scrollWidth}px`);
-  const left = selected.offsetLeft;
-  const right = list.scrollWidth - (left + selected.offsetWidth);
-  highlight.style.clipPath = `inset(4px ${right}px 4px ${left}px round 10px)`;
+function setLane(tab, text, tone = "") {
+  const status = document.querySelector(`#tab-${tab} .lane-status`);
+  if (!status) return;
+  status.querySelector(".lane-text").textContent = text;
+  status.querySelector(".dot").className = tone ? `dot tone-${tone}` : "dot";
 }
 
 function revealWorkspace(behavior = "smooth") {
@@ -72,11 +65,6 @@ function wireTabs() {
     });
   }
   if (location.hash === "#assistant") showTab("officer");
-  // Place the highlight before turning its transition on, so the first paint does not slide.
-  moveHighlight();
-  requestAnimationFrame(() => document.querySelector(".tabs")?.classList.add("ready"));
-  window.addEventListener("resize", moveHighlight, { passive: true });
-  document.fonts?.ready.then(moveHighlight);
 }
 
 /** Build an element. Strings become text nodes. */
@@ -142,21 +130,11 @@ function renderReport({ animate = false } = {}) {
   box.hidden = false;
   box.replaceChildren();
   const resetBtn = $("#report-reset");
-  if (resetBtn) resetBtn.hidden = $("#report-section")?.hidden ?? false;
+  if (resetBtn) resetBtn.hidden = false;
   const tone = report.verdict.tone;
   const title = report.identity.brand || report.target.network || report.target.host || "Inspection";
+  setLane("report", `${report.verdict.stamp} · ${title}`, tone);
 
-  const facts = h("dl", { class: "facts" });
-  const fact = (label, value, mono = false) => {
-    if (value === "" || value === null || value === undefined) return;
-    facts.append(h("div", null, h("dt", null, label), h("dd", { class: mono ? "mono" : null }, value)));
-  };
-  fact("Protocol", PROTOCOL_LABELS[report.protocol] || report.protocol || (report.failure ? "" : "Open Agentic Web"));
-  fact("Fingerprint", report.identity.short, true);
-  fact("Agents", report.identity.agents.length || "");
-  fact("Front agent", report.identity.frontMan, true);
-  fact("Model hint", report.identity.model, true);
-  fact("Spec checks", `${report.conformance.passed}/${report.conformance.total} pass`);
   // Agent Customs' signed stamp for this network, when one is published (receipts/).
   const receiptLine = h("p", { class: "receipt-line", hidden: true, "aria-live": "polite" });
   if (!report.failure) showReceipt(report, receiptLine);
@@ -165,22 +143,23 @@ function renderReport({ animate = false } = {}) {
   const aiLine = h("p", { id: "ai-line", class: "ai-line", hidden: Boolean(report.failure) });
   if (!report.failure) fillAiLine(report, aiLine);
 
+  const actions = renderReportActions(report, title);
   box.append(h("header", { class: "report-head" },
     h("div", { class: "stamp-stack" },
       h("div", { class: `stamp tone-${tone}${animate ? " animate" : ""}`, role: "img", "aria-label": `Verdict: ${report.verdict.stamp}` },
         h("strong", null, report.verdict.stamp),
         h("small", null, h("span", null, "Agent Customs"), h("span", null, stampDate(report.inspectedAt)))),
       report.failure ? null : countersign(report.aiCheck, animate)),
-    h("div", null,
+    h("div", { class: "report-title" },
       h("h2", { id: "report-title", tabindex: "-1" }, title),
       h("p", { class: "report-url" }, report.target.url),
       h("p", { class: "report-summary" }, report.verdict.summary, report.verdict.command ? " You can still check it from your computer:" : null),
       report.verdict.command ? terminalBox(report.verdict.command) : null,
-      aiLine,
-      receiptLine,
-      facts)));
+      report.failure ? renderFailureFacts(report) : null,
+      h("div", { class: "seals" }, receiptLine, aiLine),
+      actions.panel)));
 
-  if (!report.failure) box.append(renderLights(report));
+  if (!report.failure) box.append(renderPassport(report), renderLights(report));
 
   const main = h("div", { class: "report-main" });
   const side = h("div", { class: "report-side" });
@@ -215,7 +194,50 @@ function renderReport({ animate = false } = {}) {
     });
     box.querySelectorAll(".light").forEach((el) => { el.style.setProperty("--sd", "40ms"); el.classList.add("stagger"); });
   }
-  box.append(renderReportActions(report));
+  box.append(actions.dock);
+  watchDock(actions.panel, actions.dock);
+}
+
+function renderFailureFacts(report) {
+  const protocol = PROTOCOL_LABELS[report.protocol] || report.protocol;
+  return h("dl", { class: "facts" },
+    protocol ? h("div", null, h("dt", null, "Protocol"), h("dd", null, protocol)) : null,
+    h("div", null, h("dt", null, "Spec checks"), h("dd", null, `${report.conformance.passed}/${report.conformance.total} pass`)));
+}
+
+const MRZ_PROTOCOL = { "open-agentic-web": "OAW", a2a: "A2A", mcp: "MCP" };
+
+function renderPassport(report) {
+  const facts = [
+    ["Protocol", PROTOCOL_LABELS[report.protocol] || report.protocol || "Open Agentic Web"],
+    ["Fingerprint", report.identity.short, "is-mono"],
+    ["Agents", report.identity.agents.length || ""],
+    ["Front agent", report.identity.frontMan, "is-mono is-wide"],
+    ["Model hint", report.identity.model, "is-mono is-wide"],
+    ["Spec checks", `${report.conformance.passed}/${report.conformance.total} pass`],
+  ].filter(([, value]) => value !== "" && value !== null && value !== undefined);
+  const zone = (text) => String(text || "").toUpperCase().replace(/[^A-Z0-9]+/g, "<").replace(/^<+|<+$/g, "");
+  const day = new Date(report.inspectedAt);
+  const date = Number.isNaN(day.getTime()) ? ""
+    : [day.getUTCDate(), day.getUTCMonth() + 1, day.getUTCFullYear() % 100].map((n) => String(n).padStart(2, "0")).join("");
+  const line = (text) => `${text}${"<".repeat(160)}`.slice(0, 160);
+  return h("div", { class: "passport" },
+    h("dl", null, facts.map(([label, value, kind]) => h("div", { class: kind || null },
+      h("dt", null, label), h("dd", null, value)))),
+    h("p", { class: "mrz", "aria-hidden": "true" },
+      line(`AC<${MRZ_PROTOCOL[report.protocol] || "OAW"}<${zone(report.identity.brand || report.target.host)}<<`), "\n",
+      line(`${zone(report.identity.short)}<<${report.conformance.passed}<${report.conformance.total}<<${zone(report.verdict.code)}<<${date}<<`)));
+}
+
+let dockWatch = null;
+
+function watchDock(panel, dock) {
+  dockWatch?.disconnect();
+  if (typeof IntersectionObserver !== "function") return;
+  dockWatch = new IntersectionObserver(([entry]) => {
+    dock.hidden = entry.isIntersecting || entry.boundingClientRect.bottom >= 0;
+  });
+  dockWatch.observe(panel);
 }
 
 function terminalBox(command) {
@@ -326,6 +348,8 @@ function openKeySettings() {
   showTab("officer");
   const picker = $("#model-picker");
   const box = $("#mp-vault");
+  if (picker) picker.dataset.setup = "asked";
+  document.dispatchEvent(new CustomEvent("customs:model-setup"));
   if (picker) {
     // Leave room for the floating navigation bar, as the return after Save and start does.
     const at = (node) => node.getBoundingClientRect().top + window.scrollY - 110;
@@ -488,18 +512,25 @@ function renderLights(report) {
       : report.privacy.length ? `${report.privacy.length} sharing rule(s)` : "Shares nothing", worstTone(by("privacy"))],
     ["Budget", report.budget.maxSteps ? `Up to ${report.budget.maxSteps} steps` : "Runtime default", worstTone(by("budget"))],
   ];
+  const icons = { Papers: "i-papers", Contraband: "i-contraband", Identity: "i-identity", Itinerary: "i-itinerary", Privacy: "i-privacy", Budget: "i-steps" };
+  const toFindings = () => $("#findings")?.scrollIntoView({ behavior: "smooth", block: "start" });
   return h("div", { class: "lights" }, lights.map(([name, value, t]) =>
-    h("div", { class: `light tone-${t}` }, h("div", { class: "name" }, h("span", { class: "dot", "aria-hidden": "true" }), name),
-      h("div", { class: "value" }, value))));
+    h("div", { class: `light tone-${t}` }, h("div", { class: "name" }, icon(icons[name], "light-icon"), name),
+      h("div", { class: "value" }, value),
+      name === "Contraband" && contraband.length ? h("button", { type: "button", class: "light-jump", onclick: toFindings }, "See them ↓") : null)));
 }
 
+const FINDINGS_SHOWN = 3;
+
 function renderFindings(report) {
-  const block = h("div", { class: "report-block" }, h("h3", null, `Findings (${report.findings.length})`));
-  if (!report.findings.length) {
+  const findings = report.findings;
+  const head = h("div", { class: "findings-head" }, h("h3", null, `Findings (${findings.length})`));
+  const block = h("div", { id: "findings", class: "report-block" }, head);
+  if (!findings.length) {
     block.append(h("p", { class: "none" }, "Nothing found. Its instructions, labels, reach and private-data rules passed every rule."));
     return block;
   }
-  report.findings.forEach((f, i) => {
+  const rows = findings.map((f, i) => {
     const where = [f.where?.agent && `agent ${f.where.agent}`, f.where?.field].filter(Boolean).join(" · ");
     const body = h("div", { class: "finding-body" },
       h("p", null, f.detail),
@@ -507,10 +538,35 @@ function renderFindings(report) {
       f.evidence ? [h("span", { class: "label" }, "Evidence"), h("pre", { class: "evidence" }, f.evidence)] : null,
       f.why ? [h("span", { class: "label" }, "Why it matters"), h("p", null, f.why)] : null,
       f.fix ? [h("span", { class: "label" }, "Fix"), h("p", null, f.fix)] : null);
-    block.append(h("details", { class: `finding sev-${f.severity}`, open: i === 0 && ["critical", "high"].includes(f.severity) },
+    return h("details", { class: `finding sev-${f.severity}`, "data-severity": f.severity, open: i === 0 && ["critical", "high"].includes(f.severity) },
       h("summary", null, pill(f.severity), h("span", { class: "ftitle" }, f.title), where ? h("span", { class: "where" }, `${f.id} · ${where}`) : h("span", { class: "where" }, f.id)),
-      body));
+      body);
   });
+  block.append(...rows);
+
+  let filter = "all";
+  let expanded = findings.length <= FINDINGS_SHOWN + 1;
+  const chips = [];
+  const more = h("button", { type: "button", class: "findings-more", onclick: () => { expanded = true; apply(); } },
+    `Show ${findings.length - FINDINGS_SHOWN} more findings`);
+  const apply = () => {
+    rows.forEach((row, i) => { row.hidden = filter === "all" ? !expanded && i >= FINDINGS_SHOWN : row.dataset.severity !== filter; });
+    more.hidden = filter !== "all" || expanded;
+    for (const chip of chips) chip.setAttribute("aria-pressed", String(chip.dataset.filter === filter));
+  };
+  const chip = (key, label) => {
+    const button = h("button", { type: "button", class: "findings-chip", "data-filter": key, onclick: () => { filter = key; apply(); } },
+      key === "all" ? null : h("span", { class: `dot sev-${key}`, "aria-hidden": "true" }), label);
+    chips.push(button);
+    return button;
+  };
+  const counts = SEVERITY_RANK.map((sev) => [sev, findings.filter((f) => f.severity === sev).length]).filter(([, n]) => n);
+  if (counts.length > 1) {
+    head.append(h("div", { class: "findings-chips", role: "group", "aria-label": "Show findings" },
+      chip("all", `All ${findings.length}`), counts.map(([sev, n]) => chip(sev, `${n} ${sev}`))));
+  }
+  block.append(more);
+  apply();
   return block;
 }
 
@@ -611,42 +667,54 @@ async function changeApproval(change, done) {
   renderReport();
 }
 
-function renderReportActions(report) {
-  const bar = h("div", { class: "report-actions" });
+const LOCKED_NOTE = {
+  DENIED: "Denied networks can't be approved, so this one never runs.",
+  INVALID: "It can't be approved until its papers are in order.",
+};
+
+function renderReportActions(report, title) {
   const toast = h("span", { class: "toast", role: "status" }, reportNotice);
   reportNotice = "";
   const pin = desk.pins.get(report.target.url);
   const pinnedNow = matchesPin(pin, report.snapshot);
-  if (report.snapshot) {
+  const blocked = NOT_APPROVABLE.has(report.verdict.code);
+  const approval = (extra = "") => {
+    if (!report.snapshot) return null;
     if (pinnedNow) {
-      bar.append(h("button", { type: "button", class: "danger",
+      return h("button", { type: "button", class: `danger${extra}`,
         onclick: () => changeApproval(() => desk.unpin(report.target.url), "Approval forgotten. Its next use is inspected as new."),
-      }, "Forget approval"));
-    } else {
-      const blocked = NOT_APPROVABLE.has(report.verdict.code);
-      bar.append(h("button", {
-        type: "button", class: "primary", disabled: blocked, title: blocked ? "Denied networks cannot be approved." : null,
-        onclick: () => changeApproval(() => desk.pin(report.target.url), "Approved. If this network changes, it will be held for your review."),
-      }, pin ? "Approve this new version" : report.verdict.code === "HOLD" ? "Approve after review" : "Approve this version"));
+      }, "Forget approval");
     }
-  }
-  bar.append(h("button", { type: "button", class: "ghost", onclick: () => askOfficer(report) }, "Ask the officer about it"));
-  bar.append(h("span", { class: "spacer" }));
+    if (blocked) return null;
+    return h("button", { type: "button", class: `primary${extra}`,
+      onclick: () => changeApproval(() => desk.pin(report.target.url), "Approved. If this network changes, it will be held for your review."),
+    }, pin ? "Approve this new version" : report.verdict.code === "HOLD" ? "Approve after review" : "Approve this version");
+  };
+  const askFirst = !report.snapshot || (blocked && !pinnedNow);
+  const ask = (label, extra = "") => h("button", { type: "button", class: `${askFirst ? "primary" : "ghost"}${extra}`, onclick: () => askOfficer(report) }, label);
   const cleared = report.verdict.code === "CLEARED";
   const certLabel = cleared ? "Clearance certificate" : "Inspection advisory";
   const certTone = cleared ? "is-cleared" : report.verdict.code === "HOLD" ? "is-hold" : "is-denied";
-  bar.append(h("button", { type: "button", class: `small cert-trigger ${certTone}`, onclick: () => openCertificateDialog(report, toast) },
-    certificateSealIcon(cleared), h("span", null, certLabel)));
-  bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(proofText(report), toast, "Proof copied.") }, "Copy proof"));
-  bar.append(h("button", { type: "button", class: "ghost small", onclick: () => copy(JSON.stringify({ ...report, snapshot: undefined }, null, 2), toast, "Report JSON copied.") }, "Copy JSON"));
+  const certificate = (extra = "") => h("button", { type: "button", class: `cert-trigger ${certTone}${extra}`, onclick: () => openCertificateDialog(report, toast) },
+    certificateSealIcon(cleared), h("span", null, certLabel));
   const issue = wrongResultUrl(report);
-  if (issue) {
-    bar.append(h("a", { class: "button ghost small wrong-result", href: issue, target: "_blank", rel: "noopener noreferrer",
+  const links = h("div", { class: "actions-links" },
+    h("button", { type: "button", onclick: () => copy(proofText(report), toast, "Proof copied.") }, "Copy proof"),
+    h("button", { type: "button", onclick: () => copy(JSON.stringify({ ...report, snapshot: undefined }, null, 2), toast, "Report JSON copied.") }, "Copy JSON"),
+    issue ? h("a", { class: "wrong-result", href: issue, target: "_blank", rel: "noopener noreferrer",
       title: "Opens a public GitHub issue with this address and what was found. Nothing from your chat or keys is included." },
-    "Wrong result? Tell us"));
-  }
-  bar.append(toast);
-  return bar;
+    "Wrong result? Tell us") : null);
+  const locked = report.snapshot && !pinnedNow && blocked ? LOCKED_NOTE[report.verdict.code] : "";
+  const panel = h("div", { class: "report-actions", role: "group", "aria-label": "What you can do" },
+    locked ? h("p", { class: "actions-locked" }, icon("i-lock", "actions-lock"), locked) : null,
+    h("div", { class: "actions-row" }, approval(), ask("Ask the officer about it"), certificate()),
+    links,
+    toast);
+  const dock = h("div", { class: "report-dock", hidden: true },
+    h("span", { class: `dock-stamp tone-${report.verdict.tone}` }, report.verdict.stamp),
+    h("strong", { class: "dock-title" }, title),
+    h("span", { class: "dock-actions" }, approval(" small"), ask("Ask the officer", " small"), certificate(" small")));
+  return { panel, dock };
 }
 
 function certificateSealIcon(cleared) {
@@ -828,12 +896,16 @@ async function copy(text, toast, done) {
 }
 
 function askOfficer(report) {
-  const input = document.querySelector("#ns-input");
   showTab("officer");
   revealWorkspace();
-  if (!input) return;
   const deep = desk.wasDeep(report.target.url) ? "deep-checked " : "";
-  input.value = `Explain the ${deep}report on the page for ${report.target.url} in plain words, and what the publisher should fix.`;
+  fillOfficer(`Explain the ${deep}report on the page for ${report.target.url} in plain words, and what the publisher should fix.`);
+}
+
+function fillOfficer(text) {
+  const input = document.querySelector("#ns-input");
+  if (!input) return;
+  input.value = text;
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.focus({ preventScroll: true });
 }
@@ -854,23 +926,35 @@ function renderPins() {
     count.textContent = String(pins.length);
   }
   list.replaceChildren();
+  const targetOf = (p) => (p.kind === "mcp-tools" || String(p.url || "").startsWith("mcp:") ? String(p.url || "").replace(/^mcp:/, "") : p.url);
+  const nameOf = (p) => p.brand || p.network || p.host || targetOf(p);
+  const latest = pins.reduce((a, b) => (!a || String(b.pinnedAt) > String(a.pinnedAt) ? b : a), null);
+  setLane("approvals", latest ? `Latest: ${nameOf(latest)}` : "None yet");
   if (!pins.length) {
-    list.append(h("li", { class: "none" }, "Nothing approved yet. To approve a network, inspect it on the Report tab and press Approve this version. The guard also approves a clean partner the first time the officer calls it."));
+    const sunny = EXAMPLES.find((e) => e.id === "sunny");
+    list.append(h("li", { class: "none" },
+      h("span", { class: "pin-ghost", "aria-hidden": "true" }, "Your", h("br"), "stamp"),
+      h("strong", null, "No approvals yet"),
+      h("p", null, "Inspect a network and press Approve this version. The guard also approves a clean partner the first time the officer calls it."),
+      sunny ? h("button", { type: "button", class: "ghost small", onclick: () => runInspect(sunny.url) }, "Try Sunny Bakery") : null));
     return;
   }
   for (const p of pins) {
     const isMcp = p.kind === "mcp-tools" || String(p.url || "").startsWith("mcp:");
-    const rawTarget = isMcp ? String(p.url || "").replace(/^mcp:/, "") : p.url;
+    const rawTarget = targetOf(p);
     const summary = isMcp
       ? `${p.short || p.hash?.slice(7, 19) || "pinned"} · ${p.count ?? "?"} MCP tool(s) · pinned ${fmtDate(p.pinnedAt)}`
       : `${p.short} · ${p.verdict} · approved ${fmtDate(p.pinnedAt)}${p.how === "first-use" ? " by the guard on first use" : p.how === "reviewed" ? " after review" : ""}`;
-    list.append(h("li", null,
-      h("span", { class: "ptitle" }, p.brand || p.network || p.host || rawTarget),
-      h("span", { class: "pmeta" }, rawTarget),
-      h("span", { class: "pmeta" }, summary),
-      h("div", { class: "pactions" },
-        h("button", { type: "button", class: "ghost small", onclick: () => runInspect(rawTarget) }, "Check for changes"),
-        h("button", { type: "button", class: "danger small", onclick: () => desk.unpin(p.url) }, "Forget"))));
+    list.append(h("li", { class: "pin" },
+      h("span", { class: "pin-stamp", "aria-hidden": "true" },
+        h("b", null, isMcp ? "Pinned" : "Approved"), stampDate(p.pinnedAt).replace(/ \d{2}(\d{2})$/, " $1")),
+      h("div", { class: "pin-body" },
+        h("span", { class: "ptitle" }, nameOf(p)),
+        h("span", { class: "pmeta pin-url", title: rawTarget }, rawTarget),
+        h("span", { class: "pmeta" }, summary),
+        h("div", { class: "pactions" },
+          h("button", { type: "button", class: "ghost small", onclick: () => runInspect(rawTarget) }, "Check for changes"),
+          h("button", { type: "button", class: "danger small", onclick: () => desk.unpin(p.url) }, "Forget")))));
   }
 }
 
@@ -879,6 +963,8 @@ function renderCompare() {
   const cmp = desk.comparison;
   box.replaceChildren();
   if (!cmp) return;
+  const n = cmp.changes.length;
+  setLane("compare", n ? `${n} ${n === 1 ? "change" : "changes"} found` : "No changes found");
   const side = (r) => h("div", { class: "v" }, h("span", { class: `pill tone-${r.verdict.tone}`, style: "--tone: var(--" + r.verdict.tone + ")" }, r.verdict.stamp),
     h("code", null, r.target.url), h("code", null, r.identity.short));
   box.append(h("div", { class: "versions" }, side(cmp.before), icon("i-arrow", "arrow"), side(cmp.after)));
@@ -954,7 +1040,8 @@ async function showReceipt(report, line) {
   if (!check.valid) { state = "bad"; text = `A signed stamp was found, but it fails the check: ${check.reason}`; }
   else if (check.matches === false) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) is for an earlier version: this network has changed since.`; }
   else if (check.expired) { state = "warn"; text = `The signed stamp from ${stampDate(r.inspectedAt)} (${r.stamp}) has expired.`; }
-  line.replaceChildren(h("span", null, text), " ", h("a", { href: found.url, target: "_blank", rel: "noopener noreferrer" }, "See the signed receipt"));
+  line.replaceChildren(icon("i-seal", "receipt-icon"),
+    h("span", null, text, " ", h("a", { href: found.url, target: "_blank", rel: "noopener noreferrer" }, "See the signed receipt")));
   line.dataset.state = state;
   line.hidden = false;
 }
@@ -1080,6 +1167,9 @@ function wire() {
     }
     runCompare(before, after);
   });
+  for (const button of document.querySelectorAll(".officer-ask [data-ask]")) {
+    button.addEventListener("click", () => fillOfficer(button.dataset.ask));
+  }
   $("#compare-demo").addEventListener("click", () => {
     const sunny = EXAMPLES.find((e) => e.id === "sunny").url;
     const rug = EXAMPLES.find((e) => e.id === "rug").url;
