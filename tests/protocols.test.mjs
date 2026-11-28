@@ -58,6 +58,7 @@ test("clean Google A2A Agent Card is discovered at .well-known/agent.json and cl
   assert.equal(report.verdict.code, "CLEARED", report.verdict.summary);
   assert.equal(report.capabilities.sensitiveAccess.length, 0, "negated prose must not trigger sensitive tool access");
   assert.match(report.profile, /Google A2A Agent Card/);
+  assert.equal(report.conformance.checks.find((c) => c.id === "P-CORS").fix, "Send Access-Control-Allow-Origin: * on this file.");
   assert.equal(report.identity.brand, "Metro Authority");
 
   const svg = certificateSvg(report);
@@ -112,6 +113,7 @@ test("clean read-only MCP catalog is discovered at /mcp.json and cleared", async
   assert.equal(report.protocol, "mcp");
   assert.equal(report.verdict.code, "CLEARED", report.verdict.summary);
   assert.match(report.profile, /Model Context Protocol/);
+  assert.equal(report.conformance.checks.find((c) => c.id === "P-CORS").fix, "Send Access-Control-Allow-Origin: * on this file.");
 });
 
 test("MCP tool poisoning inside inputSchema descriptions and destructive hints are flagged", async () => {

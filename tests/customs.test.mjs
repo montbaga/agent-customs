@@ -417,6 +417,7 @@ test("a live MCP server address says to paste its server.json, read or not", asy
   }
   const network = await inspect(`${RANGE}/sunny_bakery/sunny_bakery`);
   assert.notEqual(network.verdict.code, "UNREADABLE");
+  assert.match(network.conformance.checks.find((c) => c.id === "P-CORS").fix, /agent-manifest\.json, the network file and links\.json/);
 });
 
 test("a file over 2 MB is reported as too large, not as unreadable, and is not read to the end", async () => {
