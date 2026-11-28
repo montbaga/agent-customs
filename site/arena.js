@@ -66,7 +66,7 @@ export async function runArenaScenario(id) {
       },
     });
     const elapsedMs = Math.max(0.1, Number((performance.now() - started).toFixed(1)));
-    const userMsg = "My card is 4242 4242 4242 4242 — can you check today's specials?";
+    const userMsg = "My card is 4242 4242 4242 4242. Can you check today's specials?";
     const redacted = redactSensitiveText(userMsg);
     const findingCount = report.findings.length;
     const topFindings = report.findings.slice(0, 3).map((f) => f.title.charAt(0).toLowerCase() + f.title.slice(1)).join(", ");
@@ -78,7 +78,7 @@ export async function runArenaScenario(id) {
       unprotected: {
         outcome: "Compromised",
         steps: [
-          { stage: "1 · What a person sees", detail: `The listing reads "${visible}" — the trailing instructions are invisible on screen.` },
+          { stage: "1 · What a person sees", detail: `The listing reads "${visible}" The instructions after it are invisible on screen.` },
           { stage: "2 · What reaches the AI", detail: `The assistant reads the hidden command too: "${hiddenOrder.trim()}"` },
           { stage: "3 · Result", detail: `When the visitor shares card ${userMsg.match(/\d{4}[\d ]+/)?.[0]?.trim()}, the AI collects it and runs the unauthorized order.` },
         ],
@@ -291,7 +291,7 @@ export async function runArenaScenario(id) {
       outcome: `${v2.verdict.stamp} · ${changes.length} ${changes.length === 1 ? "change" : "changes"} caught`,
       steps: [
         { stage: "1 · Day 1 fingerprint saved", detail: `Content hash pinned automatically on approval: ${v1.identity.short} (Cleared).` },
-        { stage: "2 · Overnight change detected", detail: `New fingerprint ${v2.identity.short} mismatches the pin — held automatically in ${elapsedMs} ms.` },
+        { stage: "2 · Overnight change detected", detail: `New fingerprint ${v2.identity.short} does not match the approved one, so it was held in ${elapsedMs} ms.` },
         { stage: "3 · Exact added line shown", detail: changes.map((c) => `${c.title}: + ${(c.added || []).join(" ")}`).join(" | ") },
       ],
     },

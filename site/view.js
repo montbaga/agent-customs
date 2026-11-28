@@ -459,7 +459,7 @@ function syncAiCheck() {
         : "This key also runs the AI double-check.";
   }
   const fact = $("#privacy-fact");
-  if (fact) fact.textContent = on ? "AI double-check on: public agent text also goes to your AI provider" : "No server: nothing you inspect leaves your browser";
+  if (fact) fact.textContent = on ? "AI double-check on: public agent text goes to your AI" : "Nothing you inspect leaves your browser";
   const emptyTitle = $("#report-empty h3");
   const emptyCopy = $("#report-empty p");
   if (emptyTitle?.textContent === CATALOG_TITLE && emptyCopy) emptyCopy.textContent = catalogCopy();
@@ -1394,10 +1394,10 @@ async function wireBenchStrip() {
     const ac = bench.agentCustoms;
     const baseline = bench.naiveRegexBaseline;
     const items = [
-      [`${bench.hostileTotal} attack vectors + ${bench.benignTotal} benign`, `R1 ${ac.round1Caught}/${ac.round1Total} · R2 ${ac.round2Caught}/${ac.round2Total} · R3 ${ac.round3Caught}/${ac.round3Total} · Held-out ${ac.heldoutCaught}/${ac.heldoutTotal} · Ext ${ac.externalQuotedCaught}/${ac.externalQuotedTotal} · ${bench.selfTestPassed}/${bench.selfTestTotal} lock/cert`],
-      [`${ac.catchRate}% attacks blocked/held`, `${ac.flaggedRate}% flagged incl. conditions · vs. ${baseline.catchRate}% normalized regex`],
-      [`${ac.falsePositiveRate}% benign false blocks`, `${ac.benignCleared}/${bench.benignTotal} clean cleared · vs. ${baseline.falsePositiveRate}% normalized regex`],
-      [`~${ac.medianDetectionMs} ms median check`, `${ac.llmTokenCost} · reproducible via npm run bench`],
+      [`${bench.hostileTotal} attacks, ${bench.benignTotal} honest tools`, "Some attacks were kept hidden while the rules were written."],
+      [`${ac.catchRate}% of attacks stopped`, `Denied or held for review. A simple word filter stops ${baseline.catchRate}%.`],
+      [`${ac.benignCleared} of ${bench.benignTotal} honest tools cleared`, `None were blocked. A simple word filter blocks ${baseline.falsePositiveRate}%.`],
+      [`About ${ac.medianDetectionMs} ms per check`, "No AI needed, so a check costs nothing."],
     ];
     list.replaceChildren(...items.map(([stat, note]) => h("li", null, h("strong", null, stat), h("span", null, note))));
   } catch {
@@ -1465,7 +1465,7 @@ function wireBuilderCodeTabs() {
       const mode = tab.dataset.codeTab;
       for (const b of tabs) b.setAttribute("aria-selected", String(b === tab));
       if (mode === "site") codeEl.innerHTML = siteMarkup;
-      else codeEl.textContent = snippets[mode] || "";
+      else codeEl.replaceChildren(...(snippets[mode] || "").split("\n").flatMap((line, i) => [i ? "\n" : "", h("span", { class: "ln" }, line)]));
     });
   }
 }
