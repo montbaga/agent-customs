@@ -154,6 +154,7 @@ const vaultStorage = `JSON.stringify({ local: { ...localStorage }, session: { ..
 const officer = async () => {
   await b.evaluate("document.querySelector('#tab-officer').click(); true");
   await b.waitFor("document.querySelector('#mp-vault iframe') && !/Loading/.test(document.querySelector('#mp-current').textContent)", 20000);
+  await b.evaluate("(() => { if (!document.querySelector('#mp-intro').hidden) document.querySelector('#mp-setup').click(); return true; })()");
 };
 const chat = async (text) => {
   const before = await b.evaluate("document.querySelectorAll('#ns-msgs .ns-msg.bot').length");

@@ -127,6 +127,9 @@ try {
   // The model picker: another provider shows its models, its key page and how to keep the key
   // cheap. The key itself goes into the key vault's frame, never into this page;
   // tools/vault-check.mjs checks that end to end.
+  const intro = await evaluate("(() => { const shown = !document.querySelector('#mp-intro').hidden; document.querySelector('#mp-setup').click(); return { shown, bodyOpen: !document.querySelector('#mp-body').hidden }; })()");
+  console.log(`  model setup: steps shown ${intro.shown} · cards open after the button ${intro.bodyOpen}`);
+  if (!intro.shown || !intro.bodyOpen) problems.push(`model setup button: ${JSON.stringify(intro)}`);
   const picked = await evaluate(`(() => {
     document.querySelector('#mp-cards input[value="claude"]').click();
     return { cards: document.querySelectorAll("#mp-cards .mp-card").length,

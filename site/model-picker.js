@@ -316,11 +316,15 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   const status = $("#mp-status");
   const safety = $("#mp-safety");
   const legacyNote = $("#mp-legacy");
+  const intro = $("#mp-intro");
+  const setupButton = $("#mp-setup");
 
   let currentSetup = setup;
   if (currentSetup?.router && currentSetup?.model) saveRouterModel(currentSetup.router, currentSetup.model);
   const held = () => vault?.status || null;
   const selection = () => held()?.selection || null;
+  let setupAsked = root.dataset.setup === "asked";
+  const waitingForSetup = () => !setupAsked && !currentSetup && !held()?.saved?.length;
   // A key with no card of its own (Otari's) goes under "Other", by its provider's name.
   let otherProvider = "";
   let wasSelectionLocked = false;
@@ -546,7 +550,7 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     else delete officerTab.dataset.state;
   };
   // What the officer uses now, and whether the steps need to be open.
-  const refreshCurrent = () => {
+  const readCurrent = () => {
     current.dataset.tone = "";
     syncOfficerTab(false);
     if (!engine) {
@@ -606,6 +610,21 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     }
     return "open";
   };
+  const officerLane = officerTab?.querySelector(".lane-status");
+  const syncOfficerLane = (mode) => {
+    if (!officerLane) return;
+    const [text, tone] = !engine || !held() ? ["Couldn't load", "warn"]
+      : officerTab.dataset.state === "locked" ? ["Key locked", "warn"]
+      : mode === "in-use" ? [modelLabel(currentSetup?.model) || "Ready", "ok"]
+      : ["Needs a model", "caution"];
+    officerLane.querySelector(".lane-text").textContent = text;
+    officerLane.querySelector(".dot").className = `dot tone-${tone}`;
+  };
+  const refreshCurrent = () => {
+    const mode = readCurrent();
+    syncOfficerLane(mode);
+    return mode;
+  };
   let forgetArmed = 0;
   const activeVia = (active) => (active ? (active.custom ? hostOf(active.router) : active.name) : "");
   const headerForgetLabel = (active) => (active ? `Forget ${activeVia(active)} key` : "Forget key");
@@ -640,7 +659,9 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
   };
   const layout = (mode) => {
     change.hidden = mode !== "in-use";
-    if (mode === "closed") body.hidden = true;
+    const waiting = mode === "open" && waitingForSetup();
+    if (intro) intro.hidden = !waiting;
+    if (mode === "closed" || waiting) body.hidden = true;
     else if (mode === "open" && body.hidden) {
       body.hidden = false;
       listForKey(selected());
@@ -967,6 +988,17 @@ export function mountModelPicker(root, { engine, providers, app, vault, setup = 
     if (setupChoice) show(setupChoice, setupChoice.custom ? { provider: savedOtherProvider(currentSetup?.provider) } : {});
     syncActions();
   });
+
+  const openSetup = () => {
+    if (setupAsked) return;
+    setupAsked = true;
+    layout(refreshCurrent());
+  };
+  setupButton?.addEventListener("click", () => {
+    openSetup();
+    cards.querySelector("input:checked")?.focus({ preventScroll: true });
+  });
+  document.addEventListener("customs:model-setup", openSetup);
 
   const switchedOnLoad = reconcileSetup();
   const mode = refreshCurrent();
