@@ -151,7 +151,7 @@ function renderReport({ animate = false } = {}) {
     if (value === "" || value === null || value === undefined) return;
     facts.append(h("div", null, h("dt", null, label), h("dd", { class: mono ? "mono" : null }, value)));
   };
-  fact("Protocol", PROTOCOL_LABELS[report.protocol] || report.protocol || "Open Agentic Web");
+  fact("Protocol", PROTOCOL_LABELS[report.protocol] || report.protocol || (report.failure ? "" : "Open Agentic Web"));
   fact("Fingerprint", report.identity.short, true);
   fact("Agents", report.identity.agents.length || "");
   fact("Front agent", report.identity.frontMan, true);
@@ -174,7 +174,8 @@ function renderReport({ animate = false } = {}) {
     h("div", null,
       h("h2", { id: "report-title", tabindex: "-1" }, title),
       h("p", { class: "report-url" }, report.target.url),
-      h("p", { class: "report-summary" }, report.verdict.summary),
+      h("p", { class: "report-summary" }, report.verdict.summary, report.verdict.command ? " You can still check it from your computer:" : null),
+      report.verdict.command ? terminalBox(report.verdict.command) : null,
       aiLine,
       receiptLine,
       facts)));
@@ -215,6 +216,27 @@ function renderReport({ animate = false } = {}) {
     box.querySelectorAll(".light").forEach((el) => { el.style.setProperty("--sd", "40ms"); el.classList.add("stagger"); });
   }
   box.append(renderReportActions(report));
+}
+
+function terminalBox(command) {
+  const copyButton = h("button", { type: "button", class: "ghost small", onclick: async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      copyButton.classList.add("is-copied");
+      copyButton.replaceChildren(icon("i-check", ""), "Copied");
+    } catch {
+      copyButton.replaceChildren("Copy failed");
+    }
+  } }, icon("i-copy", ""), "Copy");
+  return [
+    h("div", { class: "term" },
+      h("div", { class: "term-bar" },
+        h("span", { class: "term-dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
+        h("span", { class: "term-title" }, "Terminal"),
+        copyButton),
+      h("div", { class: "term-body" }, h("span", { class: "term-prompt", "aria-hidden": "true" }, ">"), h("code", null, command))),
+    h("p", { class: "term-hint" }, "Paste it into PowerShell on Windows or Terminal on a Mac. It needs Node.js."),
+  ];
 }
 
 // ---- AI double-check -------------------------------------------------------------------
@@ -1301,7 +1323,7 @@ function wireBuilderCodeTabs() {
   const snippets = {
     twolines: [
       "// At the top of site.js",
-      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.5/site/customs/guard.js\";",
+      "import { installCustomsGuard } from \"https://cdn.jsdelivr.net/gh/montbaga/agent-customs@v1.2.6/site/customs/guard.js\";",
       "",
       "// Right after boot(), with any of the guard's options",
       "installCustomsGuard(booted.engine, { strict: true });",
