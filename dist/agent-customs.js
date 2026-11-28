@@ -1,4 +1,4 @@
-// Agent Customs 1.2.6: the one-line install and the guard, in one file.
+// Agent Customs 1.2.7: the one-line install and the guard, in one file.
 // Built by tools/make-bundle.mjs from these files; edit them, not this one.
 // Apache License 2.0. Files under site/runtime/ are Cognizant's Open Agentic Web runtime,
 // unmodified, also under the Apache License 2.0.
@@ -123,7 +123,9 @@ async function analyzeNetwork(input) {
       detail: transport.cors === "ok" ? "Read from another origin, so callers' browsers can load it."
         : transport.cors === "same-origin" ? "Inspected from the same origin, so CORS was not exercised."
         : "Not checked from a browser.",
-      fix: "Send Access-Control-Allow-Origin: * on agent-manifest.json, the network file and links.json." });
+      fix: protocol === "open-agentic-web"
+        ? "Send Access-Control-Allow-Origin: * on agent-manifest.json, the network file and links.json."
+        : "Send Access-Control-Allow-Origin: * on this file." });
     if (transport.redirects?.length) {
       check({ id: "P-REDIRECT", section: "3.2, 5", title: "No redirect to another origin",
         status: transport.redirects.some((r) => r.crossOrigin) ? "warn" : "pass",

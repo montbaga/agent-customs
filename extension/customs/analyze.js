@@ -84,7 +84,9 @@ export async function analyzeNetwork(input) {
       detail: transport.cors === "ok" ? "Read from another origin, so callers' browsers can load it."
         : transport.cors === "same-origin" ? "Inspected from the same origin, so CORS was not exercised."
         : "Not checked from a browser.",
-      fix: "Send Access-Control-Allow-Origin: * on agent-manifest.json, the network file and links.json." });
+      fix: protocol === "open-agentic-web"
+        ? "Send Access-Control-Allow-Origin: * on agent-manifest.json, the network file and links.json."
+        : "Send Access-Control-Allow-Origin: * on this file." });
     if (transport.redirects?.length) {
       check({ id: "P-REDIRECT", section: "3.2, 5", title: "No redirect to another origin",
         status: transport.redirects.some((r) => r.crossOrigin) ? "warn" : "pass",
